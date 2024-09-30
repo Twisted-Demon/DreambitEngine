@@ -1,7 +1,7 @@
 
 #----------------------------- Global Properties ----------------------------#
 
-/outputDir:bin/$(Platform)
+/outputDir:../../PixelariaEngine.Sandbox/Build/net8.0/Content
 /intermediateDir:obj/$(Platform)
 /platform:DesktopGL
 /config:
@@ -12,4 +12,23 @@
 
 
 #---------------------------------- Content ---------------------------------#
+
+#begin Fonts/Pixelify-Regular.spritefont
+/importer:FontDescriptionImporter
+/processor:FontDescriptionProcessor
+/processorParam:PremultiplyAlpha=True
+/processorParam:TextureFormat=Compressed
+/build:Fonts/Pixelify-Regular.spritefont
+
+#begin Fonts/PixelifySans-Bold.ttf
+/copy:Fonts/PixelifySans-Bold.ttf
+
+#begin Fonts/PixelifySans-Medium.ttf
+/copy:Fonts/PixelifySans-Medium.ttf
+
+#begin Fonts/PixelifySans-Regular.ttf
+/copy:Fonts/PixelifySans-Regular.ttf
+
+#begin Fonts/PixelifySans-SemiBold.ttf
+/copy:Fonts/PixelifySans-SemiBold.ttf
 

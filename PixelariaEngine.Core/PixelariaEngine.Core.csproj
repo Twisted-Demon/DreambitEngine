@@ -1,6 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <TargetFramework>net8.0</TargetFramework>
+        <BaseOutputPath>Build\</BaseOutputPath>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+        <OutputPath>$(BaseOutputPath)</OutputPath> <!-- No version folder for Debug -->
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+        <OutputPath>$(BaseOutputPath)</OutputPath> <!-- No version folder for Release -->
     </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.2.1105">

@@ -5,6 +5,8 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PixelariaEngine.Core", "PixelariaEngine.Core\PixelariaEngine.Core.csproj", "{50906F51-BF0D-4F85-9C31-2B83E5AF91CB}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PixelariaEngine.Sandbox", "PixelariaEngine.Sandbox\PixelariaEngine.Sandbox.csproj", "{A6AD1C0D-11A4-45BE-83C2-E601C34025AE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -18,5 +20,9 @@ Global
 		{50906F51-BF0D-4F85-9C31-2B83E5AF91CB}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{50906F51-BF0D-4F85-9C31-2B83E5AF91CB}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{50906F51-BF0D-4F85-9C31-2B83E5AF91CB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A6AD1C0D-11A4-45BE-83C2-E601C34025AE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A6AD1C0D-11A4-45BE-83C2-E601C34025AE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A6AD1C0D-11A4-45BE-83C2-E601C34025AE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A6AD1C0D-11A4-45BE-83C2-E601C34025AE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
