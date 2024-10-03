@@ -1,0 +1,19 @@
+﻿namespace PixelariaEngine.Tests;
+
+public class DrawableComponentTest
+{
+    private Scene _scene;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _scene = new Scene();
+        _scene.Tick();
+    }
+
+    [Test]
+    public void AddRenderableComponent()
+    {
+        
+    }
+}

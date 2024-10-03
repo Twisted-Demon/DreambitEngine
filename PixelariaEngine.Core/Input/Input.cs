@@ -1,8 +1,9 @@
-﻿using Microsoft.Xna.Framework.Input;
+﻿using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Input;
 
-namespace PixelariaEngine.Core.Input;
+namespace PixelariaEngine;
 
-public static class InputManager
+public static class Input
 {
     private static KeyboardState _previousKeyboardState;
     private static KeyboardState _currentKeyboardState;
@@ -25,14 +26,17 @@ public static class InputManager
 
     public static bool IsKeyPressed(Keys key)
     {
-        return _currentKeyboardState.IsKeyDown(key);
+        var wasKeyDownInPreviousState = _previousKeyboardState.IsKeyDown(key);
+        var isKeyDownInCurrentState = _currentKeyboardState.IsKeyDown(key);
+
+        return !wasKeyDownInPreviousState && isKeyDownInCurrentState;
     }
 
     public static bool IsKeyHeld(Keys key)
     {
         var wasKeyDownInPreviousState = _previousKeyboardState.IsKeyDown(key);
         var isKeyDownInCurrentState = _currentKeyboardState.IsKeyDown(key);
-        
+
         return wasKeyDownInPreviousState && isKeyDownInCurrentState;
     }
 
@@ -40,7 +44,19 @@ public static class InputManager
     {
         var wasKeyDownInPreviousState = _previousKeyboardState.IsKeyDown(key);
         var isKeyDownInCurrentState = _currentKeyboardState.IsKeyDown(key);
-        
+
         return wasKeyDownInPreviousState && !isKeyDownInCurrentState;
+    }
+
+    public static Vector2 GetMousePosition()
+    {
+        var ms = Mouse.GetState();
+        return ms.Position.ToVector2();
+    }
+
+    public static bool IsMouseInWindow()
+    {
+        var mousePosition = Mouse.GetState().Position.ToVector2();
+        return Core.Instance.Window.ClientBounds.Contains(mousePosition);
     }
 }
