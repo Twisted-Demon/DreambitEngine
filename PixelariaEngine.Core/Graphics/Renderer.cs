@@ -2,7 +2,16 @@
 
 namespace PixelariaEngine.Graphics;
 
-public abstract class Renderer
+public abstract class Renderer(Scene scene)
 {
-    private RenderTarget2D _finalRenderTarget2D;
+    protected static GraphicsDevice Device => Core.Instance.GraphicsDevice;
+    public Scene Scene { get; private set; } = scene;
+
+    public abstract void Initialize();
+    public abstract void OnDraw();
+
+    public virtual void CleanUp()
+    {
+        
+    }
 }

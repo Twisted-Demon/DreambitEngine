@@ -27,6 +27,7 @@ public class Entity : IDisposable
             Name += $": {id}";
 
         _componentList = new ComponentList(scene);
+        Transform = new Transform();
     }
 
     public bool Enabled

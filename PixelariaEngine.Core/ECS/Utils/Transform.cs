@@ -2,7 +2,7 @@
 
 namespace PixelariaEngine.ECS;
 
-public struct Transform
+public class Transform
 {
     public Vector2 Position = new(0, 0);
     public float Rotation = 0;

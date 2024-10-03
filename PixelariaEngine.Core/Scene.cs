@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Linq;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using PixelariaEngine.ECS;
+using PixelariaEngine.Graphics;
 
 namespace PixelariaEngine;
 
@@ -10,18 +12,21 @@ public class Scene
 {
     public readonly DrawableList Drawables;
     protected readonly EntityList Entities;
+    protected Renderer Renderer;
     
     public Color BackgroundColor = Color.CornflowerBlue;
     protected bool IsInitialized;
     protected bool IsPaused;
     protected bool IsStarted;
     
-    private SpriteBatch _spriteBatch;
+    public Camera2D Camera2D;
 
     public Scene()
     {
         Entities = new EntityList(this);
         Drawables = new DrawableList();
+        Renderer = new Basic2DRenderer(this);
+        Camera2D = new Camera2D();
     }
 
     /// <summary>
@@ -36,8 +41,15 @@ public class Scene
     private void InitializeInternals()
     {
         Log.Debug("Initializing Scene");
-        _spriteBatch = new SpriteBatch(Core.Instance.GraphicsDevice);
+        Renderer?.Initialize();
         OnInitialize();
+    }
+
+    public Scene AddRenderer<T>() where T : Renderer
+    {
+        var renderer = (T)Activator.CreateInstance(typeof(T), this);
+        Renderer = renderer;
+        return this;
     }
 
     /// <summary>
@@ -70,6 +82,7 @@ public class Scene
     private void Cleanup()
     {
         Entities.ClearLists();
+        Renderer.CleanUp();
     }
 
     internal void Terminate()
@@ -94,21 +107,20 @@ public class Scene
             OnBegin();
             IsStarted = true;
         }
-
+        
         OnUpdate();
+        Camera2D.Update();
     }
 
     public virtual void OnDraw()
     {
-        Core.GraphicsDeviceManager.GraphicsDevice.Clear(BackgroundColor);
+        if (Renderer == null)
+        {
+            Log.Error("The Current Scene does not have a Renderer");
+            return;
+        }
         
-        _spriteBatch.Begin();
-        var drawables = Drawables.GetAllDrawables();
-        
-        foreach(var drawable in drawables)
-            drawable.OnDraw(_spriteBatch);
-        
-        _spriteBatch.End();
+        Renderer.OnDraw();
     }
 
     public Entity CreateEntity(string name = "entity", string tag = "default", bool enabled = true)
