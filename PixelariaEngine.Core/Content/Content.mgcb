@@ -37,6 +37,12 @@
 /processorParam:TextureFormat=Color
 /build:b_witch_run.png
 
+#begin Effects/DefaultEffect.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:Effects/DefaultEffect.fx
+
 #begin Fonts/Pixelify-Regular.spritefont
 /importer:FontDescriptionImporter
 /processor:FontDescriptionProcessor

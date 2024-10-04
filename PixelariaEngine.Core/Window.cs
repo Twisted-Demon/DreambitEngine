@@ -1,17 +1,38 @@
-﻿using Microsoft.Xna.Framework.Graphics;
+﻿using System;
+using System.Runtime.CompilerServices;
+using Microsoft.Xna.Framework.Graphics;
 
 namespace PixelariaEngine;
 
-public static class GameWindow
+public static class Window
 {
     public static int Width => Core.GraphicsDeviceManager.PreferredBackBufferWidth;
     public static int Height => Core.GraphicsDeviceManager.PreferredBackBufferHeight;
+    
+    public static event EventHandler<WindowEventArgs> WindowResized;
+
+    public static void Init()
+    {
+        Core.Instance.Window.ClientSizeChanged += (sender, args) =>
+        {
+            WindowResized?.Invoke(sender, new WindowEventArgs
+            {
+                Width = Width,
+                Height = Height
+            });
+        };
+    }
 
     public static void SetSize(int width, int height)
     {
         Core.GraphicsDeviceManager.PreferredBackBufferWidth = width;
         Core.GraphicsDeviceManager.PreferredBackBufferHeight = height;
         Core.GraphicsDeviceManager.ApplyChanges();
+    }
+
+    public static void SetAllowUserResizing(bool value)
+    {
+        Core.Instance.Window.AllowUserResizing = value;
     }
 
     public static void SetTitle(string title)
@@ -41,4 +62,10 @@ public static class GameWindow
             SetBorderless(true);
         }
     }
+}
+
+public class WindowEventArgs : EventArgs
+{
+    public int Width { get; set; }
+    public int Height { get; set; }
 }

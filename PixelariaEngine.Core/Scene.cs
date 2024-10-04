@@ -19,14 +19,13 @@ public class Scene
     protected bool IsPaused;
     protected bool IsStarted;
     
-    public Camera2D Camera2D;
+    public Camera2D MainCamera { get; private set; }
 
     public Scene()
     {
         Entities = new EntityList(this);
         Drawables = new DrawableList();
-        Renderer = new Basic2DRenderer(this);
-        Camera2D = new Camera2D();
+        Renderer = new DefaultRenderer(this);
     }
 
     /// <summary>
@@ -35,13 +34,14 @@ public class Scene
     /// </summary>
     protected virtual void OnInitialize()
     {
-        
+           
     }
 
     private void InitializeInternals()
     {
         Log.Debug("Initializing Scene");
         Renderer?.Initialize();
+        MainCamera = Entity.Create("main-camera").AttachComponent<Camera2D>();
         OnInitialize();
     }
 
@@ -82,6 +82,7 @@ public class Scene
     private void Cleanup()
     {
         Entities.ClearLists();
+        Drawables.ClearLists();
         Renderer.CleanUp();
     }
 
@@ -109,7 +110,6 @@ public class Scene
         }
         
         OnUpdate();
-        Camera2D.Update();
     }
 
     public virtual void OnDraw()
@@ -141,5 +141,10 @@ public class Scene
     public Entity GetEntity(string name)
     {
         return Entities.GetEntity(name);
+    }
+
+    public static void SetNextScene(Scene scene)
+    {
+        Core.Instance.SetNextScene(scene);
     }
 }

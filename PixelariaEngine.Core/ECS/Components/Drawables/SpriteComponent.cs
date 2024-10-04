@@ -26,11 +26,20 @@ public class SpriteComponent : DrawableComponent
         Origin = new Vector2((float)Texture.Width / 2, (float)Texture.Height / 2);
     }
     
-    public override void OnDraw(SpriteBatch spriteBatch)
+    public override void OnDraw()
     {
         if (Texture == null) return;
         
-        spriteBatch.Draw(Texture, Transform.Position, null, Color.White, Transform.Rotation, Origin, 1.0f,
-            SpriteEffects.None, 0f);
+        Core.SpriteBatch.Draw(
+            Texture,
+            new Vector2(Transform.Position.X, Transform.Position.Y),
+            null,
+            Color.White,
+            Transform.Rotation.Z,
+            Origin,
+            new Vector2(Transform.Scale.X, Transform.Scale.Y),
+            SpriteEffects.None,
+            0f
+            );
     }
 }

@@ -12,7 +12,7 @@ public abstract class DrawableComponent : Component
         set => OnDrawLayerChanged(value);
     }
 
-    public abstract void OnDraw(SpriteBatch spriteBatch);
+    public abstract void OnDraw();
 
     private void OnDrawLayerChanged(int newDrawLayer)
     {

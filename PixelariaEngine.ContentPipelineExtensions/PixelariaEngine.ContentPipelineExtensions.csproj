@@ -1,9 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <TargetFramework>net8.0</TargetFramework>
-        <BaseOutputPath>Build\</BaseOutputPath>
-        <AssemblyName>PixelariaEngine</AssemblyName>
-        <RootNamespace>PixelariaEngine</RootNamespace>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
         <OutputPath>$(BaseOutputPath)</OutputPath> <!-- No version folder for Debug -->
@@ -13,24 +10,11 @@
         <OutputPath>$(BaseOutputPath)</OutputPath> <!-- No version folder for Release -->
     </PropertyGroup>
     <ItemGroup>
+        <PackageReference Include="MonoGame.Framework.Content.Pipeline" Version="3.8.2.1105">
+            <PrivateAssets>All</PrivateAssets>
+        </PackageReference>
         <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.2.1105">
             <PrivateAssets>All</PrivateAssets>
         </PackageReference>
-        <PackageReference Include="Spectre.Console" Version="0.49.1" />
-    </ItemGroup>
-    <ItemGroup>
-      <Compile Remove="bin\**" />
-      <Compile Remove="Content\obj\**" />
-    </ItemGroup>
-    <ItemGroup>
-      <EmbeddedResource Remove="bin\**" />
-      <EmbeddedResource Remove="Content\obj\**" />
-    </ItemGroup>
-    <ItemGroup>
-      <None Remove="bin\**" />
-      <None Remove="Content\obj\**" />
-    </ItemGroup>
-    <ItemGroup>
-      <Folder Include="Assets\" />
     </ItemGroup>
 </Project>

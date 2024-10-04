@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PixelariaEngine.Sandbox", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PixelariaEngine.Tests", "PixelariaEngine.Tests\PixelariaEngine.Tests.csproj", "{8956D720-FE7E-4617-AA1F-5890680B2B91}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PixelariaEngine.ContentPipelineExtensions", "PixelariaEngine.ContentPipelineExtensions\PixelariaEngine.ContentPipelineExtensions.csproj", "{6A9F3624-04A1-4603-9982-B313543F9F8C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,5 +32,9 @@ Global
 		{8956D720-FE7E-4617-AA1F-5890680B2B91}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8956D720-FE7E-4617-AA1F-5890680B2B91}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8956D720-FE7E-4617-AA1F-5890680B2B91}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6A9F3624-04A1-4603-9982-B313543F9F8C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6A9F3624-04A1-4603-9982-B313543F9F8C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6A9F3624-04A1-4603-9982-B313543F9F8C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6A9F3624-04A1-4603-9982-B313543F9F8C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

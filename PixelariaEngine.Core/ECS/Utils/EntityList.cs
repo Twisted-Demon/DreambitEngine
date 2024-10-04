@@ -84,7 +84,6 @@ public class EntityList(Scene scene)
                      .Where(e => _entities.Contains(e)))
         {
             _entities.Remove(entityToDestroy);
-            entityToDestroy.Scene = null;
             entityToDestroy.OnRemovedFromScene();
             entityToDestroy.Destroy();
             entityToDestroy.Dispose();

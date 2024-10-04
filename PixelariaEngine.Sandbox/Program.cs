@@ -3,5 +3,6 @@ using PixelariaEngine.Graphics;
 using PixelariaEngine.Sandbox;
 
 using var game = new PixelariaEngine.Core("PixelariaEngine", 1280, 720);
-game.SetNextScene(new TransitionSceneTest().AddRenderer<Basic2DRenderer>());
+Window.SetAllowUserResizing(true);
+Scene.SetNextScene(new TransitionSceneTest().AddRenderer<DefaultRenderer>());
 game.Run();

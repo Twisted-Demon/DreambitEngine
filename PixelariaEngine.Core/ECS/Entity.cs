@@ -5,16 +5,17 @@ namespace PixelariaEngine.ECS;
 public class Entity : IDisposable
 {
     private readonly ComponentList _componentList;
+    public readonly Transform Transform;
     public readonly uint Id;
+    public string Name;
+    public string Tag;
 
     private bool _enabled;
     private bool _isDestroyed;
     private bool _isDisposed;
-    public string Name;
-    public Scene Scene;
-    public string Tag;
-    public Transform Transform;
 
+    internal Scene Scene;
+    
     internal Entity(uint id, string name, string tag, bool enabled, Scene scene)
     {
         Id = id;
@@ -28,6 +29,11 @@ public class Entity : IDisposable
 
         _componentList = new ComponentList(scene);
         Transform = new Transform();
+    }
+
+    private Entity()
+    {
+        
     }
 
     public bool Enabled
@@ -56,6 +62,16 @@ public class Entity : IDisposable
         Dispose(false);
     }
 
+    public static Entity Create(string name = "entity", string tag = "default", bool enabled = true)
+    {
+        return Core.Instance.CurrentScene.CreateEntity(name, tag, enabled);
+    }
+    
+    public static void Destroy(Entity entity)
+    {
+        Core.Instance.CurrentScene.DestroyEntity(entity);
+    }
+
     internal void Update()
     {
         if (_isDestroyed) return;
@@ -64,9 +80,18 @@ public class Entity : IDisposable
         _componentList.UpdateComponents();
     }
 
+    /// <summary>
+    /// Attaches a component to the entity, if it already exists
+    /// it will return the existing component
+    /// </summary>
+    /// <typeparam name="T">Component Type</typeparam>
+    /// <returns></returns>
     public T AttachComponent<T>() where T : Component
     {
-        var component = (T)Activator.CreateInstance<T>().SetUp(this, true);
+        var component = _componentList.GetComponent<T>();
+        if (component != null) return component;
+        
+        component = (T)Activator.CreateInstance<T>().SetUp(this, true);
 
         if (component == null)
             return null;
@@ -77,6 +102,10 @@ public class Entity : IDisposable
         return component;
     }
 
+    /// <summary>
+    /// Detaches a component from the entity and cleans it up
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
     public void DetachComponent<T>() where T : Component
     {
         var componentToRemove = _componentList.GetComponent<T>();
@@ -86,12 +115,23 @@ public class Entity : IDisposable
 
         _componentList.DetachComponent(componentToRemove);
     }
-
+    
+    /// <summary>
+    /// Detaches a component from the entity and cleans it up
+    /// only if it exists in the entities internal component list.
+    /// </summary>
+    /// <param name="component"></param>
+    /// <typeparam name="T"></typeparam>
     public void DetachComponent<T>(T component) where T : Component
     {
         _componentList.DetachComponent(component);
     }
-
+    
+    /// <summary>
+    /// Retrieves a component by Type
+    /// </summary>
+    /// <typeparam name="T">Component Type</typeparam>
+    /// <returns></returns>
     public T GetComponent<T>() where T : Component
     {
         return _componentList.GetComponent<T>();
@@ -120,7 +160,9 @@ public class Entity : IDisposable
     internal void Destroy()
     {
         _isDestroyed = true;
+        Scene = null;
         _componentList.DestroyAllComponentsNow();
+        _componentList.ClearLists();
     }
 
     public static bool operator ==(Entity a, Entity b)

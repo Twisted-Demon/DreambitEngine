@@ -24,6 +24,12 @@ public class DrawableList
         _drawablesByDrawLayer[drawable.DrawLayer].Remove(drawable);
     }
 
+    internal void ClearLists()
+    {
+        _drawables.Clear();
+        _drawablesByDrawLayer.Clear();
+    }
+
     internal void UpdateDrawableDrawLayer(DrawableComponent drawable, int oldLayer, int newLayer)
     {
         var oldLayerList = GetDrawablesByDrawLayer(oldLayer);

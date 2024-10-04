@@ -1,4 +1,6 @@
 ﻿using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
+using PixelariaEngine.Graphics;
 
 namespace PixelariaEngine;
 
@@ -11,16 +13,24 @@ public class Core : Game
         IsMouseVisible = true;
         Instance = this;
         
-        GameWindow.SetTitle(title);
-        GameWindow.SetSize(width, height);
+        PixelariaEngine.Window.SetTitle(title);
+        PixelariaEngine.Window.SetSize(width, height);
         Input.Init();
     }
 
     public static GraphicsDeviceManager GraphicsDeviceManager { get; private set; }
+    public static SpriteBatch SpriteBatch { get; private set; }
     public Scene CurrentScene { get; private set; }
     public Scene NextScene { get; private set; }
 
     public static Core Instance { get; private set; }
+
+    protected override void LoadContent()
+    {
+        base.LoadContent();
+        
+        SpriteBatch = new SpriteBatch(GraphicsDevice);
+    }
 
     protected override void Update(GameTime gameTime)
     {
@@ -36,6 +46,8 @@ public class Core : Game
         Input.PostUpdate();
 
         base.Update(gameTime);
+        
+        
     }
 
     protected override void Draw(GameTime gameTime)
@@ -58,7 +70,7 @@ public class Core : Game
         NextScene = null;
     }
 
-    public void SetNextScene(Scene scene)
+    internal void SetNextScene(Scene scene)
     {
         NextScene = scene;
     }

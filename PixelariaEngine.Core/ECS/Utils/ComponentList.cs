@@ -9,7 +9,7 @@ public class ComponentList(Scene scene)
     private readonly List<Component> _attachedComponents = [];
     private readonly List<Component> _componentsToAttach = [];
     private readonly List<Component> _componentsToDetach = [];
-    private readonly Scene _scene = scene;
+    private Scene _scene = scene;
 
     public void AttachComponent<T>(T component) where T : Component
     {
@@ -20,6 +20,7 @@ public class ComponentList(Scene scene)
         
         //register it if it is a drawable component
     }
+    
 
     public void DetachComponent<T>(T component) where T : Component
     {
@@ -51,6 +52,7 @@ public class ComponentList(Scene scene)
         foreach (var component in _componentsToAttach
                      .Where(c => !_attachedComponents.Contains(c)))
         {
+            component.Entity = null;
             component.OnRemovedFromEntity();
             component.Destroy();
             component.Dispose();
@@ -60,11 +62,11 @@ public class ComponentList(Scene scene)
 
         foreach (var component in _attachedComponents)
         {
-            component.OnRemovedFromEntity();
-            
             if(component is DrawableComponent drawableComponent)
                 _scene.Drawables.Remove(drawableComponent);
-            
+
+            component.Entity = null;
+            component.OnRemovedFromEntity();
             component.Destroy();
             component.Dispose();
         }
@@ -80,7 +82,18 @@ public class ComponentList(Scene scene)
             return result as T;
 
         result = _componentsToAttach.FirstOrDefault(c => c.GetType() == typeof(T));
-        return result as T;
+        if (result != null)
+            return result as T;
+        
+        return null;
+    }
+
+    public void ClearLists()
+    {
+        _scene = null;
+        _attachedComponents.Clear();
+        _componentsToAttach.Clear();
+        _componentsToDetach.Clear();
     }
 
     public void UpdateComponents()
@@ -116,7 +129,8 @@ public class ComponentList(Scene scene)
             //remove from drawables
             if(componentToRemove is DrawableComponent drawableComponent)
                 _scene.Drawables.Remove(drawableComponent);
-            
+
+            componentToRemove.Entity = null;
             componentToRemove.OnRemovedFromEntity();
             componentToRemove.Destroy();
             componentToRemove.Dispose();
