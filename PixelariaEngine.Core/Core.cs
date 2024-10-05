@@ -1,4 +1,5 @@
-﻿using Microsoft.Xna.Framework;
+﻿using System.Xml;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using PixelariaEngine.Graphics;
 
@@ -17,13 +18,15 @@ public class Core : Game
         PixelariaEngine.Window.SetSize(width, height);
         Input.Init();
     }
-
+    
     public static GraphicsDeviceManager GraphicsDeviceManager { get; private set; }
     public static SpriteBatch SpriteBatch { get; private set; }
     public Scene CurrentScene { get; private set; }
     public Scene NextScene { get; private set; }
 
     public static Core Instance { get; private set; }
+
+    private readonly Logger<Core> _logger = new();
 
     protected override void LoadContent()
     {
@@ -64,7 +67,7 @@ public class Core : Game
 
     private void ChangeScenes()
     {
-        Log.Info("Changing Scenes");
+        _logger.Info("Changing Scenes");
         CurrentScene?.Terminate();
         CurrentScene = NextScene;
         NextScene = null;

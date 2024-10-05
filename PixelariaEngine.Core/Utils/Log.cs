@@ -4,63 +4,69 @@ namespace PixelariaEngine;
 
 public static class Log
 {
-    public static void Trace(string format, object[] args)
+    
+    public static void Trace(string header, string format, params object[] args)
     {
         AnsiConsole.ResetColors();
-        AnsiConsole.MarkupLine($"[grey69]{format}[/]", args);
+        AnsiConsole.MarkupLine($"[white]{header}: [/][grey69]{format}[/]", args);
     }
     
-    public static void Trace(string message)
+    public static void Trace(string header, string message)
     {
         AnsiConsole.ResetColors();
-        AnsiConsole.MarkupLine($"[grey69]{message}[/]");
+        AnsiConsole.MarkupLine($"[white]{header}: [/][grey69]{message}[/]");
     }
     
-    public static void Debug(string format, object[] args)
+    
+    public static void Debug(string header, string format, params object[] args)
     {
         AnsiConsole.ResetColors();
-        AnsiConsole.MarkupLine($"[darkcyan]{format}[/]", args);
+        AnsiConsole.MarkupLine($"[white]{header}: [/][darkcyan]{format}[/]", args);
     }
     
-    public static void Debug(string message)
+    public static void Debug(string header, string message)
     {
         AnsiConsole.ResetColors();
-        AnsiConsole.MarkupLine($"[darkcyan]{message}[/]");
+        AnsiConsole.MarkupLine($"[white]{header}: [/][darkcyan]{message}[/]");
     }
     
-    public static void Info(string format, object[] args)
+    
+    public static void Info(string header, string format, params object[] args)
     {
+        
         AnsiConsole.ResetColors();
-        AnsiConsole.MarkupLine($"[deepskyblue1]{format}[/]", args);
+        AnsiConsole.MarkupLine($"[white]{header}: [/][deepskyblue1]{format}[/]", args);
     }
     
-    public static void Info(string message)
+    public static void Info(string header, string message)
     {
         AnsiConsole.ResetColors();
-        AnsiConsole.MarkupLine($"[deepskyblue1]{message}[/]");
+        AnsiConsole.MarkupLine($"[white]{header}: [/][deepskyblue1]{message}[/]");
     }
     
-    public static void Warn(string format, object[] args)
+    public static void Warn(string header, string format, params object[] args)
     {
         AnsiConsole.ResetColors();
-        AnsiConsole.MarkupLine($"[orange1]{format}[/]", args);
+        AnsiConsole.MarkupLine($"[white]{header}: [/][orange1]{format}[/]", args);
     }
     
-    public static void Warn(string message)
+    public static void Warn(string header, string message)
     {
         AnsiConsole.ResetColors();
-        AnsiConsole.MarkupLine($"[orange1]{message}[/]");
+        AnsiConsole.MarkupLine($"[white]{header}: [/][orange1]{message}[/]");
     }
     
-    public static void Error(string format, object[] args)
+    
+    public static void Error(string header, string format, params object[] args)
     {
         AnsiConsole.ResetColors();
-        AnsiConsole.MarkupLine($"[red1]{format}[/]", args);
+        AnsiConsole.MarkupLine($"[white]{header}: [/][red1]{format}[/]", args);
     }
     
-    public static void Error(string message)
+    public static void Error(string header, string message)
     {
         AnsiConsole.ResetColors();
-        AnsiConsole.MarkupLine($"[red1]{message}[/]");
+        AnsiConsole.MarkupLine($"[white]{header}: [/][red1]{message}[/]");
     }
+    
 }

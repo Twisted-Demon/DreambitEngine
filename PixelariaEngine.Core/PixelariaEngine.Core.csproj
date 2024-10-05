@@ -31,6 +31,8 @@
       <None Remove="Content\obj\**" />
     </ItemGroup>
     <ItemGroup>
-      <Folder Include="Assets\" />
+        <Reference Include="Newtonsoft.Json">
+            <HintPath>Includes\Newtonsoft.Json.dll</HintPath>
+        </Reference>
     </ItemGroup>
 </Project>

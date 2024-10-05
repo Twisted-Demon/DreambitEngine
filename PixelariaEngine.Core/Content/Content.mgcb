@@ -10,8 +10,14 @@
 
 #-------------------------------- References --------------------------------#
 
+/reference:../../PixelariaEngine.ContentPipelineExtensions/Build/net8.0/PixelariaEngine.ContentPipelineExtensions.dll
 
 #---------------------------------- Content ---------------------------------#
+
+#begin Animations/witch_run.animation
+/importer:AnimationImporter
+/processor:AnimationProcessor
+/build:Animations/witch_run.animation
 
 #begin b_witch_idle.png
 /importer:TextureImporter
@@ -73,4 +79,14 @@
 /processorParam:MakeSquare=False
 /processorParam:TextureFormat=Color
 /build:SpaceBackground.png
+
+#begin SpriteSheets/b_witch_run.spritesheet
+/importer:SpriteSheetImporter
+/processor:SpriteSheetProcessor
+/build:SpriteSheets/b_witch_run.spritesheet
+
+#begin SpriteSheets/SpaceBackground.spritesheet
+/importer:SpriteSheetImporter
+/processor:SpriteSheetProcessor
+/build:SpriteSheets/SpaceBackground.spritesheet
 

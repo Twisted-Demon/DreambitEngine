@@ -18,6 +18,8 @@ public class Scene
     protected bool IsInitialized;
     protected bool IsPaused;
     protected bool IsStarted;
+
+    private Logger<Scene> _logger = new();
     
     public Camera2D MainCamera { get; private set; }
 
@@ -39,7 +41,7 @@ public class Scene
 
     private void InitializeInternals()
     {
-        Log.Debug("Initializing Scene");
+        _logger.Debug("Initializing Scene");
         Renderer?.Initialize();
         MainCamera = Entity.Create("main-camera").AttachComponent<Camera2D>();
         OnInitialize();
@@ -104,7 +106,7 @@ public class Scene
 
         if (!IsStarted)
         {
-            Log.Trace("Scene Starting");
+            _logger.Trace("Scene Starting");
             OnBegin();
             IsStarted = true;
         }
@@ -116,7 +118,7 @@ public class Scene
     {
         if (Renderer == null)
         {
-            Log.Error("The Current Scene does not have a Renderer");
+            _logger.Error("The Current Scene does not have a Renderer");
             return;
         }
         
