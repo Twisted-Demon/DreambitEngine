@@ -4,16 +4,11 @@ namespace PixelariaEngine.ECS;
 
 public abstract class Component : IDisposable
 {
-    public Transform Transform => Entity.Transform;
-    
     private bool _enabled;
     private bool _isDestroyed;
     private bool _isDisposed;
-    
-    protected Component()
-    {
-        
-    }
+
+    public Transform Transform => Entity.Transform;
 
     public Entity Entity { get; internal set; }
     public Scene Scene => Entity?.Scene;
@@ -51,21 +46,20 @@ public abstract class Component : IDisposable
         _enabled = enabled;
 
         ProcessAttributes();
-        
+
         return this;
     }
-    
+
     private void ProcessAttributes()
     {
-        
         var attributes = Attribute.GetCustomAttributes(GetType());
         foreach (var attribute in attributes)
         {
             if (attribute is not RequireAttribute requireAttribute) continue;
-            
+
             var hasRequired = Entity.HasComponentOfType(requireAttribute.RequiredType);
             if (hasRequired) continue;
-            
+
             Entity.AttachComponent(requireAttribute.RequiredType);
         }
     }

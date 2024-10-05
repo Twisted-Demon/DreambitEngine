@@ -5,34 +5,34 @@ namespace PixelariaEngine.ECS;
 [Require(typeof(SpriteDrawer))]
 public class AnimatedSprite : Component<AnimatedSprite>
 {
-    private SpriteDrawer _spriteDrawer;
-    private SpriteSheetAnimation _spriteSheetAnimation;
     private string _animationPath;
-    
+    private int _currentFrame;
+    private float _elapsedTime;
+
     //internal variables
     private bool _isPlaying;
-    private float _elapsedTime;
+    private SpriteDrawer _spriteDrawer;
+    private SpriteSheetAnimation _spriteSheetAnimation;
     private float _timeToNextFrame;
-    private int _currentFrame;
 
     public string AnimationPath
     {
         get => _animationPath;
         set
         {
-            if(_animationPath == value) return;
+            if (_animationPath == value) return;
             _animationPath = value;
             SpriteSheetAnimation = Resources.Load<SpriteSheetAnimation>(value);
             OnAnimationPathChanged(value);
         }
     }
-    
+
     public SpriteSheetAnimation SpriteSheetAnimation
     {
         get => _spriteSheetAnimation;
         set
         {
-            if(_spriteSheetAnimation == value) return;
+            if (_spriteSheetAnimation == value) return;
             _spriteSheetAnimation = value;
             _animationPath = _spriteSheetAnimation.AssetName;
             _spriteDrawer.SpriteSheetPath = _spriteSheetAnimation.SpriteSheetPath;
@@ -42,17 +42,16 @@ public class AnimatedSprite : Component<AnimatedSprite>
 
     private void OnAnimationPathChanged(string newPath)
     {
-        
     }
 
     private void OnSpriteSheetAnimationChanged(SpriteSheetAnimation newAnimation)
     {
-        if(newAnimation == null) return;
+        if (newAnimation == null) return;
 
-        _timeToNextFrame = 1 / (float) newAnimation.FrameRate;
+        _timeToNextFrame = 1 / (float)newAnimation.FrameRate;
         _currentFrame = 0;
         _elapsedTime = 0;
-        
+
         _spriteDrawer.CurrentFrameIndex = _currentFrame;
         _spriteDrawer.Origin = _spriteSheetAnimation[0].Pivot;
     }
@@ -66,10 +65,12 @@ public class AnimatedSprite : Component<AnimatedSprite>
     public override void OnUpdate()
     {
         if (!_isPlaying) return;
-        
+
+        if (SpriteSheetAnimation == null) return;
+
         _elapsedTime += Time.DeltaTime; // increase the current time
-        
-        if(_elapsedTime >= _timeToNextFrame)
+
+        if (_elapsedTime >= _timeToNextFrame)
             ChangeFrame(); //change the frame if it's time
     }
 
@@ -78,10 +79,10 @@ public class AnimatedSprite : Component<AnimatedSprite>
         _elapsedTime = 0; //reset the elapsed time
 
         _currentFrame++; // increment the frame
-        
-        if(_currentFrame >= SpriteSheetAnimation.FrameCount)
+
+        if (_currentFrame >= SpriteSheetAnimation.FrameCount)
             _currentFrame = 0; //if we are at the frame count, reset
-        
+
         _spriteDrawer.CurrentFrameIndex = _currentFrame; //set the sprite drawer to render the new frame
         _spriteDrawer.Origin = _spriteSheetAnimation[_currentFrame].Pivot;
     }

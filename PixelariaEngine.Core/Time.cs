@@ -20,7 +20,7 @@ public static class Time
     public static float AltTimeScale { get; } = 1f;
 
     public static uint FrameCount { get; private set; }
-    
+
     public static int FrameRate { get; private set; }
 
     internal static void Update(GameTime gameTime)

@@ -1,6 +1,4 @@
-﻿using Microsoft.Xna.Framework.Graphics;
-
-namespace PixelariaEngine.ECS;
+﻿namespace PixelariaEngine.ECS;
 
 public abstract class DrawableComponent : Component
 {

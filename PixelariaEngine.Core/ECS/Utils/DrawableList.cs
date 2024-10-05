@@ -56,6 +56,9 @@ public class DrawableList
 
         return _drawablesByDrawLayer[drawLayer];
     }
-    
-    public List<DrawableComponent> GetAllDrawables() => _drawables;
+
+    public List<DrawableComponent> GetAllDrawables()
+    {
+        return _drawables;
+    }
 }

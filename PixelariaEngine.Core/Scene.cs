@@ -1,8 +1,5 @@
 ﻿using System;
-using System.Diagnostics;
-using System.Linq;
 using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 using PixelariaEngine.ECS;
 using PixelariaEngine.Graphics;
 
@@ -12,16 +9,14 @@ public class Scene
 {
     public readonly DrawableList Drawables;
     protected readonly EntityList Entities;
-    protected Renderer Renderer;
-    
+
+    private readonly Logger<Scene> _logger = new();
+
     public Color BackgroundColor = Color.CornflowerBlue;
     protected bool IsInitialized;
     protected bool IsPaused;
     protected bool IsStarted;
-
-    private Logger<Scene> _logger = new();
-    
-    public Camera2D MainCamera { get; private set; }
+    protected Renderer Renderer;
 
     public Scene()
     {
@@ -30,13 +25,14 @@ public class Scene
         Renderer = new DefaultRenderer(this);
     }
 
+    public Camera2D MainCamera { get; private set; }
+
     /// <summary>
     ///     Called after the scene has been created, but before actually running.
     ///     Here is where we should load any assets to be used.
     /// </summary>
     protected virtual void OnInitialize()
     {
-           
     }
 
     private void InitializeInternals()
@@ -110,8 +106,9 @@ public class Scene
             OnBegin();
             IsStarted = true;
         }
-        
-        OnUpdate();
+
+        if (!IsPaused)
+            OnUpdate();
     }
 
     public virtual void OnDraw()
@@ -121,7 +118,7 @@ public class Scene
             _logger.Error("The Current Scene does not have a Renderer");
             return;
         }
-        
+
         Renderer.OnDraw();
     }
 

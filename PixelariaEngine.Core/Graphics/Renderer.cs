@@ -12,6 +12,5 @@ public abstract class Renderer(Scene scene)
 
     public virtual void CleanUp()
     {
-        
     }
 }

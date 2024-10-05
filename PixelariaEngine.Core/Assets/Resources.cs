@@ -1,16 +1,15 @@
 ﻿using System;
 using Microsoft.Xna.Framework.Content;
-using Microsoft.Xna.Framework.Graphics;
 
 namespace PixelariaEngine;
 
 public class Resources
 {
-    public static ContentManager Content => Core.Instance.Content;
     private static readonly Logger<Resources> _logger = new();
-    
+    public static ContentManager Content => Core.Instance.Content;
+
     /// <summary>
-    /// Tries to Load an asset and returns null if not found 
+    ///     Tries to Load an asset and returns null if not found
     /// </summary>
     /// <param name="path"></param>
     /// <typeparam name="T"></typeparam>
@@ -21,7 +20,7 @@ public class Resources
         {
             var asset = Core.Instance.Content.Load<T>(path);
             _logger.Trace("Loaded {0} | {1}", typeof(T).Name, path);
-            
+
             return asset;
         }
         catch (Exception e)

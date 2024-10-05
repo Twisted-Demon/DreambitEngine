@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Runtime.CompilerServices;
-using Microsoft.Xna.Framework.Graphics;
 
 namespace PixelariaEngine;
 
@@ -8,7 +6,7 @@ public static class Window
 {
     public static int Width => Core.GraphicsDeviceManager.PreferredBackBufferWidth;
     public static int Height => Core.GraphicsDeviceManager.PreferredBackBufferHeight;
-    
+
     public static event EventHandler<WindowEventArgs> WindowResized;
 
     public static void Init()
@@ -53,12 +51,12 @@ public static class Window
 
     public static void SetBorderlessFullscreen(bool value)
     {
-        if (value == true)
+        if (value)
         {
             var w = Core.Instance.GraphicsDevice.Adapter.CurrentDisplayMode.Width;
             var h = Core.Instance.GraphicsDevice.Adapter.CurrentDisplayMode.Width;
-            
-            SetSize(w,h);
+
+            SetSize(w, h);
             SetBorderless(true);
         }
     }

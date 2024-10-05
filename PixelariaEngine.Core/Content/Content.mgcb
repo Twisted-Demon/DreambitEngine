@@ -14,34 +14,15 @@
 
 #---------------------------------- Content ---------------------------------#
 
-#begin Animations/witch_run.animation
+#begin Animations/b_witch_idle.animation
 /importer:AnimationImporter
 /processor:AnimationProcessor
-/build:Animations/witch_run.animation
+/build:Animations/b_witch_idle.animation
 
-#begin b_witch_idle.png
-/importer:TextureImporter
-/processor:TextureProcessor
-/processorParam:ColorKeyColor=255,0,255,255
-/processorParam:ColorKeyEnabled=True
-/processorParam:GenerateMipmaps=False
-/processorParam:PremultiplyAlpha=True
-/processorParam:ResizeToPowerOfTwo=False
-/processorParam:MakeSquare=False
-/processorParam:TextureFormat=Color
-/build:b_witch_idle.png
-
-#begin b_witch_run.png
-/importer:TextureImporter
-/processor:TextureProcessor
-/processorParam:ColorKeyColor=255,0,255,255
-/processorParam:ColorKeyEnabled=True
-/processorParam:GenerateMipmaps=False
-/processorParam:PremultiplyAlpha=True
-/processorParam:ResizeToPowerOfTwo=False
-/processorParam:MakeSquare=False
-/processorParam:TextureFormat=Color
-/build:b_witch_run.png
+#begin Animations/b_witch_run.animation
+/importer:AnimationImporter
+/processor:AnimationProcessor
+/build:Animations/b_witch_run.animation
 
 #begin Effects/DefaultEffect.fx
 /importer:EffectImporter
@@ -68,17 +49,10 @@
 #begin Fonts/PixelifySans-SemiBold.ttf
 /copy:Fonts/PixelifySans-SemiBold.ttf
 
-#begin SpaceBackground.png
-/importer:TextureImporter
-/processor:TextureProcessor
-/processorParam:ColorKeyColor=255,0,255,255
-/processorParam:ColorKeyEnabled=True
-/processorParam:GenerateMipmaps=False
-/processorParam:PremultiplyAlpha=True
-/processorParam:ResizeToPowerOfTwo=False
-/processorParam:MakeSquare=False
-/processorParam:TextureFormat=Color
-/build:SpaceBackground.png
+#begin SpriteSheets/b_witch_idle.spritesheet
+/importer:SpriteSheetImporter
+/processor:SpriteSheetProcessor
+/build:SpriteSheets/b_witch_idle.spritesheet
 
 #begin SpriteSheets/b_witch_run.spritesheet
 /importer:SpriteSheetImporter
@@ -89,4 +63,40 @@
 /importer:SpriteSheetImporter
 /processor:SpriteSheetProcessor
 /build:SpriteSheets/SpaceBackground.spritesheet
+
+#begin Textures/b_witch_idle.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyColor=255,0,255,255
+/processorParam:ColorKeyEnabled=True
+/processorParam:GenerateMipmaps=False
+/processorParam:PremultiplyAlpha=True
+/processorParam:ResizeToPowerOfTwo=False
+/processorParam:MakeSquare=False
+/processorParam:TextureFormat=Color
+/build:Textures/b_witch_idle.png
+
+#begin Textures/b_witch_run.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyColor=255,0,255,255
+/processorParam:ColorKeyEnabled=True
+/processorParam:GenerateMipmaps=False
+/processorParam:PremultiplyAlpha=True
+/processorParam:ResizeToPowerOfTwo=False
+/processorParam:MakeSquare=False
+/processorParam:TextureFormat=Color
+/build:Textures/b_witch_run.png
+
+#begin Textures/SpaceBackground.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyColor=255,0,255,255
+/processorParam:ColorKeyEnabled=True
+/processorParam:GenerateMipmaps=False
+/processorParam:PremultiplyAlpha=True
+/processorParam:ResizeToPowerOfTwo=False
+/processorParam:MakeSquare=False
+/processorParam:TextureFormat=Color
+/build:Textures/SpaceBackground.png
 

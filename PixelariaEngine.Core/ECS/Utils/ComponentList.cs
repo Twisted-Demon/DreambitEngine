@@ -18,10 +18,10 @@ public class ComponentList(Scene scene)
             return;
 
         _componentsToAttach.Add(component);
-        
+
         //register it if it is a drawable component
     }
-    
+
 
     public void DetachComponent<T>(T component) where T : Component
     {
@@ -40,7 +40,7 @@ public class ComponentList(Scene scene)
         if (_componentsToAttach.Contains(component))
         {
             _componentsToAttach.Remove(component);
-            
+
             return;
         }
 
@@ -63,7 +63,7 @@ public class ComponentList(Scene scene)
 
         foreach (var component in _attachedComponents)
         {
-            if(component is DrawableComponent drawableComponent)
+            if (component is DrawableComponent drawableComponent)
                 _scene.Drawables.Remove(drawableComponent);
 
             component.Entity = null;
@@ -85,7 +85,7 @@ public class ComponentList(Scene scene)
         result = _componentsToAttach.FirstOrDefault(c => c.GetType() == typeof(T));
         if (result != null)
             return result as T;
-        
+
         return null;
     }
 
@@ -94,7 +94,7 @@ public class ComponentList(Scene scene)
         var result = _attachedComponents.FirstOrDefault(c => c.GetType() == type);
         if (result != null)
             return true;
-        
+
         result = _componentsToAttach.FirstOrDefault(c => c.GetType() == type);
         return result != null;
     }
@@ -104,7 +104,7 @@ public class ComponentList(Scene scene)
         var result = _attachedComponents.FirstOrDefault(c => c.GetType() == type);
         if (result != null)
             return result;
-        
+
         result = _componentsToAttach.FirstOrDefault(c => c.GetType() == type);
         return result != null ? result : null;
     }
@@ -131,11 +131,11 @@ public class ComponentList(Scene scene)
                      .Where(componentToAdd => !_attachedComponents.Contains(componentToAdd)))
         {
             _attachedComponents.Add(componentToAdd);
-            
+
             //add to drawables
             if (componentToAdd is DrawableComponent drawableComponent)
                 _scene.Drawables.Add(drawableComponent);
-            
+
             componentToAdd.OnAddedToEntity();
         }
 
@@ -146,9 +146,9 @@ public class ComponentList(Scene scene)
                      .Where(x => _attachedComponents.Contains(x)))
         {
             _attachedComponents.Remove(componentToRemove);
-            
+
             //remove from drawables
-            if(componentToRemove is DrawableComponent drawableComponent)
+            if (componentToRemove is DrawableComponent drawableComponent)
                 _scene.Drawables.Remove(drawableComponent);
 
             componentToRemove.Entity = null;

@@ -1,5 +1,4 @@
-﻿using System;
-using System.Linq;
+﻿using System.Linq;
 using Microsoft.Xna.Framework;
 using Newtonsoft.Json;
 
@@ -7,21 +6,7 @@ namespace PixelariaEngine;
 
 public class SpriteSheetAnimation : PixelariaAsset
 {
-    [JsonProperty("frames")] 
-    private AnimationFrame[] _frames;
-
-    [JsonProperty("frame_rate")] public int FrameRate { get; set; } = 0;
-    
-    [JsonProperty("sprite_sheet_path")] public string SpriteSheetPath { get; set; } = string.Empty;
-    
-    public AnimationFrame this[int key]
-    {
-        get => _frames[key];
-        set => _frames[key] = value;
-    }
-
-    [JsonIgnore]
-    public int FrameCount => _frames.Length;
+    [JsonProperty("frames")] private AnimationFrame[] _frames;
 
     internal SpriteSheetAnimation(AnimationFrame[] frames)
     {
@@ -38,9 +23,21 @@ public class SpriteSheetAnimation : PixelariaAsset
         _frames = [];
     }
 
+    [JsonProperty("frame_rate")] public int FrameRate { get; set; }
+
+    [JsonProperty("sprite_sheet_path")] public string SpriteSheetPath { get; set; } = string.Empty;
+
+    public AnimationFrame this[int key]
+    {
+        get => _frames[key];
+        set => _frames[key] = value;
+    }
+
+    [JsonIgnore] public int FrameCount => _frames.Length;
+
     public bool TryGetFrame(int key, out AnimationFrame frame)
     {
-        frame = _frames.ElementAtOrDefault<AnimationFrame>(key);
+        frame = _frames.ElementAtOrDefault(key);
 
         return frame != null;
     }
@@ -48,11 +45,6 @@ public class SpriteSheetAnimation : PixelariaAsset
 
 public class AnimationFrame
 {
-    [JsonProperty("frame_index")]
-    public int FrameIndex { get; set; }
-    
-    [JsonProperty("pivot")] public Vector2 Pivot { get; set; }
-    
     [JsonProperty("animation_event", NullValueHandling = NullValueHandling.Ignore)]
     public AnimationEvent AnimationEvent;
 
@@ -64,16 +56,18 @@ public class AnimationFrame
 
     public AnimationFrame()
     {
-        
     }
+
+    [JsonProperty("frame_index")] public int FrameIndex { get; set; }
+
+    [JsonProperty("pivot")] public Vector2 Pivot { get; set; }
 }
 
 public class AnimationEvent
 {
-    [JsonProperty("name")]
-    public string Name;
-    [JsonProperty("args")]
-    public string[] Args = [];
+    [JsonProperty("args")] public string[] Args = [];
+
+    [JsonProperty("name")] public string Name;
 
     public AnimationEvent(string name, params string[] args)
     {
@@ -86,10 +80,8 @@ public class AnimationEvent
         Name = name;
         Args = new[] { arg };
     }
-    
+
     public AnimationEvent()
     {
-        
     }
 }
-

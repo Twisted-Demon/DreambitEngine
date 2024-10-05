@@ -7,29 +7,35 @@ namespace PixelariaEngine;
 
 public class SpriteSheet : PixelariaAsset
 {
-    [JsonIgnore]
-    private static readonly Logger<SpriteSheet> Logger = new();
+    [JsonIgnore] private static readonly Logger<SpriteSheet> Logger = new();
 
-    [JsonProperty("texture_path")]
-    private string _texturePath;
-    
-    [JsonIgnore]
-    public Texture2D Texture { get; private set; } = null;
+    [JsonProperty("columns")] public readonly int Columns = 1;
 
-    [JsonIgnore]
-    public string TexturePath => _texturePath;
+    [JsonProperty("rows")] public readonly int Rows = 1;
 
-    [JsonIgnore]
-    public Rectangle[] Frames { get; private set; } = [];
-    
-    [JsonIgnore]
-    public int FrameCount => Frames.Length;
-    
-    [JsonProperty("columns")]
-    public readonly int Columns = 1;
-    
-    [JsonProperty("rows")]
-    public readonly int Rows = 1;
+    [JsonProperty("texture_path")] private string _texturePath;
+
+    private SpriteSheet(int columns, int rows, string texturePath, Texture2D texture)
+    {
+        Columns = columns;
+        Rows = rows;
+        _texturePath = texturePath;
+        Texture = texture;
+
+        SplitSprite();
+    }
+
+    public SpriteSheet()
+    {
+    }
+
+    [JsonIgnore] public Texture2D Texture { get; private set; }
+
+    [JsonIgnore] public string TexturePath => _texturePath;
+
+    [JsonIgnore] public Rectangle[] Frames { get; private set; } = [];
+
+    [JsonIgnore] public int FrameCount => Frames.Length;
 
     public static SpriteSheet Create(int columns, int rows, string texturePath)
     {
@@ -39,30 +45,15 @@ public class SpriteSheet : PixelariaAsset
             return null;
 
         var spriteSheet = new SpriteSheet(columns, rows, texturePath, texture);
-        
+
         return spriteSheet;
     }
 
-    private SpriteSheet(int columns, int rows, string texturePath, Texture2D texture)
-    {
-        Columns = columns;
-        Rows = rows;
-        _texturePath = texturePath;
-        Texture = texture;
-        
-        SplitSprite();
-    }
-
-    public SpriteSheet()
-    {
-        
-    }
-    
     public void SplitSprite()
     {
         if (Columns < 1 || Rows < 1) return;
         if (Texture == null) return;
-        
+
         var totalFrames = Columns * Rows;
 
         Frames = new Rectangle[totalFrames];
@@ -78,7 +69,7 @@ public class SpriteSheet : PixelariaAsset
                 {
                     var x = i % Columns;
                     var y = i / Columns;
-                
+
                     Frames[i] = new Rectangle(x * frameWidth, y * frameHeight, frameWidth, frameHeight);
                 }
 
@@ -93,7 +84,7 @@ public class SpriteSheet : PixelariaAsset
                 break;
         }
     }
-    
+
     public bool TryGetFrame(int frame, out Rectangle frameRect)
     {
         try
@@ -126,7 +117,7 @@ public class SpriteSheet : PixelariaAsset
             _ => new Vector2(0.5f, 0.5f)
         };
     }
-    
+
     protected override void CleanUp()
     {
         Texture = null;
