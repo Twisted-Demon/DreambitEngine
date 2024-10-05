@@ -34,10 +34,7 @@ public static class Input
 
     public static bool IsKeyHeld(Keys key)
     {
-        var wasKeyDownInPreviousState = _previousKeyboardState.IsKeyDown(key);
-        var isKeyDownInCurrentState = _currentKeyboardState.IsKeyDown(key);
-
-        return wasKeyDownInPreviousState && isKeyDownInCurrentState;
+        return _currentKeyboardState.IsKeyDown(key);
     }
 
     public static bool IsKeyReleased(Keys key)

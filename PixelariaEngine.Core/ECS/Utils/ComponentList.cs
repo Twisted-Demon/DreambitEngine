@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Type = System.Type;
 
 namespace PixelariaEngine.ECS;
 
@@ -77,7 +78,7 @@ public class ComponentList(Scene scene)
 
     public T GetComponent<T>() where T : Component
     {
-        var result = _attachedComponents.FirstOrDefault(component => component.GetType() == typeof(T));
+        var result = _attachedComponents.FirstOrDefault(c => c.GetType() == typeof(T));
         if (result != null)
             return result as T;
 
@@ -86,6 +87,26 @@ public class ComponentList(Scene scene)
             return result as T;
         
         return null;
+    }
+
+    public bool ComponentOfTypeExists(Type type)
+    {
+        var result = _attachedComponents.FirstOrDefault(c => c.GetType() == type);
+        if (result != null)
+            return true;
+        
+        result = _componentsToAttach.FirstOrDefault(c => c.GetType() == type);
+        return result != null;
+    }
+
+    public Component GetComponent(Type type)
+    {
+        var result = _attachedComponents.FirstOrDefault(c => c.GetType() == type);
+        if (result != null)
+            return result;
+        
+        result = _componentsToAttach.FirstOrDefault(c => c.GetType() == type);
+        return result != null ? result : null;
     }
 
     public void ClearLists()

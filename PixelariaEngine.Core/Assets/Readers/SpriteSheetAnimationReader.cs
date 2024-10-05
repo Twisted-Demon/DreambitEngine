@@ -4,13 +4,12 @@ using Newtonsoft.Json;
 
 namespace PixelariaEngine;
 
-public class AnimationReader : ContentTypeReader<SpriteSheetAnimation>
+public class SpriteSheetAnimationReader : ContentTypeReader<SpriteSheetAnimation>
 {
     protected override SpriteSheetAnimation Read(ContentReader input, SpriteSheetAnimation existingInstance)
     {
-        
-
         //get the number of frames and frame rate
+        var spriteSheetPath = input.ReadString();
         var frameRate = input.ReadInt32();
         var framesCount = input.ReadInt32();
         
@@ -18,6 +17,7 @@ public class AnimationReader : ContentTypeReader<SpriteSheetAnimation>
         {
             AssetName = input.AssetName,
             FrameRate = frameRate,
+            SpriteSheetPath = spriteSheetPath
         };
 
         for (var i = 0; i < framesCount; i++)
@@ -27,6 +27,10 @@ public class AnimationReader : ContentTypeReader<SpriteSheetAnimation>
             //read the frame index
             var index = input.ReadInt32();
             frame.FrameIndex = index;
+            
+            //read the pivot
+            var pivot = input.ReadVector2();
+            frame.Pivot = pivot;
             
             //set the frame
             spriteSheetAnimation[i] = frame;

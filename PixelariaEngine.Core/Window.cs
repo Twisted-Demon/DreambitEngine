@@ -62,6 +62,12 @@ public static class Window
             SetBorderless(true);
         }
     }
+
+    public static void SetVsync(bool value)
+    {
+        Core.GraphicsDeviceManager.SynchronizeWithVerticalRetrace = value;
+        Core.GraphicsDeviceManager.ApplyChanges();
+    }
 }
 
 public class WindowEventArgs : EventArgs

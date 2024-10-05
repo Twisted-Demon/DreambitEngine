@@ -7,12 +7,10 @@ namespace PixelariaEngine.Sandbox.Components;
 
 public class FrameSerializer : Component
 {
-    public SpriteSheetAnimation Frames;
+    public SpriteSheetAnimation Animation;
 
     public override void OnCreated()
     {
-
-        
-        Frames = Core.Instance.Content.Load<SpriteSheetAnimation>("Animations/witch_run");
+        Animation = Resources.Load<SpriteSheetAnimation>("Animations/witch_run");
     }
 }

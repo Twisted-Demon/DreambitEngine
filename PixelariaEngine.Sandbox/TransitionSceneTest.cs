@@ -17,23 +17,22 @@ public class TransitionSceneTest : Scene
     
     protected override void OnInitialize()
     {
-        var bg = Entity.Create("bg");
-        var bgSprite = bg.AttachComponent<SpriteDrawer>();
+        _bgEntity = Entity.Create("bg");
+        var bgSprite = _bgEntity.AttachComponent<SpriteDrawer>();
         bgSprite.SpriteSheetPath = "SpriteSheets/SpaceBackground";
         
         _playerEntity = Entity.Create("player");
-        var sprite = _playerEntity.AttachComponent<SpriteDrawer>();
-        sprite.SpriteSheetPath = "SpriteSheets/b_witch_run";
-        sprite.CurrentFrameIndex = 2;
         _playerEntity.AttachComponent<SandboxController>();
-
-        _playerEntity.AttachComponent<FrameSerializer>();
+        var animator = _playerEntity.AttachComponent<AnimatedSprite>();
+        animator.AnimationPath = "Animations/witch_run";
+        animator.Play();
+        
         MainCamera.IsFollowing = true;
         MainCamera.TransformToFollow = _playerEntity.Transform;
     }
 
     protected override void OnUpdate()
     {
-        Scene.SetNextScene(new TransitionSceneTest().AddRenderer<DefaultRenderer>());
+        //Scene.SetNextScene(new TransitionSceneTest().AddRenderer<DefaultRenderer>());
     }
 }

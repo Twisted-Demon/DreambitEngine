@@ -21,13 +21,13 @@ public static class Log
     public static void Debug(string header, string format, params object[] args)
     {
         AnsiConsole.ResetColors();
-        AnsiConsole.MarkupLine($"[white]{header}: [/][darkcyan]{format}[/]", args);
+        AnsiConsole.MarkupLine($"[white]{header}: [/][cyan]{format}[/]", args);
     }
     
     public static void Debug(string header, string message)
     {
         AnsiConsole.ResetColors();
-        AnsiConsole.MarkupLine($"[white]{header}: [/][darkcyan]{message}[/]");
+        AnsiConsole.MarkupLine($"[white]{header}: [/][cyan]{message}[/]");
     }
     
     

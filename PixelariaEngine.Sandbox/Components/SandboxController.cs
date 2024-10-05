@@ -23,7 +23,6 @@ public class SandboxController : Component
             _moveDir.Normalize();
         
         Transform.Position += _moveDir * Speed * Time.DeltaTime;
-        Transform.Rotation.Z += Time.DeltaTime;
         
         if(Input.IsKeyPressed(Keys.Escape))
             Core.Instance.Exit();

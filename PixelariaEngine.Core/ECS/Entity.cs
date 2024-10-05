@@ -102,6 +102,21 @@ public class Entity : IDisposable
         return component;
     }
 
+    public Component AttachComponent(Type type)
+    {
+        var component = _componentList.GetComponent(type);
+        if(component != null) return component;
+        
+        component = Activator.CreateInstance(type) as Component;
+        if(component == null) return null;
+        component.SetUp(this, true);
+        
+        component.OnCreated();
+        _componentList.AttachComponent(component);
+        
+        return component;
+    }
+
     /// <summary>
     /// Detaches a component from the entity and cleans it up
     /// </summary>
@@ -135,6 +150,11 @@ public class Entity : IDisposable
     public T GetComponent<T>() where T : Component
     {
         return _componentList.GetComponent<T>();
+    }
+
+    internal bool HasComponentOfType(Type componentType)
+    {
+        return _componentList.ComponentOfTypeExists(componentType);   
     }
 
     internal void OnAddedToScene()

@@ -1,4 +1,6 @@
-﻿using System.Xml;
+﻿using System;
+using System.Diagnostics;
+using System.Xml;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using PixelariaEngine.Graphics;
@@ -14,8 +16,14 @@ public class Core : Game
         IsMouseVisible = true;
         Instance = this;
         
+        GameName = title;
         PixelariaEngine.Window.SetTitle(title);
         PixelariaEngine.Window.SetSize(width, height);
+
+        GraphicsDeviceManager.SynchronizeWithVerticalRetrace = false;
+        GraphicsDeviceManager.ApplyChanges();
+        TargetElapsedTime = TimeSpan.FromSeconds((double)1/120);
+        
         Input.Init();
     }
     
@@ -27,6 +35,7 @@ public class Core : Game
     public static Core Instance { get; private set; }
 
     private readonly Logger<Core> _logger = new();
+    private static string GameName { get; set; }
 
     protected override void LoadContent()
     {
@@ -38,6 +47,8 @@ public class Core : Game
     protected override void Update(GameTime gameTime)
     {
         Time.Update(gameTime);
+        
+        UpdateDebug();
 
         Input.PreUpdate();
         {
@@ -52,6 +63,29 @@ public class Core : Game
         
         
     }
+
+    private void UpdateDebug()
+    {
+        #if DEBUG
+        UpdateTitle();
+        #endif
+    }
+    
+    #if DEBUG
+    private float _debugElapsedTime = 0f;
+    private void UpdateTitle()
+    {
+        _debugElapsedTime += Time.DeltaTime;
+        
+        if (_debugElapsedTime < 1f)
+            return;
+        _debugElapsedTime = 0f;
+        var memory = Process.GetCurrentProcess().PrivateMemorySize64;
+        var megabytes = (double) memory / (1024 * 1024);
+        megabytes = Math.Round(megabytes, 2);
+        PixelariaEngine.Window.SetTitle($"{GameName} {Time.FrameRate}fps | memory: {megabytes}MB");
+    }
+    #endif
 
     protected override void Draw(GameTime gameTime)
     {

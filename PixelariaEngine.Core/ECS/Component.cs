@@ -2,16 +2,17 @@
 
 namespace PixelariaEngine.ECS;
 
-public class Component : IDisposable
+public abstract class Component : IDisposable
 {
     public Transform Transform => Entity.Transform;
     
     private bool _enabled;
     private bool _isDestroyed;
     private bool _isDisposed;
-
+    
     protected Component()
     {
+        
     }
 
     public Entity Entity { get; internal set; }
@@ -49,7 +50,24 @@ public class Component : IDisposable
         Entity = entity;
         _enabled = enabled;
 
+        ProcessAttributes();
+        
         return this;
+    }
+    
+    private void ProcessAttributes()
+    {
+        
+        var attributes = Attribute.GetCustomAttributes(GetType());
+        foreach (var attribute in attributes)
+        {
+            if (attribute is not RequireAttribute requireAttribute) continue;
+            
+            var hasRequired = Entity.HasComponentOfType(requireAttribute.RequiredType);
+            if (hasRequired) continue;
+            
+            Entity.AttachComponent(requireAttribute.RequiredType);
+        }
     }
 
     /// <summary>
@@ -167,4 +185,9 @@ public class Component : IDisposable
         _isDestroyed = true;
         _isDisposed = true;
     }
+}
+
+public abstract class Component<T> : Component where T : Component
+{
+    protected Logger<T> Logger = new();
 }

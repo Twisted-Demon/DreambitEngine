@@ -10,7 +10,7 @@ public class AnimationWriter : ContentTypeWriter<SpriteSheetAnimation>
 {
     public override string GetRuntimeReader(TargetPlatform targetPlatform)
     {
-        var type = typeof(AnimationReader);
+        var type = typeof(SpriteSheetAnimationReader);
         
         var typeName = type.FullName;
         var assemblyName = type.Assembly.GetName().Name;
@@ -20,6 +20,9 @@ public class AnimationWriter : ContentTypeWriter<SpriteSheetAnimation>
 
     protected override void Write(ContentWriter output, SpriteSheetAnimation anim)
     {
+        //serialize the sprite sheet path
+        output.Write(anim.SpriteSheetPath);
+        
         //serialize the framerate
         output.Write(anim.FrameRate);
         
@@ -37,6 +40,9 @@ public class AnimationWriter : ContentTypeWriter<SpriteSheetAnimation>
     {
         // write the frame index
         output.Write(frame.FrameIndex);
+        
+        //write the pivot
+        output.Write(frame.Pivot);
             
         // write if we  have an animation event
         if (frame.AnimationEvent == null)

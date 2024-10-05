@@ -17,16 +17,16 @@ public class Resources
     /// <returns></returns>
     public static T Load<T>(string path) where T : class
     {
-        _logger.Trace("loading asset - {0}", path);
         try
         {
-            return Core.Instance.Content.Load<T>(path);
+            var asset = Core.Instance.Content.Load<T>(path);
+            _logger.Trace("Loaded {0} | {1}", typeof(T).Name, path);
+            
+            return asset;
         }
         catch (Exception e)
         {
-            _logger.Warn("Could not load resource {0}", path);
-            _logger.Debug("Exception: {0}", e);
-
+            _logger.Warn("Could not load {0} | {1}", typeof(T).Name, path);
             return null;
         }
     }

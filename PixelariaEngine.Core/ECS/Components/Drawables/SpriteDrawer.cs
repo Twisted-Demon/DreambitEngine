@@ -6,7 +6,7 @@ using PixelariaEngine.Graphics;
 
 namespace PixelariaEngine.ECS;
 
-public class SpriteDrawer : DrawableComponent
+public class SpriteDrawer : DrawableComponent<SpriteDrawer>
 {
     private SpriteSheet _spriteSheet;
     
@@ -22,14 +22,34 @@ public class SpriteDrawer : DrawableComponent
         set
         {
             if(_spriteSheetPath == value) return;
-            _spriteSheetPath = value;
-            _spriteSheet = Resources.Load<SpriteSheet>(_spriteSheetPath);
+            OnSpriteSheetPathChanged(value);
         }
+    }
+
+    public SpriteSheet SpriteSheet
+    {
+        get => _spriteSheet;
+        set
+        {
+            if(_spriteSheet == value) return;
+            _spriteSheet = value;
+            _spriteSheetPath = _spriteSheet.AssetName;
+        }
+    }
+
+    private void OnSpriteSheetPathChanged(string newPath)
+    {
+        _spriteSheetPath = newPath;
+        _spriteSheet = Resources.Load<SpriteSheet>(_spriteSheetPath);    
     }
     
     public override void OnDraw()
     {
-        if (_spriteSheet?.Texture == null) return;
+        if (_spriteSheet?.Texture == null)
+        {
+            Logger.Warn("Entity {0} is missing a texture", Entity.Name);
+            return;
+        }
         
         _spriteSheet.TryGetFrame(CurrentFrameIndex, out var spriteFrame);
         

@@ -25,3 +25,8 @@ public abstract class DrawableComponent : Component
         Scene.Drawables.UpdateDrawableDrawLayer(this, oldDrawLayer, newDrawLayer);
     }
 }
+
+public abstract class DrawableComponent<T> : DrawableComponent where T : DrawableComponent
+{
+    protected Logger<T> Logger = new();
+}

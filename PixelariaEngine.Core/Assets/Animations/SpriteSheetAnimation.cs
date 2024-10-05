@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using Microsoft.Xna.Framework;
 using Newtonsoft.Json;
 
@@ -8,8 +9,10 @@ public class SpriteSheetAnimation : PixelariaAsset
 {
     [JsonProperty("frames")] 
     private AnimationFrame[] _frames;
+
+    [JsonProperty("frame_rate")] public int FrameRate { get; set; } = 0;
     
-    [JsonProperty("frame_rate")] public int FrameRate = 0;
+    [JsonProperty("sprite_sheet_path")] public string SpriteSheetPath { get; set; } = string.Empty;
     
     public AnimationFrame this[int key]
     {
@@ -34,12 +37,22 @@ public class SpriteSheetAnimation : PixelariaAsset
     {
         _frames = [];
     }
+
+    public bool TryGetFrame(int key, out AnimationFrame frame)
+    {
+        frame = _frames.ElementAtOrDefault<AnimationFrame>(key);
+
+        return frame != null;
+    }
 }
 
 public class AnimationFrame
 {
     [JsonProperty("frame_index")]
-    public int FrameIndex;
+    public int FrameIndex { get; set; }
+    
+    [JsonProperty("pivot")] public Vector2 Pivot { get; set; }
+    
     [JsonProperty("animation_event", NullValueHandling = NullValueHandling.Ignore)]
     public AnimationEvent AnimationEvent;
 
