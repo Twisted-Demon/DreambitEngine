@@ -5,7 +5,7 @@ namespace PixelariaEngine;
 
 public class Resources
 {
-    private static readonly Logger<Resources> _logger = new();
+    private static readonly Logger<Resources> Logger = new();
     public static ContentManager Content => Core.Instance.Content;
 
     /// <summary>
@@ -19,13 +19,13 @@ public class Resources
         try
         {
             var asset = Core.Instance.Content.Load<T>(path);
-            _logger.Trace("Loaded {0} | {1}", typeof(T).Name, path);
+            Logger.Trace("Loaded {0} | {1}", typeof(T).Name, path);
 
             return asset;
         }
         catch (Exception e)
         {
-            _logger.Warn("Could not load {0} | {1}", typeof(T).Name, path);
+            Logger.Warn("Could not load {0} | {1}", typeof(T).Name, path);
             return null;
         }
     }
