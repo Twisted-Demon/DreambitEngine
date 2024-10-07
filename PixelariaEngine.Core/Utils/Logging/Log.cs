@@ -2,7 +2,7 @@
 
 namespace PixelariaEngine;
 
-public static class Log
+internal static class Log
 {
     public static void Trace(string header, string format, params object[] args)
     {

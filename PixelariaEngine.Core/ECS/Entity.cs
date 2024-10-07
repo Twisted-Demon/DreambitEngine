@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace PixelariaEngine.ECS;
 
@@ -149,6 +150,29 @@ public class Entity : IDisposable
     public T GetComponent<T>() where T : Component
     {
         return _componentList.GetComponent<T>();
+    }
+
+    /// <summary>
+    /// gets a list of all components that are attached, regardless if they are active
+    /// </summary>
+    /// <returns></returns>
+    public List<Component> GetAllAttachedComponents()
+    {
+        return _componentList.GetAllAttachedComponents();
+    }
+    
+    /// <summary>
+    /// gets a list of all components only if they are active
+    /// </summary>
+    /// <returns></returns>
+    public List<Component> GetAllActiveComponents()
+    {
+        return _componentList.GetAllActiveComponents();
+    }
+
+    public List<Component> GetAllComponents()
+    {
+        return _componentList.GetAllComponents();
     }
 
     internal bool HasComponentOfType(Type componentType)

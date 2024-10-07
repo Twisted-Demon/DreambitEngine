@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Xna.Framework;
 using PixelariaEngine.ECS;
 using PixelariaEngine.Graphics;
@@ -7,22 +9,25 @@ namespace PixelariaEngine;
 
 public class Scene
 {
+    private readonly Logger<Scene> _logger = new();
+
+    public bool DebugMode { get; set; } = false;
     public readonly DrawableList Drawables;
     protected readonly EntityList Entities;
-
-    private readonly Logger<Scene> _logger = new();
 
     public Color BackgroundColor = Color.CornflowerBlue;
     protected bool IsInitialized;
     protected bool IsPaused;
     protected bool IsStarted;
-    protected Renderer Renderer;
+    protected readonly List<Renderer> Renderers = [];
+    
 
     public Scene()
     {
         Entities = new EntityList(this);
         Drawables = new DrawableList();
-        Renderer = new DefaultRenderer(this);
+
+        AddRenderer<DebugRenderer>();
     }
 
     public Camera2D MainCamera { get; private set; }
@@ -38,15 +43,18 @@ public class Scene
     private void InitializeInternals()
     {
         _logger.Debug("Initializing Scene");
-        Renderer?.Initialize();
         MainCamera = Entity.Create("main-camera").AttachComponent<Camera2D>();
+        
+        foreach(var renderer in Renderers)
+            renderer.Initialize();
+        
         OnInitialize();
     }
 
     public Scene AddRenderer<T>() where T : Renderer
     {
         var renderer = (T)Activator.CreateInstance(typeof(T), this);
-        Renderer = renderer;
+        Renderers.Add(renderer);
         return this;
     }
 
@@ -73,7 +81,7 @@ public class Scene
     /// <summary>
     ///     Called when a scene is ended.
     /// </summary>
-    internal virtual void OnEnd()
+    protected virtual void OnEnd()
     {
     }
 
@@ -81,7 +89,8 @@ public class Scene
     {
         Entities.ClearLists();
         Drawables.ClearLists();
-        Renderer.CleanUp();
+        foreach(var renderer in Renderers)
+            renderer.CleanUpInternal();
     }
 
     internal void Terminate()
@@ -98,8 +107,6 @@ public class Scene
             IsInitialized = true;
         }
 
-        UpdateInternals();
-
         if (!IsStarted)
         {
             _logger.Trace("Scene Starting");
@@ -107,19 +114,23 @@ public class Scene
             IsStarted = true;
         }
 
+        UpdateInternals();
+
+        //TODO: fix pausing
         if (!IsPaused)
             OnUpdate();
     }
 
     public virtual void OnDraw()
     {
-        if (Renderer == null)
+        if (Renderers.Count == 0)
         {
             _logger.Error("The Current Scene does not have a Renderer");
             return;
         }
 
-        Renderer.OnDraw();
+        foreach(var renderer in Renderers.OrderBy(x => x.Order).ToList())
+            renderer.OnDraw();
     }
 
     public Entity CreateEntity(string name = "entity", string tag = "default", bool enabled = true)
@@ -142,8 +153,18 @@ public class Scene
         return Entities.GetEntity(name);
     }
 
+    public List<Entity> GetAllActiveEntities()
+    {
+        return Entities.GetAllActiveEntitiesEntities();
+    }
+
     public static void SetNextScene(Scene scene)
     {
         Core.Instance.SetNextScene(scene);
     }
+}
+
+public abstract class Scene<T> : Scene where T : class
+{
+    protected Logger<T> Logger { get; private set; } = new();
 }

@@ -6,18 +6,19 @@ namespace PixelariaEngine.ECS;
 
 public class Camera2D : Component
 {
-    public CameraFollowBehavior CameraFollowBehavior = CameraFollowBehavior.Direct;
+    public CameraFollowBehavior CameraFollowBehavior = CameraFollowBehavior.Lerp;
     public bool IsFollowing = true;
     public Transform TransformToFollow;
     public float LerpSpeed { get; set; } = 0.1f;
     public float Zoom { get; set; } = 1f;
+    public float ResolutionZoom { get; set; } = 1f;
+    private int TargetHorizontalResolution { get; } = 384;
     public Matrix TransformMatrix { get; private set; }
+    public Matrix UnscaledTransformMatrix { get; private set; }
 
     private static Point ScreenSize
         => new(Core.Instance.GraphicsDevice.Viewport.Width, Core.Instance.GraphicsDevice.Viewport.Height);
 
-    private int TargetHorizontalResolution { get; } = 256;
-    private float ResolutionZoom { get; set; } = 1f;
 
     public override void OnCreated()
     {
@@ -30,6 +31,10 @@ public class Camera2D : Component
         TransformMatrix = Transform.GetTransformationMatrix() *
                           Matrix.CreateScale(new Vector3(ResolutionZoom * Zoom, ResolutionZoom * Zoom, 1)) *
                           Matrix.CreateTranslation(new Vector3(0.5f * ScreenSize.X, 0.5f * ScreenSize.Y, 0f));
+        
+        UnscaledTransformMatrix = Transform.GetTransformationMatrix() * 
+                                  //Matrix.CreateScale(new Vector3(Zoom, Zoom, 1)) * 
+                                  Matrix.CreateTranslation(new Vector3(0.5f * ScreenSize.X, 0.5f * ScreenSize.Y, 0f));
 
         UpdatePosition();
     }
@@ -46,7 +51,7 @@ public class Camera2D : Component
 
     private void SetResolutionZoom()
     {
-        ResolutionZoom = ScreenSize.Y / (float)TargetHorizontalResolution;
+        ResolutionZoom = ScreenSize.X / (float)TargetHorizontalResolution;
     }
 
     private void UpdatePosition()

@@ -1,11 +1,12 @@
-﻿using Microsoft.Xna.Framework;
+﻿using System;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
 using PixelariaEngine.ECS;
 
 namespace PixelariaEngine.Sandbox.Components;
 
 [Require(typeof(AnimatedSprite))]
-public class SandboxController : Component
+public class SandboxController : Component<SandboxController>
 {
     private Vector3 _moveDir;
     private const float Speed = 75f;
@@ -23,6 +24,17 @@ public class SandboxController : Component
 
         _animator = Entity.GetComponent<AnimatedSprite>();
         _animator.Play();
+        
+        Scene.MainCamera.IsFollowing = true;
+        Scene.MainCamera.TransformToFollow = Transform;
+
+        var box1 = Box.CreateSquare(Vector2.Zero, 5.0f);
+        var box2 = Box.CreateSquare(Vector2.One, 5.0f);
+
+        var collides = box1.Intersects(box2);
+        
+        if(collides)
+            Logger.Info("COLLIDED");
     }
 
     public override void OnUpdate()
@@ -32,6 +44,9 @@ public class SandboxController : Component
         
         if(Input.IsKeyPressed(Keys.Escape))
             Core.Instance.Exit();
+
+        if (Input.IsKeyPressed(Keys.F1))
+            Scene.DebugMode = true;
     }
 
     private void UpdateAnimation()

@@ -109,6 +109,26 @@ public class ComponentList(Scene scene)
         return result != null ? result : null;
     }
 
+    public List<Component> GetAllAttachedComponents()
+    {
+        return _attachedComponents;
+    }
+
+    public List<Component> GetAllActiveComponents()
+    {
+        return _attachedComponents.Where(x => x.Enabled).ToList();
+    }
+
+    public List<Component> GetAllComponents()
+    {
+        var result = new List<Component>();
+        
+        result.AddRange(_componentsToAttach);
+        result.AddRange(_attachedComponents);
+
+        return result;
+    }
+
     public void ClearLists()
     {
         _scene = null;

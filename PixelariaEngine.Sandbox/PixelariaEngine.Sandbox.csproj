@@ -9,10 +9,17 @@
     </PropertyGroup>
     <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
         <OutputPath>$(BaseOutputPath)</OutputPath> <!-- No version folder for Debug -->
+        <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+        <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(Configuration)' == 'Release'">
         <OutputPath>$(BaseOutputPath)</OutputPath> <!-- No version folder for Release -->
+        <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+        <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+        <GenerateDependencyFile>false</GenerateDependencyFile>
+        <DebugSymbols>false</DebugSymbols>
+        <DebugType>none</DebugType>
     </PropertyGroup>
     <PropertyGroup>
         <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -44,7 +51,7 @@
     </ItemGroup>
     <ItemGroup>
       <Reference Include="Newtonsoft.Json">
-        <HintPath>..\PixelariaEngine.Core\Includes\Newtonsoft.Json.dll</HintPath>
+        <HintPath>..\Includes\Newtonsoft.Json.dll</HintPath>
       </Reference>
     </ItemGroup>
     <Target Name="RestoreDotnetTools" BeforeTargets="Restore">

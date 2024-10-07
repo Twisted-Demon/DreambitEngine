@@ -8,6 +8,7 @@ namespace PixelariaEngine;
 public class Core : Game
 {
     private readonly Logger<Core> _logger = new();
+    public static LogLevel LogLevel = LogLevel.Debug;
 
     public Core(string title, int width = 800, int height = 600)
     {
@@ -17,8 +18,11 @@ public class Core : Game
         Instance = this;
 
         GameName = title;
+        PixelariaEngine.Window.Init();
         PixelariaEngine.Window.SetTitle(title);
         PixelariaEngine.Window.SetSize(width, height);
+
+        SetFixedTimeStep(false);
 
         TargetElapsedTime = TimeSpan.FromSeconds((double)1 / 120); //set Target fps to 120
 
@@ -87,6 +91,8 @@ public class Core : Game
         CurrentScene?.Terminate();
         CurrentScene = NextScene;
         NextScene = null;
+
+        Time.SceneLoaded();
     }
 
     internal void SetNextScene(Scene scene)

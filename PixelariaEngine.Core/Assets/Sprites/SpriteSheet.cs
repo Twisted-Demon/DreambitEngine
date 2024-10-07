@@ -25,6 +25,17 @@ public class SpriteSheet : PixelariaAsset
         SplitSprite();
     }
 
+    private SpriteSheet(int gridSize, string texturePath, Texture2D texture)
+    {
+        Columns = texture.Width / gridSize;
+        Rows = texture.Height / gridSize;
+        _texturePath = texturePath;
+        Texture = texture;
+
+        SplitSprite();
+    }
+
+
     public SpriteSheet()
     {
     }
@@ -33,7 +44,7 @@ public class SpriteSheet : PixelariaAsset
 
     [JsonIgnore] public string TexturePath => _texturePath;
 
-    [JsonIgnore] public Rectangle[] Frames { get; private set; } = [];
+    [JsonIgnore] public Rectangle?[] Frames { get; private set; } = [];
 
     [JsonIgnore] public int FrameCount => Frames.Length;
 
@@ -41,12 +52,14 @@ public class SpriteSheet : PixelariaAsset
     {
         var texture = Resources.Load<Texture2D>(texturePath);
 
-        if (texture == null)
-            return null;
+        return texture == null ? null : new SpriteSheet(columns, rows, texturePath, texture);
+    }
 
-        var spriteSheet = new SpriteSheet(columns, rows, texturePath, texture);
+    public static SpriteSheet Create(int gridSize, string texturePath)
+    {
+        var texture = Resources.Load<Texture2D>(texturePath);
 
-        return spriteSheet;
+        return texture == null ? null : new SpriteSheet(gridSize, texturePath, texture);
     }
 
     public void SplitSprite()
@@ -56,7 +69,7 @@ public class SpriteSheet : PixelariaAsset
 
         var totalFrames = Columns * Rows;
 
-        Frames = new Rectangle[totalFrames];
+        Frames = new Rectangle?[totalFrames];
 
         switch (Frames.Length)
         {
@@ -79,13 +92,13 @@ public class SpriteSheet : PixelariaAsset
                 Frames[0] = new Rectangle(0, 0, Texture.Width, Texture.Height);
                 break;
             default:
-                Frames = new Rectangle[1];
+                Frames = new Rectangle?[1];
                 Frames[0] = new Rectangle(0, 0, Texture.Width, Texture.Height);
                 break;
         }
     }
 
-    public bool TryGetFrame(int frame, out Rectangle frameRect)
+    public bool TryGetFrame(int frame, out Rectangle? frameRect)
     {
         try
         {

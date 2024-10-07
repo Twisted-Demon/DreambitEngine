@@ -9,14 +9,13 @@ public class EntityList(Scene scene)
     private readonly List<Entity> _entities = [];
     private readonly List<Entity> _entitiesToCreate = [];
     private readonly List<Entity> _entitiesToDestroy = [];
-    private readonly Scene _scene = scene;
 
     private uint _nextEntityId;
 
     public Entity CreateEntity(string name, string tag, bool enabled)
     {
         //create the entity
-        var entity = new Entity(_nextEntityId, name, tag, enabled, _scene);
+        var entity = new Entity(_nextEntityId, name, tag, enabled, scene);
         _entitiesToCreate.Add(entity);
 
         _nextEntityId++; //increment for the next entity ID.
@@ -116,5 +115,23 @@ public class EntityList(Scene scene)
 
         entityResult = _entitiesToCreate.FirstOrDefault(entity => entity.Name == name);
         return entityResult;
+    }
+
+    public List<Entity> GetAllActiveEntitiesEntities()
+    {
+        return _entities.Where(entity => entity.Enabled).ToList();
+    }
+
+    public List<Entity> GetAllAddedEntities()
+    {
+        return _entities.ToList();
+    }
+
+    public List<Entity> GetAllEntities()
+    {
+        var list = new List<Entity>();
+        list.AddRange(_entities);
+        list.AddRange(_entitiesToCreate);
+        return list;
     }
 }

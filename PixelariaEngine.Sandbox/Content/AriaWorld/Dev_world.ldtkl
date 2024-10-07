@@ -562,35 +562,38 @@
 			"entityInstances": [
 				{
 					"__identifier": "Tree",
-					"__grid": [174,221],
+					"__grid": [300,402],
 					"__pivot": [0.484,0.875],
-					"__tags": ["forest_foliage"],
+					"__tags": ["Foliage"],
 					"__tile": { "tilesetUid": 1, "x": 64, "y": 2096, "w": 64, "h": 96 },
-					"__smartColor": "#BE4A2F",
+					"__smartColor": "#FFFFFF",
 					"iid": "89a14020-73f0-11ef-9a48-37a173f144b4",
 					"width": 64,
 					"height": 96,
 					"defUid": 4,
-					"px": [174,221],
+					"px": [300,402],
 					"fieldInstances": [{ "__identifier": "RenderTiles", "__type": "Tile", "__value": { "tilesetUid": 1, "x": 64, "y": 2096, "w": 64, "h": 96 }, "__tile": { "tilesetUid": 1, "x": 64, "y": 2096, "w": 64, "h": 96 }, "defUid": 21, "realEditorValues": [] }],
-					"__worldX": 174,
-					"__worldY": 221
+					"__worldX": 300,
+					"__worldY": 402
 				},
 				{
 					"__identifier": "Tree",
-					"__grid": [255,219],
+					"__grid": [189,401],
 					"__pivot": [0.484,0.875],
-					"__tags": ["forest_foliage"],
-					"__tile": { "tilesetUid": 1, "x": 64, "y": 2096, "w": 64, "h": 96 },
-					"__smartColor": "#BE4A2F",
+					"__tags": ["Foliage"],
+					"__tile": { "tilesetUid": 1, "x": 256, "y": 2208, "w": 64, "h": 96 },
+					"__smartColor": "#FFFFFF",
 					"iid": "8b25bd40-73f0-11ef-9a48-077a3f48a66d",
 					"width": 64,
 					"height": 96,
 					"defUid": 4,
-					"px": [255,219],
-					"fieldInstances": [{ "__identifier": "RenderTiles", "__type": "Tile", "__value": { "tilesetUid": 1, "x": 64, "y": 2096, "w": 64, "h": 96 }, "__tile": { "tilesetUid": 1, "x": 64, "y": 2096, "w": 64, "h": 96 }, "defUid": 21, "realEditorValues": [] }],
-					"__worldX": 255,
-					"__worldY": 219
+					"px": [189,401],
+					"fieldInstances": [{ "__identifier": "RenderTiles", "__type": "Tile", "__value": { "tilesetUid": 1, "x": 256, "y": 2208, "w": 64, "h": 96 }, "__tile": { "tilesetUid": 1, "x": 256, "y": 2208, "w": 64, "h": 96 }, "defUid": 21, "realEditorValues": [{
+						"id": "V_String",
+						"params": ["256,2208,64,96"]
+					}] }],
+					"__worldX": 189,
+					"__worldY": 401
 				},
 				{
 					"__identifier": "PlayerStart",
@@ -607,6 +610,41 @@
 					"fieldInstances": [],
 					"__worldX": 215,
 					"__worldY": 232
+				},
+				{
+					"__identifier": "BigTree",
+					"__grid": [132,286],
+					"__pivot": [0.5,0.925],
+					"__tags": ["Foliage"],
+					"__tile": { "tilesetUid": 1, "x": 32, "y": 2304, "w": 160, "h": 160 },
+					"__smartColor": "#FFFFFF",
+					"iid": "e915f3b0-73f0-11ef-b738-55fee7de3bfa",
+					"width": 160,
+					"height": 160,
+					"defUid": 152,
+					"px": [132,286],
+					"fieldInstances": [{ "__identifier": "RenderTiles", "__type": "Tile", "__value": { "tilesetUid": 1, "x": 32, "y": 2304, "w": 160, "h": 160 }, "__tile": { "tilesetUid": 1, "x": 32, "y": 2304, "w": 160, "h": 160 }, "defUid": 153, "realEditorValues": [] }],
+					"__worldX": 132,
+					"__worldY": 286
+				},
+				{
+					"__identifier": "BigTree",
+					"__grid": [288,288],
+					"__pivot": [0.5,0.925],
+					"__tags": ["Foliage"],
+					"__tile": { "tilesetUid": 1, "x": 192, "y": 2304, "w": 160, "h": 160 },
+					"__smartColor": "#FFFFFF",
+					"iid": "ead41e70-73f0-11ef-b738-d1a9ee53eff5",
+					"width": 160,
+					"height": 160,
+					"defUid": 152,
+					"px": [288,288],
+					"fieldInstances": [{ "__identifier": "RenderTiles", "__type": "Tile", "__value": { "tilesetUid": 1, "x": 192, "y": 2304, "w": 160, "h": 160 }, "__tile": { "tilesetUid": 1, "x": 192, "y": 2304, "w": 160, "h": 160 }, "defUid": 153, "realEditorValues": [{
+						"id": "V_String",
+						"params": ["192,2304,160,160"]
+					}] }],
+					"__worldX": 288,
+					"__worldY": 288
 				}
 			]
 		},

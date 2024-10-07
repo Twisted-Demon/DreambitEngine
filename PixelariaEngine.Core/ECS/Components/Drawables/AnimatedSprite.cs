@@ -53,7 +53,7 @@ public class AnimatedSprite : Component<AnimatedSprite>
         _elapsedTime = 0;
 
         _spriteDrawer.CurrentFrameIndex = _currentFrame;
-        _spriteDrawer.Origin = _spriteSheetAnimation[0].Pivot;
+        _spriteDrawer.Pivot = _spriteSheetAnimation[0].Pivot;
     }
 
     public override void OnCreated()
@@ -84,7 +84,7 @@ public class AnimatedSprite : Component<AnimatedSprite>
             _currentFrame = 0; //if we are at the frame count, reset
 
         _spriteDrawer.CurrentFrameIndex = _currentFrame; //set the sprite drawer to render the new frame
-        _spriteDrawer.Origin = _spriteSheetAnimation[_currentFrame].Pivot;
+        _spriteDrawer.Pivot = _spriteSheetAnimation[_currentFrame].Pivot;
     }
 
     public void Play()

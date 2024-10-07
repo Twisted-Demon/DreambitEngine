@@ -2,15 +2,35 @@
 
 namespace PixelariaEngine.Graphics;
 
-public abstract class Renderer(Scene scene)
+public class Renderer
 {
+    public int Order = 0;
     protected static GraphicsDevice Device => Core.Instance.GraphicsDevice;
-    protected Scene Scene { get; private set; } = scene;
+    protected Scene Scene { get; private set; }
 
-    public abstract void Initialize();
-    public abstract void OnDraw();
-
-    public virtual void CleanUp()
+    protected Renderer(Scene scene)
+    {
+        Scene = scene;
+        Window.WindowResized += OnWindowResized;
+    }
+    protected virtual void OnWindowResized(object sender, WindowEventArgs args)
     {
     }
+
+    public virtual void Initialize() {}
+    public virtual void OnDraw(){}
+
+    public void CleanUpInternal()
+    {
+        Window.WindowResized -= OnWindowResized;
+    }
+
+    protected virtual void OnCleanUp()
+    {
+        
+    }
+
+    protected static RenderTarget2D CreateRenderTarget()
+        => new RenderTarget2D(Device, Device.PresentationParameters.BackBufferWidth,
+            Device.PresentationParameters.BackBufferHeight);
 }

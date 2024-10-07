@@ -24,7 +24,7 @@
     </ItemGroup>
     <ItemGroup>
       <Reference Include="Newtonsoft.Json">
-        <HintPath>..\PixelariaEngine.Core\Includes\Newtonsoft.Json.dll</HintPath>
+        <HintPath>..\Includes\Newtonsoft.Json.dll</HintPath>
       </Reference>
     </ItemGroup>
 </Project>

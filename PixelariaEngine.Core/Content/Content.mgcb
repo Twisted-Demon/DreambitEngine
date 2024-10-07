@@ -1,7 +1,7 @@
 
 #----------------------------- Global Properties ----------------------------#
 
-/outputDir:../../PixelariaEngine.Sandbox/Build/net8.0/Content
+/outputDir:../../PixelariaEngine.Sandbox/Build/Content
 /intermediateDir:obj/$(Platform)
 /platform:DesktopGL
 /config:
@@ -10,7 +10,8 @@
 
 #-------------------------------- References --------------------------------#
 
-/reference:../../PixelariaEngine.ContentPipelineExtensions/Build/net8.0/PixelariaEngine.ContentPipelineExtensions.dll
+/reference:../../Includes/PixelariaEngine.ContentPipelineExtensions.dll
+/reference:../../Includes/LDtk.ContentPipeline.dll
 
 #---------------------------------- Content ---------------------------------#
 

@@ -10,9 +10,10 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
 
     private string _spriteSheetPath = string.Empty;
     public Color Color { get; set; } = Color.White;
-    public Vector2 Origin { get; set; } = Vector2.Zero;
+    public Vector2 Pivot { get; set; } = Vector2.Zero;
     public SpriteOrigin OriginType { get; set; } = SpriteOrigin.Center;
     public int CurrentFrameIndex { get; set; }
+    public Rectangle? Frame { get; set; } = null;
 
     public string SpriteSheetPath
     {
@@ -49,15 +50,22 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
             return;
         }
 
-        _spriteSheet.TryGetFrame(CurrentFrameIndex, out var spriteFrame);
+        var spriteFrame = Frame;
 
-        var originToUse = Origin;
+        if (spriteFrame == null)
+            _spriteSheet.TryGetFrame(CurrentFrameIndex, out spriteFrame);
+
+        if (spriteFrame == null) return;
+
+        var originToUse = Pivot;
 
         if (OriginType != SpriteOrigin.Custom)
         {
             var relative = SpriteSheet.GetRelativeOrigin(OriginType);
-            originToUse = new Vector2(relative.X * spriteFrame.Width, relative.Y * spriteFrame.Height);
+            originToUse = new Vector2(relative.X * (float)spriteFrame?.Width, relative.Y * (float)spriteFrame?.Height);
         }
+
+        var depth = Transform.Position.Y / Core.Instance.GraphicsDevice.Viewport.Height;
 
         Core.SpriteBatch.Draw(
             _spriteSheet.Texture,
@@ -68,7 +76,35 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
             originToUse,
             Transform.ScaleToVec2,
             SpriteEffects.None,
-            0f
+            depth
         );
+    }
+
+    public override void OnDebugDraw()
+    {
+        var spriteFrame = Frame;
+        
+        if (spriteFrame == null)
+            _spriteSheet.TryGetFrame(CurrentFrameIndex, out spriteFrame);
+        
+        if (spriteFrame == null) return;
+        
+        var originToUse = Pivot;
+        
+        if (OriginType != SpriteOrigin.Custom)
+        {
+            var relative = SpriteSheet.GetRelativeOrigin(OriginType);
+            originToUse = new Vector2(relative.X * (float)spriteFrame?.Width, relative.Y * (float)spriteFrame?.Height);
+        }
+
+        var rect = new Rectangle(
+            (int)(Transform.Position.X - (originToUse.X)),
+            (int)(Transform.Position.Y - (originToUse.Y)),
+            (int)(spriteFrame?.Width),
+            (int)(spriteFrame?.Height)
+        );
+        
+        Core.SpriteBatch.DrawHollowRectangle(rect, Color.Yellow);
+        Core.SpriteBatch.DrawLine(Transform.PositionToVec2, Transform.PositionToVec2, Color.Red);
     }
 }

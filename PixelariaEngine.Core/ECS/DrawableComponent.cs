@@ -1,6 +1,6 @@
 ﻿namespace PixelariaEngine.ECS;
 
-public abstract class DrawableComponent : Component
+public class DrawableComponent : Component
 {
     private int _drawLayer;
 
@@ -10,7 +10,17 @@ public abstract class DrawableComponent : Component
         set => OnDrawLayerChanged(value);
     }
 
-    public abstract void OnDraw();
+    public virtual void OnDraw()
+    {
+    }
+
+    public virtual void OnPreDraw()
+    {
+    }
+
+    public virtual void OnPostDraw()
+    {
+    }
 
     private void OnDrawLayerChanged(int newDrawLayer)
     {
@@ -26,5 +36,5 @@ public abstract class DrawableComponent : Component
 
 public abstract class DrawableComponent<T> : DrawableComponent where T : DrawableComponent
 {
-    protected Logger<T> Logger = new();
+    protected readonly Logger<T> Logger = new();
 }

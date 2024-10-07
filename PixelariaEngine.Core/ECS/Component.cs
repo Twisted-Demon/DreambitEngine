@@ -117,6 +117,14 @@ public abstract class Component : IDisposable
     {
     }
 
+    /// <summary>
+    /// Called if debug mode is activated. Used to render debug data.
+    /// </summary>
+    public virtual void OnDebugDraw()
+    {
+        
+    }
+
     internal void Destroy()
     {
         _isDestroyed = true;

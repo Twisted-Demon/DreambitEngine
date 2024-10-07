@@ -1,11 +1,12 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 
 namespace PixelariaEngine.ECS;
 
 public class DrawableList
 {
     private readonly List<DrawableComponent> _drawables = [];
-    private readonly Dictionary<int, List<DrawableComponent>> _drawablesByDrawLayer = [];
+    private readonly Dictionary<int, List<DrawableComponent>> _drawLayers = [];
 
     internal int Count => _drawables.Count;
     internal DrawableComponent this[int index] => _drawables[index];
@@ -21,13 +22,13 @@ public class DrawableList
     internal void Remove(DrawableComponent drawable)
     {
         _drawables.Remove(drawable);
-        _drawablesByDrawLayer[drawable.DrawLayer].Remove(drawable);
+        _drawLayers[drawable.DrawLayer].Remove(drawable);
     }
 
     internal void ClearLists()
     {
         _drawables.Clear();
-        _drawablesByDrawLayer.Clear();
+        _drawLayers.Clear();
     }
 
     internal void UpdateDrawableDrawLayer(DrawableComponent drawable, int oldLayer, int newLayer)
@@ -51,14 +52,26 @@ public class DrawableList
 
     public List<DrawableComponent> GetDrawablesByDrawLayer(int drawLayer)
     {
-        if (!_drawablesByDrawLayer.TryGetValue(drawLayer, out _))
-            _drawablesByDrawLayer[drawLayer] = [];
+        if (!_drawLayers.TryGetValue(drawLayer, out _))
+            _drawLayers[drawLayer] = [];
 
-        return _drawablesByDrawLayer[drawLayer];
+        return _drawLayers[drawLayer];
+    }
+    
+    public int DrawLayerCount => _drawLayers.Count;
+
+    public Dictionary<int, List<DrawableComponent>> GetDrawLayers()
+    {
+        return _drawLayers;
     }
 
     public List<DrawableComponent> GetAllDrawables()
     {
         return _drawables;
+    }
+
+    public List<DrawableComponent> GetAllEnabledDrawables()
+    {
+        return _drawables.Where(d => d.Enabled && d.Entity.Enabled).ToList();
     }
 }

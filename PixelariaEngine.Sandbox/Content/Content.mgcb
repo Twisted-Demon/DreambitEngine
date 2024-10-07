@@ -1,7 +1,7 @@
 
 #----------------------------- Global Properties ----------------------------#
 
-/outputDir:../Build/net8.0/Content
+/outputDir:../Build/Content
 /intermediateDir:obj/$(Platform)
 /platform:DesktopGL
 /config:
@@ -10,7 +10,8 @@
 
 #-------------------------------- References --------------------------------#
 
-/reference:../../PixelariaEngine.ContentPipelineExtensions/Build/net8.0/PixelariaEngine.ContentPipelineExtensions.dll
+/reference:../../Includes/PixelariaEngine.ContentPipelineExtensions.dll
+/reference:../../Includes/LDtk.ContentPipeline.dll
 
 #---------------------------------- Content ---------------------------------#
 
@@ -25,13 +26,19 @@
 /build:Animations/b_witch_run.animation
 
 #begin AriaWorld.ldtk
-/copy:AriaWorld.ldtk
+/importer:LDtkFileImporter
+/processor:LDtkFileProcessor
+/build:AriaWorld.ldtk
 
 #begin AriaWorld/Dev_world.ldtkl
-/copy:AriaWorld/Dev_world.ldtkl
+/importer:LDtkLevelImporter
+/processor:LDtkLevelProcessor
+/build:AriaWorld/Dev_world.ldtkl
 
 #begin AriaWorld/Level_1.ldtkl
-/copy:AriaWorld/Level_1.ldtkl
+/importer:LDtkLevelImporter
+/processor:LDtkLevelProcessor
+/build:AriaWorld/Level_1.ldtkl
 
 #begin SpriteSheets/b_witch_idle.spritesheet
 /importer:SpriteSheetImporter

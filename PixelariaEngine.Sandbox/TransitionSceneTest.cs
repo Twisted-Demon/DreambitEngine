@@ -1,4 +1,5 @@
 ﻿using PixelariaEngine.ECS;
+using PixelariaEngine.Graphics;
 using PixelariaEngine.Sandbox.Components;
 
 namespace PixelariaEngine.Sandbox;
@@ -13,12 +14,14 @@ public class TransitionSceneTest : Scene
         _bgEntity = Entity.Create("bg");
         var bgSprite = _bgEntity.AttachComponent<SpriteDrawer>();
         bgSprite.SpriteSheetPath = "SpriteSheets/SpaceBackground";
+        bgSprite.OriginType = SpriteOrigin.BottomCenter;
 
         _playerEntity = Entity.Create("player");
         _playerEntity.AttachComponent<SandboxController>();
 
         MainCamera.IsFollowing = true;
         MainCamera.TransformToFollow = _playerEntity.Transform;
+        
     }
 
     protected override void OnUpdate()
