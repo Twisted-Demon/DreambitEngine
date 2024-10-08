@@ -45,5 +45,6 @@
     }
   ],
   "frame_rate": 8,
-  "sprite_sheet_path": "SpriteSheets/b_witch_run"
+  "sprite_sheet_path": "SpriteSheets/b_witch_run",
+  "one_shot": false
 }

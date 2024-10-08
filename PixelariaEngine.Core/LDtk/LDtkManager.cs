@@ -11,7 +11,6 @@ public class LDtkManager : Singleton<LDtkManager>
     public readonly Dictionary<int, SpriteSheet> SpriteSheets = new();
     public LDtkFile LDtkFile;
     public LDtkWorld LDtkWorld;
-    public Dictionary<string, EntityDefinition> EntityDefinitions = [];
 
     public void SetUp(string ldtkFilePath)
     {
@@ -49,7 +48,7 @@ public class LDtkManager : Singleton<LDtkManager>
         var defs = LDtkFile.Defs;
         foreach (var tileSet in defs.Tilesets)
         {
-            if (string.IsNullOrEmpty(tileSet.RelPath)) return;
+            if (string.IsNullOrEmpty(tileSet.RelPath)) continue;
 
             var texturePath = tileSet.RelPath.Replace(".png", "");
             var gridSize = tileSet.TileGridSize;
@@ -61,17 +60,12 @@ public class LDtkManager : Singleton<LDtkManager>
         }
     }
 
-    private void SetUpEntityDefinitions()
+    public T GetEntityDefinition<T>()
+        where T : new()
     {
-        var defs = LDtkFile.Defs;
-        foreach(var entity in defs.Entities)
-            EntityDefinitions.Add(entity.Identifier, entity);
+        return LDtkFile.GetEntityDefinition<T>();
     }
-
-    public EntityDefinition GetEntityDefinition<T>()
-    {
-        return EntityDefinitions[typeof(T).Name];
-    }
+    
     public LDtkLevel LoadLDtkLevel(Guid iid)
     {
         return LDtkWorld.LoadLevel(iid);

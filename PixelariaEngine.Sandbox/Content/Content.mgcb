@@ -15,10 +15,35 @@
 
 #---------------------------------- Content ---------------------------------#
 
+#begin Animations/arthas_idle.animation
+/importer:AnimationImporter
+/processor:AnimationProcessor
+/build:Animations/arthas_idle.animation
+
+#begin Animations/arthas_idle.animation
+/importer:AnimationImporter
+/processor:AnimationProcessor
+/build:Animations/arthas_idle.animation
+
+#begin Animations/arthas_lick.animation
+/importer:AnimationImporter
+/processor:AnimationProcessor
+/build:Animations/arthas_lick.animation
+
 #begin Animations/b_witch_idle.animation
 /importer:AnimationImporter
 /processor:AnimationProcessor
 /build:Animations/b_witch_idle.animation
+
+#begin Animations/b_witch_idle.animation
+/importer:AnimationImporter
+/processor:AnimationProcessor
+/build:Animations/b_witch_idle.animation
+
+#begin Animations/b_witch_run.animation
+/importer:AnimationImporter
+/processor:AnimationProcessor
+/build:Animations/b_witch_run.animation
 
 #begin Animations/b_witch_run.animation
 /importer:AnimationImporter
@@ -40,6 +65,11 @@
 /processor:LDtkLevelProcessor
 /build:AriaWorld/Level_1.ldtkl
 
+#begin SpriteSheets/arthas.spritesheet
+/importer:SpriteSheetImporter
+/processor:SpriteSheetProcessor
+/build:SpriteSheets/arthas.spritesheet
+
 #begin SpriteSheets/b_witch_idle.spritesheet
 /importer:SpriteSheetImporter
 /processor:SpriteSheetProcessor
@@ -54,6 +84,18 @@
 /importer:SpriteSheetImporter
 /processor:SpriteSheetProcessor
 /build:SpriteSheets/SpaceBackground.spritesheet
+
+#begin Textures/ArthasSpriteSheet.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyColor=255,0,255,255
+/processorParam:ColorKeyEnabled=True
+/processorParam:GenerateMipmaps=False
+/processorParam:PremultiplyAlpha=True
+/processorParam:ResizeToPowerOfTwo=False
+/processorParam:MakeSquare=False
+/processorParam:TextureFormat=Color
+/build:Textures/ArthasSpriteSheet.png
 
 #begin Textures/b_witch_idle.png
 /importer:TextureImporter

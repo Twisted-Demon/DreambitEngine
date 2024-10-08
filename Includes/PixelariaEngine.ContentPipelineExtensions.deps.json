@@ -11,6 +11,7 @@
           "MonoGame.Framework.Content.Pipeline": "3.8.2.1105",
           "MonoGame.Framework.DesktopGL": "3.8.2.1105",
           "PixelariaEngine": "1.0.0",
+          "LDtkMonogame.Reference": "1.0.0.0",
           "Newtonsoft.Json": "11.0.0.0",
           "PixelariaEngine.Reference": "1.0.0.0"
         },
@@ -346,14 +347,34 @@
       },
       "System.Memory/4.5.3": {},
       "System.ValueTuple/4.5.0": {},
+      "LDtkMonogame/1.0.0": {
+        "dependencies": {
+          "MonoGame.Framework.DesktopGL": "3.8.2.1105"
+        },
+        "runtime": {
+          "LDtkMonogame.dll": {
+            "assemblyVersion": "1.0.0",
+            "fileVersion": ""
+          }
+        }
+      },
       "PixelariaEngine/1.0.0": {
         "dependencies": {
+          "LDtkMonogame": "1.0.0",
           "Spectre.Console": "0.49.1"
         },
         "runtime": {
           "PixelariaEngine.dll": {
             "assemblyVersion": "1.0.0",
             "fileVersion": ""
+          }
+        }
+      },
+      "LDtkMonogame.Reference/1.0.0.0": {
+        "runtime": {
+          "LDtkMonogame.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
           }
         }
       },
@@ -500,8 +521,18 @@
       "path": "system.valuetuple/4.5.0",
       "hashPath": "system.valuetuple.4.5.0.nupkg.sha512"
     },
+    "LDtkMonogame/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
     "PixelariaEngine/1.0.0": {
       "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "LDtkMonogame.Reference/1.0.0.0": {
+      "type": "reference",
       "serviceable": false,
       "sha512": ""
     },

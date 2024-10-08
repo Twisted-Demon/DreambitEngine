@@ -1,16 +1,13 @@
 ﻿using LDtk;
 using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
-using PixelariaEngine.ECS;
 
 namespace PixelariaEngine.Sandbox;
 
-public partial class BigTree : LDtkEntity<BigTree>
+public partial class Unbreakable : LDtkEntity<Unbreakable>
 {
     protected override void SetUp(LDtkLevel level)
     {
         var entity = CreateEntity(this);
         AttachTileSpriteDrawer(this, entity, RenderTiles, Color.White);
-        entity.AttachComponent<BoxCollider>();
     }
 }

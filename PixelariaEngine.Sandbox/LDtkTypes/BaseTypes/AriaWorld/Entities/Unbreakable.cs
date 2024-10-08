@@ -6,7 +6,7 @@ namespace PixelariaEngine.Sandbox;
 using LDtk;
 using Microsoft.Xna.Framework;
 
-public partial class PlayerStart : ILDtkEntity
+public partial class Unbreakable : ILDtkEntity
 {
     public string Identifier { get; set; }
     public System.Guid Iid { get; set; }
@@ -18,5 +18,6 @@ public partial class PlayerStart : ILDtkEntity
 
     public Color SmartColor { get; set; }
 
+    public TilesetRectangle? RenderTiles { get; set; }
 }
 #pragma warning restore

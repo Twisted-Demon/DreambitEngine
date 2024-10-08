@@ -39,4 +39,7 @@
     <ItemGroup>
       <ProjectReference Include="..\LDtkMonogame\LDtk\LDtk.csproj" />
     </ItemGroup>
+    <ItemGroup>
+      <Folder Include="AI\FSM\Conditions\" />
+    </ItemGroup>
 </Project>

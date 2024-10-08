@@ -16,6 +16,8 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
     public int CurrentFrameIndex { get; set; }
     public TilesetRectangle FrameRect { get; set; } = null;
 
+    public bool IsHorizontalFlip { get; set; } = false;
+
     public string SpriteSheetPath
     {
         get => _spriteSheetPath;
@@ -63,6 +65,11 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
 
         var depth = Transform.WorldPosition.Y / Core.Instance.GraphicsDevice.Viewport.Height;
 
+        var spriteEffect = SpriteEffects.None;
+        
+        if (IsHorizontalFlip)
+            spriteEffect |= SpriteEffects.FlipHorizontally;
+
         Core.SpriteBatch.Draw(
             _spriteSheet.Texture,
             Transform.WorldPosToVec2,
@@ -71,7 +78,7 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
             Transform.WorldZRotation,
             originToUse,
             Transform.WorldScaleToVec2,
-            SpriteEffects.None,
+            spriteEffect,
             depth
         );
     }

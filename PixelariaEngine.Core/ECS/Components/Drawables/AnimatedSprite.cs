@@ -1,4 +1,6 @@
-﻿using PixelariaEngine.Graphics;
+﻿using System.Collections.Generic;
+using System.Linq;
+using PixelariaEngine.Graphics;
 
 namespace PixelariaEngine.ECS;
 
@@ -14,6 +16,7 @@ public class AnimatedSprite : Component<AnimatedSprite>
     private SpriteDrawer _spriteDrawer;
     private SpriteSheetAnimation _spriteSheetAnimation;
     private float _timeToNextFrame;
+    private Queue<SpriteSheetAnimation> _animationQueue = new();
 
     public string AnimationPath
     {
@@ -34,6 +37,7 @@ public class AnimatedSprite : Component<AnimatedSprite>
         {
             if (_spriteSheetAnimation == value) return;
             _spriteSheetAnimation = value;
+            if (value == null) return;
             _animationPath = _spriteSheetAnimation.AssetName;
             _spriteDrawer.SpriteSheetPath = _spriteSheetAnimation.SpriteSheetPath;
             OnSpriteSheetAnimationChanged(value);
@@ -68,6 +72,11 @@ public class AnimatedSprite : Component<AnimatedSprite>
 
         if (SpriteSheetAnimation == null) return;
 
+        UpdateCurrentAnimation();
+    }
+
+    private void UpdateCurrentAnimation()
+    {
         _elapsedTime += Time.DeltaTime; // increase the current time
 
         if (_elapsedTime >= _timeToNextFrame)
@@ -81,10 +90,33 @@ public class AnimatedSprite : Component<AnimatedSprite>
         _currentFrame++; // increment the frame
 
         if (_currentFrame >= SpriteSheetAnimation.FrameCount)
-            _currentFrame = 0; //if we are at the frame count, reset
+            AnimationEnded(); //if we are at the frame count, reset
 
-        _spriteDrawer.CurrentFrameIndex = _currentFrame; //set the sprite drawer to render the new frame
+        _spriteDrawer.CurrentFrameIndex = _spriteSheetAnimation[_currentFrame].FrameIndex; //set the sprite drawer to render the new frame
         _spriteDrawer.Pivot = _spriteSheetAnimation[_currentFrame].Pivot;
+    }
+
+    private void AnimationEnded()
+    {
+        if (!_spriteSheetAnimation.OneShot)
+            _currentFrame = 0;
+        else
+        {
+            if (_animationQueue.Count == 0)
+            {
+                _currentFrame = _spriteSheetAnimation.FrameCount - 1;
+                Pause();
+                return;
+            }
+
+            SpriteSheetAnimation = null;
+            SpriteSheetAnimation  = _animationQueue.Dequeue();
+        }
+    }
+
+    public void QueueAnimation(SpriteSheetAnimation animation)
+    {
+        _animationQueue.Enqueue(animation);
     }
 
     public void Play()

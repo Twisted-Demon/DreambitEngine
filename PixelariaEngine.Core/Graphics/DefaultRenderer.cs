@@ -50,6 +50,7 @@ public class DefaultRenderer(Scene scene) : Renderer(scene)
     private void ShowRenderBuffer()
     {
         Device.SetRenderTarget(null);
+        Device.Clear(Scene.BackgroundColor);
 
         Core.SpriteBatch.Begin(samplerState: SamplerState.PointClamp, blendState: BlendState.NonPremultiplied,
             sortMode: SpriteSortMode.FrontToBack);
@@ -71,7 +72,7 @@ public class DefaultRenderer(Scene scene) : Renderer(scene)
             //set the render target for the layer
             Device.SetRenderTarget(_renderTargets[i]);
             
-            Device.Clear(Scene.BackgroundColor);
+            Device.Clear(Color.Transparent);
             
             Core.SpriteBatch.Begin(transformMatrix: Scene.MainCamera.TransformMatrix,
                 samplerState: SamplerState.PointClamp, sortMode: SpriteSortMode.FrontToBack

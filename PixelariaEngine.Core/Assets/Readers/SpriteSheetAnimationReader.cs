@@ -10,12 +10,14 @@ public class SpriteSheetAnimationReader : ContentTypeReader<SpriteSheetAnimation
         var spriteSheetPath = input.ReadString();
         var frameRate = input.ReadInt32();
         var framesCount = input.ReadInt32();
+        var oneShot = input.ReadBoolean();
 
         var spriteSheetAnimation = new SpriteSheetAnimation(framesCount)
         {
             AssetName = input.AssetName,
             FrameRate = frameRate,
-            SpriteSheetPath = spriteSheetPath
+            SpriteSheetPath = spriteSheetPath,
+            OneShot = oneShot,
         };
 
         for (var i = 0; i < framesCount; i++)

@@ -7,6 +7,9 @@ namespace PixelariaEngine;
 public class SpriteSheetAnimation : PixelariaAsset
 {
     [JsonProperty("frames")] private AnimationFrame[] _frames;
+    
+    [JsonIgnore]
+    public AnimationFrame[] Frames => _frames;
 
     internal SpriteSheetAnimation(AnimationFrame[] frames)
     {
@@ -23,9 +26,14 @@ public class SpriteSheetAnimation : PixelariaAsset
         _frames = [];
     }
 
-    [JsonProperty("frame_rate")] public int FrameRate { get; set; }
+    [JsonProperty("frame_rate")] 
+    public int FrameRate { get; set; }
 
-    [JsonProperty("sprite_sheet_path")] public string SpriteSheetPath { get; set; } = string.Empty;
+    [JsonProperty("sprite_sheet_path")] 
+    public string SpriteSheetPath { get; set; } = string.Empty;
+    
+    [JsonProperty("one_shot", NullValueHandling = NullValueHandling.Ignore)] 
+    public bool OneShot { get; set; } = false;
 
     public AnimationFrame this[int key]
     {

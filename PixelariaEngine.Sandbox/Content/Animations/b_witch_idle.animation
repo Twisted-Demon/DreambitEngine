@@ -29,5 +29,6 @@
     }
   ],
   "frame_rate": 8,
-  "sprite_sheet_path": "SpriteSheets/b_witch_idle"
+  "sprite_sheet_path": "SpriteSheets/b_witch_idle",
+  "one_shot": false
 }

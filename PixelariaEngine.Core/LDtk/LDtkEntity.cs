@@ -11,11 +11,12 @@ public class LDtkEntity<T> : LDtkEntity where T : new()
     {
         var entity = Entity.Create(data.Identifier);
         entity.Transform.Position = new Vector3(data.Position, 0);
+        entity.AttachComponent<LDtkEntityComponent>().Iid = data.Iid;
 
         return entity;
     }
 
-    protected void AttachTileSpriteDrawer<TU>(TU data, Entity entity, TilesetRectangle tilesetRect)
+    protected void AttachTileSpriteDrawer<TU>(TU data, Entity entity, TilesetRectangle tilesetRect, Color? color = null)
         where TU : ILDtkEntity
     {
         if (tilesetRect == null) return;
@@ -24,7 +25,7 @@ public class LDtkEntity<T> : LDtkEntity where T : new()
 
         sprite.Pivot = new Vector2(data.Pivot.X * tilesetRect.W, data.Pivot.Y * tilesetRect.H);
         sprite.OriginType = SpriteOrigin.Custom;
-        sprite.Color = data.SmartColor;
+        sprite.Color = color ?? data.SmartColor;
 
         sprite.SpriteSheet = LDtkManager.Instance.SpriteSheets[tilesetRect.TilesetUid];
         sprite.FrameRect = tilesetRect;

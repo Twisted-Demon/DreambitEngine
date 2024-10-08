@@ -10,6 +10,7 @@ namespace PixelariaEngine.Sandbox.Components;
 public class SandboxController : Component<SandboxController>
 {
     private Vector3 _moveDir;
+    private Vector2 _facing;
     private const float Speed = 75f;
     
     //animations
@@ -17,6 +18,7 @@ public class SandboxController : Component<SandboxController>
     private SpriteSheetAnimation _runAnimation;
 
     private AnimatedSprite _animator;
+    private SpriteDrawer _sprite;
     
     private BoxCollider _collider;
 
@@ -28,32 +30,13 @@ public class SandboxController : Component<SandboxController>
         _animator = Entity.GetComponent<AnimatedSprite>();
         _animator.Play();
         
+        _sprite = Entity.GetComponent<SpriteDrawer>();
+        
         Scene.MainCamera.IsFollowing = true;
         Scene.MainCamera.TransformToFollow = Transform;
         Scene.MainCamera.CameraFollowBehavior = CameraFollowBehavior.Lerp;
         
         _collider = Entity.GetComponentInChildren<BoxCollider>();
-        _collider.OnCollisionEnter += OnCollisionEnter;
-        _collider.OnCollisionStay += OnCollisionStay;
-        _collider.OnCollisionExit += OnCollisionExit;
-
-        ///var def = LDtkManager.Instance.GetEntityDefinition<PlayerStart>();
-        var def = LDtkManager.Instance.LDtkFile.GetEntityDefinition<PlayerStart>();
-    }
-
-    private void OnCollisionEnter(Collider other)
-    {
-        Logger.Debug("OnCollisionEnter");
-    }
-    
-    private void OnCollisionStay(Collider other)
-    {
-        Logger.Debug("OnCollisionStay");
-    }
-    
-    private void OnCollisionExit(Collider other)
-    {
-        Logger.Debug("OnCollisionExit");
     }
 
     public override void OnUpdate()
@@ -72,6 +55,14 @@ public class SandboxController : Component<SandboxController>
     {
         _animator.SpriteSheetAnimation = 
             _moveDir == Vector3.Zero ? _idleAnimation : _runAnimation;
+
+        if (!(_moveDir.Length() > 0)) return;
+        
+        _facing = new Vector2(_moveDir.X, _moveDir.Y);
+        if (_facing.X < 0)
+            _sprite.IsHorizontalFlip = true;
+        else
+            _sprite.IsHorizontalFlip = false;
     }
 
     private void HandleMovement()

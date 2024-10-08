@@ -3,11 +3,10 @@ namespace PixelariaEngine.Sandbox;
 // This file was automatically generated, any modifications will be lost!
 
 #pragma warning disable
-public enum FoliageType
+public enum TestEnum
 {
-    Tree1,
-    FoliageType0,
-    FoliageType1,
-    FoliageType2,
+    TestEnum0,
+    TestEnum1,
+    TestEnum2,
 }
 #pragma warning restore

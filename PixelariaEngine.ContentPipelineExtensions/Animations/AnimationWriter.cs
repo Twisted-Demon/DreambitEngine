@@ -28,6 +28,9 @@ public class AnimationWriter : ContentTypeWriter<SpriteSheetAnimation>
         
         //serialize the number of frames first
         output.Write(anim.FrameCount);
+        
+        //serialize if we are oneshot
+        output.Write(anim.OneShot);
 
         //loop through the number of frames and serialize them
         for (var i = 0; i < anim.FrameCount; i++)
