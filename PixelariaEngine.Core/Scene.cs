@@ -133,9 +133,9 @@ public class Scene
             renderer.OnDraw();
     }
 
-    public Entity CreateEntity(string name = "entity", string tag = "default", bool enabled = true)
+    public Entity CreateEntity(string name = "entity", HashSet<string> tags = null, bool enabled = true)
     {
-        return Entities.CreateEntity(name, tag, enabled);
+        return Entities.CreateEntity(name, tags, enabled);
     }
 
     public void DestroyEntity(Entity entity)

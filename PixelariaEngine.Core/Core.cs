@@ -22,7 +22,7 @@ public class Core : Game
         PixelariaEngine.Window.SetTitle(title);
         PixelariaEngine.Window.SetSize(width, height);
 
-        SetFixedTimeStep(false);
+        //SetFixedTimeStep(false);
 
         TargetElapsedTime = TimeSpan.FromSeconds((double)1 / 120); //set Target fps to 120
 
@@ -58,7 +58,8 @@ public class Core : Game
         {
             if (NextScene != null)
                 ChangeScenes();
-
+            
+            HandlePhysics();
             CurrentScene.Tick();
         }
         Input.PostUpdate();
@@ -79,6 +80,20 @@ public class Core : Game
         base.Draw(gameTime);
     }
 
+    private const float FixedPhysicsStep = 1f / 120f;
+    private float accumulatedPhysicsTime = 0f;
+
+    private void HandlePhysics()
+    {
+        accumulatedPhysicsTime += Time.DeltaTime;
+
+        if (accumulatedPhysicsTime >= FixedPhysicsStep)
+        {
+            //handle physics here;
+            accumulatedPhysicsTime = 0f;
+        }
+    }
+    
     protected override void OnExiting(object sender, ExitingEventArgs args)
     {
         CurrentScene?.Terminate();
@@ -91,6 +106,7 @@ public class Core : Game
         CurrentScene?.Terminate();
         CurrentScene = NextScene;
         NextScene = null;
+        accumulatedPhysicsTime = 0f;
 
         Time.SceneLoaded();
     }

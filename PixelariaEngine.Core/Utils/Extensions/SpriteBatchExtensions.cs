@@ -34,6 +34,13 @@ public static class SpriteBatchExtensions
             SpriteEffects.None, 
             0);
     }
+
+    public static void DrawPoint(this SpriteBatch spriteBatch, Vector2 point, Color color, float thickness = 1f)
+    {
+        EnsurePixelTextureExists(spriteBatch.GraphicsDevice);
+        
+        spriteBatch.Draw(_pixelTexture, point, null, color, 0, Vector2.Zero, thickness, SpriteEffects.None, 0);
+    }
     
     // Draw a Filled Rectangle
     public static void DrawFilledRectangle(this SpriteBatch spriteBatch, Rectangle rectangle, Color color)

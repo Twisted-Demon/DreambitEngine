@@ -15,13 +15,28 @@ public class Entity : IDisposable
     public string Name;
 
     internal Scene Scene;
-    public string Tag;
+    public HashSet<string> Tags;
+    
+    private Entity _parent = null;
 
-    internal Entity(uint id, string name, string tag, bool enabled, Scene scene)
+    public Entity Parent
+    {
+        get => _parent;
+        set
+        {
+            if(_parent != value) return;
+            _parent = value;
+            _parent._children.Add(this);
+        }
+    }
+
+    private readonly List<Entity> _children = [];
+
+    internal Entity(uint id, string name, HashSet<string> tags, bool enabled, Scene scene)
     {
         Id = id;
         Name = name;
-        Tag = tag;
+        Tags = tags;
         _enabled = enabled;
         Scene = scene;
 
@@ -29,7 +44,7 @@ public class Entity : IDisposable
             Name += $": {id}";
 
         _componentList = new ComponentList(scene);
-        Transform = new Transform();
+        Transform = new Transform(this);
     }
 
     private Entity()
@@ -62,14 +77,37 @@ public class Entity : IDisposable
         Dispose(false);
     }
 
-    public static Entity Create(string name = "entity", string tag = "default", bool enabled = true)
+    public static Entity Create(string name = "entity", HashSet<string> tags = null, bool enabled = true)
     {
-        return Core.Instance.CurrentScene.CreateEntity(name, tag, enabled);
+        return Core.Instance.CurrentScene.CreateEntity(name, tags, enabled);
+    }
+
+    public static Entity CreateChildOf(Entity parent, string name = "entity", HashSet<string> tags = null,
+        bool enabled = true)
+    {
+        var entity = Core.Instance.CurrentScene.CreateEntity(name, tags, enabled);
+        entity.Parent = parent;
+        parent._children.Add(entity);
+        
+        return entity;
+    }
+
+    public static List<Entity> GetChildren(Entity parentEntity)
+    {
+        var children = new List<Entity>();
+        children.AddRange(parentEntity._children);
+
+        return children;
     }
 
     public static void Destroy(Entity entity)
     {
         Core.Instance.CurrentScene.DestroyEntity(entity);
+    }
+
+    public static bool CompareTag(Component component, string tag)
+    {
+        return component.Entity.Tags.Contains(tag);
     }
 
     internal void Update()
@@ -150,6 +188,24 @@ public class Entity : IDisposable
     public T GetComponent<T>() where T : Component
     {
         return _componentList.GetComponent<T>();
+    }
+
+    public T GetComponentInChildren<T>() where T : Component
+    {
+        foreach (var child in _children)
+        {
+            //check if we have the component
+            var component = child.GetComponent<T>();
+            
+            //if we do have it, return
+            if (component != null) return component;
+            
+            //if we don't check in children
+            component = child.GetComponentInChildren<T>();
+        }
+        
+        //only get here if no children have component
+        return null;
     }
 
     /// <summary>

@@ -12,10 +12,12 @@ public class EntityList(Scene scene)
 
     private uint _nextEntityId;
 
-    public Entity CreateEntity(string name, string tag, bool enabled)
+    internal Entity CreateEntity(string name, HashSet<string> tags, bool enabled)
     {
+        tags ??= ["default"];
+        
         //create the entity
-        var entity = new Entity(_nextEntityId, name, tag, enabled, scene);
+        var entity = new Entity(_nextEntityId, name, tags, enabled, scene);
         _entitiesToCreate.Add(entity);
 
         _nextEntityId++; //increment for the next entity ID.
@@ -23,7 +25,7 @@ public class EntityList(Scene scene)
         return entity;
     }
 
-    public void DestroyEntity(Entity entity)
+    internal void DestroyEntity(Entity entity)
     {
         if (entity == null)
         {
@@ -47,7 +49,7 @@ public class EntityList(Scene scene)
             _entitiesToDestroy.Add(entity);
     }
 
-    public void ClearLists()
+    internal void ClearLists()
     {
         foreach (var entity in _entitiesToCreate)
             entity.Destroy();
@@ -91,7 +93,7 @@ public class EntityList(Scene scene)
         _entitiesToDestroy.Clear();
     }
 
-    public void OnTick()
+    internal void OnTick()
     {
         UpdateLists();
         UpdateEntities();
@@ -116,6 +118,15 @@ public class EntityList(Scene scene)
         entityResult = _entitiesToCreate.FirstOrDefault(entity => entity.Name == name);
         return entityResult;
     }
+
+    public List<Entity> GetEntitiesByTag(string tag)
+    {
+        var entites = _entities.Where(e => e.Tags.Contains(tag)).ToList();
+        entites.AddRange(_entitiesToCreate.Where(e => e.Tags.Contains(tag)));
+
+        return _entities;
+    }
+    
 
     public List<Entity> GetAllActiveEntitiesEntities()
     {

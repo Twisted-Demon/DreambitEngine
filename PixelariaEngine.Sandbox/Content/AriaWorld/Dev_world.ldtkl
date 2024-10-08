@@ -600,14 +600,26 @@
 					"__grid": [215,232],
 					"__pivot": [0.5,0.5],
 					"__tags": ["player"],
-					"__tile": { "tilesetUid": 11, "x": 256, "y": 144, "w": 16, "h": 16 },
-					"__smartColor": "#D77643",
+					"__tile": { "tilesetUid": 1, "x": 192, "y": 224, "w": 96, "h": 80 },
+					"__smartColor": "#A75A5A",
 					"iid": "515f96c0-73f0-11ef-9a48-eda9394c4765",
 					"width": 1,
 					"height": 1,
 					"defUid": 5,
 					"px": [215,232],
-					"fieldInstances": [],
+					"fieldInstances": [
+						{ "__identifier": "Integerrrrrr", "__type": "Int", "__value": 4, "__tile": null, "defUid": 155, "realEditorValues": [] },
+						{ "__identifier": "Floattttt", "__type": "Float", "__value": 5, "__tile": null, "defUid": 156, "realEditorValues": [] },
+						{ "__identifier": "boooool", "__type": "Bool", "__value": false, "__tile": null, "defUid": 157, "realEditorValues": [] },
+						{ "__identifier": "Stringggggg", "__type": "String", "__value": null, "__tile": null, "defUid": 158, "realEditorValues": [] },
+						{ "__identifier": "multilinesssss", "__type": "String", "__value": "asdf\nasdf\nasdf\nasdf\n", "__tile": null, "defUid": 159, "realEditorValues": [] },
+						{ "__identifier": "Colorrrrr", "__type": "Color", "__value": "#A75A5A", "__tile": null, "defUid": 160, "realEditorValues": [] },
+						{ "__identifier": "FoliageType", "__type": "LocalEnum.FoliageType", "__value": "Tree1", "__tile": null, "defUid": 161, "realEditorValues": [] },
+						{ "__identifier": "File_path", "__type": "FilePath", "__value": null, "__tile": null, "defUid": 162, "realEditorValues": [] },
+						{ "__identifier": "Tileeeeeee", "__type": "Tile", "__value": { "tilesetUid": 1, "x": 192, "y": 224, "w": 96, "h": 80 }, "__tile": { "tilesetUid": 1, "x": 192, "y": 224, "w": 96, "h": 80 }, "defUid": 163, "realEditorValues": [] },
+						{ "__identifier": "Entity_refffffff", "__type": "EntityRef", "__value": null, "__tile": null, "defUid": 164, "realEditorValues": [] },
+						{ "__identifier": "Point", "__type": "Point", "__value": null, "__tile": null, "defUid": 165, "realEditorValues": [] }
+					],
 					"__worldX": 215,
 					"__worldY": 232
 				},
@@ -629,7 +641,7 @@
 				},
 				{
 					"__identifier": "BigTree",
-					"__grid": [288,288],
+					"__grid": [278,252],
 					"__pivot": [0.5,0.925],
 					"__tags": ["Foliage"],
 					"__tile": { "tilesetUid": 1, "x": 192, "y": 2304, "w": 160, "h": 160 },
@@ -638,13 +650,13 @@
 					"width": 160,
 					"height": 160,
 					"defUid": 152,
-					"px": [288,288],
+					"px": [278,252],
 					"fieldInstances": [{ "__identifier": "RenderTiles", "__type": "Tile", "__value": { "tilesetUid": 1, "x": 192, "y": 2304, "w": 160, "h": 160 }, "__tile": { "tilesetUid": 1, "x": 192, "y": 2304, "w": 160, "h": 160 }, "defUid": 153, "realEditorValues": [{
 						"id": "V_String",
 						"params": ["192,2304,160,160"]
 					}] }],
-					"__worldX": 288,
-					"__worldY": 288
+					"__worldX": 278,
+					"__worldY": 252
 				}
 			]
 		},

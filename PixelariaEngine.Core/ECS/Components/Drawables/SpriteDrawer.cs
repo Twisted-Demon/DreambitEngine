@@ -1,4 +1,5 @@
-﻿using Microsoft.Xna.Framework;
+﻿using LDtk;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using PixelariaEngine.Graphics;
 
@@ -13,7 +14,7 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
     public Vector2 Pivot { get; set; } = Vector2.Zero;
     public SpriteOrigin OriginType { get; set; } = SpriteOrigin.Center;
     public int CurrentFrameIndex { get; set; }
-    public Rectangle? Frame { get; set; } = null;
+    public TilesetRectangle FrameRect { get; set; } = null;
 
     public string SpriteSheetPath
     {
@@ -50,61 +51,63 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
             return;
         }
 
-        var spriteFrame = Frame;
-
-        if (spriteFrame == null)
-            _spriteSheet.TryGetFrame(CurrentFrameIndex, out spriteFrame);
-
-        if (spriteFrame == null) return;
+        var spriteFrame = GetDrawRect();
 
         var originToUse = Pivot;
 
         if (OriginType != SpriteOrigin.Custom)
         {
             var relative = SpriteSheet.GetRelativeOrigin(OriginType);
-            originToUse = new Vector2(relative.X * (float)spriteFrame?.Width, relative.Y * (float)spriteFrame?.Height);
+            originToUse = new Vector2(relative.X * spriteFrame.Width, relative.Y * spriteFrame.Height);
         }
 
-        var depth = Transform.Position.Y / Core.Instance.GraphicsDevice.Viewport.Height;
+        var depth = Transform.WorldPosition.Y / Core.Instance.GraphicsDevice.Viewport.Height;
 
         Core.SpriteBatch.Draw(
             _spriteSheet.Texture,
-            Transform.PositionToVec2,
+            Transform.WorldPosToVec2,
             spriteFrame,
             Color,
-            Transform.SingleRotation,
+            Transform.WorldZRotation,
             originToUse,
-            Transform.ScaleToVec2,
+            Transform.WorldScaleToVec2,
             SpriteEffects.None,
             depth
         );
     }
+    
+    private Rectangle GetDrawRect()
+    {
+        if(FrameRect != null)
+            return new Rectangle(FrameRect.X, FrameRect.Y, FrameRect.W, FrameRect.H);
+        
+        _spriteSheet.TryGetFrame(CurrentFrameIndex, out var spriteFrame);
+
+        return spriteFrame;
+    }
 
     public override void OnDebugDraw()
     {
-        var spriteFrame = Frame;
-        
-        if (spriteFrame == null)
-            _spriteSheet.TryGetFrame(CurrentFrameIndex, out spriteFrame);
-        
-        if (spriteFrame == null) return;
+        var spriteFrame = GetDrawRect();
         
         var originToUse = Pivot;
         
         if (OriginType != SpriteOrigin.Custom)
         {
             var relative = SpriteSheet.GetRelativeOrigin(OriginType);
-            originToUse = new Vector2(relative.X * (float)spriteFrame?.Width, relative.Y * (float)spriteFrame?.Height);
+            originToUse = new Vector2(relative.X * spriteFrame.Width, relative.Y * spriteFrame.Height);
         }
 
         var rect = new Rectangle(
-            (int)(Transform.Position.X - (originToUse.X)),
-            (int)(Transform.Position.Y - (originToUse.Y)),
-            (int)(spriteFrame?.Width),
-            (int)(spriteFrame?.Height)
+            (int)(Transform.WorldPosition.X - originToUse.X),
+            (int)(Transform.WorldPosition.Y - originToUse.Y),
+            spriteFrame.Width,
+            spriteFrame.Height
         );
-        
+
+        var thickness = 3.0f;
+        var vec2 = Transform.WorldPosToVec2 - new Vector2(thickness / 2, thickness / 2);
         Core.SpriteBatch.DrawHollowRectangle(rect, Color.Yellow);
-        Core.SpriteBatch.DrawLine(Transform.PositionToVec2, Transform.PositionToVec2, Color.Red);
+        Core.SpriteBatch.DrawPoint(vec2, Color.Red, thickness);
     }
 }

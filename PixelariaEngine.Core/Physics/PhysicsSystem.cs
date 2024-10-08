@@ -1,35 +1,41 @@
-﻿using Box2D.NET.Bindings;
+﻿using System.Collections.Generic;
+using PixelariaEngine.ECS;
 
 namespace PixelariaEngine;
 
-public unsafe class PhysicsSystem
+public class PhysicsSystem : Singleton<PhysicsSystem>
 {
-    public PhysicsSystem()
+    public List<Collider> Colliders { get; } = [];
+
+    public void RegisterCollider(Collider collider)
     {
-        //var worldDef = B2.DefaultWorldDef();
-        //worldDef.gravity = new B2.Vec2{x = 0, y = 0};
-//
-        //var worldId = B2.CreateWorld(&worldDef);
-        //
-        ////create body
-        //var bodyDef = B2.DefaultBodyDef();
-        //bodyDef.type = B2.dynamicBody;
-        //
-        //var bodyId = B2.CreateBody(worldId, &bodyDef);
-        //
-        ////create a shape
-        //var box = B2.MakeBox(1, 1);
-        //var shapeDef = B2.DefaultShapeDef();
-        //
-        //var shapeId = B2.CreatePolygonShape(bodyId, &shapeDef, &box);
-//
-        //B2.ShapeCastInput input;
-        //var polygon = B2.ShapeGetPolygon(shapeId);
-        //
-        //polygon.
-        //
-        //var aabb = B2.ShapeCast();
-//
-        //B2.DestroyWorld(worldId);
+        if(!Colliders.Contains(collider)) Colliders.Add(collider);
     }
+
+    public bool Cast(Collider collider, out CollisionResult collisionResult)
+    {
+        collisionResult = new CollisionResult();
+        
+        foreach (var other in Colliders)
+        {
+            if(other == collider ) continue;
+
+            var polygon = collider.GetTransformedPolygon();
+            var otherPolygon = other.GetTransformedPolygon();
+            
+            if(!polygon.Intersects(otherPolygon)) continue;
+            
+            collisionResult.Collisions.Add(other);
+        }
+        
+        return collisionResult.Collisions.Count > 0;
+    }
+}
+
+public readonly struct CollisionResult()
+{
+    public List<Collider> Collisions { get; } = [];
+    public int Count => Collisions.Count;
+
+    public Collider this[int key] => Collisions[key];
 }

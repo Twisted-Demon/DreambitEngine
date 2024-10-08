@@ -11,6 +11,7 @@ public class LDtkManager : Singleton<LDtkManager>
     public readonly Dictionary<int, SpriteSheet> SpriteSheets = new();
     public LDtkFile LDtkFile;
     public LDtkWorld LDtkWorld;
+    public Dictionary<string, EntityDefinition> EntityDefinitions = [];
 
     public void SetUp(string ldtkFilePath)
     {
@@ -60,6 +61,17 @@ public class LDtkManager : Singleton<LDtkManager>
         }
     }
 
+    private void SetUpEntityDefinitions()
+    {
+        var defs = LDtkFile.Defs;
+        foreach(var entity in defs.Entities)
+            EntityDefinitions.Add(entity.Identifier, entity);
+    }
+
+    public EntityDefinition GetEntityDefinition<T>()
+    {
+        return EntityDefinitions[typeof(T).Name];
+    }
     public LDtkLevel LoadLDtkLevel(Guid iid)
     {
         return LDtkWorld.LoadLevel(iid);

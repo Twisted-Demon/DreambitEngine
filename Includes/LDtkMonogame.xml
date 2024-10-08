@@ -1287,6 +1287,11 @@
             Defines the source generated JSON serialization contract metadata for a given type.
             </summary>
         </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.DefaultOverride">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
         <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.Definitions">
             <summary>
             Defines the source generated JSON serialization contract metadata for a given type.
@@ -2161,6 +2166,13 @@
             <param name="fields"> The fields. </param>
             <param name="level"> The level. </param>
         </member>
+        <member name="M:LDtk.LDtkFieldParser.ParseCustomEntityFieldDefinitions``1(``0,LDtk.Full.FieldDefinition[])">
+            <summary> Parses the custom fields. </summary>
+            <typeparam name="T"> Generic type parameter. </typeparam>
+            <param name="entity"> The entity. </param>
+            <param name="fields"> The fields. </param>
+            <param name="level"> The level. </param>
+        </member>
         <member name="M:LDtk.LDtkFieldParser.ParseBaseEntityFields``1(``0,LDtk.EntityInstance,LDtk.LDtkLevel)">
             <summary> Parses the base entity fields. </summary>
             <typeparam name="T"> Generic type parameter. </typeparam>
@@ -2707,6 +2719,11 @@
             Defines the source generated JSON serialization contract metadata for a given type.
             </summary>
         </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.NullableSingle">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
         <member name="P:LDtk.LDtkJsonSourceGenerator.SingleArray">
             <summary>
             Defines the source generated JSON serialization contract metadata for a given type.
@@ -2803,6 +2820,71 @@
             </summary>
         </member>
         <member name="P:LDtk.LDtkJsonSourceGenerator.FlagArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.AllowedRefs">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.NullableAllowedRefs">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.DefaultOverride">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.EditorDisplayMode">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.NullableEditorDisplayMode">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.EditorDisplayPos">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.NullableEditorDisplayPos">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.EditorLinkStyle">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.NullableEditorLinkStyle">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.FieldDefinition">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.FieldDefinitionArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.TextLanguageMode">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.NullableTextLanguageMode">
             <summary>
             Defines the source generated JSON serialization contract metadata for a given type.
             </summary>

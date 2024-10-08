@@ -2,6 +2,7 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
 using PixelariaEngine.ECS;
+using PixelariaEngine.Graphics;
 
 namespace PixelariaEngine.Sandbox.Components;
 
@@ -16,6 +17,8 @@ public class SandboxController : Component<SandboxController>
     private SpriteSheetAnimation _runAnimation;
 
     private AnimatedSprite _animator;
+    
+    private BoxCollider _collider;
 
     public override void OnCreated()
     {
@@ -27,14 +30,30 @@ public class SandboxController : Component<SandboxController>
         
         Scene.MainCamera.IsFollowing = true;
         Scene.MainCamera.TransformToFollow = Transform;
-
-        var box1 = Box.CreateSquare(Vector2.Zero, 5.0f);
-        var box2 = Box.CreateSquare(Vector2.One, 5.0f);
-
-        var collides = box1.Intersects(box2);
+        Scene.MainCamera.CameraFollowBehavior = CameraFollowBehavior.Lerp;
         
-        if(collides)
-            Logger.Info("COLLIDED");
+        _collider = Entity.GetComponentInChildren<BoxCollider>();
+        _collider.OnCollisionEnter += OnCollisionEnter;
+        _collider.OnCollisionStay += OnCollisionStay;
+        _collider.OnCollisionExit += OnCollisionExit;
+
+        ///var def = LDtkManager.Instance.GetEntityDefinition<PlayerStart>();
+        var def = LDtkManager.Instance.LDtkFile.GetEntityDefinition<PlayerStart>();
+    }
+
+    private void OnCollisionEnter(Collider other)
+    {
+        Logger.Debug("OnCollisionEnter");
+    }
+    
+    private void OnCollisionStay(Collider other)
+    {
+        Logger.Debug("OnCollisionStay");
+    }
+    
+    private void OnCollisionExit(Collider other)
+    {
+        Logger.Debug("OnCollisionExit");
     }
 
     public override void OnUpdate()
@@ -46,7 +65,7 @@ public class SandboxController : Component<SandboxController>
             Core.Instance.Exit();
 
         if (Input.IsKeyPressed(Keys.F1))
-            Scene.DebugMode = true;
+            Scene.DebugMode = !Scene.DebugMode;
     }
 
     private void UpdateAnimation()
@@ -67,6 +86,14 @@ public class SandboxController : Component<SandboxController>
         
         if(_moveDir != Vector3.Zero)
             _moveDir.Normalize();
+
+        if (Input.IsKeyPressed(Keys.I))
+        {
+            if (PhysicsSystem.Instance.Cast(_collider, out var collisionResult))
+            {
+                Logger.Debug($"We are colliding");
+            }
+        }
         
         Transform.Position += _moveDir * Speed * Time.DeltaTime;
     }

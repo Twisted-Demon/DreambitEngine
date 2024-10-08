@@ -7,6 +7,8 @@ namespace PixelariaEngine.ECS;
 
 public class ComponentList(Scene scene)
 {
+    private readonly Logger<ComponentList> _logger = new();
+    
     private readonly List<Component> _attachedComponents = [];
     private readonly List<Component> _componentsToAttach = [];
     private readonly List<Component> _componentsToDetach = [];
@@ -27,13 +29,13 @@ public class ComponentList(Scene scene)
     {
         if (component == null)
         {
-            Console.WriteLine("ComponentList: Could not destroy component, component is null");
+            _logger.Warn("Could not destroy component, component is null");
             return;
         }
 
         if (_componentsToDetach.Contains(component))
         {
-            Console.WriteLine("ComponentList: {0} is already being removed", component.GetType().Name);
+            _logger.Trace("ComponentList: {0} is already being removed", component.GetType().Name);
             return;
         }
 

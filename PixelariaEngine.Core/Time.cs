@@ -22,6 +22,9 @@ public static class Time
     public static ulong FrameCount { get; private set; }
 
     public static int FrameRate { get; private set; }
+    
+    public static float PhysicsDeltaTime { get; private set; }
+    public static float UnscaledPhysicsDeltaTime { get; private set; }
 
     internal static void Update(GameTime gameTime)
     {
@@ -36,6 +39,11 @@ public static class Time
         TimeSinceSceneLoaded += dt;
         FrameCount++;
         FrameRate = Mathf.RoundToInt(1 / DeltaTime);
+    }
+
+    internal static void UpdatePhysicsTime()
+    {
+        
     }
 
     internal static void SceneLoaded()

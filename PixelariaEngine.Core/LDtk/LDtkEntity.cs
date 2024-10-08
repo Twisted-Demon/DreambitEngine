@@ -27,7 +27,7 @@ public class LDtkEntity<T> : LDtkEntity where T : new()
         sprite.Color = data.SmartColor;
 
         sprite.SpriteSheet = LDtkManager.Instance.SpriteSheets[tilesetRect.TilesetUid];
-        sprite.Frame = tilesetRect.ToMonoGameRect();
+        sprite.FrameRect = tilesetRect;
     }
 
     protected virtual void SetUp(LDtkLevel level)

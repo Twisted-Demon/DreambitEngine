@@ -2,12 +2,12 @@
 
 namespace PixelariaEngine;
 
-public class Box : Polygon
+public class Box : Shape
 {
-    public Vector2 TopLeft => Corners[0];
-    public Vector2 TopRight => Corners[1];
-    public Vector2 BottomLeft => Corners[2];
-    public Vector2 BottomRight => Corners[3];
+    public Vector2 TopLeft => Polygon.Vertices[0];
+    public Vector2 TopRight => Polygon.Vertices[1];
+    public Vector2 BottomLeft => Polygon.Vertices[3];
+    public Vector2 BottomRight => Polygon.Vertices[2];
 
     private Box() : base(4)
     {
@@ -15,15 +15,27 @@ public class Box : Polygon
     
     public static Box CreateSquare(Vector2 center, float halfExtent)
     {
-        var box = new Box()
+        var box = new Box();
+        box.Polygon.Vertices = new[]
         {
-            Corners =
-            {
-                [0] = center + new Vector2(-halfExtent, -halfExtent),
-                [1] = center + new Vector2(halfExtent, -halfExtent),
-                [2] = center + new Vector2(-halfExtent, halfExtent),
-                [3] = center + new Vector2(halfExtent, halfExtent)
-            }
+            center + new Vector2(-halfExtent, -halfExtent),
+            center + new Vector2(halfExtent, -halfExtent),
+            center + new Vector2(halfExtent, halfExtent),
+            center + new Vector2(-halfExtent, halfExtent)
+        };
+
+        return box;
+    }
+
+    public static Box CreateRectangle(Vector2 center, float halfWidth, float halfHeight)
+    {
+        var box = new Box();
+        box.Polygon.Vertices = new[]
+        {
+            center + new Vector2(-halfWidth, -halfHeight),
+            center + new Vector2(halfWidth, -halfHeight),
+            center + new Vector2(halfWidth, halfHeight),
+            center + new Vector2(-halfWidth, halfHeight)
         };
 
         return box;

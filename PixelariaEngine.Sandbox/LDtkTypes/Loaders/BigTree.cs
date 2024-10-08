@@ -1,4 +1,5 @@
 ﻿using LDtk;
+using PixelariaEngine.ECS;
 
 namespace PixelariaEngine.Sandbox;
 
@@ -8,5 +9,6 @@ public partial class BigTree : LDtkEntity<BigTree>
     {
         var entity = CreateEntity(this);
         AttachTileSpriteDrawer(this, entity, RenderTiles);
+        entity.AttachComponent<BoxCollider>();
     }
 }

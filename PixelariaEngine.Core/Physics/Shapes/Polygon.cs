@@ -3,36 +3,38 @@ using Microsoft.Xna.Framework;
 
 namespace PixelariaEngine;
 
-public class Polygon
+public struct Polygon
 {
-    public Vector2[] Corners { get; protected init; }
+    public Vector2[] Vertices;
+    public int Length => Vertices.Length;
 
-    protected Polygon(int cornerCount)
+    public Vector2 this[int key]
     {
-        Corners = new Vector2[cornerCount];
+        get => Vertices[key];
+        set => Vertices[key] = value;
     }
 
     public Vector2[] GetEdges()
     {
-        var edges = new Vector2[Corners.Length];
-        for (var i = 0; i < Corners.Length; i++)
+        var edges = new Vector2[Vertices.Length];
+        for (var i = 0; i < Vertices.Length; i++)
         {
-            var current = Corners[i];
-            var next = Corners[(i + 1) % Corners.Length];
+            var current = Vertices[i];
+            var next = Vertices[(i + 1) % Vertices.Length];
             edges[i] = next - current;
         }
 
         return edges;
     }
-
+    
     public (float min, float max) ProjectOntoAxis(Vector2 axis)
     {
-        var min = Vector2.Dot(Corners[0], axis);
+        var min = Vector2.Dot(Vertices[0], axis);
         var max = min;
 
-        for (var i = 1; i < Corners.Length; i++)
+        for (var i = 1; i < Vertices.Length; i++)
         {
-            float projection = Vector2.Dot(Corners[i], axis);
+            float projection = Vector2.Dot(Vertices[i], axis);
             if(projection < min)
                 min=projection;
             if(projection > max)
@@ -41,7 +43,7 @@ public class Polygon
 
         return (min, max);
     }
-
+    
     public bool Intersects(Polygon other)
     {
         var axes = new List<Vector2>();
@@ -65,5 +67,23 @@ public class Polygon
         }
 
         return true;
+    }
+
+    public Polygon Transform(Matrix transformationMatrix)
+    {
+        var polygon = new Polygon
+        {
+            Vertices = new Vector2[Length]
+        };
+
+        for (var i = 0; i < Length; i++)
+        {
+            var point3D = new Vector3(Vertices[i], 0);
+            var transformedPoint = Vector3.Transform(point3D, transformationMatrix);
+            
+            polygon.Vertices[i] = new Vector2(transformedPoint.X, transformedPoint.Y);
+        }
+
+        return polygon;
     }
 }

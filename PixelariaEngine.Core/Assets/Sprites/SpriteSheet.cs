@@ -44,7 +44,7 @@ public class SpriteSheet : PixelariaAsset
 
     [JsonIgnore] public string TexturePath => _texturePath;
 
-    [JsonIgnore] public Rectangle?[] Frames { get; private set; } = [];
+    [JsonIgnore] public Rectangle[] Frames { get; private set; } = [];
 
     [JsonIgnore] public int FrameCount => Frames.Length;
 
@@ -69,7 +69,7 @@ public class SpriteSheet : PixelariaAsset
 
         var totalFrames = Columns * Rows;
 
-        Frames = new Rectangle?[totalFrames];
+        Frames = new Rectangle[totalFrames];
 
         switch (Frames.Length)
         {
@@ -92,13 +92,13 @@ public class SpriteSheet : PixelariaAsset
                 Frames[0] = new Rectangle(0, 0, Texture.Width, Texture.Height);
                 break;
             default:
-                Frames = new Rectangle?[1];
+                Frames = new Rectangle[1];
                 Frames[0] = new Rectangle(0, 0, Texture.Width, Texture.Height);
                 break;
         }
     }
 
-    public bool TryGetFrame(int frame, out Rectangle? frameRect)
+    public bool TryGetFrame(int frame, out Rectangle frameRect)
     {
         try
         {
