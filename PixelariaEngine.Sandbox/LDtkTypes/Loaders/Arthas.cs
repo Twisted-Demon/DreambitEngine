@@ -11,12 +11,7 @@ public partial class Arthas : LDtkEntity<Arthas>
     {
         var entity = CreateEntity(this);
         //AttachTileSpriteDrawer(this, entity, RenderTiles, Color.White);
-
-        var idleAnimation = Resources.Load<SpriteSheetAnimation>("Animations/arthas_idle");
-
-        var animator = entity.AttachComponent<AnimatedSprite>();
-        animator.SpriteSheetAnimation = idleAnimation;
-        animator.Play();
+        var animator = entity.AttachComponent<SpriteAnimator>();
 
         var sprite = entity.GetComponent<SpriteDrawer>();
         sprite.IsHorizontalFlip = IsFlipped;

@@ -6,7 +6,7 @@ namespace PixelariaEngine.Sandbox.AI.Arthas;
 public class ArthasIdle : State<ArthasIdle>
 {
     private SpriteDrawer _spriteDrawer;
-    private AnimatedSprite _animator;
+    private SpriteAnimator _animator;
     private SpriteSheetAnimation _idleAnimation;
     private SpriteSheetAnimation _lickAnimation;
 
@@ -15,13 +15,14 @@ public class ArthasIdle : State<ArthasIdle>
     public override void OnInitialize()
     {
         _spriteDrawer = FSM.Entity.GetComponent<SpriteDrawer>();
-        _animator = FSM.Entity.GetComponent<AnimatedSprite>();
+        _animator = FSM.Entity.GetComponent<SpriteAnimator>();
 
         _idleAnimation = Resources.Load<SpriteSheetAnimation>("Animations/arthas_idle");
         _lickAnimation = Resources.Load<SpriteSheetAnimation>("Animations/arthas_lick");
 
         _lickDelay = (float) _random.Next(5, 10);
-        _animator.SpriteSheetAnimation = _idleAnimation;
+        _animator.Animation = _idleAnimation;
+        _animator.Play();
     }
 
     public override void OnExecute()
@@ -34,7 +35,7 @@ public class ArthasIdle : State<ArthasIdle>
 
     private void HandleAnimation()
     {
-        if (_animator.SpriteSheetAnimation.AssetName == "Animations/arthas_lick")
+        if (_animator.Animation.AssetName == "Animations/arthas_lick")
             return;
         
         _elapsedTimeSinceLick += Time.DeltaTime;
@@ -44,7 +45,7 @@ public class ArthasIdle : State<ArthasIdle>
             _elapsedTimeSinceLick = 0; 
             _lickDelay = (float) _random.Next(5, 10);
             
-            _animator.SpriteSheetAnimation = _lickAnimation;
+            _animator.Animation = _lickAnimation;
             
             var numOfLicks = _random.Next(3, 5);
             for (var i = 0; i < numOfLicks; i++)

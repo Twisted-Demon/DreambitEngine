@@ -24,7 +24,7 @@ public class LDtkEntity<T> : LDtkEntity where T : new()
         var sprite = entity.AttachComponent<SpriteDrawer>();
 
         sprite.Pivot = new Vector2(data.Pivot.X * tilesetRect.W, data.Pivot.Y * tilesetRect.H);
-        sprite.OriginType = SpriteOrigin.Custom;
+        sprite.PivotType = SpritePivot.Custom;
         sprite.Color = color ?? data.SmartColor;
 
         sprite.SpriteSheet = LDtkManager.Instance.SpriteSheets[tilesetRect.TilesetUid];

@@ -113,20 +113,20 @@ public class SpriteSheet : PixelariaAsset
         }
     }
 
-    public static Vector2 GetRelativeOrigin(SpriteOrigin originType)
+    public static Vector2 GetRelativeOrigin(SpritePivot pivotType)
     {
-        return originType switch
+        return pivotType switch
         {
-            SpriteOrigin.TopLeft => new Vector2(0f, 0f),
-            SpriteOrigin.TopCenter => new Vector2(0.5f, 0),
-            SpriteOrigin.TopRight => new Vector2(1f, 0f),
-            SpriteOrigin.CenterLeft => new Vector2(0f, 0.5f),
-            SpriteOrigin.Center => new Vector2(0.5f, 0.5f),
-            SpriteOrigin.CenterRight => new Vector2(1f, 0.5f),
-            SpriteOrigin.BottomLeft => new Vector2(0f, 1f),
-            SpriteOrigin.BottomCenter => new Vector2(0.5f, 1f),
-            SpriteOrigin.BottomRight => new Vector2(1f, 1f),
-            SpriteOrigin.Custom => new Vector2(0.5f, 0.5f),
+            SpritePivot.TopLeft => new Vector2(0f, 0f),
+            SpritePivot.TopCenter => new Vector2(0.5f, 0),
+            SpritePivot.TopRight => new Vector2(1f, 0f),
+            SpritePivot.CenterLeft => new Vector2(0f, 0.5f),
+            SpritePivot.Center => new Vector2(0.5f, 0.5f),
+            SpritePivot.CenterRight => new Vector2(1f, 0.5f),
+            SpritePivot.BottomLeft => new Vector2(0f, 1f),
+            SpritePivot.BottomCenter => new Vector2(0.5f, 1f),
+            SpritePivot.BottomRight => new Vector2(1f, 1f),
+            SpritePivot.Custom => new Vector2(0.5f, 0.5f),
             _ => new Vector2(0.5f, 0.5f)
         };
     }

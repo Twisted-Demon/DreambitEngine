@@ -6,7 +6,7 @@ using PixelariaEngine.Graphics;
 
 namespace PixelariaEngine.Sandbox.Components;
 
-[Require(typeof(AnimatedSprite))]
+[Require(typeof(SpriteAnimator))]
 public class SandboxController : Component<SandboxController>
 {
     private Vector3 _moveDir;
@@ -17,7 +17,7 @@ public class SandboxController : Component<SandboxController>
     private SpriteSheetAnimation _idleAnimation;
     private SpriteSheetAnimation _runAnimation;
 
-    private AnimatedSprite _animator;
+    private SpriteAnimator _animator;
     private SpriteDrawer _sprite;
     
     private BoxCollider _collider;
@@ -27,7 +27,7 @@ public class SandboxController : Component<SandboxController>
         _idleAnimation = Resources.Load<SpriteSheetAnimation>("Animations/b_witch_idle");
         _runAnimation = Resources.Load<SpriteSheetAnimation>("Animations/b_witch_run");
 
-        _animator = Entity.GetComponent<AnimatedSprite>();
+        _animator = Entity.GetComponent<SpriteAnimator>();
         _animator.Play();
         
         _sprite = Entity.GetComponent<SpriteDrawer>();
@@ -53,16 +53,24 @@ public class SandboxController : Component<SandboxController>
 
     private void UpdateAnimation()
     {
-        _animator.SpriteSheetAnimation = 
+        _animator.Animation = 
             _moveDir == Vector3.Zero ? _idleAnimation : _runAnimation;
 
         if (!(_moveDir.Length() > 0)) return;
         
         _facing = new Vector2(_moveDir.X, _moveDir.Y);
-        if (_facing.X < 0)
-            _sprite.IsHorizontalFlip = true;
-        else
-            _sprite.IsHorizontalFlip = false;
+
+        switch (_facing.X)
+        {
+            case 0:
+                return;
+            case < 0:
+                _sprite.IsHorizontalFlip = true;
+                break;
+            default:
+                _sprite.IsHorizontalFlip = false;
+                break;
+        }
     }
 
     private void HandleMovement()

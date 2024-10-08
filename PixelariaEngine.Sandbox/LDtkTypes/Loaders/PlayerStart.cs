@@ -10,6 +10,7 @@ public partial class PlayerStart : LDtkEntity<PlayerStart>
     protected override void SetUp(LDtkLevel level)
     {
         var entity = CreateEntity(this);
+        entity.Name = "player";
         var colliderEntity = Entity.CreateChildOf(entity, "player_collider", ["player"]);
         
         var collider = colliderEntity.AttachComponent<BoxCollider>();

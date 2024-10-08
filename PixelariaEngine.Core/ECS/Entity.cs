@@ -24,7 +24,7 @@ public class Entity : IDisposable
         get => _parent;
         set
         {
-            if(_parent != value) return;
+            if(_parent == value) return;
             _parent = value;
             _parent._children.Add(this);
         }
@@ -87,6 +87,7 @@ public class Entity : IDisposable
     {
         var entity = Core.Instance.CurrentScene.CreateEntity(name, tags, enabled);
         entity.Parent = parent;
+        entity.Transform.Entity = entity;
         parent._children.Add(entity);
         
         return entity;
