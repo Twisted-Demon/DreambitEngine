@@ -55,7 +55,6 @@ public class ComponentList(Scene scene)
         foreach (var component in _componentsToAttach
                      .Where(c => !_attachedComponents.Contains(c)))
         {
-            component.Entity = null;
             component.OnRemovedFromEntity();
             component.Destroy();
             component.Dispose();
@@ -67,8 +66,7 @@ public class ComponentList(Scene scene)
         {
             if (component is DrawableComponent drawableComponent)
                 _scene.Drawables.Remove(drawableComponent);
-
-            component.Entity = null;
+            
             component.OnRemovedFromEntity();
             component.Destroy();
             component.Dispose();

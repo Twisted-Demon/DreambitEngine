@@ -9,18 +9,14 @@ public class Camera2D : Component
     public CameraFollowBehavior CameraFollowBehavior = CameraFollowBehavior.Lerp;
     public bool IsFollowing = true;
     public Transform TransformToFollow;
-    public float LerpSpeed { get; set; } = 5f;
-    private float Zoom { get; set; } = 1f;
     private float ResolutionZoom { get; set; } = 1f;
+    public float LerpSpeed { get; set; } = 5f;
+    public float Zoom { get; set; } = 1f;
     public float TotalZoom => Zoom * ResolutionZoom;
-    private int TargetHorizontalResolution { get; } = 384;
+    public int TargetVerticalResolution { get; private set; } = 288;
     public Matrix TransformMatrix { get; private set; }
     public Matrix UnscaledTransformMatrix { get; private set; }
     
-
-    private static Point ScreenSize
-        => new(Core.Instance.GraphicsDevice.Viewport.Width, Core.Instance.GraphicsDevice.Viewport.Height);
-
 
     public override void OnCreated()
     {
@@ -45,7 +41,7 @@ public class Camera2D : Component
         return Matrix.CreateTranslation(-Transform.WorldPosition) * 
                Matrix.CreateRotationZ(Transform.WorldZRotation) * 
                Matrix.CreateScale(new Vector3(scaleFactor, scaleFactor, 1)) * 
-               Matrix.CreateTranslation(new Vector3(0.5f * ScreenSize.X, 0.5f * ScreenSize.Y, 0f));
+               Matrix.CreateTranslation(new Vector3(0.5f * Window.ScreenSize.X, 0.5f * Window.ScreenSize.Y, 0f));
     }
     
 
@@ -56,7 +52,13 @@ public class Camera2D : Component
 
     private void SetResolutionZoom()
     {
-        ResolutionZoom = ScreenSize.X / (float)TargetHorizontalResolution;
+        ResolutionZoom = Window.ScreenSize.Y / (float)TargetVerticalResolution;
+    }
+
+    public void SetTargetVerticalResolution(int targetVerticalResolution)
+    {
+        TargetVerticalResolution = targetVerticalResolution;
+        SetResolutionZoom();
     }
 
     private void UpdatePosition()

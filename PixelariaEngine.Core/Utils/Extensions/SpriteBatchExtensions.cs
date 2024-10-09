@@ -34,6 +34,20 @@ public static class SpriteBatchExtensions
             SpriteEffects.None, 
             0);
     }
+    
+    //Draw a polygon
+    public static void DrawPolygon(this SpriteBatch spriteBatch, Vector2[] points, Color color, float thickness = 1f)
+    {
+        EnsurePixelTextureExists(spriteBatch.GraphicsDevice);
+        
+        for (int i = 0; i < points.Length; i++)
+        {
+            var current = points[i];
+            var next = points[(i + 1) % points.Length];
+            
+            DrawLine(spriteBatch, current, next, color, thickness);
+        }
+    }
 
     public static void DrawPoint(this SpriteBatch spriteBatch, Vector2 point, Color color, float thickness = 1f)
     {
@@ -49,6 +63,8 @@ public static class SpriteBatchExtensions
         
         spriteBatch.Draw(_pixelTexture, rectangle, color);
     }
+    
+    //draw a filled rectangle with a square
 
     // Draw a Hollow Rectangle (outline)
     public static void DrawHollowRectangle(this SpriteBatch spriteBatch, Rectangle rectangle, Color color, float thickness = 1f)

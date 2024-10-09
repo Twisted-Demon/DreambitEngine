@@ -1,11 +1,14 @@
 ﻿using System;
+using Microsoft.Xna.Framework;
 
 namespace PixelariaEngine;
 
 public static class Window
 {
-    public static int Width => Core.GraphicsDeviceManager.PreferredBackBufferWidth;
-    public static int Height => Core.GraphicsDeviceManager.PreferredBackBufferHeight;
+    public static int Width => Core.Instance.GraphicsDevice.Viewport.Width;
+    public static int Height => Core.Instance.GraphicsDevice.Viewport.Height;
+    
+    public static Point ScreenSize => new Point(Width, Height);
 
     public static event EventHandler<WindowEventArgs> WindowResized;
 

@@ -7,7 +7,7 @@ public class LDtkScene : Scene<LDtkScene>
 {
     private string _levelIdentifier;
 
-    private LDtkLevel Level { get; set; }
+    public LDtkLevel Level { get; set; }
 
     public string LevelIdentifier
     {

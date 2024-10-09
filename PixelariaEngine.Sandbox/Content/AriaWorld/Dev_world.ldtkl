@@ -29,6 +29,191 @@
 	"fieldInstances": [],
 	"layerInstances": [
 		{
+			"__identifier": "Triggers",
+			"__type": "Entities",
+			"__cWid": 544,
+			"__cHei": 496,
+			"__gridSize": 1,
+			"__opacity": 1,
+			"__pxTotalOffsetX": 0,
+			"__pxTotalOffsetY": 0,
+			"__tilesetDefUid": null,
+			"__tilesetRelPath": null,
+			"iid": "da1b41a0-73f0-11ef-904c-3770fc8e0b78",
+			"levelId": 0,
+			"layerDefUid": 189,
+			"pxOffsetX": 0,
+			"pxOffsetY": 0,
+			"visible": true,
+			"optionalRules": [],
+			"intGridCsv": [],
+			"autoLayerTiles": [],
+			"seed": 9640335,
+			"overrideTilesetUid": null,
+			"gridTiles": [],
+			"entityInstances": [
+				{
+					"__identifier": "CustomTrigger",
+					"__grid": [217,210],
+					"__pivot": [0.5,0.5],
+					"__tags": ["physics"],
+					"__tile": null,
+					"__smartColor": "#BE4A2F",
+					"iid": "f3aef490-73f0-11ef-904c-55ceef489b33",
+					"width": 16,
+					"height": 16,
+					"defUid": 185,
+					"px": [217,210],
+					"fieldInstances": [{ "__identifier": "Bounds", "__type": "Array<Point>", "__value": [
+						{ "cx": 214, "cy": 137 },
+						{ "cx": 112, "cy": 163 },
+						{ "cx": 106, "cy": 240 },
+						{ "cx": 173, "cy": 295 },
+						{ "cx": 273, "cy": 295 },
+						{ "cx": 338, "cy": 238 },
+						{ "cx": 334, "cy": 160 },
+						{ "cx": 263, "cy": 134 }
+					], "__tile": null, "defUid": 186, "realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["214,137"]
+						},
+						{
+							"id": "V_String",
+							"params": ["112,163"]
+						},
+						{
+							"id": "V_String",
+							"params": ["106,240"]
+						},
+						{
+							"id": "V_String",
+							"params": ["173,295"]
+						},
+						{
+							"id": "V_String",
+							"params": ["273,295"]
+						},
+						{
+							"id": "V_String",
+							"params": ["338,238"]
+						},
+						{
+							"id": "V_String",
+							"params": ["334,160"]
+						},
+						{
+							"id": "V_String",
+							"params": ["263,134"]
+						}
+					] }],
+					"__worldX": 217,
+					"__worldY": 210
+				}
+			]
+		},
+		{
+			"__identifier": "Living_entities",
+			"__type": "Entities",
+			"__cWid": 544,
+			"__cHei": 496,
+			"__gridSize": 1,
+			"__opacity": 1,
+			"__pxTotalOffsetX": 0,
+			"__pxTotalOffsetY": 0,
+			"__tilesetDefUid": null,
+			"__tilesetRelPath": null,
+			"iid": "7a08fa40-73f0-11ef-904c-430ad1d9d484",
+			"levelId": 0,
+			"layerDefUid": 179,
+			"pxOffsetX": 0,
+			"pxOffsetY": 0,
+			"visible": true,
+			"optionalRules": [],
+			"intGridCsv": [],
+			"autoLayerTiles": [],
+			"seed": 3460643,
+			"overrideTilesetUid": null,
+			"gridTiles": [],
+			"entityInstances": [
+				{
+					"__identifier": "Arthas",
+					"__grid": [254,213],
+					"__pivot": [0.5,1],
+					"__tags": ["npc"],
+					"__tile": { "tilesetUid": 174, "x": 0, "y": 32, "w": 32, "h": 32 },
+					"__smartColor": "#92CCD6",
+					"iid": "9a6399d0-73f0-11ef-904c-af46ef3c213b",
+					"width": 32,
+					"height": 32,
+					"defUid": 169,
+					"px": [254,214],
+					"fieldInstances": [
+						{ "__identifier": "IsFlipped", "__type": "Bool", "__value": true, "__tile": null, "defUid": 171, "realEditorValues": [{
+							"id": "V_Bool",
+							"params": [ true ]
+						}] },
+						{ "__identifier": "RenderTiles", "__type": "Tile", "__value": { "tilesetUid": 174, "x": 0, "y": 32, "w": 32, "h": 32 }, "__tile": { "tilesetUid": 174, "x": 0, "y": 32, "w": 32, "h": 32 }, "defUid": 172, "realEditorValues": [] },
+						{ "__identifier": "WakeUpTriggerEntityRef", "__type": "EntityRef", "__value": {
+							"entityIid": "f3aef490-73f0-11ef-904c-55ceef489b33",
+							"layerIid": "da1b41a0-73f0-11ef-904c-3770fc8e0b78",
+							"levelIid": "80581670-73f0-11ef-93e9-3f99e5118946",
+							"worldIid": "8057ef60-73f0-11ef-93e9-1b323ecc99a6"
+						}, "__tile": null, "defUid": 187, "realEditorValues": [{
+							"id": "V_String",
+							"params": ["f3aef490-73f0-11ef-904c-55ceef489b33"]
+						}] }
+					],
+					"__worldX": 254,
+					"__worldY": 214
+				},
+				{
+					"__identifier": "PlayerStart",
+					"__grid": [359,390],
+					"__pivot": [0.5,0.5],
+					"__tags": ["player"],
+					"__tile": { "tilesetUid": 11, "x": 256, "y": 144, "w": 16, "h": 16 },
+					"__smartColor": "#7DD188",
+					"iid": "5e079b50-73f0-11ef-904c-153d22519c6d",
+					"width": 1,
+					"height": 1,
+					"defUid": 5,
+					"px": [359,390],
+					"fieldInstances": [],
+					"__worldX": 359,
+					"__worldY": 390
+				},
+				{
+					"__identifier": "Darion",
+					"__grid": [177,213],
+					"__pivot": [0.5,1],
+					"__tags": ["npc"],
+					"__tile": { "tilesetUid": 184, "x": 0, "y": 32, "w": 32, "h": 32 },
+					"__smartColor": "#92CCD6",
+					"iid": "606a8660-73f0-11ef-904c-f18e096fb6bc",
+					"width": 32,
+					"height": 32,
+					"defUid": 180,
+					"px": [177,214],
+					"fieldInstances": [
+						{ "__identifier": "IsFlipped", "__type": "Bool", "__value": false, "__tile": null, "defUid": 181, "realEditorValues": [] },
+						{ "__identifier": "RenderTiles", "__type": "Tile", "__value": { "tilesetUid": 184, "x": 0, "y": 32, "w": 32, "h": 32 }, "__tile": { "tilesetUid": 184, "x": 0, "y": 32, "w": 32, "h": 32 }, "defUid": 182, "realEditorValues": [] },
+						{ "__identifier": "WakeUpTriggerEntityRef", "__type": "EntityRef", "__value": {
+							"entityIid": "f3aef490-73f0-11ef-904c-55ceef489b33",
+							"layerIid": "da1b41a0-73f0-11ef-904c-3770fc8e0b78",
+							"levelIid": "80581670-73f0-11ef-93e9-3f99e5118946",
+							"worldIid": "8057ef60-73f0-11ef-93e9-1b323ecc99a6"
+						}, "__tile": null, "defUid": 188, "realEditorValues": [{
+							"id": "V_String",
+							"params": ["f3aef490-73f0-11ef-904c-55ceef489b33"]
+						}] }
+					],
+					"__worldX": 177,
+					"__worldY": 214
+				}
+			]
+		},
+		{
 			"__identifier": "TileColliders",
 			"__type": "IntGrid",
 			"__cWid": 136,
@@ -596,22 +781,6 @@
 					"__worldY": 401
 				},
 				{
-					"__identifier": "PlayerStart",
-					"__grid": [215,232],
-					"__pivot": [0.5,0.5],
-					"__tags": ["player"],
-					"__tile": { "tilesetUid": 11, "x": 256, "y": 144, "w": 16, "h": 16 },
-					"__smartColor": "#7DD188",
-					"iid": "515f96c0-73f0-11ef-9a48-eda9394c4765",
-					"width": 1,
-					"height": 1,
-					"defUid": 5,
-					"px": [215,232],
-					"fieldInstances": [],
-					"__worldX": 215,
-					"__worldY": 232
-				},
-				{
 					"__identifier": "BigTree",
 					"__grid": [100,313],
 					"__pivot": [0.5,0.925],
@@ -645,28 +814,6 @@
 					}] }],
 					"__worldX": 343,
 					"__worldY": 297
-				},
-				{
-					"__identifier": "Arthas",
-					"__grid": [252,214],
-					"__pivot": [0.5,1],
-					"__tags": ["npcs"],
-					"__tile": { "tilesetUid": 174, "x": 0, "y": 32, "w": 32, "h": 32 },
-					"__smartColor": "#92CCD6",
-					"iid": "4d8aacc0-73f0-11ef-bae8-21b0d52bf141",
-					"width": 32,
-					"height": 32,
-					"defUid": 169,
-					"px": [252,215],
-					"fieldInstances": [
-						{ "__identifier": "IsFlipped", "__type": "Bool", "__value": true, "__tile": null, "defUid": 171, "realEditorValues": [{
-							"id": "V_Bool",
-							"params": [ true ]
-						}] },
-						{ "__identifier": "RenderTiles", "__type": "Tile", "__value": { "tilesetUid": 174, "x": 0, "y": 32, "w": 32, "h": 32 }, "__tile": { "tilesetUid": 174, "x": 0, "y": 32, "w": 32, "h": 32 }, "defUid": 172, "realEditorValues": [] }
-					],
-					"__worldX": 252,
-					"__worldY": 215
 				}
 			]
 		},

@@ -6,22 +6,15 @@ namespace PixelariaEngine.Sandbox;
 using LDtk;
 using Microsoft.Xna.Framework;
 
-public partial class PlayerStart: ILDtkEntity
+public partial class CustomTrigger: ILDtkEntity
 {
-    public static readonly PlayerStart Default = new()
+    public static readonly CustomTrigger Default = new()
     {
-        Identifier = "PlayerStart",
-        Uid = 5,
-        Size = new Vector2(1f, 1f),
+        Identifier = "CustomTrigger",
+        Uid = 185,
+        Size = new Vector2(16f, 16f),
         Pivot = new Vector2(0.5f, 0.5f),
-        Tile = new TilesetRectangle()
-        {
-            X = 256,
-            Y = 144,
-            W = 16,
-            H = 16
-        },
-        SmartColor = new Color(125, 209, 136, 255),
+        SmartColor = new Color(190, 74, 47, 255),
 
     };
 
@@ -35,5 +28,6 @@ public partial class PlayerStart: ILDtkEntity
 
     public Color SmartColor { get; set; }
 
+    public Point[] Bounds { get; set; }
 }
 #pragma warning restore

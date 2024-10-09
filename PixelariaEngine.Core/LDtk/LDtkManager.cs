@@ -59,12 +59,6 @@ public class LDtkManager : Singleton<LDtkManager>
             SpriteSheets.Add(tileSet.Uid, spriteSheet);
         }
     }
-
-    public T GetEntityDefinition<T>()
-        where T : new()
-    {
-        return LDtkFile.GetEntityDefinition<T>();
-    }
     
     public LDtkLevel LoadLDtkLevel(Guid iid)
     {

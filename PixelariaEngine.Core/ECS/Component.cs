@@ -8,7 +8,7 @@ public abstract class Component : IDisposable
     private bool _isDestroyed;
     private bool _isDisposed;
 
-    public Transform Transform => Entity.Transform;
+    public Transform Transform => Entity?.Transform;
 
     public Entity Entity { get; internal set; }
     public Scene Scene => Entity?.Scene;

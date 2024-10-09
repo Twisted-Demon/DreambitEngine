@@ -6,12 +6,12 @@ namespace PixelariaEngine.Sandbox;
 using LDtk;
 using Microsoft.Xna.Framework;
 
-public partial class Arthas: ILDtkEntity
+public partial class Darion: ILDtkEntity
 {
-    public static readonly Arthas Default = new()
+    public static readonly Darion Default = new()
     {
-        Identifier = "Arthas",
-        Uid = 169,
+        Identifier = "Darion",
+        Uid = 180,
         Size = new Vector2(32f, 32f),
         Pivot = new Vector2(0.5f, 1f),
         Tile = new TilesetRectangle()

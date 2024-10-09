@@ -18,6 +18,6 @@ public partial class BigTree : LDtkEntity<BigTree>
         var vec2Pivot = new Vector2(0, -75);
         collider.Bounds = Box.CreateRectangle(vec2Pivot, 54, 50);
         
-        colliderEntity.AttachComponent<FoliageDimmer>();
+        colliderEntity.AttachComponent<AlphaDimmer>();
     }
 }

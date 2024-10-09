@@ -31,6 +31,6 @@ public class Renderer
     }
 
     protected static RenderTarget2D CreateRenderTarget()
-        => new RenderTarget2D(Device, Device.PresentationParameters.BackBufferWidth,
-            Device.PresentationParameters.BackBufferHeight);
+        => new RenderTarget2D(Device, Window.ScreenSize.X,
+            Window.ScreenSize.Y);
 }

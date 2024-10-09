@@ -87,8 +87,6 @@ public class Entity : IDisposable
     {
         var entity = Core.Instance.CurrentScene.CreateEntity(name, tags, enabled);
         entity.Parent = parent;
-        entity.Transform.Entity = entity;
-        parent._children.Add(entity);
         
         return entity;
     }

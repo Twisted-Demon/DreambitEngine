@@ -30,6 +30,16 @@
 /processor:AnimationProcessor
 /build:Animations/arthas_lick.animation
 
+#begin Animations/arthas_lick.animation
+/importer:AnimationImporter
+/processor:AnimationProcessor
+/build:Animations/arthas_lick.animation
+
+#begin Animations/arthas_sleep.animation
+/importer:AnimationImporter
+/processor:AnimationProcessor
+/build:Animations/arthas_sleep.animation
+
 #begin Animations/b_witch_idle.animation
 /importer:AnimationImporter
 /processor:AnimationProcessor
@@ -97,6 +107,30 @@
 /processorParam:TextureFormat=Color
 /build:Textures/ArthasSpriteSheet.png
 
+#begin Textures/ArthasSpriteSheet.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyColor=255,0,255,255
+/processorParam:ColorKeyEnabled=True
+/processorParam:GenerateMipmaps=False
+/processorParam:PremultiplyAlpha=True
+/processorParam:ResizeToPowerOfTwo=False
+/processorParam:MakeSquare=False
+/processorParam:TextureFormat=Color
+/build:Textures/ArthasSpriteSheet.png
+
+#begin Textures/b_witch_idle.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyColor=255,0,255,255
+/processorParam:ColorKeyEnabled=True
+/processorParam:GenerateMipmaps=False
+/processorParam:PremultiplyAlpha=True
+/processorParam:ResizeToPowerOfTwo=False
+/processorParam:MakeSquare=False
+/processorParam:TextureFormat=Color
+/build:Textures/b_witch_idle.png
+
 #begin Textures/b_witch_idle.png
 /importer:TextureImporter
 /processor:TextureProcessor
@@ -121,6 +155,30 @@
 /processorParam:TextureFormat=Color
 /build:Textures/b_witch_run.png
 
+#begin Textures/b_witch_run.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyColor=255,0,255,255
+/processorParam:ColorKeyEnabled=True
+/processorParam:GenerateMipmaps=False
+/processorParam:PremultiplyAlpha=True
+/processorParam:ResizeToPowerOfTwo=False
+/processorParam:MakeSquare=False
+/processorParam:TextureFormat=Color
+/build:Textures/b_witch_run.png
+
+#begin Textures/DarionSpriteSheet.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyColor=255,0,255,255
+/processorParam:ColorKeyEnabled=True
+/processorParam:GenerateMipmaps=False
+/processorParam:PremultiplyAlpha=True
+/processorParam:ResizeToPowerOfTwo=False
+/processorParam:MakeSquare=False
+/processorParam:TextureFormat=Color
+/build:Textures/DarionSpriteSheet.png
+
 #begin Textures/forest_tiles.png
 /importer:TextureImporter
 /processor:TextureProcessor
@@ -132,6 +190,30 @@
 /processorParam:MakeSquare=False
 /processorParam:TextureFormat=Color
 /build:Textures/forest_tiles.png
+
+#begin Textures/forest_tiles.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyColor=255,0,255,255
+/processorParam:ColorKeyEnabled=True
+/processorParam:GenerateMipmaps=False
+/processorParam:PremultiplyAlpha=True
+/processorParam:ResizeToPowerOfTwo=False
+/processorParam:MakeSquare=False
+/processorParam:TextureFormat=Color
+/build:Textures/forest_tiles.png
+
+#begin Textures/SpaceBackground.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyColor=255,0,255,255
+/processorParam:ColorKeyEnabled=True
+/processorParam:GenerateMipmaps=False
+/processorParam:PremultiplyAlpha=True
+/processorParam:ResizeToPowerOfTwo=False
+/processorParam:MakeSquare=False
+/processorParam:TextureFormat=Color
+/build:Textures/SpaceBackground.png
 
 #begin Textures/SpaceBackground.png
 /importer:TextureImporter

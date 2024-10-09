@@ -6,8 +6,9 @@ namespace PixelariaEngine.ECS;
 
 public class Collider : Component<Collider>
 {
-    public Shape Bounds { get; set; }
-    public bool isTrigger { get; set; } = false;
+    public Shape Bounds { get; set; } = null;
+    public Polygon TransformedBounds => GetTransformedPolygon();
+    public bool IsTrigger { get; set; } = false;
     private readonly List<Collider> _otherColliders = [];
 
     public Action<Collider> OnCollisionEnter;
@@ -20,8 +21,14 @@ public class Collider : Component<Collider>
         PhysicsSystem.Instance.RegisterCollider(this);
     }
 
+    public override void OnDestroyed()
+    {
+        PhysicsSystem.Instance.DeregisterCollider(this);
+    }
+
     public override void OnRemovedFromEntity()
     {
+        PhysicsSystem.Instance.DeregisterCollider(this);
         OnCollisionEnter = null;
         OnCollisionStay = null;
         OnCollisionExit = null;
@@ -29,7 +36,7 @@ public class Collider : Component<Collider>
 
     public override void OnUpdate()
     {
-        if(isTrigger) CheckForTriggerCollisions();
+        if(IsTrigger && Bounds != null) CheckForTriggerCollisions();
     }
 
     private void CheckForTriggerCollisions()
@@ -65,14 +72,6 @@ public class Collider : Component<Collider>
 
     public override void OnDebugDraw()
     {
-        var tranformedShape = GetTransformedPolygon();
-
-        for (int i = 0; i < tranformedShape.Vertices.Length; i++)
-        {
-            var current = tranformedShape.Vertices[i];
-            var next = tranformedShape.Vertices[(i + 1) % tranformedShape.Vertices.Length];
-
-            Core.SpriteBatch.DrawLine(current, next, Color.White, 1f);
-        }
+        Core.SpriteBatch.DrawPolygon(TransformedBounds.Vertices, Color.White, 1.0f);
     }
 }

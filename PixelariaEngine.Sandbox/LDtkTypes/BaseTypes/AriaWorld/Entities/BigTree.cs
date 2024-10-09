@@ -6,8 +6,32 @@ namespace PixelariaEngine.Sandbox;
 using LDtk;
 using Microsoft.Xna.Framework;
 
-public partial class BigTree : ILDtkEntity
+public partial class BigTree: ILDtkEntity
 {
+    public static readonly BigTree Default = new()
+    {
+        Identifier = "BigTree",
+        Uid = 152,
+        Size = new Vector2(160f, 160f),
+        Pivot = new Vector2(0.5f, 0.925f),
+        Tile = new TilesetRectangle()
+        {
+            X = 32,
+            Y = 2304,
+            W = 160,
+            H = 160
+        },
+        SmartColor = new Color(144, 229, 138, 255),
+
+        RenderTiles = new TilesetRectangle()
+        {
+            X = 32,
+            Y = 2304,
+            W = 160,
+            H = 160
+        },
+    };
+
     public string Identifier { get; set; }
     public System.Guid Iid { get; set; }
     public int Uid { get; set; }

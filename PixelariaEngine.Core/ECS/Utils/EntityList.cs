@@ -20,7 +20,7 @@ public class EntityList(Scene scene)
         var entity = new Entity(_nextEntityId, name, tags, enabled, scene);
         entity.Transform.Entity = entity;
         _entitiesToCreate.Add(entity);
-
+        
         _nextEntityId++; //increment for the next entity ID.
 
         return entity;

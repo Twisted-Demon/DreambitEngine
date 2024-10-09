@@ -15,8 +15,9 @@ public partial class PlayerStart : LDtkEntity<PlayerStart>
         
         var collider = colliderEntity.AttachComponent<BoxCollider>();
         collider.SetShape(Box.CreateRectangle(new Vector2(0, -5), 5, 10));
-        collider.isTrigger = true;
+        collider.IsTrigger = true;
         
         entity.AttachComponent<SandboxController>();
+        
     }
 }

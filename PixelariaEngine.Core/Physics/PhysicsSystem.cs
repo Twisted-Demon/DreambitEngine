@@ -12,6 +12,11 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         if(!Colliders.Contains(collider)) Colliders.Add(collider);
     }
 
+    public void DeregisterCollider(Collider collider)
+    {
+        Colliders.Remove(collider);
+    }
+
     public bool Cast(Collider collider, out CollisionResult collisionResult)
     {
         collisionResult = new CollisionResult();
@@ -19,6 +24,10 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         foreach (var other in Colliders)
         {
             if(other == collider ) continue;
+            
+            if (other == null) continue;
+            if (collider == null) continue;
+            if (!other.Enabled || !other.Entity.Enabled) continue;
 
             var polygon = collider.GetTransformedPolygon();
             var otherPolygon = other.GetTransformedPolygon();
