@@ -37,6 +37,17 @@ public class SandboxController : Component<SandboxController>
         Scene.MainCamera.CameraFollowBehavior = CameraFollowBehavior.Lerp;
         
         _collider = Entity.GetComponentInChildren<BoxCollider>();
+        
+        TestUi();
+    }
+
+    private void TestUi()
+    {
+        var (canvas, canvasEntity) = Canvas.Create();
+
+        var text = UIText.Create(canvas, "Hello World");
+        
+        text.Transform.Position = new Vector3(25, 0, 0);
     }
 
     public override void OnUpdate()

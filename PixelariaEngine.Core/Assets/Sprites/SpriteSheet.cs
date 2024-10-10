@@ -113,24 +113,6 @@ public class SpriteSheet : PixelariaAsset
         }
     }
 
-    public static Vector2 GetRelativeOrigin(SpritePivot pivotType)
-    {
-        return pivotType switch
-        {
-            SpritePivot.TopLeft => new Vector2(0f, 0f),
-            SpritePivot.TopCenter => new Vector2(0.5f, 0),
-            SpritePivot.TopRight => new Vector2(1f, 0f),
-            SpritePivot.CenterLeft => new Vector2(0f, 0.5f),
-            SpritePivot.Center => new Vector2(0.5f, 0.5f),
-            SpritePivot.CenterRight => new Vector2(1f, 0.5f),
-            SpritePivot.BottomLeft => new Vector2(0f, 1f),
-            SpritePivot.BottomCenter => new Vector2(0.5f, 1f),
-            SpritePivot.BottomRight => new Vector2(1f, 1f),
-            SpritePivot.Custom => new Vector2(0.5f, 0.5f),
-            _ => new Vector2(0.5f, 0.5f)
-        };
-    }
-
     protected override void CleanUp()
     {
         Texture = null;

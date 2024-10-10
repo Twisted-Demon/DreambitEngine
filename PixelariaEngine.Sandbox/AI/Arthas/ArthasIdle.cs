@@ -7,36 +7,42 @@ public class ArthasIdle : State<ArthasIdle>
 {
     private SpriteDrawer _spriteDrawer;
     private SpriteAnimator _animator;
-    private SpriteSheetAnimation _idleAnimation;
-    private SpriteSheetAnimation _lickAnimation;
-    private SpriteSheetAnimation _sleepAnimation;
+    private BlackboardVar<SpriteSheetAnimation> _idleAnimation;
+    private BlackboardVar<SpriteSheetAnimation> _lickAnimation;
+    private BlackboardVar<SpriteSheetAnimation> _sleepAnimation;
     private PolyShapeCollider _wakeUpCollider;
 
     private Random _random = new Random();
-    private bool _isAwake = false;
+    private BlackboardVar<bool> _isAwake;
     
     public override void OnInitialize()
     {
+        _isAwake = Blackboard.CreateVariable<bool>("isAwake", false);
+        _idleAnimation = Blackboard.CreateVariable<SpriteSheetAnimation>("idleAnimation");
+        _lickAnimation = Blackboard.CreateVariable<SpriteSheetAnimation>("lickAnimation");
+        _sleepAnimation = Blackboard.CreateVariable<SpriteSheetAnimation>("sleepAnimation");
+        
         _spriteDrawer = FSM.Entity.GetComponent<SpriteDrawer>();
         _animator = FSM.Entity.GetComponent<SpriteAnimator>();
         _wakeUpCollider = FSM.Entity.GetComponentInChildren<PolyShapeCollider>();
 
         _wakeUpCollider.OnCollisionEnter += OnCollisionEnter;
 
-        _idleAnimation = Resources.Load<SpriteSheetAnimation>("Animations/arthas_idle");
-        _lickAnimation = Resources.Load<SpriteSheetAnimation>("Animations/arthas_lick");
-        _sleepAnimation = Resources.Load<SpriteSheetAnimation>("Animations/arthas_sleep");
+        _idleAnimation.Value = Resources.Load<SpriteSheetAnimation>("Animations/arthas_idle");
+        _lickAnimation.Value = Resources.Load<SpriteSheetAnimation>("Animations/arthas_lick");
+        _sleepAnimation.Value = Resources.Load<SpriteSheetAnimation>("Animations/arthas_sleep");
+        
 
         _lickDelay = (float) _random.Next(5, 10);
-        _animator.Animation = _sleepAnimation;
+        _animator.Animation = _sleepAnimation.Value;
         _animator.Play();
     }
 
     private void OnCollisionEnter(Collider other)
     {
         if (!Entity.CompareTag(other, "player")) return;
-        _isAwake = true;
-        _animator.Animation = _idleAnimation;
+        _isAwake.Value = true;
+        _animator.Animation = _idleAnimation.Value;
         
         _wakeUpCollider.OnCollisionEnter -= OnCollisionEnter;
         Entity.Destroy(_wakeUpCollider.Entity);
@@ -46,7 +52,7 @@ public class ArthasIdle : State<ArthasIdle>
 
     public override void OnExecute()
     {
-        if (!_isAwake)
+        if (!_isAwake.Value)
             return;
         
         HandleLickAnimation();
@@ -57,7 +63,7 @@ public class ArthasIdle : State<ArthasIdle>
 
     private void HandleLickAnimation()
     {
-        if (_animator.Animation == _sleepAnimation || _animator.Animation == _lickAnimation)
+        if (_animator.Animation == _sleepAnimation.Value || _animator.Animation == _lickAnimation.Value)
             return;
         
         _elapsedTimeSinceLick += Time.DeltaTime;
@@ -67,14 +73,14 @@ public class ArthasIdle : State<ArthasIdle>
             _elapsedTimeSinceLick = 0; 
             _lickDelay = (float) _random.Next(5, 10);
             
-            _animator.Animation = _lickAnimation;
+            _animator.Animation = _lickAnimation.Value;
             
             var numOfLicks = _random.Next(2, 4);
             for (var i = 0; i < numOfLicks; i++)
             {
-                _animator.QueueAnimation(_lickAnimation);
+                _animator.QueueAnimation(_lickAnimation.Value);
             }
-            _animator.QueueAnimation(_idleAnimation);
+            _animator.QueueAnimation(_idleAnimation.Value);
         }
     }
 }

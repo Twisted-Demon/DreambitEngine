@@ -6,9 +6,9 @@ namespace PixelariaEngine.Sandbox;
 using LDtk;
 using Microsoft.Xna.Framework;
 
-public partial class CustomTrigger: ILDtkEntity
+public partial class CustomTrigger : ILDtkEntity
 {
-    public static readonly CustomTrigger Default = new()
+    public static CustomTrigger Default() => new()
     {
         Identifier = "CustomTrigger",
         Uid = 185,

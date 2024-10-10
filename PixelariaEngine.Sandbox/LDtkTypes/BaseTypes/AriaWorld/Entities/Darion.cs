@@ -6,9 +6,9 @@ namespace PixelariaEngine.Sandbox;
 using LDtk;
 using Microsoft.Xna.Framework;
 
-public partial class Darion: ILDtkEntity
+public partial class Darion : ILDtkEntity
 {
-    public static readonly Darion Default = new()
+    public static Darion Default() => new()
     {
         Identifier = "Darion",
         Uid = 180,

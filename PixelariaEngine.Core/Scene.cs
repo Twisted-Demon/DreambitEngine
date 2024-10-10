@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 using PixelariaEngine.ECS;
 using PixelariaEngine.Graphics;
 
@@ -28,6 +29,7 @@ public class Scene
         Drawables = new DrawableList();
 
         AddRenderer<DebugRenderer>();
+        AddRenderer<UIRenderer>();
     }
 
     public Camera2D MainCamera { get; private set; }
@@ -131,6 +133,18 @@ public class Scene
 
         foreach(var renderer in Renderers.OrderBy(x => x.Order).ToList())
             renderer.OnDraw();
+        
+        Core.Instance.GraphicsDevice.SetRenderTarget(null);
+        Core.Instance.GraphicsDevice.Clear(BackgroundColor);
+        foreach (var renderer in Renderers.OrderBy(x => x.Order).Where(x => x.IsActive).ToList())
+        {
+            
+            Core.SpriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp);
+
+            Core.SpriteBatch.Draw(renderer.FinalRenderTarget, Vector2.Zero, Color.White);
+            
+            Core.SpriteBatch.End();
+        }
     }
 
     public Entity CreateEntity(string name = "entity", HashSet<string> tags = null, bool enabled = true)

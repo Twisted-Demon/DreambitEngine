@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using PixelariaEngine.Graphics;
 
 namespace PixelariaEngine;
 
@@ -15,6 +17,81 @@ public static class SpriteBatchExtensions
             _pixelTexture = new Texture2D(graphicsDevice, 1, 1);
             _pixelTexture.SetData(new[] { Color.White });
         }
+    }
+    
+    private static List<string> SplitTextIntoLines(SpriteFont spriteFont, string text, float maxWidth)
+    {
+        var lines = new List<string>();
+        var words = text.Split(' ');
+        var currentLine = string.Empty;
+
+        foreach (var word in words)
+        {
+            var testLine = currentLine + (currentLine.Length > 0 ? " " : "") + word;
+            var size = spriteFont.MeasureString(testLine);
+
+            if (size.X > maxWidth)
+            {
+                if(currentLine.Length > 0)
+                    lines.Add(currentLine);
+                
+                currentLine = word;
+            }
+            else
+                currentLine = testLine;
+        }
+        
+        if(currentLine.Length > 0)
+            lines.Add(currentLine);
+
+        return lines;
+    }
+    
+    //draw multi lined text
+    public static void DrawMultiLineText(this SpriteBatch spriteBatch, SpriteFont spriteFont, string text, Vector2 position, 
+        HorizontalAlignment horizontalAlignment, VerticalAlignment verticalAlignment, Color color, float maxWidth)
+    {
+        var lines = SplitTextIntoLines(spriteFont, text, maxWidth);
+        
+        //calculate the total height
+        float totalHeight = lines.Count * spriteFont.LineSpacing;
+
+        switch (verticalAlignment)
+        {
+            case VerticalAlignment.Top:
+                break;
+            case VerticalAlignment.Center:
+                position.Y -= totalHeight / 2;
+                break;
+            case VerticalAlignment.Bottom:
+                position.Y -= totalHeight;
+                break;
+        }
+        
+
+        for (int i = 0; i < lines.Count; i++)
+        {
+            
+            //adjust the horizontal position based on alighn
+
+            var alignmentOffset = GetAlignmentOffset(spriteFont, lines[i], horizontalAlignment);
+
+            var pos = new Vector2(position.X + alignmentOffset.X, position.Y);
+            spriteBatch.DrawString(spriteFont, lines[i], new Vector2(pos.X, pos.Y + i * spriteFont.LineSpacing), color);
+        }
+    }
+    
+    private static Vector2 GetAlignmentOffset(SpriteFont spriteFont, string text, HorizontalAlignment horizontalAlignment)
+    {
+        var textSize = spriteFont.MeasureString(text);
+
+        return horizontalAlignment switch
+        {
+            HorizontalAlignment.Center => new Vector2(-textSize.X / 2, textSize.Y / 2),
+            HorizontalAlignment.Left => new Vector2(-textSize.X, textSize.Y / 2),
+            HorizontalAlignment.Right => new Vector2(textSize.X / 2, textSize.Y / 2),
+            _ => Vector2.Zero
+        };
     }
 
     // Draw a Line

@@ -6,9 +6,9 @@ namespace PixelariaEngine.Sandbox;
 using LDtk;
 using Microsoft.Xna.Framework;
 
-public partial class Tree: ILDtkEntity
+public partial class Tree : ILDtkEntity
 {
-    public static readonly Tree Default = new()
+    public static Tree Default() => new()
     {
         Identifier = "Tree",
         Uid = 4,
@@ -21,7 +21,7 @@ public partial class Tree: ILDtkEntity
             W = 64,
             H = 96
         },
-        SmartColor = new Color(144, 229, 138, 255),
+        SmartColor = new Color(255, 255, 255, 255),
 
         RenderTiles = new TilesetRectangle()
         {

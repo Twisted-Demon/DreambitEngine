@@ -18,7 +18,7 @@ public class DefaultRenderer(Scene scene) : Renderer(scene)
         UpdateRenderTargets();
         PreRender();
         RenderDrawables();
-        ShowRenderBuffer();
+        RenderToFinalRenderTarget();
     }
 
     private void PreRender()
@@ -35,9 +35,7 @@ public class DefaultRenderer(Scene scene) : Renderer(scene)
         if (_renderTargets.Count == Scene.Drawables.DrawLayerCount) return;
 
         foreach (var renderTarget in _renderTargets)
-        {
             renderTarget.Dispose();
-        }
 
         _renderTargets.Clear();
 
@@ -47,13 +45,13 @@ public class DefaultRenderer(Scene scene) : Renderer(scene)
         }
     }
 
-    private void ShowRenderBuffer()
+    private void RenderToFinalRenderTarget()
     {
-        Device.SetRenderTarget(null);
-        Device.Clear(Scene.BackgroundColor);
+        Device.SetRenderTarget(FinalRenderTarget);
+        Device.Clear(Color.Transparent);
 
         Core.SpriteBatch.Begin(samplerState: SamplerState.PointClamp, blendState: BlendState.NonPremultiplied,
-            sortMode: SpriteSortMode.FrontToBack);
+            sortMode: SpriteSortMode.Immediate);
 
         foreach (var renderTarget in _renderTargets)
             Core.SpriteBatch.Draw(renderTarget, Vector2.Zero, Color.White);
@@ -71,7 +69,6 @@ public class DefaultRenderer(Scene scene) : Renderer(scene)
         {
             //set the render target for the layer
             Device.SetRenderTarget(_renderTargets[i]);
-            
             Device.Clear(Color.Transparent);
             
             Core.SpriteBatch.Begin(transformMatrix: Scene.MainCamera.TransformMatrix,
@@ -91,6 +88,8 @@ public class DefaultRenderer(Scene scene) : Renderer(scene)
 
     protected override void OnWindowResized(object sender, WindowEventArgs args)
     {
+        base.OnWindowResized(sender, args);
+        
         var renderTargetCount = _renderTargets.Count;
         
         foreach (var renderTarget in _renderTargets)

@@ -12,7 +12,7 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
     private string _spriteSheetPath = string.Empty;
     public Color Color { get; set; } = Color.White;
     public Vector2 Pivot { get; set; } = Vector2.Zero;
-    public SpritePivot PivotType { get; set; } = SpritePivot.Center;
+    public PivotType PivotType { get; set; } = PivotType.Center;
     public int CurrentFrameIndex { get; set; }
     public TilesetRectangle FrameRect { get; set; } = null;
 
@@ -57,9 +57,9 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
 
         var originToUse = Pivot;
 
-        if (PivotType != SpritePivot.Custom)
+        if (PivotType != PivotType.Custom)
         {
-            var relative = SpriteSheet.GetRelativeOrigin(PivotType);
+            var relative = PivotHelper.GetRelativeOrigin(PivotType);
             originToUse = new Vector2(relative.X * spriteFrame.Width, relative.Y * spriteFrame.Height);
         }
 
@@ -99,9 +99,9 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
         
         var originToUse = Pivot;
         
-        if (PivotType != SpritePivot.Custom)
+        if (PivotType != PivotType.Custom)
         {
-            var relative = SpriteSheet.GetRelativeOrigin(PivotType);
+            var relative = PivotHelper.GetRelativeOrigin(PivotType);
             originToUse = new Vector2(relative.X * spriteFrame.Width, relative.Y * spriteFrame.Height);
         }
 

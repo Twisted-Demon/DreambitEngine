@@ -6,9 +6,9 @@ namespace PixelariaEngine.Sandbox;
 using LDtk;
 using Microsoft.Xna.Framework;
 
-public partial class BigTree: ILDtkEntity
+public partial class BigTree : ILDtkEntity
 {
-    public static readonly BigTree Default = new()
+    public static BigTree Default() => new()
     {
         Identifier = "BigTree",
         Uid = 152,

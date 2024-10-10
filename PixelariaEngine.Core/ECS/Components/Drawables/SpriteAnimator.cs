@@ -30,7 +30,7 @@ public class SpriteAnimator : Component<SpriteAnimator>
     public override void OnCreated()
     {
         _spriteDrawer = Entity.GetComponent<SpriteDrawer>();
-        _spriteDrawer.PivotType = SpritePivot.Custom;
+        _spriteDrawer.PivotType = PivotType.Custom;
     }
 
     public override void OnUpdate()

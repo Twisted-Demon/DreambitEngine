@@ -13,9 +13,11 @@ public class Camera2D : Component
     public float LerpSpeed { get; set; } = 5f;
     public float Zoom { get; set; } = 1f;
     public float TotalZoom => Zoom * ResolutionZoom;
-    public int TargetVerticalResolution { get; private set; } = 288;
+    public int TargetVerticalResolution { get; private set; } = 360;
     public Matrix TransformMatrix { get; private set; }
     public Matrix UnscaledTransformMatrix { get; private set; }
+    
+    public Matrix TopLeftTransformMatrix { get; private set; }
     
 
     public override void OnCreated()
@@ -28,6 +30,7 @@ public class Camera2D : Component
     {
         TransformMatrix = CalculateTransformMatrix(ResolutionZoom * Zoom);
         UnscaledTransformMatrix = CalculateTransformMatrix();
+        TopLeftTransformMatrix = CalculateTopLeftMatrix(TotalZoom);
         UpdatePosition();
     }
 
@@ -37,6 +40,14 @@ public class Camera2D : Component
     }
 
     private Matrix CalculateTransformMatrix(float scaleFactor = 1.0f)
+    {
+        return Matrix.CreateTranslation(-Transform.WorldPosition) * 
+               Matrix.CreateRotationZ(Transform.WorldZRotation) * 
+               Matrix.CreateScale(new Vector3(scaleFactor, scaleFactor, 1)) * 
+               Matrix.CreateTranslation(new Vector3(0.5f * Window.ScreenSize.X, 0.5f * Window.ScreenSize.Y, 0f));
+    }
+    
+    private Matrix CalculateTopLeftMatrix(float scaleFactor = 1.0f)
     {
         return Matrix.CreateTranslation(-Transform.WorldPosition) * 
                Matrix.CreateRotationZ(Transform.WorldZRotation) * 

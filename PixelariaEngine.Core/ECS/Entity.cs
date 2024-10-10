@@ -91,10 +91,10 @@ public class Entity : IDisposable
         return entity;
     }
 
-    public static List<Entity> GetChildren(Entity parentEntity)
+    public List<Entity> GetChildren()
     {
         var children = new List<Entity>();
-        children.AddRange(parentEntity._children);
+        children.AddRange(_children);
 
         return children;
     }

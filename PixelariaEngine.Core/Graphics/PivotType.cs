@@ -1,6 +1,6 @@
 ﻿namespace PixelariaEngine.Graphics;
 
-public enum SpritePivot
+public enum PivotType
 {
     TopLeft,
     TopCenter,

@@ -6,9 +6,9 @@ namespace PixelariaEngine.Sandbox;
 using LDtk;
 using Microsoft.Xna.Framework;
 
-public partial class Arthas: ILDtkEntity
+public partial class Arthas : ILDtkEntity
 {
-    public static readonly Arthas Default = new()
+    public static Arthas Default() => new()
     {
         Identifier = "Arthas",
         Uid = 169,

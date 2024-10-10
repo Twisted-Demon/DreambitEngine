@@ -275,7 +275,7 @@
 			"fillOpacity": 0.08,
 			"lineOpacity": 0,
 			"hollow": true,
-			"color": "#90E58A",
+			"color": "#FFFFFF",
 			"renderMode": "Tile",
 			"showName": true,
 			"tilesetId": 1,

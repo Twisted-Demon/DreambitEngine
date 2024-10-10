@@ -14,7 +14,7 @@ public class TransitionSceneTest : Scene
         _bgEntity = Entity.Create("bg");
         var bgSprite = _bgEntity.AttachComponent<SpriteDrawer>();
         bgSprite.SpriteSheetPath = "SpriteSheets/SpaceBackground";
-        bgSprite.PivotType = SpritePivot.BottomCenter;
+        bgSprite.PivotType = PivotType.BottomCenter;
 
         _playerEntity = Entity.Create("player");
         _playerEntity.AttachComponent<SandboxController>();

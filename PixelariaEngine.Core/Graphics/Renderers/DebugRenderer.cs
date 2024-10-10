@@ -1,4 +1,5 @@
 ﻿using System.Linq;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
 namespace PixelariaEngine.Graphics;
@@ -13,9 +14,11 @@ public class DebugRenderer(Scene scene) : Renderer(scene)
 
     public override void OnDraw()
     {
+        IsActive = scene.DebugMode;
         if (!scene.DebugMode) return;
         
-        Device.SetRenderTarget(null);
+        Device.SetRenderTarget(FinalRenderTarget);
+        Device.Clear(Color.Transparent);
         
         Core.SpriteBatch.Begin(
             samplerState: SamplerState.PointClamp, 

@@ -10,6 +10,7 @@ public class FSM : Component<FSM>
     private State CurrentState { get; set; }
     private State NextState { get; set; } = null;
     private readonly Dictionary<string, State> _statesMap = [];
+    public Blackboard Blackboard { get; set; } = new();
 
     public override void OnUpdate()
     {

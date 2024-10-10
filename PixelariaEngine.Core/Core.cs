@@ -22,6 +22,8 @@ public class Core : Game
         PixelariaEngine.Window.SetTitle(title);
         PixelariaEngine.Window.SetSize(width, height);
 
+        GraphicsDevice.BlendState = BlendState.NonPremultiplied;
+
         //SetFixedTimeStep(false);
 
         TargetElapsedTime = TimeSpan.FromSeconds((double)1 / 120); //set Target fps to 120

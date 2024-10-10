@@ -5,6 +5,7 @@ public abstract class State
     public string Identifier;
 
     internal bool IsStarted = false;
+    protected Blackboard Blackboard => FSM.Blackboard;
     public FSM FSM;
     
     public virtual void OnInitialize()

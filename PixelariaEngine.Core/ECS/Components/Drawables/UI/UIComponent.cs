@@ -1,4 +1,4 @@
-﻿namespace PixelariaEngine.ECS.UI;
+﻿namespace PixelariaEngine.ECS;
 
 public class UIComponent : DrawableComponent
 {

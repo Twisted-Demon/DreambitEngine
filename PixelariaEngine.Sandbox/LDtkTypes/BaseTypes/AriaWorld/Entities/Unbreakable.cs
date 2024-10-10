@@ -6,9 +6,9 @@ namespace PixelariaEngine.Sandbox;
 using LDtk;
 using Microsoft.Xna.Framework;
 
-public partial class Unbreakable: ILDtkEntity
+public partial class Unbreakable : ILDtkEntity
 {
-    public static readonly Unbreakable Default = new()
+    public static Unbreakable Default() => new()
     {
         Identifier = "Unbreakable",
         Uid = 170,

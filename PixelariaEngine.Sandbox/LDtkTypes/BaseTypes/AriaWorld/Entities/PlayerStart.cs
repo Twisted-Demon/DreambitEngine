@@ -6,9 +6,9 @@ namespace PixelariaEngine.Sandbox;
 using LDtk;
 using Microsoft.Xna.Framework;
 
-public partial class PlayerStart: ILDtkEntity
+public partial class PlayerStart : ILDtkEntity
 {
-    public static readonly PlayerStart Default = new()
+    public static PlayerStart Default() => new()
     {
         Identifier = "PlayerStart",
         Uid = 5,
@@ -22,7 +22,6 @@ public partial class PlayerStart: ILDtkEntity
             H = 16
         },
         SmartColor = new Color(125, 209, 136, 255),
-
     };
 
     public string Identifier { get; set; }
@@ -34,6 +33,5 @@ public partial class PlayerStart: ILDtkEntity
     public Rectangle Tile { get; set; }
 
     public Color SmartColor { get; set; }
-
 }
 #pragma warning restore

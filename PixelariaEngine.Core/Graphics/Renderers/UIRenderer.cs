@@ -4,7 +4,6 @@ using System.Linq;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using PixelariaEngine.ECS;
-using PixelariaEngine.ECS.UI;
 
 namespace PixelariaEngine.Graphics;
 
@@ -13,6 +12,7 @@ public class UIRenderer(Scene scene) : Renderer(scene)
 {
     private Camera2D _uiCamera;
     private readonly List<RenderTarget2D> _renderTargets = [];
+    private int _targetUIHeight => 576;
 
     public override void Initialize()
     {
@@ -21,18 +21,19 @@ public class UIRenderer(Scene scene) : Renderer(scene)
 
         _uiCamera = Entity.Create("uiCamera").AttachComponent<Camera2D>();
         _uiCamera.IsFollowing = false;
-        _uiCamera.SetTargetVerticalResolution(768);
+        _uiCamera.SetTargetVerticalResolution(_targetUIHeight);
         _uiCamera.Zoom = 1.0f;
     }
 
     private void UpdateRenderTargets()
     {
-        //if the layer count has changed
         if (_renderTargets.Count == Scene.Drawables.DrawLayerCount) return;
-        
-        ClearRenderTargets();
-    
-        //rebuild our render targets
+
+        foreach (var renderTarget in _renderTargets)
+            renderTarget.Dispose();
+
+        _renderTargets.Clear();
+
         for (var i = 0; i < Scene.Drawables.DrawLayerCount; i++)
         {
             _renderTargets.Add(CreateRenderTarget());
@@ -47,48 +48,66 @@ public class UIRenderer(Scene scene) : Renderer(scene)
         for (var i = 0; i < layerOrder.Count; i++)
         {
             Device.SetRenderTarget(_renderTargets[i]);
-            
             Device.Clear(Color.Transparent);
-
-            Core.SpriteBatch.Begin(transformMatrix: _uiCamera.TransformMatrix,
+            
+            Core.SpriteBatch.Begin(transformMatrix:_uiCamera.TopLeftTransformMatrix,
+                sortMode: SpriteSortMode.Immediate,
                 samplerState: SamplerState.PointClamp,
                 blendState: BlendState.NonPremultiplied);
 
             var drawables = drawLayers[layerOrder[i]]
-                .Where(x => x.Enabled && x.Entity.Enabled && x is UIComponent);
+                .Where(x => x.Enabled && x.Entity.Enabled && x is Canvas);
             
             foreach(var drawableComponent in drawables)
             {
-                var uiComponent = (UIComponent)drawableComponent;
-                uiComponent.OnDrawUI();
+                var canvas = (Canvas)drawableComponent;
+                canvas.UpdateCanvasInternals(_targetUIHeight);
+                canvas.OnDrawUI();
             }
             
             Core.SpriteBatch.End();
         }
     }
 
+    private void RenderToFinalRenderTarget()
+    {
+        Device.SetRenderTarget(FinalRenderTarget);
+        Device.Clear(Color.Transparent);
+        
+        Core.SpriteBatch.Begin(
+            
+            samplerState: SamplerState.PointClamp, 
+            blendState: BlendState.NonPremultiplied);
+        
+        foreach(var renderTarget in _renderTargets)
+            Core.SpriteBatch.Draw(renderTarget, Vector2.Zero, Color.White);
+        
+        Core.SpriteBatch.End();
+    }
+
     public override void OnDraw()
     {
         UpdateRenderTargets();
         DrawUIComponents();
+        RenderToFinalRenderTarget();
     }
+    
 
-    private void ClearRenderTargets()
+    protected override void OnWindowResized(object sender, WindowEventArgs args)
     {
-        //clear the render targets and dispose of them
+        base.OnWindowResized(sender, args);
+        
+        var renderTargetCount = _renderTargets.Count;
+        _uiCamera.SetTargetVerticalResolution(_targetUIHeight);
+        
         foreach (var renderTarget in _renderTargets)
         {
             renderTarget.Dispose();
         }
         
         _renderTargets.Clear();
-    }
 
-    protected override void OnWindowResized(object sender, WindowEventArgs args)
-    {
-        ClearRenderTargets();
-
-        for (var i = 0; i < _renderTargets.Count; i++)
+        for (var i = 0; i < renderTargetCount; i++)
         {
             _renderTargets.Add(CreateRenderTarget());
         }
