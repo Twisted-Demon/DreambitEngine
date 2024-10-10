@@ -9,9 +9,9 @@ public class Canvas : UIComponent
 {
     private int _targetWidth;
     private int _targetHeight;
-    private List<UIElement> _uiComponents = [];
+    private readonly List<UIElement> _uiComponents = [];
     
-    internal void UpdateCanvasInternals(int targetHeight)
+    internal void UpdateInternalCanvasSize(int targetHeight)
     {
         _targetHeight = targetHeight;
         _targetWidth = (int)(Window.AspectRatio * _targetHeight);
@@ -25,8 +25,10 @@ public class Canvas : UIComponent
         }
     }
 
-    public Vector2 ConvertToScreenCoord(Vector2 position)
+    internal Vector2 ConvertToScreenCoord(UIElement uiElement)
     {
+        var position = uiElement.Transform.WorldPosToVec2;
+        
         var xScale = _targetWidth / (float)100;
         var yScale = _targetHeight / (float)100;
         

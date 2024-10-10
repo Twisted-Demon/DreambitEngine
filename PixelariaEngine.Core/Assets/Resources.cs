@@ -1,32 +1,67 @@
 ﻿using System;
+using System.Collections.Generic;
 using Microsoft.Xna.Framework.Content;
 
 namespace PixelariaEngine;
 
-public class Resources
+public class Resources : Singleton<Resources>
 {
-    private static readonly Logger<Resources> Logger = new();
-    public static ContentManager Content => Core.Instance.Content;
+    private ContentManager Content { get; } = Core.Instance.Content;
+    private List<IDisposable> _disposableAssets;
+    internal List<IDisposable> DisposableAssets
+    {
+        get
+        {
+            if (_disposableAssets != null) return _disposableAssets;
+            
+            var fieldInfo = ReflectionUtils.GetFieldInfo(typeof(ContentManager), "disposableAssets");
+            _disposableAssets = fieldInfo.GetValue(Core.Instance.Content) as List<IDisposable>;
+            return _disposableAssets;
+        }
+    }
+    
+    private Dictionary<string, object> _loadedAssets;
+    internal Dictionary<string, object> LoadedAssets
+    {
+        get
+        {
+            if (_loadedAssets != null) return _loadedAssets;
+            var fieldInfo = ReflectionUtils.GetFieldInfo(typeof(ContentManager), "loadedAssets");
+            _loadedAssets = fieldInfo.GetValue(Core.Instance.Content) as Dictionary<string, object>;
+            return _loadedAssets;
+        }
+    }
+    
+    
 
     /// <summary>
-    ///     Tries to Load an asset and returns null if not found
+    ///     Tries to Load an asset and returns default if not found
     /// </summary>
-    /// <param name="path"></param>
+    /// <param name="assetName"></param>
     /// <typeparam name="T"></typeparam>
     /// <returns></returns>
-    public static T Load<T>(string path) where T : class
+    public static T LoadAsset<T>(string assetName) where T : class
     {
+        //if we already have the asset we will return it
+        if (Instance.LoadedAssets.TryGetValue(assetName, out var rawAsset))
+        {
+            if (rawAsset is T asset)
+                return asset;
+        }
+
         try
         {
-            var asset = Core.Instance.Content.Load<T>(path);
-            Logger.Trace("Loaded {0} | {1}", typeof(T).Name, path);
+            var asset = Instance.Content.Load<T>(assetName);
+            Instance.Logger.Debug("Loaded {0} | {1}", typeof(T).Name, assetName);
 
             return asset;
         }
         catch (Exception e)
         {
-            Logger.Warn("Could not load {0} | {1}", typeof(T).Name, path);
-            return null;
+            Instance.Logger.Warn("Could not load {0} | {1}", typeof(T).Name, assetName);
+            Instance.Logger.Error(e.Message);
+
+            return default;
         }
     }
 }

@@ -12,7 +12,7 @@ public class UIRenderer(Scene scene) : Renderer(scene)
 {
     private Camera2D _uiCamera;
     private readonly List<RenderTarget2D> _renderTargets = [];
-    private int _targetUIHeight => 576;
+    private int _targetUIHeight => Window.Height;
 
     public override void Initialize()
     {
@@ -61,7 +61,7 @@ public class UIRenderer(Scene scene) : Renderer(scene)
             foreach(var drawableComponent in drawables)
             {
                 var canvas = (Canvas)drawableComponent;
-                canvas.UpdateCanvasInternals(_targetUIHeight);
+                canvas.UpdateInternalCanvasSize(_targetUIHeight);
                 canvas.OnDrawUI();
             }
             

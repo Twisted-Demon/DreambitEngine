@@ -42,7 +42,7 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
     private void OnSpriteSheetPathChanged(string newPath)
     {
         _spriteSheetPath = newPath;
-        _spriteSheet = Resources.Load<SpriteSheet>(_spriteSheetPath);
+        _spriteSheet = Resources.LoadAsset<SpriteSheet>(_spriteSheetPath);
     }
 
     public override void OnDraw()

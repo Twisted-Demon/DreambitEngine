@@ -2,11 +2,10 @@
 
 namespace PixelariaEngine;
 
-public class Singleton<T> where T : class
+public abstract class Singleton<T> where T : class
 {
+    protected Logger<T> Logger { get; } = new();
     private static T _instance;
-
-    protected Logger<T> Logger = new();
 
     public static T Instance
     {

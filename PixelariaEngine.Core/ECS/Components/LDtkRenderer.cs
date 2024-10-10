@@ -10,7 +10,7 @@ public class LDtkRenderer : DrawableComponent<LDtkRenderer>
 
     public override void OnCreated()
     {
-        _renderer = new ExampleRenderer(Core.SpriteBatch, Resources.Content);
+        _renderer = new ExampleRenderer(Core.SpriteBatch, Core.Instance.Content);
     }
 
     public override void OnPreDraw()

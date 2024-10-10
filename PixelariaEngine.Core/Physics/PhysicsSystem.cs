@@ -39,6 +39,8 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         
         return collisionResult.Collisions.Count > 0;
     }
+
+    public Logger<PhysicsSystem> Logger { get; set; } = new();
 }
 
 public readonly struct CollisionResult()

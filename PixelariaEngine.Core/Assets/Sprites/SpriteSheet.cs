@@ -50,14 +50,14 @@ public class SpriteSheet : PixelariaAsset
 
     public static SpriteSheet Create(int columns, int rows, string texturePath)
     {
-        var texture = Resources.Load<Texture2D>(texturePath);
+        var texture = Resources.LoadAsset<Texture2D>(texturePath);
 
         return texture == null ? null : new SpriteSheet(columns, rows, texturePath, texture);
     }
 
     public static SpriteSheet Create(int gridSize, string texturePath)
     {
-        var texture = Resources.Load<Texture2D>(texturePath);
+        var texture = Resources.LoadAsset<Texture2D>(texturePath);
 
         return texture == null ? null : new SpriteSheet(gridSize, texturePath, texture);
     }

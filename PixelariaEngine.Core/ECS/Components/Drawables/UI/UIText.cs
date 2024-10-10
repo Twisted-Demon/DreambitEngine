@@ -1,9 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using LDtk.Full;
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using MonoGame.Extended.BitmapFonts;
 using PixelariaEngine.Graphics;
 
 namespace PixelariaEngine.ECS;
@@ -15,7 +12,7 @@ public class UIText : UIElement
     public PivotType Pivot { get; set; } = PivotType.Center;
 
     private string _fontName = string.Empty;
-    private SpriteFont _spriteFont;
+    private BitmapFont _spriteFont;
 
     public string FontName
     {
@@ -25,16 +22,16 @@ public class UIText : UIElement
             if (_fontName == value)
                 return;
             _fontName = value;
-            _spriteFont = Resources.Load<SpriteFont>(_fontName);
+            _spriteFont = Resources.LoadAsset<BitmapFont>(_fontName);
         }
     }
 
     public override void OnDrawUI()
     {
-        var position = Canvas.ConvertToScreenCoord(Entity.Transform.WorldPosToVec2);
+        var position = GetScreenPos();
         
         Core.SpriteBatch.DrawMultiLineText(_spriteFont, Text, position, 
-            HorizontalAlignment, VerticalAlignment, Color.White, MaxWidth);
+            HTextAlignment, VTextAlignment, Color.White, MaxWidth);
     }
 
     public static UIText Create(Canvas canvas, string text, HorizontalAlignment horizontalAlignment = HorizontalAlignment.Center,
@@ -44,7 +41,7 @@ public class UIText : UIElement
         
         labelComponent.FontName = fontName;
         labelComponent.Text = text;
-        labelComponent.HorizontalAlignment = horizontalAlignment;
+        labelComponent.HTextAlignment = horizontalAlignment;
         
         return labelComponent;
     }

@@ -28,9 +28,9 @@ public class ArthasIdle : State<ArthasIdle>
 
         _wakeUpCollider.OnCollisionEnter += OnCollisionEnter;
 
-        _idleAnimation.Value = Resources.Load<SpriteSheetAnimation>("Animations/arthas_idle");
-        _lickAnimation.Value = Resources.Load<SpriteSheetAnimation>("Animations/arthas_lick");
-        _sleepAnimation.Value = Resources.Load<SpriteSheetAnimation>("Animations/arthas_sleep");
+        _idleAnimation.Value = Resources.LoadAsset<SpriteSheetAnimation>("Animations/arthas_idle");
+        _lickAnimation.Value = Resources.LoadAsset<SpriteSheetAnimation>("Animations/arthas_lick");
+        _sleepAnimation.Value = Resources.LoadAsset<SpriteSheetAnimation>("Animations/arthas_sleep");
         
 
         _lickDelay = (float) _random.Next(5, 10);

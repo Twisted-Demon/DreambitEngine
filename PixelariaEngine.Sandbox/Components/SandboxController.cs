@@ -24,8 +24,8 @@ public class SandboxController : Component<SandboxController>
 
     public override void OnCreated()
     {
-        _idleAnimation = Resources.Load<SpriteSheetAnimation>("Animations/b_witch_idle");
-        _runAnimation = Resources.Load<SpriteSheetAnimation>("Animations/b_witch_run");
+        _idleAnimation = Resources.LoadAsset<SpriteSheetAnimation>("Animations/b_witch_idle");
+        _runAnimation = Resources.LoadAsset<SpriteSheetAnimation>("Animations/b_witch_run");
 
         _animator = Entity.GetComponent<SpriteAnimator>();
         _animator.Play();
@@ -47,7 +47,7 @@ public class SandboxController : Component<SandboxController>
 
         var text = UIText.Create(canvas, "Hello World");
         
-        text.Transform.Position = new Vector3(25, 0, 0);
+        text.Transform.Position = new Vector3(0, 0, 0);
     }
 
     public override void OnUpdate()

@@ -12,31 +12,24 @@
 
 /reference:../../Includes/PixelariaEngine.ContentPipelineExtensions.dll
 /reference:../../Includes/LDtk.ContentPipeline.dll
+/reference:../../Includes/MonoGame.Extended.Content.Pipeline.dll
 
 #---------------------------------- Content ---------------------------------#
 
-#begin Fonts/Micro5Charted-Regular.ttf
-/copy:Fonts/Micro5Charted-Regular.ttf
-
-#begin Fonts/Pixelify-Regular.spritefont
-/importer:FontDescriptionImporter
-/processor:FontDescriptionProcessor
+#begin Fonts/dogica_bmf_0.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyColor=255,0,255,255
+/processorParam:ColorKeyEnabled=True
+/processorParam:GenerateMipmaps=False
 /processorParam:PremultiplyAlpha=True
-/processorParam:TextureFormat=Compressed
-/build:Fonts/Pixelify-Regular.spritefont
+/processorParam:ResizeToPowerOfTwo=False
+/processorParam:MakeSquare=False
+/processorParam:TextureFormat=Color
+/build:Fonts/dogica_bmf_0.png
 
-#begin Fonts/PixelifySans-Bold.ttf
-/copy:Fonts/PixelifySans-Bold.ttf
-
-#begin Fonts/PixelifySans-Medium.ttf
-/copy:Fonts/PixelifySans-Medium.ttf
-
-#begin Fonts/PixelifySans-Regular.ttf
-/copy:Fonts/PixelifySans-Regular.ttf
-
-#begin Fonts/PixelifySans-SemiBold.ttf
-/copy:Fonts/PixelifySans-SemiBold.ttf
-
-#begin Fonts/PixelOperator.ttf
-/copy:Fonts/PixelOperator.ttf
+#begin Fonts/dogica_bmf.fnt
+/importer:BitmapFontImporter
+/processor:BitmapFontProcessor
+/build:Fonts/dogica_bmf.fnt
 

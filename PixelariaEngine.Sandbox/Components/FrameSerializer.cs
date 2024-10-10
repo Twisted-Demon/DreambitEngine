@@ -11,6 +11,6 @@ public class FrameSerializer : Component
 
     public override void OnCreated()
     {
-        Animation = Resources.Load<SpriteSheetAnimation>("Animations/witch_run");
+        Animation = Resources.LoadAsset<SpriteSheetAnimation>("Animations/witch_run");
     }
 }

@@ -39,7 +39,7 @@ public class LDtkManager : Singleton<LDtkManager>
 
     private void LoadFileAndWorld(string ldtkFilePath)
     {
-        LDtkFile = LDtkFile.FromFile(ldtkFilePath, Resources.Content);
+        LDtkFile = LDtkFile.FromFile(ldtkFilePath, Core.Instance.Content);
         LDtkWorld = LDtkFile.LoadSingleWorld();
     }
 
@@ -78,4 +78,6 @@ public class LDtkManager : Singleton<LDtkManager>
             .Where(type => type.IsClass && !type.IsAbstract && type.IsSubclassOf(typeof(TBase)))
             .ToList();
     }
+
+    public Logger<LDtkManager> Logger { get; set; } = new();
 }

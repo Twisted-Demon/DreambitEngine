@@ -2,5 +2,5 @@
 
 public static class Fonts
 {
-    public const string Default = "Fonts/Pixelify-Regular";
+    public const string Default = "Fonts/dogica_bmf";
 }
