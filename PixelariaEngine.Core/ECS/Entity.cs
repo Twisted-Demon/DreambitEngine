@@ -5,28 +5,25 @@ namespace PixelariaEngine.ECS;
 
 public class Entity : IDisposable
 {
-    private readonly ComponentList _componentList;
+    private Entity _parent;
+    private ComponentList ComponentList { get; }
+    public Transform Transform { get; private set; }
+    public HashSet<string> Tags { get; } = [];
+    internal Scene Scene { get; private set; }
+    
     public readonly uint Id;
-    public readonly Transform Transform;
-
     private bool _enabled;
     private bool _isDestroyed;
     private bool _isDisposed;
     public string Name;
-
-    internal Scene Scene;
-    public HashSet<string> Tags;
     
-    private Entity _parent = null;
-
     public Entity Parent
     {
         get => _parent;
         set
         {
             if(_parent == value) return;
-            _parent = value;
-            _parent._children.Add(this);
+            SetParent(value);
         }
     }
 
@@ -43,7 +40,7 @@ public class Entity : IDisposable
         if (Name == "entity")
             Name += $": {id}";
 
-        _componentList = new ComponentList(scene);
+        ComponentList = new ComponentList(scene);
         Transform = new Transform(this);
     }
 
@@ -113,8 +110,8 @@ public class Entity : IDisposable
     {
         if (_isDestroyed) return;
 
-        _componentList.UpdateLists();
-        _componentList.UpdateComponents();
+        ComponentList.UpdateLists();
+        ComponentList.UpdateComponents();
     }
 
     /// <summary>
@@ -125,7 +122,7 @@ public class Entity : IDisposable
     /// <returns></returns>
     public T AttachComponent<T>() where T : Component
     {
-        var component = _componentList.GetComponent<T>();
+        var component = ComponentList.GetComponent<T>();
         if (component != null) return component;
 
         component = (T)Activator.CreateInstance<T>().SetUp(this, true);
@@ -134,14 +131,14 @@ public class Entity : IDisposable
             return null;
 
         component.OnCreated();
-        _componentList.AttachComponent(component);
+        ComponentList.AttachComponent(component);
 
         return component;
     }
 
     public Component AttachComponent(Type type)
     {
-        var component = _componentList.GetComponent(type);
+        var component = ComponentList.GetComponent(type);
         if (component != null) return component;
 
         component = Activator.CreateInstance(type) as Component;
@@ -149,7 +146,7 @@ public class Entity : IDisposable
         component.SetUp(this, true);
 
         component.OnCreated();
-        _componentList.AttachComponent(component);
+        ComponentList.AttachComponent(component);
 
         return component;
     }
@@ -160,12 +157,12 @@ public class Entity : IDisposable
     /// <typeparam name="T"></typeparam>
     public void DetachComponent<T>() where T : Component
     {
-        var componentToRemove = _componentList.GetComponent<T>();
+        var componentToRemove = ComponentList.GetComponent<T>();
 
         if (componentToRemove == null)
             return;
 
-        _componentList.DetachComponent(componentToRemove);
+        ComponentList.DetachComponent(componentToRemove);
     }
 
     /// <summary>
@@ -176,7 +173,7 @@ public class Entity : IDisposable
     /// <typeparam name="T"></typeparam>
     public void DetachComponent<T>(T component) where T : Component
     {
-        _componentList.DetachComponent(component);
+        ComponentList.DetachComponent(component);
     }
 
     /// <summary>
@@ -186,7 +183,7 @@ public class Entity : IDisposable
     /// <returns></returns>
     public T GetComponent<T>() where T : Component
     {
-        return _componentList.GetComponent<T>();
+        return ComponentList.GetComponent<T>();
     }
 
     public T GetComponentInChildren<T>() where T : Component
@@ -213,7 +210,7 @@ public class Entity : IDisposable
     /// <returns></returns>
     public List<Component> GetAllAttachedComponents()
     {
-        return _componentList.GetAllAttachedComponents();
+        return ComponentList.GetAllAttachedComponents();
     }
     
     /// <summary>
@@ -222,17 +219,17 @@ public class Entity : IDisposable
     /// <returns></returns>
     public List<Component> GetAllActiveComponents()
     {
-        return _componentList.GetAllActiveComponents();
+        return ComponentList.GetAllActiveComponents();
     }
 
     public List<Component> GetAllComponents()
     {
-        return _componentList.GetAllComponents();
+        return ComponentList.GetAllComponents();
     }
 
     internal bool HasComponentOfType(Type componentType)
     {
-        return _componentList.ComponentOfTypeExists(componentType);
+        return ComponentList.ComponentOfTypeExists(componentType);
     }
 
     internal void OnAddedToScene()
@@ -255,12 +252,21 @@ public class Entity : IDisposable
         //Todo: Implement on call back for components
     }
 
+    private void SetParent(Entity parentEntity)
+    {
+        if (_parent != null)
+            _parent._children.Remove(this);
+        
+        _parent = parentEntity;
+        parentEntity._children.Add(this);
+    }
+
     internal void Destroy()
     {
         _isDestroyed = true;
         Scene = null;
-        _componentList.DestroyAllComponentsNow();
-        _componentList.ClearLists();
+        ComponentList.DestroyAllComponentsNow();
+        ComponentList.ClearLists();
     }
 
     public static bool operator ==(Entity a, Entity b)

@@ -60,6 +60,9 @@ public class SandboxController : Component<SandboxController>
 
         if (Input.IsKeyPressed(Keys.F1))
             Scene.DebugMode = !Scene.DebugMode;
+        
+        if(Input.IsKeyPressed(Keys.Space))
+            Scene.SetNextLDtkScene(Worlds.World.Dev_world);
     }
 
     private void UpdateAnimation()

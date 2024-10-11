@@ -21,6 +21,8 @@ public class Scene
     protected bool IsPaused;
     protected bool IsStarted;
     protected readonly List<Renderer> Renderers = [];
+
+    private bool _useDefaultRenderer = true;
     
 
     public Scene()
@@ -30,6 +32,7 @@ public class Scene
 
         AddRenderer<DebugRenderer>();
         AddRenderer<UIRenderer>();
+        _useDefaultRenderer = true;
     }
 
     public Camera2D MainCamera { get; private set; }
@@ -46,6 +49,9 @@ public class Scene
     {
         _logger.Debug("Initializing Scene");
         MainCamera = Entity.Create("main-camera").AttachComponent<Camera2D>();
+
+        if (_useDefaultRenderer)
+            AddRenderer<DefaultRenderer>();
         
         foreach(var renderer in Renderers)
             renderer.Initialize();
@@ -57,6 +63,7 @@ public class Scene
     {
         var renderer = (T)Activator.CreateInstance(typeof(T), this);
         Renderers.Add(renderer);
+        _useDefaultRenderer = false;
         return this;
     }
 
@@ -175,6 +182,27 @@ public class Scene
     public static void SetNextScene(Scene scene)
     {
         Core.Instance.SetNextScene(scene);
+    }
+
+    public static LDtkScene SetNextLDtkScene(string identifier)
+    {
+        var scene = new LDtkScene();
+        scene.LevelIdentifier = identifier;
+        SetNextScene(scene);
+
+        return scene;
+    }
+
+    public static LDtkScene SetNextLDtkScene(Guid iid)
+    {
+        var scene = new LDtkScene
+        {
+            LevelIid = iid,
+            LoadByGuid = true
+        };
+        SetNextScene(scene);
+
+        return scene;
     }
 }
 

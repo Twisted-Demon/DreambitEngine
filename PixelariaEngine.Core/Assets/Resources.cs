@@ -8,7 +8,7 @@ public class Resources : Singleton<Resources>
 {
     private ContentManager Content { get; } = Core.Instance.Content;
     private List<IDisposable> _disposableAssets;
-    internal List<IDisposable> DisposableAssets
+    private List<IDisposable> DisposableAssets
     {
         get
         {
@@ -21,7 +21,7 @@ public class Resources : Singleton<Resources>
     }
     
     private Dictionary<string, object> _loadedAssets;
-    internal Dictionary<string, object> LoadedAssets
+    private Dictionary<string, object> LoadedAssets
     {
         get
         {
@@ -32,8 +32,6 @@ public class Resources : Singleton<Resources>
         }
     }
     
-    
-
     /// <summary>
     ///     Tries to Load an asset and returns default if not found
     /// </summary>
@@ -51,8 +49,9 @@ public class Resources : Singleton<Resources>
 
         try
         {
+            Instance.Logger.Trace("Loading {0} - {1}", typeof(T).Name, assetName);
             var asset = Instance.Content.Load<T>(assetName);
-            Instance.Logger.Debug("Loaded {0} | {1}", typeof(T).Name, assetName);
+            Instance.Logger.Debug("Loaded {0} - {1}", typeof(T).Name, assetName);
 
             return asset;
         }

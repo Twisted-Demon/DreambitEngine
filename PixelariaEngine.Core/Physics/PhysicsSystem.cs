@@ -23,10 +23,10 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         
         foreach (var other in Colliders)
         {
-            if(other == @this) continue;
-            
-            if (other == null) continue;
             if (@this == null) continue;
+            if(other == @this) continue;
+            if (other == null) continue;
+            
             if (!other.Enabled || !other.Entity.Enabled) continue;
 
             var polygon = @this.GetTransformedPolygon();
@@ -39,8 +39,6 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         
         return collisionResult.Collisions.Count > 0;
     }
-
-    public Logger<PhysicsSystem> Logger { get; set; } = new();
 }
 
 public readonly struct CollisionResult()

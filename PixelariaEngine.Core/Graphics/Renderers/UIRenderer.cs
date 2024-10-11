@@ -112,4 +112,12 @@ public class UIRenderer(Scene scene) : Renderer(scene)
             _renderTargets.Add(CreateRenderTarget());
         }
     }
+
+    protected override void OnCleanUp()
+    {
+        foreach(var renderTarget in _renderTargets)
+            renderTarget?.Dispose();
+        
+        _renderTargets.Clear();
+    }
 }

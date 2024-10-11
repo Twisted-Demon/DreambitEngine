@@ -1,30 +1,17 @@
-﻿using LDtk;
+﻿using System;
+using LDtk;
 using PixelariaEngine.ECS;
 
 namespace PixelariaEngine;
 
 public class LDtkScene : Scene<LDtkScene>
 {
-    private string _levelIdentifier;
-
     public LDtkLevel Level { get; set; }
 
-    public string LevelIdentifier
-    {
-        get => _levelIdentifier;
-        set
-        {
-            if (_levelIdentifier != null) return;
-            _levelIdentifier = value;
-        }
-    }
-
-    public Scene SetUpWorld(string worldName)
-    {
-        LDtkManager.Instance.SetUp(worldName);
-
-        return this;
-    }
+    public string LevelIdentifier { get; internal set; }
+    public Guid? LevelIid { get; internal init; }
+    
+    internal bool LoadByGuid { get; init; }
 
     protected override void OnInitialize()
     {
@@ -34,14 +21,16 @@ public class LDtkScene : Scene<LDtkScene>
             return;
         }
 
-        if (_levelIdentifier == null)
+        if (LevelIdentifier == null && LevelIid == null)
         {
             Logger.Error("Level Identifier not set, please modify the LDtkScene.LevelIdentifier value first");
             return;
         }
 
         //set up the level
-        Level = LDtkManager.Instance.LoadLDtkLevel(_levelIdentifier);
+        Level = LoadByGuid ? LDtkManager.Instance.LoadLDtkLevel((Guid)LevelIid!) : 
+            LDtkManager.Instance.LoadLDtkLevel(LevelIdentifier);
+        
 
         //create the LDtk Renderer
         var ldtkRenderer = CreateEntity("LDtkRenderer")
@@ -51,5 +40,10 @@ public class LDtkScene : Scene<LDtkScene>
 
         //set up all the entities
         LDtkManager.SetUpEntities(Level);
+    }
+
+    protected override void OnEnd()
+    {
+        Level = null;
     }
 }

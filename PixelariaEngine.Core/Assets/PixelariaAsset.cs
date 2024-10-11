@@ -2,7 +2,7 @@
 
 namespace PixelariaEngine;
 
-public class PixelariaAsset : DisposableObject
+public abstract class PixelariaAsset : DisposableObject
 {
     [JsonIgnore] public string AssetName { get; set; }
 }

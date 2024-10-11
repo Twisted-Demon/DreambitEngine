@@ -27,9 +27,10 @@ public class Renderer
     public virtual void Initialize() {}
     public virtual void OnDraw(){}
 
-    public void CleanUpInternal()
+    internal void CleanUpInternal()
     {
         Window.WindowResized -= OnWindowResized;
+        FinalRenderTarget?.Dispose();
     }
 
     protected virtual void OnCleanUp()
