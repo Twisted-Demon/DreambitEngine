@@ -33,7 +33,7 @@ public class Transform
         get
         {
             if (Parent == null)
-                return Position;
+                return Rotation;
             
             return Rotation + Parent.WorldRotation;
         }
@@ -56,15 +56,15 @@ public class Transform
 
     public Matrix GetTransformationMatrix()
     {
-        var localMatrix = Matrix.CreateTranslation(Position) *
-               Matrix.CreateRotationX(Rotation.X) *
-               Matrix.CreateRotationY(Rotation.Y) *
-               Matrix.CreateRotationZ(Rotation.Z) *
-               Matrix.CreateScale(Scale);
+        var localMatrix = Matrix.CreateScale(Scale) *
+                          Matrix.CreateRotationZ(Rotation.Z) *
+                          Matrix.CreateRotationY(Rotation.Y) *
+                          Matrix.CreateRotationX(Rotation.X) *
+                          Matrix.CreateTranslation(Position);
         
         if(Parent == null)
             return localMatrix;
         
-        return localMatrix * Parent.GetTransformationMatrix();
+        return Parent.GetTransformationMatrix() * localMatrix;
     }
 }

@@ -4,16 +4,18 @@ using Microsoft.Xna.Framework;
 
 namespace PixelariaEngine.ECS;
 
-public class Collider : Component<Collider>
+public class Collider : Component
 {
     public Shape Bounds { get; set; } = null;
     public Polygon TransformedBounds => GetTransformedPolygon();
     public bool IsTrigger { get; set; } = false;
-    private readonly List<Collider> _otherColliders = [];
+    private List<Collider> _otherColliders = [];
 
     public Action<Collider> OnCollisionEnter;
     public Action<Collider> OnCollisionStay;
     public Action<Collider> OnCollisionExit;
+
+    public List<string> InterestedIn = [];
 
 
     public override void OnCreated()
@@ -24,14 +26,17 @@ public class Collider : Component<Collider>
     public override void OnDestroyed()
     {
         PhysicsSystem.Instance.DeregisterCollider(this);
+        OnCollisionEnter = null;
+        OnCollisionStay = null;
+        OnCollisionExit = null;
+        _otherColliders.Clear();
+        _otherColliders = null;
+        Bounds = null;
     }
 
     public override void OnRemovedFromEntity()
     {
         PhysicsSystem.Instance.DeregisterCollider(this);
-        OnCollisionEnter = null;
-        OnCollisionStay = null;
-        OnCollisionExit = null;
     }
 
     public override void OnUpdate()
@@ -41,7 +46,14 @@ public class Collider : Component<Collider>
 
     private void CheckForTriggerCollisions()
     {
-        PhysicsSystem.Instance.Cast(this, out var collisionResults);
+        CollisionResult collisionResults;
+        
+        if(InterestedIn.Count == 0)
+            PhysicsSystem.Instance.PolygonCast(this, out collisionResults);
+        else
+            PhysicsSystem.Instance.PolygonCastByTag(this, out collisionResults, InterestedIn.ToArray());
+
+        _otherColliders.RemoveAll(x => x.IsDestroyed);
         
         foreach (var other in collisionResults.Collisions)
         {
@@ -67,7 +79,7 @@ public class Collider : Component<Collider>
 
     public Polygon GetTransformedPolygon()
     {
-        return Bounds.TransformPolygon(Transform.GetTransformationMatrix());
+        return Bounds.TransformPolygon(Transform);
     }
 
     public override void OnDebugDraw()

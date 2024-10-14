@@ -24,7 +24,7 @@ public class Core : Game
 
         GraphicsDevice.BlendState = BlendState.NonPremultiplied;
 
-        //SetFixedTimeStep(false);
+        SetFixedTimeStep(false);
 
         TargetElapsedTime = TimeSpan.FromSeconds((double)1 / 120); //set Target fps to 120
 
@@ -48,6 +48,7 @@ public class Core : Game
         base.LoadContent();
 
         SpriteBatch = new SpriteBatch(GraphicsDevice);
+        LDtkManager.Instance.Init();
     }
 
     protected override void Update(GameTime gameTime)
@@ -71,7 +72,7 @@ public class Core : Game
 
     private void UpdateDebug()
     {
-#if DEBUG
+#if DEBUG || RELEASE
         UpdateTitle();
 #endif
     }
@@ -99,6 +100,7 @@ public class Core : Game
     protected override void OnExiting(object sender, ExitingEventArgs args)
     {
         CurrentScene?.Terminate();
+        SpriteBatch.Dispose();
         base.OnExiting(sender, args);
     }
 
@@ -110,6 +112,7 @@ public class Core : Game
         NextScene = null;
         accumulatedPhysicsTime = 0f;
 
+        PhysicsSystem.Instance.CleanUp();
         Time.SceneLoaded();
     }
 
@@ -118,7 +121,7 @@ public class Core : Game
         NextScene = scene;
     }
 
-#if DEBUG
+#if DEBUG || RELEASE
     private float _debugElapsedTime;
     private void UpdateTitle()
     {

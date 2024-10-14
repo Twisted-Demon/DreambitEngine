@@ -1,14 +1,16 @@
 ﻿using System;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using PixelariaEngine.ECS;
 using PixelariaEngine.Graphics;
 
-namespace PixelariaEngine.Sandbox.Components;
+namespace PixelariaEngine.Sandbox;
 
 [Require(typeof(SpriteAnimator))]
-public class SandboxController : Component<SandboxController>
+public class SandboxController : Component
 {
+    private Logger<SandboxController> _logger = new();
     private Vector3 _moveDir;
     private Vector2 _facing;
     private const float Speed = 75f;
@@ -24,8 +26,8 @@ public class SandboxController : Component<SandboxController>
 
     public override void OnCreated()
     {
-        _idleAnimation = Resources.LoadAsset<SpriteSheetAnimation>("Animations/b_witch_idle");
-        _runAnimation = Resources.LoadAsset<SpriteSheetAnimation>("Animations/b_witch_run");
+        _idleAnimation = Resources.LoadAsset<SpriteSheetAnimation>("Animations/aria_idle");
+        _runAnimation = Resources.LoadAsset<SpriteSheetAnimation>("Animations/aria_run");
 
         _animator = Entity.GetComponent<SpriteAnimator>();
         _animator.Play();
@@ -38,16 +40,15 @@ public class SandboxController : Component<SandboxController>
         
         _collider = Entity.GetComponentInChildren<BoxCollider>();
         
-        TestUi();
     }
 
     private void TestUi()
     {
-        var (canvas, canvasEntity) = Canvas.Create();
-
-        var text = UIText.Create(canvas, "Hello World");
-        
-        text.Transform.Position = new Vector3(0, 0, 0);
+        //var (canvas, canvasEntity) = Canvas.Create();
+//
+        //var text = UIText.Create(canvas, "Hello World");
+        //
+        //text.Transform.Position = new Vector3(0, 0, 0);
     }
 
     public override void OnUpdate()
@@ -61,8 +62,11 @@ public class SandboxController : Component<SandboxController>
         if (Input.IsKeyPressed(Keys.F1))
             Scene.DebugMode = !Scene.DebugMode;
         
-        if(Input.IsKeyPressed(Keys.Space))
-            Scene.SetNextLDtkScene(Worlds.World.Dev_world);
+        if(Input.IsKeyHeld(Keys.Space))
+            Scene.SetNextLDtkScene(Worlds.AriaWorld.Dev_world);
+        
+        if(Input.IsKeyHeld(Keys.LeftShift))
+            Transform.Rotation.Z += Time.DeltaTime;
     }
 
     private void UpdateAnimation()
@@ -91,20 +95,20 @@ public class SandboxController : Component<SandboxController>
     {
         _moveDir = Vector3.Zero;
         
-        _moveDir.X += Input.IsKeyHeld(Keys.D) ? 1 : 0;
-        _moveDir.X -= Input.IsKeyHeld(Keys.A)  ? 1 : 0;
+        _moveDir.X += Input.IsKeyHeld(Keys.Right) ? 1 : 0;
+        _moveDir.X -= Input.IsKeyHeld(Keys.Left)  ? 1 : 0;
         
-        _moveDir.Y += Input.IsKeyHeld(Keys.S)  ? 1 : 0;
-        _moveDir.Y -= Input.IsKeyHeld(Keys.W)  ? 1 : 0;
+        _moveDir.Y += Input.IsKeyHeld(Keys.Down)  ? 1 : 0;
+        _moveDir.Y -= Input.IsKeyHeld(Keys.Up)  ? 1 : 0;
         
         if(_moveDir != Vector3.Zero)
             _moveDir.Normalize();
 
         if (Input.IsKeyPressed(Keys.I))
         {
-            if (PhysicsSystem.Instance.Cast(_collider, out var collisionResult))
+            if (PhysicsSystem.Instance.PolygonCast(_collider, out var collisionResult))
             {
-                Logger.Debug($"We are colliding");
+                _logger.Debug($"We are colliding");
             }
         }
         

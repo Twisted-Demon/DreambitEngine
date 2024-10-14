@@ -1,7 +1,6 @@
 ﻿using LDtk;
 using Microsoft.Xna.Framework;
 using PixelariaEngine.ECS;
-using PixelariaEngine.Sandbox.Components;
 
 namespace PixelariaEngine.Sandbox;
 
@@ -9,7 +8,7 @@ public partial class PlayerStart : LDtkEntity<PlayerStart>
 {
     protected override void SetUp(LDtkLevel level)
     {
-        var entity = CreateEntity(this);
+        var entity = CreateEntity(this, tags: ["player"]);
         entity.Name = "player";
         var colliderEntity = Entity.CreateChildOf(entity, "player_collider", ["player"]);
         
@@ -18,6 +17,8 @@ public partial class PlayerStart : LDtkEntity<PlayerStart>
         collider.IsTrigger = true;
         
         entity.AttachComponent<SandboxController>();
-        
+        entity.AttachComponent<CatFollowPoints>();
+
+        Core.Instance.CurrentScene.MainCamera.ForcePosition(entity.Transform.WorldPosition);
     }
 }

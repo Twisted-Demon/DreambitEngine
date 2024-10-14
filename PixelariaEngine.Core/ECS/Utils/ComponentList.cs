@@ -9,9 +9,9 @@ public class ComponentList(Scene scene)
 {
     private readonly Logger<ComponentList> _logger = new();
     
-    private readonly List<Component> _attachedComponents = [];
-    private readonly List<Component> _componentsToAttach = [];
-    private readonly List<Component> _componentsToDetach = [];
+    private HashSet<Component> _attachedComponents = [];
+    private HashSet<Component> _componentsToAttach = [];
+    private HashSet<Component> _componentsToDetach = [];
     private Scene _scene = scene;
 
     public void AttachComponent<T>(T component) where T : Component
@@ -19,9 +19,10 @@ public class ComponentList(Scene scene)
         if (_componentsToAttach.Contains(component))
             return;
 
+        if (_attachedComponents.Contains(component) || _componentsToDetach.Contains(component))
+            return;
+        
         _componentsToAttach.Add(component);
-
-        //register it if it is a drawable component
     }
 
 
@@ -55,6 +56,7 @@ public class ComponentList(Scene scene)
         foreach (var component in _componentsToAttach
                      .Where(c => !_attachedComponents.Contains(c)))
         {
+            component.Entity = null;
             component.OnRemovedFromEntity();
             component.Destroy();
             component.Dispose();
@@ -67,6 +69,7 @@ public class ComponentList(Scene scene)
             if (component is DrawableComponent drawableComponent)
                 _scene.Drawables.Remove(drawableComponent);
             
+            component.Entity = null;
             component.OnRemovedFromEntity();
             component.Destroy();
             component.Dispose();
@@ -78,11 +81,11 @@ public class ComponentList(Scene scene)
 
     public T GetComponent<T>() where T : Component
     {
-        var result = _attachedComponents.FirstOrDefault(c => c.GetType() == typeof(T));
+        var result = _attachedComponents.FirstOrDefault(c => c is T);
         if (result != null)
             return result as T;
 
-        result = _componentsToAttach.FirstOrDefault(c => c.GetType() == typeof(T));
+        result = _componentsToAttach.FirstOrDefault(c => c is T);
         if (result != null)
             return result as T;
 
@@ -91,11 +94,11 @@ public class ComponentList(Scene scene)
 
     public bool ComponentOfTypeExists(Type type)
     {
-        var result = _attachedComponents.FirstOrDefault(c => c.GetType() == type);
+        var result = _attachedComponents.FirstOrDefault(c => type.IsAssignableFrom(c.GetType()));
         if (result != null)
             return true;
 
-        result = _componentsToAttach.FirstOrDefault(c => c.GetType() == type);
+        result = _componentsToAttach.FirstOrDefault(c => type.IsAssignableFrom(c.GetType()));
         return result != null;
     }
 
@@ -109,24 +112,24 @@ public class ComponentList(Scene scene)
         return result != null ? result : null;
     }
 
-    public List<Component> GetAllAttachedComponents()
+    public IReadOnlyCollection<Component> GetAllAttachedComponents()
     {
         return _attachedComponents;
     }
 
-    public List<Component> GetAllActiveComponents()
+    public IReadOnlyCollection<Component> GetAllActiveComponents()
     {
-        return _attachedComponents.Where(x => x.Enabled).ToList();
+        return _attachedComponents.Where(x => x.Enabled).ToHashSet();
     }
 
-    public List<Component> GetAllComponents()
+    public IReadOnlyCollection<Component> GetAllComponents()
     {
         var result = new List<Component>();
         
         result.AddRange(_componentsToAttach);
         result.AddRange(_attachedComponents);
 
-        return result;
+        return result.ToHashSet();
     }
 
     public void ClearLists()
@@ -147,8 +150,7 @@ public class ComponentList(Scene scene)
     public void UpdateLists()
     {
         //Handle Creation
-        foreach (var componentToAdd in _componentsToAttach
-                     .Where(componentToAdd => !_attachedComponents.Contains(componentToAdd)))
+        foreach (var componentToAdd in _componentsToAttach)
         {
             _attachedComponents.Add(componentToAdd);
 
@@ -162,19 +164,19 @@ public class ComponentList(Scene scene)
         _componentsToAttach.Clear();
 
         //Handle Deletion
-        foreach (var componentToRemove in _componentsToDetach
-                     .Where(x => _attachedComponents.Contains(x)))
+        foreach (var componentToRemove in _componentsToDetach)
         {
-            _attachedComponents.Remove(componentToRemove);
+            if (_attachedComponents.Remove(componentToRemove))
+            {
+                //remove from drawables
+                if (componentToRemove is DrawableComponent drawableComponent)
+                    _scene.Drawables.Remove(drawableComponent);
 
-            //remove from drawables
-            if (componentToRemove is DrawableComponent drawableComponent)
-                _scene.Drawables.Remove(drawableComponent);
-
-            componentToRemove.Entity = null;
-            componentToRemove.OnRemovedFromEntity();
-            componentToRemove.Destroy();
-            componentToRemove.Dispose();
+                componentToRemove.Entity = null;
+                componentToRemove.OnRemovedFromEntity();
+                componentToRemove.Destroy();
+                componentToRemove.Dispose();
+            }
         }
 
         _componentsToDetach.Clear();

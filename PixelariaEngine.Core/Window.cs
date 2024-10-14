@@ -5,8 +5,8 @@ namespace PixelariaEngine;
 
 public static class Window
 {
-    public static int Width => Core.Instance.GraphicsDevice.Viewport.Width;
-    public static int Height => Core.Instance.GraphicsDevice.Viewport.Height;
+    public static int Width => Core.Instance.GraphicsDevice.PresentationParameters.BackBufferWidth;
+    public static int Height => Core.Instance.GraphicsDevice.PresentationParameters.BackBufferHeight;
     
     public static Point ScreenSize => new(Width, Height);
     

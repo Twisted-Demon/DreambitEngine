@@ -1,0 +1,42 @@
+{
+    "frames": [
+      {
+        "frame_index": 12,
+        "pivot": "42,33"
+      },
+      {
+        "frame_index": 13,
+        "pivot": "42,33"
+      },
+      {
+        "frame_index": 14,
+        "pivot": "42,33"
+      }
+      ,
+      {
+        "frame_index": 15,
+        "pivot": "42,33"
+      }
+      ,
+      {
+        "frame_index": 16,
+        "pivot": "42,33"
+      }
+      ,
+      {
+        "frame_index": 17,
+        "pivot": "42,33"
+      },
+      {
+        "frame_index": 18,
+        "pivot": "42,33"
+      },
+      {
+        "frame_index": 19,
+        "pivot": "42,33"
+      }
+    ],
+    "frame_rate": 8,
+    "sprite_sheet_path": "SpriteSheets/Aria",
+    "one_shot": false
+  }

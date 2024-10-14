@@ -1,6 +1,5 @@
 ﻿using PixelariaEngine.ECS;
 using PixelariaEngine.Graphics;
-using PixelariaEngine.Sandbox.Components;
 
 namespace PixelariaEngine.Sandbox;
 

@@ -3,7 +3,7 @@
 namespace PixelariaEngine.ECS;
 
 [AttributeUsage(AttributeTargets.Class)]
-public class RequireAttribute(Type type) : Attribute
+public class RequireAttribute(params Type[] type) : Attribute
 {
-    public Type RequiredType = type;
+    public readonly Type[] RequiredTypes = type;
 }

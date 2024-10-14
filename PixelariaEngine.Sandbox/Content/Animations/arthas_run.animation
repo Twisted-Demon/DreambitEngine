@@ -1,0 +1,39 @@
+{
+    "frames": [
+      {
+        "frame_index": 32,
+        "pivot": "15,31"
+      },
+      {
+        "frame_index": 33,
+        "pivot": "15,31"
+      },
+      {
+        "frame_index": 34,
+        "pivot": "15,31"
+      },
+      {
+        "frame_index": 35,
+        "pivot": "15,31"
+      },
+      {
+        "frame_index": 36,
+        "pivot": "15,31"
+      },
+      {
+        "frame_index": 37,
+        "pivot": "15,31"
+      },
+      {
+        "frame_index": 38,
+        "pivot": "15,31"
+      },
+      {
+        "frame_index": 39,
+        "pivot": "15,31"
+      }
+    ],
+  "frame_rate": 8,
+  "sprite_sheet_path": "SpriteSheets/arthas",
+  "one_shot": false
+}

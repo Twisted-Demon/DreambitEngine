@@ -17,6 +17,33 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
     public TilesetRectangle FrameRect { get; set; } = null;
 
     public bool IsHorizontalFlip { get; set; } = false;
+    
+    private float cameraTopY { get; set; }
+
+    public override Rectangle Bounds
+    {
+        get
+        {
+            var spriteFrame = GetDrawRect();
+        
+            var originToUse = Pivot;
+        
+            if (PivotType != PivotType.Custom)
+            {
+                var relative = PivotHelper.GetRelativePivot(PivotType);
+                originToUse = new Vector2(relative.X * spriteFrame.Width, relative.Y * spriteFrame.Height);
+            }
+
+            var rect = new Rectangle(
+                (int)(Transform.WorldPosition.X - originToUse.X),
+                (int)(Transform.WorldPosition.Y - originToUse.Y),
+                spriteFrame.Width,
+                spriteFrame.Height
+            );
+
+            return rect;
+        }
+    }
 
     public string SpriteSheetPath
     {
@@ -45,6 +72,7 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
         _spriteSheet = Resources.LoadAsset<SpriteSheet>(_spriteSheetPath);
     }
 
+
     public override void OnDraw()
     {
         if (_spriteSheet?.Texture == null)
@@ -59,16 +87,19 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
 
         if (PivotType != PivotType.Custom)
         {
-            var relative = PivotHelper.GetRelativeOrigin(PivotType);
+            var relative = PivotHelper.GetRelativePivot(PivotType);
             originToUse = new Vector2(relative.X * spriteFrame.Width, relative.Y * spriteFrame.Height);
         }
 
-        var depth = Transform.WorldPosition.Y / Core.Instance.GraphicsDevice.Viewport.Height;
+        var depth = Transform.WorldPosition.Y / 99999999;
 
         var spriteEffect = SpriteEffects.None;
-        
+
         if (IsHorizontalFlip)
+        {
             spriteEffect |= SpriteEffects.FlipHorizontally;
+            originToUse.X = spriteFrame.Width - originToUse.X;
+        }
 
         Core.SpriteBatch.Draw(
             _spriteSheet.Texture,
@@ -95,26 +126,14 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
 
     public override void OnDebugDraw()
     {
-        var spriteFrame = GetDrawRect();
-        
-        var originToUse = Pivot;
-        
-        if (PivotType != PivotType.Custom)
-        {
-            var relative = PivotHelper.GetRelativeOrigin(PivotType);
-            originToUse = new Vector2(relative.X * spriteFrame.Width, relative.Y * spriteFrame.Height);
-        }
+        var vec2 = Transform.WorldPosToVec2;
+        Core.SpriteBatch.DrawHollowRectangle(Bounds, Color.Yellow);
+        Core.SpriteBatch.DrawPoint(vec2, Color.Red, 3.0f);
+    }
 
-        var rect = new Rectangle(
-            (int)(Transform.WorldPosition.X - originToUse.X),
-            (int)(Transform.WorldPosition.Y - originToUse.Y),
-            spriteFrame.Width,
-            spriteFrame.Height
-        );
-
-        var thickness = 3.0f;
-        var vec2 = Transform.WorldPosToVec2 - new Vector2(thickness / 2, thickness / 2);
-        Core.SpriteBatch.DrawHollowRectangle(rect, Color.Yellow);
-        Core.SpriteBatch.DrawPoint(vec2, Color.Red, thickness);
+    public override void OnDestroyed()
+    {
+        FrameRect = null;
+        _spriteSheet = null;
     }
 }

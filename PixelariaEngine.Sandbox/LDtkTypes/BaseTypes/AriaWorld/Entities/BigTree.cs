@@ -21,7 +21,7 @@ public partial class BigTree : ILDtkEntity
             W = 160,
             H = 160
         },
-        SmartColor = new Color(144, 229, 138, 255),
+        SmartColor = new Color(255, 255, 255, 255),
 
         RenderTiles = new TilesetRectangle()
         {

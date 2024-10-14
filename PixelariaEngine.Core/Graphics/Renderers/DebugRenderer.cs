@@ -22,9 +22,10 @@ public class DebugRenderer(Scene scene) : Renderer(scene)
         
         Core.SpriteBatch.Begin(
             samplerState: SamplerState.PointClamp, 
-            blendState: BlendState.NonPremultiplied,
+            blendState: BlendState.AlphaBlend,
             sortMode: SpriteSortMode.FrontToBack,
-            transformMatrix: Scene.MainCamera.TransformMatrix);
+            transformMatrix: Scene.MainCamera.TransformMatrix,
+            effect: DefaultEffect);
 
         foreach (var entity in Scene.GetAllActiveEntities())
         {

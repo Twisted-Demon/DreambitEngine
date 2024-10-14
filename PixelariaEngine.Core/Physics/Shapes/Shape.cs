@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using Microsoft.Xna.Framework;
+using PixelariaEngine.ECS;
 
 namespace PixelariaEngine;
 
@@ -22,8 +23,8 @@ public class Shape
         return Polygon.Intersects(other.Polygon);
     }
 
-    public Polygon TransformPolygon(Matrix transformationMatrix)
+    public Polygon TransformPolygon(Transform transform)
     {
-        return Polygon.Transform(transformationMatrix);
+        return Polygon.Transform(transform);
     }
 }

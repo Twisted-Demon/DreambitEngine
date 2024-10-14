@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using LDtk;
-using MonoGame.Extended.Graphics;
+using LDtk.Renderer;
 
 namespace PixelariaEngine;
 
@@ -13,11 +13,18 @@ public class LDtkManager : Singleton<LDtkManager>
     public readonly Dictionary<Guid, LDtkLevel> LoadedWorlds = new();
     public LDtkFile LDtkFile;
     public LDtkWorld LDtkWorld;
+    public LDtkLevel CurrentLevel;
+    public ExampleRenderer LDtkRenderer;
 
     public void SetUp(string ldtkFilePath)
     {
         LoadFileAndWorld(ldtkFilePath);
         SetUpSpriteSheets();
+    }
+
+    public void Init()
+    {
+        LDtkRenderer = new ExampleRenderer(Core.SpriteBatch, Core.Instance.Content);
     }
 
     public static void SetUpEntities(LDtkLevel ldtkLevel)
@@ -66,12 +73,15 @@ public class LDtkManager : Singleton<LDtkManager>
     {
         if(LoadedWorlds.TryGetValue(iid, out var level))
         {
+            CurrentLevel = level;
             return level;
         }
         
         level = LDtkWorld.LoadLevel(iid);
         
         LoadedWorlds.Add(iid, level);
+        
+        CurrentLevel = level;
 
         return level;
     }

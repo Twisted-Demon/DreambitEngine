@@ -5,17 +5,17 @@ using PixelariaEngine.Graphics;
 namespace PixelariaEngine.ECS;
 
 [Require(typeof(SpriteDrawer))]
-public class SpriteAnimator : Component<SpriteAnimator>
+public class SpriteAnimator : Component
 {
     public bool IsPlaying { get; private set; }
     
     //internals
     private SpriteDrawer _spriteDrawer;
     private SpriteSheetAnimation _currentAnimation;
-    private readonly Queue<SpriteSheetAnimation> _animationQueue = [];
+    private Queue<SpriteSheetAnimation> _animationQueue = [];
     private float _elapsedFrameTime;
     private float _timeToNextFrame;
-    private int _currentAnimationFrame = 0;
+    private int _currentAnimationFrame;
 
     public SpriteSheetAnimation Animation
     {
@@ -90,6 +90,11 @@ public class SpriteAnimator : Component<SpriteAnimator>
         _animationQueue.Enqueue(animation);
     }
 
+    public void ClearAnimationQueue()
+    {
+        _animationQueue.Clear();
+    }
+
     public void Pause()
     {
         IsPlaying = false;
@@ -144,5 +149,13 @@ public class SpriteAnimator : Component<SpriteAnimator>
     private void SetFrameRate(int newFrameRate)
     {
         _timeToNextFrame = 1 / (float)newFrameRate;
+    }
+
+    public override void OnDestroyed()
+    {
+        _spriteDrawer = null;
+        _currentAnimation = null;
+        _animationQueue.Clear();
+        _animationQueue = null;
     }
 }

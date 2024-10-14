@@ -1,0 +1,34 @@
+﻿{
+  "frames": [
+    {
+      "frame_index": 0,
+      "pivot": "42,33"
+    },
+    {
+      "frame_index": 1,
+      "pivot": "42,33"
+    },
+    {
+      "frame_index": 2,
+      "pivot": "42,33"
+    }
+    ,
+    {
+      "frame_index": 3,
+      "pivot": "42,33"
+    }
+    ,
+    {
+      "frame_index": 4,
+      "pivot": "42,33"
+    }
+    ,
+    {
+      "frame_index": 5,
+      "pivot": "42,33"
+    }
+  ],
+  "frame_rate": 8,
+  "sprite_sheet_path": "SpriteSheets/Aria",
+  "one_shot": false
+}

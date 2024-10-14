@@ -5,8 +5,8 @@ namespace PixelariaEngine.ECS;
 public abstract class Component : IDisposable
 {
     private bool _enabled;
-    private bool _isDestroyed;
     private bool _isDisposed;
+    internal bool IsDestroyed;
 
     public Transform Transform => Entity?.Transform;
 
@@ -40,7 +40,7 @@ public abstract class Component : IDisposable
         Dispose(false);
     }
 
-    internal Component SetUp(Entity entity, bool enabled)
+    internal virtual Component SetUp(Entity entity, bool enabled)
     {
         Entity = entity;
         _enabled = enabled;
@@ -56,11 +56,14 @@ public abstract class Component : IDisposable
         foreach (var attribute in attributes)
         {
             if (attribute is not RequireAttribute requireAttribute) continue;
+            
+            foreach(var requiredType in requireAttribute.RequiredTypes)
+            {
+                var hasRequired = Entity.HasComponentOfType(requiredType);
+                if (hasRequired) continue;
 
-            var hasRequired = Entity.HasComponentOfType(requireAttribute.RequiredType);
-            if (hasRequired) continue;
-
-            Entity.AttachComponent(requireAttribute.RequiredType);
+                Entity.AttachComponent(requiredType);
+            }
         }
     }
 
@@ -127,7 +130,7 @@ public abstract class Component : IDisposable
 
     internal void Destroy()
     {
-        _isDestroyed = true;
+        IsDestroyed = true;
         OnDestroyed();
     }
 
@@ -142,7 +145,7 @@ public abstract class Component : IDisposable
                 return false;
         }
 
-        if (a._isDestroyed && ReferenceEquals(b, null)) return true;
+        if (a.IsDestroyed && ReferenceEquals(b, null)) return true;
 
         return ReferenceEquals(a, b);
     }
@@ -172,7 +175,7 @@ public abstract class Component : IDisposable
     /// <returns></returns>
     public static bool IsNull(Component component)
     {
-        return component == null || component._isDestroyed;
+        return component == null || component.IsDestroyed;
     }
 
     protected virtual void OnDisposing()
@@ -184,12 +187,20 @@ public abstract class Component : IDisposable
         if (_isDisposed) return;
         if (disposing) OnDisposing();
 
-        _isDestroyed = true;
+        IsDestroyed = true;
         _isDisposed = true;
+        Entity = null;
     }
 }
 
-public abstract class Component<T> : Component where T : Component
+public class SingletonComponent<T> : Component where T : SingletonComponent<T>
 {
-    protected Logger<T> Logger = new();
+    public static T Instance { get; private set; }
+    
+    internal override Component SetUp(Entity entity, bool enabled)
+    {
+        Instance = this as T;
+        
+        return base.SetUp(entity, enabled);
+    }
 }

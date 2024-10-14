@@ -6,6 +6,7 @@ public class Renderer
 {
     public int Order = 0;
     protected static GraphicsDevice Device => Core.Instance.GraphicsDevice;
+    protected Effect DefaultEffect { get; private set; }
     protected Scene Scene { get; private set; }
     
     public RenderTarget2D FinalRenderTarget { get; private set; }
@@ -24,6 +25,12 @@ public class Renderer
         FinalRenderTarget = CreateRenderTarget();
     }
 
+    internal void InitializeInternals()
+    {
+        DefaultEffect = Resources.LoadAsset<Effect>("Effects/ForwardDiffuse");
+        Initialize();
+    }
+    
     public virtual void Initialize() {}
     public virtual void OnDraw(){}
 
@@ -31,6 +38,7 @@ public class Renderer
     {
         Window.WindowResized -= OnWindowResized;
         FinalRenderTarget?.Dispose();
+        FinalRenderTarget = null;
     }
 
     protected virtual void OnCleanUp()
@@ -39,6 +47,16 @@ public class Renderer
     }
 
     protected static RenderTarget2D CreateRenderTarget()
-        => new RenderTarget2D(Device, Window.ScreenSize.X,
-            Window.ScreenSize.Y, false, SurfaceFormat.Color, DepthFormat.None);
+    {
+        var target = new RenderTarget2D(
+            Device,
+            Device.PresentationParameters.BackBufferWidth,
+            Device.PresentationParameters.BackBufferHeight,
+            false,
+            Device.PresentationParameters.BackBufferFormat,
+            DepthFormat.None
+        );
+
+        return target;
+    }
 }

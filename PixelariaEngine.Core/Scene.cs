@@ -12,7 +12,7 @@ public class Scene
 {
     private readonly Logger<Scene> _logger = new();
 
-    public bool DebugMode { get; set; } = false;
+    public bool DebugMode { get; set; }
     public readonly DrawableList Drawables;
     protected readonly EntityList Entities;
 
@@ -22,7 +22,7 @@ public class Scene
     protected bool IsStarted;
     protected readonly List<Renderer> Renderers = [];
 
-    private bool _useDefaultRenderer = true;
+    private bool _useDefaultRenderer;
     
 
     public Scene()
@@ -54,7 +54,7 @@ public class Scene
             AddRenderer<DefaultRenderer>();
         
         foreach(var renderer in Renderers)
-            renderer.Initialize();
+            renderer.InitializeInternals();
         
         OnInitialize();
     }
@@ -106,6 +106,15 @@ public class Scene
     {
         OnEnd();
         Cleanup();
+        
+        // Force garbage collection
+        GC.Collect();
+
+// Wait for finalizers to run
+        GC.WaitForPendingFinalizers();
+
+// Optionally, force another GC collection to clean up finalized objects
+        GC.Collect();
     }
 
     public virtual void Tick()

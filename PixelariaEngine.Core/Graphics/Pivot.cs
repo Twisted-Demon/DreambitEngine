@@ -4,7 +4,7 @@ namespace PixelariaEngine.Graphics;
 
 public static class PivotHelper
 {
-    public static Vector2 GetRelativeOrigin(PivotType pivotTypeType)
+    public static Vector2 GetRelativePivot(PivotType pivotTypeType)
     {
         return pivotTypeType switch
         {

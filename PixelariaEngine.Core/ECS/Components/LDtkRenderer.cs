@@ -1,22 +1,25 @@
 ﻿using LDtk;
 using LDtk.Renderer;
+using Microsoft.Xna.Framework;
 
 namespace PixelariaEngine.ECS;
 
 public class LDtkRenderer : DrawableComponent<LDtkRenderer>
 {
+    public override Rectangle Bounds { get; }
     private ExampleRenderer _renderer;
     public LDtkLevel Level { get; set; }
 
     public override void OnCreated()
     {
-        _renderer = new ExampleRenderer(Core.SpriteBatch, Core.Instance.Content);
+        _renderer = LDtkManager.Instance.LDtkRenderer;
     }
 
     public override void OnPreDraw()
     {
         _renderer.PrerenderLevel(Level);
     }
+
 
     public override void OnDraw()
     {
@@ -25,6 +28,10 @@ public class LDtkRenderer : DrawableComponent<LDtkRenderer>
 
     public override void OnDestroyed()
     {
-        _renderer.Dispose();
+    }
+
+    public override bool IsVisibleFromCamera(Rectangle cameraBounds)
+    {
+        return true;
     }
 }

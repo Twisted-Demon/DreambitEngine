@@ -1,10 +1,10 @@
 ﻿using Microsoft.Xna.Framework;
 using PixelariaEngine.ECS;
 
-namespace PixelariaEngine.Sandbox.Components;
+namespace PixelariaEngine.Sandbox;
 
 [Require(typeof(BoxCollider))]
-public class AlphaDimmer : Component<AlphaDimmer>
+public class AlphaDimmer : Component
 {
     private SpriteDrawer _spriteDrawer;
     private BoxCollider _collider;

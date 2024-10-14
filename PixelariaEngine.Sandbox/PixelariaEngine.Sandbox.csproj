@@ -17,7 +17,6 @@
         <OutputPath>$(BaseOutputPath)</OutputPath> <!-- No version folder for Release -->
         <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
         <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
-        <GenerateDependencyFile>false</GenerateDependencyFile>
         <DebugSymbols>false</DebugSymbols>
         <DebugType>none</DebugType>
     </PropertyGroup>

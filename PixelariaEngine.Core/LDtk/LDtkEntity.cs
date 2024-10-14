@@ -1,4 +1,7 @@
-﻿using LDtk;
+﻿using System.Collections.Generic;
+using System.Linq;
+using System.Reflection.Metadata.Ecma335;
+using LDtk;
 using Microsoft.Xna.Framework;
 using PixelariaEngine.ECS;
 using PixelariaEngine.Graphics;
@@ -7,9 +10,11 @@ namespace PixelariaEngine;
 
 public class LDtkEntity<T> : LDtkEntity where T : new()
 {
-    protected Entity CreateEntity<TU>(TU data) where TU : ILDtkEntity
+    protected Entity CreateEntity<TU>(TU data, string name = null, HashSet<string> tags = null) where TU : ILDtkEntity
     {
-        var entity = Entity.Create(data.Identifier);
+        name ??= data.Identifier;
+        
+        var entity = Entity.Create(name, tags);
         entity.Transform.Position = new Vector3(data.Position, 0);
         entity.AttachComponent<LDtkEntityComponent>().Iid = data.Iid;
 
@@ -29,6 +34,16 @@ public class LDtkEntity<T> : LDtkEntity where T : new()
 
         sprite.SpriteSheet = LDtkManager.Instance.SpriteSheets[tilesetRect.TilesetUid];
         sprite.FrameRect = tilesetRect;
+    }
+
+    protected PolyShapeCollider CreatePolyCollider(Entity entity, Point[] points, Vector2 entityPosition)
+    {
+        var verts = points.Select(p => new Vector2(p.X, p.Y) - entityPosition).ToArray();
+
+        var bounds = entity.AttachComponent<PolyShapeCollider>();
+        var shape = PolyShape.Create(verts);
+        bounds.SetShape(shape);
+        return bounds;
     }
 
     protected virtual void SetUp(LDtkLevel level)

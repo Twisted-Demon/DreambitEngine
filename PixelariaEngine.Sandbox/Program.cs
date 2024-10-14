@@ -9,7 +9,10 @@ Window.SetAllowUserResizing(true); //allow user resizing
 LDtkManager.Instance.SetUp("AriaWorld");
 
 //set the initial scene and & renderer
-Scene.SetNextLDtkScene(Worlds.World.Dev_world);
+var scene = Scene.SetNextLDtkScene(Worlds.AriaWorld.EntityTest);
+
+scene.AddRenderer<DefaultRenderer>();
+
 
 //Run the game
 game.Run();

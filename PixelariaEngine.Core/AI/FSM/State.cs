@@ -1,12 +1,16 @@
-﻿namespace PixelariaEngine;
+﻿using PixelariaEngine.ECS;
+
+namespace PixelariaEngine;
 
 public abstract class State
 {
-    public string Identifier;
+    public string Identifier { get; internal set; }
 
     internal bool IsStarted = false;
-    protected Blackboard Blackboard => FSM.Blackboard;
-    public FSM FSM;
+    protected Blackboard Blackboard => Fsm.Blackboard;
+    public FSM Fsm;
+    public Scene Scene => Fsm?.Scene;
+    public Transform Transform => Fsm?.Transform;
     
     public virtual void OnInitialize()
     {
@@ -16,6 +20,17 @@ public abstract class State
     public virtual void OnEnter()
     {
         
+    }
+    
+    /// <summary>
+    /// Here is where we should check if we should switch states
+    /// true for we should continue to run the current state
+    /// false for we should be switching states
+    /// </summary>
+    /// <returns></returns>
+    public virtual bool Reason()
+    {
+        return true;
     }
 
     public abstract void OnExecute();

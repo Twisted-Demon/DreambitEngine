@@ -50,4 +50,10 @@ public class UILabel : UIElement
         
         return uiLabel;
     }
+
+    public override void OnDestroyed()
+    {
+        SpriteSheet = null;
+        TextElement = null;
+    }
 }

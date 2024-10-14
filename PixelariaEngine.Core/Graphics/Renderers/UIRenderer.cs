@@ -11,7 +11,7 @@ namespace PixelariaEngine.Graphics;
 public class UIRenderer(Scene scene) : Renderer(scene)
 {
     private Camera2D _uiCamera;
-    private readonly List<RenderTarget2D> _renderTargets = [];
+    private List<RenderTarget2D> _renderTargets = [];
     private int _targetUIHeight => Window.Height;
 
     public override void Initialize()
@@ -53,7 +53,8 @@ public class UIRenderer(Scene scene) : Renderer(scene)
             Core.SpriteBatch.Begin(transformMatrix:_uiCamera.TopLeftTransformMatrix,
                 sortMode: SpriteSortMode.Immediate,
                 samplerState: SamplerState.PointClamp,
-                blendState: BlendState.NonPremultiplied);
+                blendState: BlendState.AlphaBlend,
+                effect: DefaultEffect);
 
             var drawables = drawLayers[layerOrder[i]]
                 .Where(x => x.Enabled && x.Entity.Enabled && x is Canvas);
@@ -119,5 +120,7 @@ public class UIRenderer(Scene scene) : Renderer(scene)
             renderTarget?.Dispose();
         
         _renderTargets.Clear();
+        _renderTargets = null;
+        _uiCamera = null;
     }
 }

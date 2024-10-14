@@ -2,7 +2,7 @@
 
 namespace PixelariaEngine.ECS;
 
-public class LDtkEntityComponent : Component<LDtkEntityComponent>
+public class LDtkEntityComponent : Component
 {
     public Guid Iid { get; internal set; }
 }

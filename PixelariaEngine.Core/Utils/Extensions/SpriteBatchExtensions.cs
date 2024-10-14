@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using MonoGame.Extended.BitmapFonts;
 using PixelariaEngine.Graphics;
 
 namespace PixelariaEngine;
@@ -20,7 +19,7 @@ public static class SpriteBatchExtensions
         }
     }
     
-    private static List<string> SplitTextIntoLines(BitmapFont spriteFont, string text, float maxWidth)
+    private static List<string> SplitTextIntoLines(SpriteFont spriteFont, string text, float maxWidth)
     {
         var lines = new List<string>();
         var words = text.Split(' ');
@@ -31,7 +30,7 @@ public static class SpriteBatchExtensions
             var testLine = currentLine + (currentLine.Length > 0 ? " " : "") + word;
             var size = spriteFont.MeasureString(testLine);
 
-            if (size.Width > maxWidth)
+            if (size.X > maxWidth)
             {
                 if(currentLine.Length > 0)
                     lines.Add(currentLine);
@@ -49,13 +48,13 @@ public static class SpriteBatchExtensions
     }
     
     //draw multi lined text
-    public static void DrawMultiLineText(this SpriteBatch spriteBatch, BitmapFont spriteFont, string text, Vector2 position, 
+    public static void DrawMultiLineText(this SpriteBatch spriteBatch, SpriteFont spriteFont, string text, Vector2 position, 
         HorizontalAlignment horizontalAlignment, VerticalAlignment verticalAlignment, Color color, float maxWidth)
     {
         var lines = SplitTextIntoLines(spriteFont, text, maxWidth);
         
         //calculate the total height
-        float totalHeight = lines.Count * spriteFont.LineHeight;
+        float totalHeight = lines.Count * spriteFont.LineSpacing;
 
         switch (verticalAlignment)
         {
@@ -78,25 +77,43 @@ public static class SpriteBatchExtensions
             var alignmentOffset = GetAlignmentOffset(spriteFont, lines[i], horizontalAlignment);
 
             var pos = new Vector2(position.X + alignmentOffset.X, position.Y);
-            spriteBatch.DrawString(spriteFont, lines[i], new Vector2(pos.X, pos.Y + i * spriteFont.LineHeight), color);
+            spriteBatch.DrawString(spriteFont, lines[i], new Vector2(pos.X, pos.Y + i * spriteFont.LineSpacing), color);
         }
     }
     
-    private static Vector2 GetAlignmentOffset(BitmapFont spriteFont, string text, HorizontalAlignment horizontalAlignment)
+    private static Vector2 GetAlignmentOffset(SpriteFont spriteFont, string text, HorizontalAlignment horizontalAlignment)
     {
         var textSize = spriteFont.MeasureString(text);
 
         return horizontalAlignment switch
         {
-            HorizontalAlignment.Center => new Vector2(-textSize.Width/ 2, textSize.Height / 2),
-            HorizontalAlignment.Left => new Vector2(-textSize.Width, textSize.Height / 2),
-            HorizontalAlignment.Right => new Vector2(textSize.Width / 2, textSize.Height / 2),
+            HorizontalAlignment.Center => new Vector2(-textSize.X/ 2, textSize.X / 2),
+            HorizontalAlignment.Left => new Vector2(-textSize.X, textSize.X / 2),
+            HorizontalAlignment.Right => new Vector2(textSize.X / 2, textSize.X / 2),
             _ => Vector2.Zero
         };
     }
 
     // Draw a Line
     public static void DrawLine(this SpriteBatch spriteBatch, Vector2 start, Vector2 end, Color color, float thickness = 1f)
+    {
+        EnsurePixelTextureExists(spriteBatch.GraphicsDevice);
+        
+        var edge = end - start;
+        var angle = (float)Math.Atan2(edge.Y, edge.X);
+
+        spriteBatch.Draw(_pixelTexture, 
+            new Rectangle((int)start.X, (int)start.Y, (int)edge.Length(), (int)thickness), 
+            null, 
+            color, 
+            angle, 
+            Vector2.Zero, 
+            SpriteEffects.None, 
+            0);
+    }
+    
+    // Draw a line
+    public static void DrawLine(this SpriteBatch spriteBatch, Vector3 start, Vector3 end, Color color, float thickness = 1f)
     {
         EnsurePixelTextureExists(spriteBatch.GraphicsDevice);
         
@@ -127,11 +144,35 @@ public static class SpriteBatchExtensions
         }
     }
 
+    public static void DrawPath(this SpriteBatch spriteBatch, Vector2[] points, Color color, float thickness = 1f)
+    {
+        for (int i = 0; i < points.Length - 1; i++)
+        {
+            var current = points[i];
+            var next = points[i + 1];
+
+            DrawLine(spriteBatch, current, next, color, thickness);
+        }
+    }
+    
+    public static void DrawPath(this SpriteBatch spriteBatch, Vector3[] points, Color color, float thickness = 1f)
+    {
+        for (int i = 0; i < points.Length - 1; i++)
+        {
+            var current = points[i];
+            var next = points[i + 1];
+
+            DrawLine(spriteBatch, current, next, color, thickness);
+        }
+    }
+
     public static void DrawPoint(this SpriteBatch spriteBatch, Vector2 point, Color color, float thickness = 1f)
     {
         EnsurePixelTextureExists(spriteBatch.GraphicsDevice);
         
-        spriteBatch.Draw(_pixelTexture, point, null, color, 0, Vector2.Zero, thickness, SpriteEffects.None, 0);
+        var pos = new Vector2(point.X - thickness * 0.5f, point.Y - thickness * 0.5f);
+        
+        spriteBatch.Draw(_pixelTexture, pos, null, color, 0, Vector2.Zero, thickness, SpriteEffects.None, 0);
     }
     
     // Draw a Filled Rectangle

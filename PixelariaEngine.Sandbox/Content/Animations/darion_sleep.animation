@@ -1,0 +1,23 @@
+{
+    "frames": [
+      {
+        "frame_index": 48,
+        "pivot": "15,31"
+      },
+      {
+        "frame_index": 49,
+        "pivot": "15,31"
+      },
+      {
+        "frame_index": 50,
+        "pivot": "15,31"
+      },
+      {
+        "frame_index": 51,
+        "pivot": "15,31"
+      }
+    ],
+  "frame_rate": 4,
+  "sprite_sheet_path": "SpriteSheets/darion",
+  "one_shot": false
+}

@@ -5,8 +5,8 @@ namespace PixelariaEngine.ECS;
 
 public class DrawableList
 {
-    private readonly List<DrawableComponent> _drawables = [];
-    private readonly Dictionary<int, List<DrawableComponent>> _drawLayers = [];
+    private List<DrawableComponent> _drawables = [];
+    private Dictionary<int, List<DrawableComponent>> _drawLayers = [];
 
     internal int Count => _drawables.Count;
     internal DrawableComponent this[int index] => _drawables[index];
@@ -29,6 +29,9 @@ public class DrawableList
     {
         _drawables.Clear();
         _drawLayers.Clear();
+
+        _drawables = null;
+        _drawLayers = null;
     }
 
     internal void UpdateDrawableDrawLayer(DrawableComponent drawable, int oldLayer, int newLayer)

@@ -14,4 +14,8 @@ public abstract class UIElement : UIComponent
         return Canvas.ConvertToScreenCoord(this);
     }
 
+    public override void OnDestroyed()
+    {
+        Canvas = null;
+    }
 }

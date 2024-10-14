@@ -31,6 +31,22 @@
       {
         "frame_index": 27,
         "pivot": "15,31"
+      },
+      {
+        "frame_index": 24,
+        "pivot": "15,31"
+      },
+      {
+        "frame_index": 25,
+        "pivot": "15,31"
+      },
+      {
+        "frame_index": 26,
+        "pivot": "15,31"
+      },
+      {
+        "frame_index": 27,
+        "pivot": "15,31"
       }
     ],
   "frame_rate": 8,

@@ -6,9 +6,9 @@ namespace PixelariaEngine.ECS;
 public class Entity : IDisposable
 {
     private Entity _parent;
-    private ComponentList ComponentList { get; }
+    private ComponentList ComponentList { get; set; }
     public Transform Transform { get; private set; }
-    public HashSet<string> Tags { get; } = [];
+    public HashSet<string> Tags { get; private set; } = [];
     internal Scene Scene { get; private set; }
     
     public readonly uint Id;
@@ -33,9 +33,14 @@ public class Entity : IDisposable
     {
         Id = id;
         Name = name;
-        Tags = tags;
         _enabled = enabled;
         Scene = scene;
+
+        if (tags == null)
+            Tags = ["default"];
+        else
+            foreach (var tag in tags)
+                Tags.Add(tag);
 
         if (Name == "entity")
             Name += $": {id}";
@@ -85,6 +90,13 @@ public class Entity : IDisposable
         var entity = Core.Instance.CurrentScene.CreateEntity(name, tags, enabled);
         entity.Parent = parent;
         
+        return entity;
+    }
+
+    public static Entity FindByName(string name)
+    {
+        var entity = Core.Instance.CurrentScene.GetEntity(name);
+
         return entity;
     }
 
@@ -208,7 +220,7 @@ public class Entity : IDisposable
     /// gets a list of all components that are attached, regardless if they are active
     /// </summary>
     /// <returns></returns>
-    public List<Component> GetAllAttachedComponents()
+    public IReadOnlyCollection<Component> GetAllAttachedComponents()
     {
         return ComponentList.GetAllAttachedComponents();
     }
@@ -217,12 +229,12 @@ public class Entity : IDisposable
     /// gets a list of all components only if they are active
     /// </summary>
     /// <returns></returns>
-    public List<Component> GetAllActiveComponents()
+    public IReadOnlyCollection<Component> GetAllActiveComponents()
     {
         return ComponentList.GetAllActiveComponents();
     }
 
-    public List<Component> GetAllComponents()
+    public IReadOnlyCollection<Component> GetAllComponents()
     {
         return ComponentList.GetAllComponents();
     }
@@ -318,5 +330,12 @@ public class Entity : IDisposable
 
         _isDestroyed = true;
         _isDisposed = true;
+
+        _parent = null;
+        ComponentList = null;
+        Transform = null;
+        Tags.Clear();
+        Tags = null;
+        Scene = null;
     }
 }

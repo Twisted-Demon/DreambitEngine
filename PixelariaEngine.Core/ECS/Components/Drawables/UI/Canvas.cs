@@ -7,7 +7,7 @@ public class Canvas : UIComponent
 {
     private int _targetWidth;
     private int _targetHeight;
-    private readonly List<UIElement> _uiComponents = [];
+    private List<UIElement> _uiComponents = [];
     
     internal void UpdateInternalCanvasSize(int targetHeight)
     {
@@ -61,5 +61,11 @@ public class Canvas : UIComponent
         var canvas = entity.AttachComponent<Canvas>();
 
         return (canvas, entity);
+    }
+
+    public override void OnDestroyed()
+    {
+        _uiComponents.Clear();
+        _uiComponents = null;
     }
 }

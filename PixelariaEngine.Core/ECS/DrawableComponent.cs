@@ -1,8 +1,11 @@
-﻿namespace PixelariaEngine.ECS;
+﻿using Microsoft.Xna.Framework;
 
-public class DrawableComponent : Component
+namespace PixelariaEngine.ECS;
+
+public abstract class DrawableComponent : Component
 {
     private int _drawLayer;
+    public abstract Rectangle Bounds { get; }
 
     public int DrawLayer
     {
@@ -31,6 +34,11 @@ public class DrawableComponent : Component
         _drawLayer = newDrawLayer;
 
         Scene.Drawables.UpdateDrawableDrawLayer(this, oldDrawLayer, newDrawLayer);
+    }
+
+    public virtual bool IsVisibleFromCamera(Rectangle cameraBounds)
+    {
+        return cameraBounds.Contains(Bounds);
     }
 }
 

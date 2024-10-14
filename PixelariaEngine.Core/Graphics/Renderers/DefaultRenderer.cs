@@ -7,7 +7,7 @@ namespace PixelariaEngine.Graphics;
 
 public class DefaultRenderer(Scene scene) : Renderer(scene)
 {
-    private readonly List<RenderTarget2D> _layerRenderTargets = [];
+    private List<RenderTarget2D> _layerRenderTargets = [];
 
     public override void Initialize()
     {
@@ -51,7 +51,7 @@ public class DefaultRenderer(Scene scene) : Renderer(scene)
         Device.Clear(Color.Transparent);
 
         Core.SpriteBatch.Begin(samplerState: SamplerState.PointClamp, blendState: BlendState.NonPremultiplied,
-            sortMode: SpriteSortMode.Immediate);
+            sortMode: SpriteSortMode.Immediate, effect: DefaultEffect);
 
         foreach (var renderTarget in _layerRenderTargets)
             Core.SpriteBatch.Draw(renderTarget, Vector2.Zero, Color.White);
@@ -77,9 +77,12 @@ public class DefaultRenderer(Scene scene) : Renderer(scene)
             
             var drawables = drawLayers[layerOrder[i]]
                 .Where(x => x.Enabled && x.Entity.Enabled && x.DrawLayer != RenderLayers.LightLayer);
-            
-            foreach (var drawable in drawables)
+
+            foreach (var drawable in drawables
+                         .Where(d => d.IsVisibleFromCamera(Scene.MainCamera.Bounds)))
+            {
                 drawable.OnDraw();
+            }
             
             Core.SpriteBatch.End();
         }
@@ -111,5 +114,6 @@ public class DefaultRenderer(Scene scene) : Renderer(scene)
             renderTarget?.Dispose();
         
         _layerRenderTargets.Clear();
+        _layerRenderTargets = null;
     }
 }

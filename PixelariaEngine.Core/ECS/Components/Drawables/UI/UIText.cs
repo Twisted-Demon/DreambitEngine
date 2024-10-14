@@ -1,6 +1,5 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using MonoGame.Extended.BitmapFonts;
 using PixelariaEngine.Graphics;
 
 namespace PixelariaEngine.ECS;
@@ -12,7 +11,7 @@ public class UIText : UIElement
     public PivotType Pivot { get; set; } = PivotType.Center;
 
     private string _fontName = string.Empty;
-    private BitmapFont _spriteFont;
+    private SpriteFont _spriteFont;
 
     public string FontName
     {
@@ -22,7 +21,7 @@ public class UIText : UIElement
             if (_fontName == value)
                 return;
             _fontName = value;
-            _spriteFont = Resources.LoadAsset<BitmapFont>(_fontName);
+            _spriteFont = Resources.LoadAsset<SpriteFont>(_fontName);
         }
     }
 
@@ -46,5 +45,8 @@ public class UIText : UIElement
         return labelComponent;
     }
 
-    
+    public override void OnDestroyed()
+    {
+        _spriteFont = null;
+    }
 }
