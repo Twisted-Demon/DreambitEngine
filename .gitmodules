@@ -1,0 +1,3 @@
+[submodule "LDtkMonogame"]
+	path = LDtkMonogame
+	url = https://github.com/IrishBruse/LDtkMonogame.git

@@ -37,7 +37,7 @@ public partial class Darion : LDtkEntity<Darion>
         var fsm = entity.AttachComponent<FSM>();
         
         fsm.Blackboard.CreateVariable("followDistance", 30.0f);
-        fsm.Blackboard.CreateVariable("followSpeed", 65.0f);
+        fsm.Blackboard.CreateVariable("followSpeed", 70.0f);
         fsm.Blackboard.CreateVariable<Entity>("player");
         fsm.Blackboard.CreateVariable("catType", "Darion");
         var idleAnimation = fsm.Blackboard.CreateVariable<SpriteSheetAnimation>("idleAnimation");
