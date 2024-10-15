@@ -17,6 +17,8 @@ public class SpriteAnimator : Component
     private float _timeToNextFrame;
     private int _currentAnimationFrame;
 
+    private readonly Logger<SpriteAnimator> _logger = new();
+
     public SpriteSheetAnimation Animation
     {
         get => _currentAnimation;
@@ -57,7 +59,7 @@ public class SpriteAnimator : Component
     private void ChangeAnimationFrame()
     {
         //if we have another frame in the animation, set the current frame to the next one
-        if (_currentAnimation.TryGetFrame(_currentAnimationFrame + 1, out var _))
+        if (_currentAnimation.TryGetFrame(_currentAnimationFrame + 1, out var nextFrame))
         {
             SetAnimationFrame(_currentAnimationFrame + 1);
             return;
@@ -124,6 +126,9 @@ public class SpriteAnimator : Component
             _currentAnimationFrame = frameNumber;
             _spriteDrawer.CurrentFrameIndex = nextFrame.FrameIndex;
             _spriteDrawer.Pivot = nextFrame.Pivot;
+            
+            if(nextFrame.AnimationEvent != null)
+                _logger.Debug("Animation event was triggered: {0}", nextFrame.AnimationEvent.Name);
         }
     }
 
@@ -138,11 +143,11 @@ public class SpriteAnimator : Component
         
         SetFrameRate(newAnimation.FrameRate);
         ResetInternals();
+        SetAnimationFrame(0);
     }
 
     private void ResetInternals()
     {
-        SetAnimationFrame(0);
         _elapsedFrameTime = 0;
     }
 

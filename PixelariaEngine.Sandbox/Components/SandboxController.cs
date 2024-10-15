@@ -69,11 +69,12 @@ public class SandboxController : Component
         if (Input.IsKeyPressed(Keys.F1))
             Scene.DebugMode = !Scene.DebugMode;
         
-        if(Input.IsKeyHeld(Keys.Space))
+        if(Input.IsKeyPressed(Keys.Space))
             Scene.SetNextLDtkScene(Worlds.AriaWorld.Dev_world);
-        
-        if(Input.IsKeyHeld(Keys.LeftShift))
-            Transform.Rotation.Z += Time.DeltaTime;
+
+
+        if (Input.IsKeyPressed(Keys.Q))
+            HolyBell.CreateInstance(Transform.WorldPosition);
     }
 
     private void UpdateAnimation()

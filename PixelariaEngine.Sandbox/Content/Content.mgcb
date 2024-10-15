@@ -25,6 +25,11 @@
 /processor:AnimationProcessor
 /build:Animations/aria_run.animation
 
+#begin Animations/arthas_cast.animation
+/importer:AnimationImporter
+/processor:AnimationProcessor
+/build:Animations/arthas_cast.animation
+
 #begin Animations/arthas_idle.animation
 /importer:AnimationImporter
 /processor:AnimationProcessor
@@ -65,6 +70,11 @@
 /processor:AnimationProcessor
 /build:Animations/darion_sleep.animation
 
+#begin Animations/holybell.animation
+/importer:AnimationImporter
+/processor:AnimationProcessor
+/build:Animations/holybell.animation
+
 #begin AriaWorld.ldtk
 /importer:LDtkFileImporter
 /processor:LDtkFileProcessor
@@ -101,10 +111,20 @@
 /processor:SpriteSheetProcessor
 /build:SpriteSheets/darion.spritesheet
 
+#begin SpriteSheets/holybell.spritesheet
+/importer:SpriteSheetImporter
+/processor:SpriteSheetProcessor
+/build:SpriteSheets/holybell.spritesheet
+
 #begin SpriteSheets/keyboard.spritesheet
 /importer:SpriteSheetImporter
 /processor:SpriteSheetProcessor
 /build:SpriteSheets/keyboard.spritesheet
+
+#begin SpriteSheets/SpaceBackground.spritesheet
+/importer:SpriteSheetImporter
+/processor:SpriteSheetProcessor
+/build:SpriteSheets/SpaceBackground.spritesheet
 
 #begin Textures/AncientRuins/blood to grass1.png
 /importer:TextureImporter
@@ -2049,6 +2069,18 @@
 /processorParam:MakeSquare=False
 /processorParam:TextureFormat=Color
 /build:Textures/pnoise32x512.png
+
+#begin Textures/Spells/HolyBell.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyColor=255,0,255,255
+/processorParam:ColorKeyEnabled=True
+/processorParam:GenerateMipmaps=False
+/processorParam:PremultiplyAlpha=True
+/processorParam:ResizeToPowerOfTwo=False
+/processorParam:MakeSquare=False
+/processorParam:TextureFormat=Color
+/build:Textures/Spells/HolyBell.png
 
 #begin Textures/UI/KeyboardIcons.png
 /importer:TextureImporter

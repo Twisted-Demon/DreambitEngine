@@ -73,7 +73,7 @@ public class AnimationFrame
 
 public class AnimationEvent
 {
-    [JsonProperty("args")] public string[] Args = [];
+    [JsonProperty("args", NullValueHandling = NullValueHandling.Ignore)] public string[] Args = [];
 
     [JsonProperty("name")] public string Name;
 
