@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using LDtk;
 using LDtk.Renderer;
+using PixelariaEngine.ECS;
 
 namespace PixelariaEngine;
 
@@ -11,6 +12,7 @@ public class LDtkManager : Singleton<LDtkManager>
 {
     public readonly Dictionary<int, SpriteSheet> SpriteSheets = new();
     public readonly Dictionary<Guid, LDtkLevel> LoadedWorlds = new();
+    private readonly Dictionary<Guid, Entity> EntityRefs = new(); 
     public LDtkFile LDtkFile;
     public LDtkWorld LDtkWorld;
     public LDtkLevel CurrentLevel;
@@ -32,6 +34,19 @@ public class LDtkManager : Singleton<LDtkManager>
         var types = GetDerivedTypes<LDtkEntity>();
 
         foreach (var type in types) InvokeSetUpEntitiesForType(type, ldtkLevel);
+    }
+
+    public static void RegisterEntity(Guid iid, Entity entity)
+    {
+        if (!Instance.EntityRefs.ContainsKey(iid))
+            return;
+
+        Instance.EntityRefs.Add(iid, entity);
+    }
+
+    public static void DeregisterEntity(Guid iid)
+    {
+        Instance.EntityRefs.Remove(iid);
     }
 
     private static void InvokeSetUpEntitiesForType(Type entityType, object ldtkLevel)

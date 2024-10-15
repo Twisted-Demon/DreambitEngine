@@ -18,7 +18,7 @@ public class Collider : Component
     public List<string> InterestedIn = [];
 
 
-    public override void OnCreated()
+    public override void OnAddedToEntity()
     {
         PhysicsSystem.Instance.RegisterCollider(this);
     }
@@ -29,14 +29,21 @@ public class Collider : Component
         OnCollisionEnter = null;
         OnCollisionStay = null;
         OnCollisionExit = null;
-        _otherColliders.Clear();
-        _otherColliders = null;
-        Bounds = null;
     }
 
     public override void OnRemovedFromEntity()
     {
         PhysicsSystem.Instance.DeregisterCollider(this);
+    }
+
+    public override void OnDisabled()
+    {
+        PhysicsSystem.Instance.DeregisterCollider(this);
+    }
+
+    public override void OnEnabled()
+    {
+        PhysicsSystem.Instance.RegisterCollider(this);
     }
 
     public override void OnUpdate()
@@ -49,9 +56,9 @@ public class Collider : Component
         CollisionResult collisionResults;
         
         if(InterestedIn.Count == 0)
-            PhysicsSystem.Instance.PolygonCast(this, out collisionResults);
+            PhysicsSystem.Instance.ColliderCast(this, out collisionResults);
         else
-            PhysicsSystem.Instance.PolygonCastByTag(this, out collisionResults, InterestedIn.ToArray());
+            PhysicsSystem.Instance.ColliderCastByTag(this, out collisionResults, InterestedIn.ToArray());
 
         _otherColliders.RemoveAll(x => x.IsDestroyed);
         
@@ -80,6 +87,11 @@ public class Collider : Component
     public Polygon GetTransformedPolygon()
     {
         return Bounds.TransformPolygon(Transform);
+    }
+
+    public Polygon GetTransformedPolyWithDesiredPos(Vector3 desiredPos)
+    {
+        return Bounds.TransformWithDesiredPos(Transform, desiredPos);
     }
 
     public override void OnDebugDraw()

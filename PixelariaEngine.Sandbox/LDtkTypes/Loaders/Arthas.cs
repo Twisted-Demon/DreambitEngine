@@ -42,7 +42,7 @@ public partial class Arthas : LDtkEntity<Arthas>
     {
         var fsm = entity.AttachComponent<FSM>();
         
-        fsm.Blackboard.CreateVariable("followDistance", 30.0f);
+        fsm.Blackboard.CreateVariable("followDistance", 35.0f);
         fsm.Blackboard.CreateVariable("followSpeed", 75.0f);
         fsm.Blackboard.CreateVariable<Entity>("player");
         fsm.Blackboard.CreateVariable("catType", "Arthas");

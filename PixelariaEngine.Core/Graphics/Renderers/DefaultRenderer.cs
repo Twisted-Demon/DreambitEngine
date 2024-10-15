@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using System.Net.Mime;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -8,9 +9,11 @@ namespace PixelariaEngine.Graphics;
 public class DefaultRenderer(Scene scene) : Renderer(scene)
 {
     private List<RenderTarget2D> _layerRenderTargets = [];
+    private Effect fogEffect;
 
     public override void Initialize()
     {
+        fogEffect = Resources.LoadAsset<Effect>("Effects/FogEffect");
     }
 
     public override void OnDraw()
@@ -64,29 +67,40 @@ public class DefaultRenderer(Scene scene) : Renderer(scene)
     {
         var drawLayers = Scene.Drawables.GetDrawLayers();
         var layerOrder = drawLayers.Keys.OrderBy(x => x).ToList();
+        var cameraMatrix = Scene.MainCamera.TransformMatrix;
 
-        for (var i = 0; i < layerOrder.Count; i++)
+        fogEffect.Parameters["fogStart"].SetValue(100f);
+        fogEffect.Parameters["fogEnd"].SetValue(500f);
+        fogEffect.Parameters["fogColor"].SetValue(new Vector4(0.7f, 0.7f, 0.7f, 1f));
+
+        for (int i = 0; i < layerOrder.Count; i++)
         {
-            //set the render target for the layer
             Device.SetRenderTarget(_layerRenderTargets[i]);
             Device.Clear(Color.Transparent);
             
-            Core.SpriteBatch.Begin(transformMatrix: Scene.MainCamera.TransformMatrix,
-                samplerState: SamplerState.PointClamp, sortMode: SpriteSortMode.FrontToBack
-                , blendState: BlendState.NonPremultiplied);
-            
             var drawables = drawLayers[layerOrder[i]]
-                .Where(x => x.Enabled && x.Entity.Enabled && x.DrawLayer != RenderLayers.LightLayer);
+                .Where(x => x.Enabled && x.Entity.Enabled && x.DrawLayer != RenderLayers.LightLayer)
+                .ToList();
 
-            foreach (var drawable in drawables
-                         .Where(d => d.IsVisibleFromCamera(Scene.MainCamera.Bounds)))
-            {
+            var visibleDrawables = drawables
+                .Where(d => d.IsVisibleFromCamera(Scene.MainCamera.Bounds))
+                .ToList();
+
+            if (visibleDrawables.Count == 0) continue;
+            
+            Core.SpriteBatch.Begin(
+                transformMatrix: cameraMatrix,
+                samplerState: SamplerState.PointClamp,
+                sortMode: SpriteSortMode.FrontToBack,
+                blendState: BlendState.NonPremultiplied,
+                effect: fogEffect
+            );
+            
+            foreach(var drawable in visibleDrawables)
                 drawable.OnDraw();
-            }
             
             Core.SpriteBatch.End();
         }
-        
     }
 
     protected override void OnWindowResized(object sender, WindowEventArgs args)

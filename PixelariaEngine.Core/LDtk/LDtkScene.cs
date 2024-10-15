@@ -1,5 +1,6 @@
 ﻿using System;
 using LDtk;
+using Microsoft.Xna.Framework;
 using PixelariaEngine.ECS;
 
 namespace PixelariaEngine;
@@ -35,6 +36,8 @@ public class LDtkScene : Scene<LDtkScene>
         //create the LDtk Renderer
         var ldtkRenderer = CreateEntity("LDtkRenderer")
             .AttachComponent<LDtkRenderer>();
+
+        ldtkRenderer.Entity.AlwaysUpdate = true;
 
         ldtkRenderer.Level = Level;
 

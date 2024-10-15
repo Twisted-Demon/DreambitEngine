@@ -14,9 +14,8 @@ public class LDtkEntity<T> : LDtkEntity where T : new()
     {
         name ??= data.Identifier;
         
-        var entity = Entity.Create(name, tags);
-        entity.Transform.Position = new Vector3(data.Position, 0);
-        entity.AttachComponent<LDtkEntityComponent>().Iid = data.Iid;
+        var entity = Entity.Create(name, tags, createAt: new Vector3(data.Position, 0));
+        entity.AttachComponent<LDtkIid>().Iid = data.Iid;
 
         return entity;
     }
@@ -46,10 +45,14 @@ public class LDtkEntity<T> : LDtkEntity where T : new()
         return bounds;
     }
 
+    /// <summary>
+    /// Override this to create the object
+    /// </summary>
+    /// <param name="level"></param>
     protected virtual void SetUp(LDtkLevel level)
     {
     }
-
+    
     public static void SetUpEntities(LDtkLevel level)
     {
         var ldtkEntities = level.GetEntities<T>();

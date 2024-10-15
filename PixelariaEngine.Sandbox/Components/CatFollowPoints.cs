@@ -10,7 +10,7 @@ public class CatFollowPoints : Component
     private Vector3 _arthasPositionDir = Vector3.Zero;
     private Vector3 _darionPositionDir = Vector3.Zero;
 
-    public float Offset = 25.0f; // set 10px away from player
+    public float Offset = 15.0f; // set 10px away from player
     
     // the actual position, after accounting for collisions
     public Vector3 ArthasPos;
@@ -33,7 +33,7 @@ public class CatFollowPoints : Component
         
         var ray = new Ray2D(playerPos.ToVector2(), intendedDarionPos.ToVector2());
 
-        if (PhysicsSystem.Instance.RayCast(ray, out var result))
+        if (PhysicsSystem.Instance.RayCastByTag(ray, out _, "wall"))
         {
             intendedDarionPos = playerPos;
         }
@@ -44,7 +44,7 @@ public class CatFollowPoints : Component
         
         ray = new Ray2D(playerPos.ToVector2(), intendedArthasPos.ToVector2());
         
-        if (PhysicsSystem.Instance.RayCast(ray, out result))
+        if (PhysicsSystem.Instance.RayCastByTag(ray, out _, "wall"))
         {
             intendedArthasPos = playerPos;
         }

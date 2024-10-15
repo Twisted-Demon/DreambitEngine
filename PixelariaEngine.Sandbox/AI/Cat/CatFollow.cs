@@ -90,7 +90,7 @@ public class CatFollow : State<CatFollow>
         _pathElapsedTime += Time.DeltaTime;
 
         if (!(_pathElapsedTime >= 0.25f)) return;
-        _pathElapsedTime -= 0.1f;
+        _pathElapsedTime -= 0.25f;
         GenPathToDestination();
     }
 

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http.Headers;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using PixelariaEngine.ECS;
@@ -49,6 +50,7 @@ public class Scene
     {
         _logger.Debug("Initializing Scene");
         MainCamera = Entity.Create("main-camera").AttachComponent<Camera2D>();
+        MainCamera.Entity.AlwaysUpdate = true;
 
         if (_useDefaultRenderer)
             AddRenderer<DefaultRenderer>();
@@ -163,9 +165,16 @@ public class Scene
         }
     }
 
-    public Entity CreateEntity(string name = "entity", HashSet<string> tags = null, bool enabled = true)
+    public Entity CreateEntity(string name = "entity", HashSet<string> tags = null
+        , bool enabled = true, Vector3? createAt = null)
     {
-        return Entities.CreateEntity(name, tags, enabled);
+        var entity = Entities.CreateEntity(name, tags, enabled, createAt);
+        return entity;
+    }
+
+    public void SetEntityAlwaysUpdate(Entity entity, bool value)
+    {
+        Entities.SetEntityAlwaysUpdate(entity, value);
     }
 
     public void DestroyEntity(Entity entity)

@@ -27,4 +27,9 @@ public class Shape
     {
         return Polygon.Transform(transform);
     }
+
+    public Polygon TransformWithDesiredPos(Transform transform, Vector3 desiredPos)
+    {
+        return Polygon.TransformWithDesiredPos(transform, desiredPos);
+    }
 }

@@ -27,12 +27,11 @@ public class DebugRenderer(Scene scene) : Renderer(scene)
             transformMatrix: Scene.MainCamera.TransformMatrix,
             effect: DefaultEffect);
 
-        foreach (var entity in Scene.GetAllActiveEntities())
+        foreach (var component in Scene.GetAllActiveEntities()
+                     .Select(entity => entity.GetAllActiveComponents())
+                     .SelectMany(components => components))
         {
-            var components = entity.GetAllActiveComponents();
-            
-            foreach(var component in components)
-                component.OnDebugDraw();
+            component.OnDebugDraw();
         }
         
         Core.SpriteBatch.End();

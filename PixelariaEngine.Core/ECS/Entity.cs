@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
+using Microsoft.Xna.Framework;
 
 namespace PixelariaEngine.ECS;
 
@@ -7,6 +9,7 @@ public class Entity : IDisposable
 {
     private Entity _parent;
     private ComponentList ComponentList { get; set; }
+    private bool _alwaysUpadte = false;
     public Transform Transform { get; private set; }
     public HashSet<string> Tags { get; private set; } = [];
     internal Scene Scene { get; private set; }
@@ -24,6 +27,21 @@ public class Entity : IDisposable
         {
             if(_parent == value) return;
             SetParent(value);
+        }
+    }
+
+    public bool AlwaysUpdate
+    {
+        get => _alwaysUpadte;
+        set
+        {
+            if(_alwaysUpadte == value) return;
+            _alwaysUpadte = value;
+
+            foreach (var child in _children)
+                child.AlwaysUpdate = value;
+
+            Scene.SetEntityAlwaysUpdate(this, value);
         }
     }
 
@@ -79,9 +97,13 @@ public class Entity : IDisposable
         Dispose(false);
     }
 
-    public static Entity Create(string name = "entity", HashSet<string> tags = null, bool enabled = true)
+    public static Entity Create(string name = "entity", HashSet<string> tags = null
+        , bool enabled = true, Vector3? createAt = null)
     {
-        return Core.Instance.CurrentScene.CreateEntity(name, tags, enabled);
+        var entity = Core.Instance.CurrentScene.CreateEntity(name, tags, enabled, createAt);
+
+        entity.Transform.LastWorldPosition = entity.Transform.WorldPosition;
+        return entity;
     }
 
     public static Entity CreateChildOf(Entity parent, string name = "entity", HashSet<string> tags = null,
@@ -89,7 +111,8 @@ public class Entity : IDisposable
     {
         var entity = Core.Instance.CurrentScene.CreateEntity(name, tags, enabled);
         entity.Parent = parent;
-        
+
+        entity.Transform.LastWorldPosition = entity.Transform.WorldPosition;
         return entity;
     }
 
@@ -111,11 +134,23 @@ public class Entity : IDisposable
     public static void Destroy(Entity entity)
     {
         Core.Instance.CurrentScene.DestroyEntity(entity);
+
+        if (entity._children.Count <= 0) return;
+        
+        foreach (var child in entity._children)
+            Destroy(child);
     }
 
     public static bool CompareTag(Component component, string tag)
     {
         return component.Entity.Tags.Contains(tag);
+    }
+
+    internal void UpdateTransform()
+    {
+        if (Transform.LastWorldPosition != Transform.WorldPosition)
+        {
+        }
     }
 
     internal void Update()
@@ -330,12 +365,5 @@ public class Entity : IDisposable
 
         _isDestroyed = true;
         _isDisposed = true;
-
-        _parent = null;
-        ComponentList = null;
-        Transform = null;
-        Tags.Clear();
-        Tags = null;
-        Scene = null;
     }
 }

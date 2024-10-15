@@ -41,7 +41,7 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         Colliders.Clear();
     }
 
-    public bool PolygonCast(Collider @this, out CollisionResult collisionResult)
+    public bool ColliderCast(Collider @this, out CollisionResult collisionResult)
     {
         collisionResult = new CollisionResult();
         
@@ -64,7 +64,7 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         return collisionResult.Collisions.Count > 0;
     }
 
-    public bool PolygonCastByTag(Collider @this, out CollisionResult collisionResult, params string[] tags)
+    public bool ColliderCastByTag(Collider @this, out CollisionResult collisionResult, params string[] tags)
     {
         collisionResult = new CollisionResult();
         
@@ -93,6 +93,54 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         return collisionResult.Collisions.Count > 0;
     }
 
+    public bool PolygonCastByTag(Polygon @this, out CollisionResult collisionResult, params string[] tags)
+    {
+        collisionResult = new CollisionResult();
+
+        foreach (var tag in tags)
+        {
+            if (!CollidersByTag.TryGetValue(tag, out var value))
+                continue;
+
+            foreach (var other in value)
+            {
+                if (other == null || !other.Enabled || !other.Entity.Enabled) continue;
+
+                var otherPolygon = other.GetTransformedPolygon();
+
+                if (!@this.Intersects(otherPolygon)) continue;
+                
+                collisionResult.Collisions.Add(other);
+            }
+        }
+        
+        return collisionResult.Collisions.Count > 0;
+    }
+    
+    public bool RayCastByTag(Ray2D ray, out CollisionResult collisionResult, params string[] tags)
+    {
+        collisionResult = new CollisionResult();
+        foreach (var tag in tags)
+        {
+            if (!CollidersByTag.TryGetValue(tag, out var value))
+                continue;
+
+            foreach (var other in value)
+            {
+                if (other == null) continue;
+            
+                if (!other.Enabled || !other.Entity.Enabled) continue;
+
+                var otherPoly = other.GetTransformedPolygon();
+                if (!otherPoly.RayIntersects(ray.Start, ray.End, out _)) continue;
+            
+                collisionResult.Collisions.Add(other);
+            }
+        }
+        
+        return collisionResult.Collisions.Count > 0;
+    }
+
     public bool RayCast(Ray2D ray, out CollisionResult collisionResult)
     {
         collisionResult = new CollisionResult();
@@ -111,6 +159,7 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         
         return collisionResult.Collisions.Count > 0;
     }
+    
 }
 
 public readonly struct CollisionResult()

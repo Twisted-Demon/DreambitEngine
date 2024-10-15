@@ -2,7 +2,17 @@
 
 namespace PixelariaEngine.ECS;
 
-public class LDtkEntityComponent : Component
+public class LDtkIid : Component
 {
     public Guid Iid { get; internal set; }
+
+    public override void OnCreated()
+    {
+        LDtkManager.RegisterEntity(Iid, Entity);
+    }
+
+    public override void OnDestroyed()
+    {
+        LDtkManager.DeregisterEntity(Iid);
+    }
 }

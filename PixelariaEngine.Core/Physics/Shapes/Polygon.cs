@@ -142,15 +142,31 @@ public struct Polygon
         {
             Vertices = new Vector2[Length]
         };
-        
-        var rotationMatrix = Matrix.CreateRotationZ(transform.WorldZRotation);
-        var scaleMatrix = Matrix.CreateScale(transform.WorldScale);
-        var translationMatrix = Matrix.CreateTranslation(transform.WorldPosition);
 
         for (var i = 0; i < Length; i++)
         {
             var point3D = new Vector3(Vertices[i], 0);
             var transformedPoint = Vector3.Transform(point3D, transform.GetTransformationMatrix());
+            
+            polygon.Vertices[i] = new Vector2(transformedPoint.X, transformedPoint.Y);
+        }
+
+        return polygon;
+    }
+
+    public Polygon TransformWithDesiredPos(Transform transform, Vector3 desiredPos)
+    {
+        var polygon = new Polygon
+        {
+            Vertices = new Vector2[Length]
+        };
+
+        var translationMatrix = transform.GetTransformationMatrix() * Matrix.CreateTranslation(desiredPos);
+
+        for (var i = 0; i < Length; i++)
+        {
+            var point3D = new Vector3(Vertices[i], 0);
+            var transformedPoint = Vector3.Transform(point3D, translationMatrix);
             
             polygon.Vertices[i] = new Vector2(transformedPoint.X, transformedPoint.Y);
         }

@@ -7,13 +7,13 @@ using PixelariaEngine.Graphics;
 
 namespace PixelariaEngine.Sandbox;
 
-[Require(typeof(SpriteAnimator))]
+[Require(typeof(SpriteAnimator), typeof(TileWallMover))]
 public class SandboxController : Component
 {
     private Logger<SandboxController> _logger = new();
     private Vector3 _moveDir;
     private Vector2 _facing;
-    private const float Speed = 75f;
+    private const float Speed = 175f;
     
     //animations
     private SpriteSheetAnimation _idleAnimation;
@@ -23,6 +23,7 @@ public class SandboxController : Component
     private SpriteDrawer _sprite;
     
     private BoxCollider _collider;
+    private TileWallMover _mover;
 
     public override void OnCreated()
     {
@@ -40,6 +41,12 @@ public class SandboxController : Component
         
         _collider = Entity.GetComponentInChildren<BoxCollider>();
         
+        
+        _mover = Entity.GetComponent<TileWallMover>();
+        _mover.Collider = _collider;
+        _mover.AstarGrid = Entity.FindByName("managers").GetComponent<AStarGrid>();
+
+        _mover.InterestedTags = ["wall"];
     }
 
     private void TestUi()
@@ -103,15 +110,7 @@ public class SandboxController : Component
         
         if(_moveDir != Vector3.Zero)
             _moveDir.Normalize();
-
-        if (Input.IsKeyPressed(Keys.I))
-        {
-            if (PhysicsSystem.Instance.PolygonCast(_collider, out var collisionResult))
-            {
-                _logger.Debug($"We are colliding");
-            }
-        }
         
-        Transform.Position += _moveDir * Speed * Time.DeltaTime;
+        _mover.Velocity = _moveDir * Speed;
     }
 }

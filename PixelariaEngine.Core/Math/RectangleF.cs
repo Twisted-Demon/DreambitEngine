@@ -431,4 +431,14 @@ public struct RectangleF : IEquatable<RectangleF>
       width = this.Width;
       height = this.Height;
     }
+
+    public Rectangle ToRectangle()
+    {
+      return new Rectangle(
+        (int)X,
+        (int)Y,
+        (int)Width,
+        (int)Height
+        );
+    }
 }

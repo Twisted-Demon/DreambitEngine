@@ -24,11 +24,20 @@ public class Camera2D : Component
     {
         get
         {
+            // Get the 2D world position of the object the camera is following
             var pos = TransformToFollow.WorldPosToVec2;
+
+            // Calculate the width and height of the camera view based on the current zoom
             var width = (int)(Window.Width);
             var height = (int)(Window.Height);
-            
-            return new Rectangle((int)pos.X - width/2, (int)pos.Y - height/2, width, height);
+
+            // Return the bounds of the camera view
+            return new Rectangle(
+                (int)(pos.X - width / 2), // Center the X position based on the zoomed width
+                (int)(pos.Y - height / 2), // Center the Y position based on the zoomed height
+                width, 
+                height
+            );
         }
     }
 

@@ -9,6 +9,7 @@ public partial class Managers : LDtkEntity<Managers>
     {
         var collisionGrid = LDtkManager.Instance.CurrentLevel.GetIntGrid("CollisionGrid");
         var entity = CreateEntity(this);
+        entity.AlwaysUpdate = true;
         entity.AttachComponent<AStarGrid>().InitializeGrid(collisionGrid);
         entity.Name = "managers";
     }

@@ -55,4 +55,16 @@ public class AStarGrid : Component
     {
         return IsInBounds(x, y) ? _nodes[x, y] : default;
     }
+
+    public bool IsWalkable(Vector2 position)
+    {
+        var posX = Mathf.FloorToInt(position.X / CellSize);
+        var posY = Mathf.FloorToInt(position.Y / CellSize);
+        
+        var posToCheck = new Point(posX, posY);
+        
+        var node = GetNode(posToCheck.X, posToCheck.Y);
+
+        return node.IsWalkable;
+    }
 }

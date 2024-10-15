@@ -6,29 +6,29 @@ namespace PixelariaEngine.Sandbox;
 using LDtk;
 using Microsoft.Xna.Framework;
 
-public partial class StoneWall : ILDtkEntity
+public partial class Prop2x1 : ILDtkEntity
 {
-    public static StoneWall Default() => new()
+    public static Prop2x1 Default() => new()
     {
-        Identifier = "StoneWall",
-        Uid = 322,
-        Size = new Vector2(96f, 96f),
-        Pivot = new Vector2(0.5f, 1f),
+        Identifier = "Prop2x1",
+        Uid = 328,
+        Size = new Vector2(64f, 32f),
+        Pivot = new Vector2(0.5f, 0.88f),
         Tile = new TilesetRectangle()
         {
-            X = 384,
-            Y = 1472,
-            W = 96,
-            H = 64
+            X = 832,
+            Y = 160,
+            W = 64,
+            H = 32
         },
         SmartColor = new Color(255, 255, 255, 255),
 
         RenderTiles = new TilesetRectangle()
         {
-            X = 384,
-            Y = 1472,
-            W = 96,
-            H = 64
+            X = 832,
+            Y = 160,
+            W = 64,
+            H = 32
         },
     };
 
@@ -43,6 +43,6 @@ public partial class StoneWall : ILDtkEntity
     public Color SmartColor { get; set; }
 
     public TilesetRectangle? RenderTiles { get; set; }
-    public EntityReference? Collider { get; set; }
+    public bool CanFade { get; set; }
 }
 #pragma warning restore

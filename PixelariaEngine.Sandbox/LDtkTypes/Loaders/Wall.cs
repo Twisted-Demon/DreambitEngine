@@ -10,7 +10,7 @@ public partial class Wall : LDtkEntity<Wall>
 {
     protected override void SetUp(LDtkLevel level)
     {
-        var entity = CreateEntity(this);
+        var entity = CreateEntity(this, tags: ["wall"]);
         if (Vertices is null) return;
 
         var bounds = CreatePolyCollider(entity, Vertices!, Position);

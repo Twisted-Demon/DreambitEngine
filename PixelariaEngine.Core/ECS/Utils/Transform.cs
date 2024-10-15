@@ -10,6 +10,8 @@ public class Transform
     public Vector3 Rotation = new(0, 0, 0);
     public Vector3 Scale = new(1, 1, 1);
 
+    internal Vector3 LastWorldPosition = Vector3.Zero;
+
     public Transform Parent => Entity.Parent?.Transform;
 
     internal Transform(Entity owningEntity)
