@@ -20,12 +20,12 @@ public class Camera2D : Component
     
     public Matrix TopLeftTransformMatrix { get; private set; }
 
-    public Rectangle Bounds
+    public Rectangle BoundsNoZoom
     {
         get
         {
             // Get the 2D world position of the object the camera is following
-            var pos = TransformToFollow.WorldPosToVec2;
+            var pos = Transform.WorldPosToVec2;
 
             // Calculate the width and height of the camera view based on the current zoom
             var width = (int)(Window.Width);
@@ -33,8 +33,29 @@ public class Camera2D : Component
 
             // Return the bounds of the camera view
             return new Rectangle(
-                (int)(pos.X - width / 2), // Center the X position based on the zoomed width
-                (int)(pos.Y - height / 2), // Center the Y position based on the zoomed height
+                (int)(pos.X - width * 0.5f), // Center the X position based on the zoomed width
+                (int)(pos.Y - height * 0.5f), // Center the Y position based on the zoomed height
+                width, 
+                height
+            );
+        }
+    }
+    
+    public Rectangle Bounds
+    {
+        get
+        {
+            // Get the 2D world position of the object the camera is following
+            var pos = Transform.WorldPosToVec2;
+
+            // Calculate the width and height of the camera view based on the current zoom
+            var width = (int)(Window.Width / TotalZoom);
+            var height = (int)(Window.Height / TotalZoom);
+
+            // Return the bounds of the camera view
+            return new Rectangle(
+                (int)(pos.X - width * 0.5f), // Center the X position based on the zoomed width
+                (int)(pos.Y - height * 0.5f), // Center the Y position based on the zoomed height
                 width, 
                 height
             );

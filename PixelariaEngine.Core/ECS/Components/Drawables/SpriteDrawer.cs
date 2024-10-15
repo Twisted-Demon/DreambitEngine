@@ -11,6 +11,7 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
 
     private string _spriteSheetPath = string.Empty;
     public Color Color { get; set; } = Color.White;
+    public float Alpha { get; set; } = 1.0f;
     public Vector2 Pivot { get; set; } = Vector2.Zero;
     public PivotType PivotType { get; set; } = PivotType.Center;
     public int CurrentFrameIndex { get; set; }
@@ -100,12 +101,12 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
             spriteEffect |= SpriteEffects.FlipHorizontally;
             originToUse.X = spriteFrame.Width - originToUse.X;
         }
-
+        
         Core.SpriteBatch.Draw(
             _spriteSheet.Texture,
             Transform.WorldPosToVec2,
             spriteFrame,
-            Color,
+            Color * Alpha,
             Transform.WorldZRotation,
             originToUse,
             Transform.WorldScaleToVec2,

@@ -1,4 +1,5 @@
 ﻿using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 
 namespace PixelariaEngine.ECS;
 
@@ -6,6 +7,10 @@ public abstract class DrawableComponent : Component
 {
     private int _drawLayer;
     public abstract Rectangle Bounds { get; }
+    
+    public Effect Effect { get; set; }
+
+    public bool UsesEffect => Effect != null;
 
     public int DrawLayer
     {
@@ -38,7 +43,7 @@ public abstract class DrawableComponent : Component
 
     public virtual bool IsVisibleFromCamera(Rectangle cameraBounds)
     {
-        return cameraBounds.Contains(Bounds);
+        return cameraBounds.Intersects(Bounds);
     }
 }
 

@@ -1,6 +1,8 @@
 ﻿using LDtk;
 using Microsoft.Xna.Framework;
 using PixelariaEngine.ECS;
+using PixelariaEngine.Graphics;
+using PixelariaEngine.Sandbox.Drawable;
 using PixelariaEngine.Sandbox.Player;
 
 namespace PixelariaEngine.Sandbox;
@@ -19,7 +21,7 @@ public partial class PlayerStart : LDtkEntity<PlayerStart>
         entity.AttachComponent<CatFollowPoints>();
 
         SetUpFsm(entity);
-
+        SetUpSmoke(entity);
     }
 
     private void CreateCollider(Entity parent)
@@ -40,5 +42,17 @@ public partial class PlayerStart : LDtkEntity<PlayerStart>
         ]);
         
         fsm.SetInitialState<PlayerFree>();
+    }
+
+    private void SetUpSmoke(Entity entity)
+    {
+        var e = Entity.Create(tags: ["smoke"]);
+        var fog = e.AttachComponent<Fog>();
+        fog.DrawLayer = 3;
+
+        fog.Width = LDtkManager.Instance.CurrentLevel.PxWid;
+        fog.Height = LDtkManager.Instance.CurrentLevel.PxHei;
+        
+        fog.PivotType = PivotType.TopLeft;
     }
 }

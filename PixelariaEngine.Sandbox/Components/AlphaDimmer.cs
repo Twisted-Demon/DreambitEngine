@@ -31,12 +31,12 @@ public class AlphaDimmer : Component
         if (_isDimming)
         {
             _alpha = Mathf.Clamp(_alpha -= dimAmount, .2f, 1f);
-            _spriteDrawer.Color = new Color(1, 1, 1, _alpha);
+            _spriteDrawer.Alpha = _alpha;
         }
         else
         {
             _alpha = Mathf.Clamp(_alpha += dimAmount, .2f, 1f);
-            _spriteDrawer.Color = new Color(1, 1, 1, _alpha);
+            _spriteDrawer.Alpha = _alpha;
         }
     }
 

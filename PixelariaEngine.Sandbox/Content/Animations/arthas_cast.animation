@@ -1,0 +1,33 @@
+{
+    "frames": [
+      {
+        "frame_index": 56,
+        "pivot": "15,31"
+      },
+      {
+        "frame_index": 57,
+        "pivot": "15,31"
+      },
+      {
+        "frame_index": 58,
+        "pivot": "15,31"
+      },
+      {
+        "frame_index": 59,
+        "pivot": "15,31"
+      }
+      ,
+      {
+        "frame_index": 60,
+        "pivot": "15,31"
+      }
+      ,
+      {
+        "frame_index": 61,
+        "pivot": "15,31"
+      }
+    ],
+  "frame_rate": 12,
+  "sprite_sheet_path": "SpriteSheets/arthas",
+  "one_shot": true
+}

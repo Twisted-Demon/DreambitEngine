@@ -9,13 +9,7 @@ namespace PixelariaEngine.Graphics;
 public class DefaultRenderer(Scene scene) : Renderer(scene)
 {
     private List<RenderTarget2D> _layerRenderTargets = [];
-    private Effect fogEffect;
-
-    public override void Initialize()
-    {
-        fogEffect = Resources.LoadAsset<Effect>("Effects/FogEffect");
-    }
-
+    
     public override void OnDraw()
     {
         UpdateRenderTargets();
@@ -52,6 +46,16 @@ public class DefaultRenderer(Scene scene) : Renderer(scene)
     {
         Device.SetRenderTarget(FinalRenderTarget);
         Device.Clear(Color.Transparent);
+        
+        //fogEffect.Parameters["fogStart"].SetValue(25f);
+        //fogEffect.Parameters["fogEnd"].SetValue(1000f);
+        //fogEffect.Parameters["fogColor"].SetValue(new Vector4(0.75f, 0.75f, 0.75f, 1f));
+        //
+        //fogEffect.Parameters["noiseScale"].SetValue(new Vector2(1f, 1f));
+        //fogEffect.Parameters["noiseOffset"].SetValue(Vector2.Zero);
+        //
+        //fogEffect.Parameters["NoiseSampler"].SetValue(_fogNoiseTexture);
+        
 
         Core.SpriteBatch.Begin(samplerState: SamplerState.PointClamp, blendState: BlendState.NonPremultiplied,
             sortMode: SpriteSortMode.Immediate, effect: DefaultEffect);
@@ -69,10 +73,6 @@ public class DefaultRenderer(Scene scene) : Renderer(scene)
         var layerOrder = drawLayers.Keys.OrderBy(x => x).ToList();
         var cameraMatrix = Scene.MainCamera.TransformMatrix;
 
-        fogEffect.Parameters["fogStart"].SetValue(100f);
-        fogEffect.Parameters["fogEnd"].SetValue(500f);
-        fogEffect.Parameters["fogColor"].SetValue(new Vector4(0.7f, 0.7f, 0.7f, 1f));
-
         for (int i = 0; i < layerOrder.Count; i++)
         {
             Device.SetRenderTarget(_layerRenderTargets[i]);
@@ -87,17 +87,40 @@ public class DefaultRenderer(Scene scene) : Renderer(scene)
                 .ToList();
 
             if (visibleDrawables.Count == 0) continue;
+
+            var sortedDrawables = visibleDrawables
+                .OrderBy(d => d.Transform.WorldPosition.Y)
+                .ThenBy(d => d.UsesEffect ? d.Effect : DefaultEffect)
+                .ToList();
+
+            Effect currentEffect = null;
             
             Core.SpriteBatch.Begin(
                 transformMatrix: cameraMatrix,
                 samplerState: SamplerState.PointClamp,
                 sortMode: SpriteSortMode.FrontToBack,
-                blendState: BlendState.NonPremultiplied,
-                effect: fogEffect
+                blendState: BlendState.AlphaBlend,
+                effect: DefaultEffect
             );
-            
-            foreach(var drawable in visibleDrawables)
+
+            foreach (var drawable in sortedDrawables)
+            {
+                Effect drawableEffect = drawable.UsesEffect ? drawable.Effect : DefaultEffect;
+
+                if (drawableEffect != currentEffect)
+                {
+                    Core.SpriteBatch.End();
+                    Core.SpriteBatch.Begin(
+                        transformMatrix: cameraMatrix,
+                        samplerState: SamplerState.PointClamp,
+                        sortMode: SpriteSortMode.Deferred,
+                        blendState: BlendState.AlphaBlend,
+                        effect: drawableEffect
+                    );
+                    currentEffect = drawableEffect;
+                }
                 drawable.OnDraw();
+            }
             
             Core.SpriteBatch.End();
         }

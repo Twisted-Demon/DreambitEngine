@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
+using Microsoft.Xna.Framework.Graphics;
 
 namespace PixelariaEngine;
 
@@ -53,6 +55,11 @@ public class Resources : Singleton<Resources>
             var asset = Instance.Content.Load<T>(assetName);
             Instance.Logger.Debug("Loaded {0} - {1}", typeof(T).Name, assetName);
 
+            if (asset is Texture2D texture)
+            {
+                asset = PremultiplyTexture(texture) as T;
+            }
+
             return asset;
         }
         catch (Exception e)
@@ -62,5 +69,22 @@ public class Resources : Singleton<Resources>
 
             return default;
         }
+    }
+    
+    private static Texture2D PremultiplyTexture(Texture2D texture)
+    {
+        Color[] data = new Color[texture.Width * texture.Height];
+        texture.GetData(data);
+
+        for (int i = 0; i < data.Length; i++)
+        {
+            Color c = data[i];
+            float alpha = c.A / 255f;
+            data[i] = new Color((byte)(c.R * alpha), (byte)(c.G * alpha), (byte)(c.B * alpha), c.A);
+        }
+
+        Texture2D result = new Texture2D(texture.GraphicsDevice, texture.Width, texture.Height);
+        result.SetData(data);
+        return result;
     }
 }
