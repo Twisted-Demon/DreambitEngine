@@ -16,6 +16,7 @@ public class SpriteAnimator : Component
     private float _elapsedFrameTime;
     private float _timeToNextFrame;
     private int _currentAnimationFrame;
+    private Dictionary<string, Action> _eventActions = [];
 
     private readonly Logger<SpriteAnimator> _logger = new();
 
@@ -119,6 +120,27 @@ public class SpriteAnimator : Component
         Play();
     }
 
+    public void RegisterEvent(string eventName, Action eventAction)
+    {
+        if (_eventActions.ContainsKey(eventName))
+        {
+            // Add the event action to the existing one (+= syntax allows you to chain multiple methods to the same event)
+            _eventActions[eventName] += eventAction;
+        }
+        else
+        {
+            // If the event doesn't exist, create a new one
+            _eventActions[eventName] = eventAction;
+        }
+    }
+
+    public void DeregisterEvent(string eventName)
+    {
+        if(_eventActions.TryGetValue(eventName, out var eventAction))
+            _eventActions[eventName] -= eventAction;
+        
+    }
+
     private void SetAnimationFrame(int frameNumber)
     {
         if (_currentAnimation.TryGetFrame(frameNumber, out var nextFrame))
@@ -126,9 +148,11 @@ public class SpriteAnimator : Component
             _currentAnimationFrame = frameNumber;
             _spriteDrawer.CurrentFrameIndex = nextFrame.FrameIndex;
             _spriteDrawer.Pivot = nextFrame.Pivot;
+
+            if (nextFrame.AnimationEvent == null) return;
             
-            if(nextFrame.AnimationEvent != null)
-                _logger.Debug("Animation event was triggered: {0}", nextFrame.AnimationEvent.Name);
+            if(_eventActions.TryGetValue(nextFrame.AnimationEvent.Name, out var eventAction))
+                eventAction?.Invoke();
         }
     }
 

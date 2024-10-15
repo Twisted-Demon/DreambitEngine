@@ -96,6 +96,12 @@
 /processorParam:DebugMode=Auto
 /build:Effects/FogEffect.fx
 
+#begin Sounds/arthasSpell.mp3
+/importer:Mp3Importer
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:Sounds/arthasSpell.mp3
+
 #begin SpriteSheets/aria.spritesheet
 /importer:SpriteSheetImporter
 /processor:SpriteSheetProcessor

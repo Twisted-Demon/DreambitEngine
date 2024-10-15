@@ -1,4 +1,5 @@
-﻿using PixelariaEngine.ECS;
+﻿using Microsoft.Xna.Framework.Audio;
+using PixelariaEngine.ECS;
 
 namespace PixelariaEngine.Sandbox;
 
@@ -13,6 +14,9 @@ public class SpellEffect : Component
     private SpriteAnimator _animator;
     private SpriteSheetAnimation _spellAnimation;
 
+    public string SoundEffectPath = string.Empty;
+    private SoundEffect _soundEffect;
+
     public override void OnAddedToEntity()
     {
         _animator = Entity.GetComponent<SpriteAnimator>();
@@ -22,6 +26,16 @@ public class SpellEffect : Component
         
         _animator.Animation = _spellAnimation;
         _animator.Play();
+
+        if (SoundEffectPath != string.Empty)
+            _soundEffect = Resources.LoadAsset<SoundEffect>(SoundEffectPath);
+
+        if (_soundEffect == null) return;
+
+        var soundInstance = _soundEffect.CreateInstance();
+
+        soundInstance.Volume = 0.5f;
+        soundInstance.Play();
     }
 
     public override void OnUpdate()
