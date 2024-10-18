@@ -90,17 +90,39 @@
 /processor:LDtkLevelProcessor
 /build:AriaWorld/EntityTest.ldtkl
 
+#begin Effects/AreaFogEffect.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:Effects/AreaFogEffect.fx
+
 #begin Effects/FogEffect.fx
 /importer:EffectImporter
 /processor:EffectProcessor
 /processorParam:DebugMode=Auto
 /build:Effects/FogEffect.fx
 
+#begin Fonts/monogram-font.spritefont
+/importer:FontDescriptionImporter
+/processor:FontDescriptionProcessor
+/processorParam:PremultiplyAlpha=True
+/processorParam:TextureFormat=Compressed
+/build:Fonts/monogram-font.spritefont
+
+#begin Fonts/monogram.ttf
+/copy:Fonts/monogram.ttf
+
 #begin Sounds/arthasSpell.mp3
 /importer:Mp3Importer
 /processor:SoundEffectProcessor
 /processorParam:Quality=Best
 /build:Sounds/arthasSpell.mp3
+
+#begin Sounds/bellGong.mp3
+/importer:Mp3Importer
+/processor:SoundEffectProcessor
+/processorParam:Quality=Best
+/build:Sounds/bellGong.mp3
 
 #begin SpriteSheets/aria.spritesheet
 /importer:SpriteSheetImporter
@@ -2028,6 +2050,18 @@
 /processorParam:TextureFormat=Color
 /build:Textures/DarionSpriteSheet.png
 
+#begin Textures/NineSlice.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyColor=255,0,255,255
+/processorParam:ColorKeyEnabled=True
+/processorParam:GenerateMipmaps=False
+/processorParam:PremultiplyAlpha=True
+/processorParam:ResizeToPowerOfTwo=False
+/processorParam:MakeSquare=False
+/processorParam:TextureFormat=Color
+/build:Textures/NineSlice.png
+
 #begin Textures/pnoise-alpha-16x512.png
 /importer:TextureImporter
 /processor:TextureProcessor
@@ -2087,6 +2121,18 @@
 /processorParam:MakeSquare=False
 /processorParam:TextureFormat=Color
 /build:Textures/Spells/HolyBell.png
+
+#begin Textures/TiledNoise.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyColor=255,0,255,255
+/processorParam:ColorKeyEnabled=True
+/processorParam:GenerateMipmaps=False
+/processorParam:PremultiplyAlpha=True
+/processorParam:ResizeToPowerOfTwo=False
+/processorParam:MakeSquare=False
+/processorParam:TextureFormat=Color
+/build:Textures/TiledNoise.png
 
 #begin Textures/UI/KeyboardIcons.png
 /importer:TextureImporter

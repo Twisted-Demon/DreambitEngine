@@ -87,16 +87,16 @@ public class Camera2D : Component
     {
         return Matrix.CreateTranslation(-Transform.WorldPosition) *
                Matrix.CreateScale(new Vector3(scaleFactor, scaleFactor, 1)) * 
-        Matrix.CreateRotationZ(Transform.WorldZRotation) *
-            Matrix.CreateTranslation(new Vector3(0.5f * Window.ScreenSize.X, 0.5f * Window.ScreenSize.Y, 0f));
+               Matrix.CreateRotationZ(Transform.WorldZRotation) * 
+               Matrix.CreateTranslation(new Vector3(0.5f * Window.ScreenSize.X, 0.5f * Window.ScreenSize.Y, 0f));
     }
     
     private Matrix CalculateTopLeftMatrix(float scaleFactor = 1.0f)
     {
         return Matrix.CreateTranslation(-Transform.WorldPosition) *
-               Matrix.CreateTranslation(new Vector3(0.5f * Window.ScreenSize.X, 0.5f * Window.ScreenSize.Y, 0f)) *
                Matrix.CreateScale(new Vector3(scaleFactor, scaleFactor, 1)) *
-               Matrix.CreateRotationZ(Transform.WorldZRotation);
+               Matrix.CreateRotationZ(Transform.WorldZRotation) *
+               Matrix.CreateTranslation(new Vector3(0.5f * Window.ScreenSize.X, 0.5f * Window.ScreenSize.Y, 0f));
     }
     
 
@@ -107,7 +107,7 @@ public class Camera2D : Component
 
     private void SetResolutionZoom()
     {
-        ResolutionZoom = Window.ScreenSize.Y / (float)TargetVerticalResolution;
+        ResolutionZoom = Window.Height / (float)TargetVerticalResolution;
     }
 
     public void SetViewPort()

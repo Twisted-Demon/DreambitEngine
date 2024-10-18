@@ -2,7 +2,7 @@
 using System.Linq;
 using Microsoft.Xna.Framework.Graphics;
 
-namespace PixelariaEngine.Graphics;
+namespace PixelariaEngine;
 
 public class DeferredRenderer(Scene scene) : Renderer(scene)
 {

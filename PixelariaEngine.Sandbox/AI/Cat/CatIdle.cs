@@ -38,7 +38,7 @@ public class CatIdle : State<CatIdle>
     {
         _animator.ClearAnimationQueue();
         _animator.Animation = _idleAnimation.Value;
-        
+        _animator.Play();
     }
     
     public override void OnExecute()

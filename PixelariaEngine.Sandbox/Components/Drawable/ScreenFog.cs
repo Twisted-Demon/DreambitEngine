@@ -6,7 +6,7 @@ using PixelariaEngine.Graphics;
 
 namespace PixelariaEngine.Sandbox.Drawable;
 
-public class Fog : DrawableComponent<Fog>
+public class ScreenFog : DrawableComponent<ScreenFog>
 {
     public override Rectangle Bounds => GetBounds();
     public int Width = 32;
@@ -14,11 +14,16 @@ public class Fog : DrawableComponent<Fog>
     public PivotType PivotType { get; set; } = PivotType.Center;
     public Vector2 Pivot { get; set; }
     private Texture2D _fogNoiseTexture;
-    public float Alpha { get; set; } = .65f;
+    
+    private float _alpha  = .5f;
+
+    private readonly float _maxAlpha = 0.5f;
 
     public Vector2 NoiseOffset;
 
     public Vector2 NoiseScale;
+
+    private bool _isDimming = false;
 
     public override void OnCreated()
     {
@@ -34,6 +39,27 @@ public class Fog : DrawableComponent<Fog>
         var heightRatio = height / (float)512;
         
         NoiseScale = new Vector2(widthRatio, heightRatio);
+        
+    }
+
+    public override void OnUpdate()
+    {
+        if (_isDimming)
+        {
+            _alpha -= 0.11f * Time.DeltaTime;
+            if (_alpha <= 0.25f)
+                _isDimming = false;
+        }
+        else
+        {
+            _alpha += 0.0183f * Time.DeltaTime;
+            _alpha = Mathf.Clamp(_alpha, 0, _maxAlpha);
+        }
+    }
+
+    public void DimFog()
+    {
+        _isDimming = true;
     }
 
     public override void OnPreDraw()
@@ -58,7 +84,7 @@ public class Fog : DrawableComponent<Fog>
     public override void OnDraw()
     {
         GraphicsUtil.Device.SamplerStates[0] = SamplerState.PointWrap;
-        Core.SpriteBatch.DrawFilledRectangle(Bounds, Color.DarkGray * Alpha);
+        Core.SpriteBatch.DrawFilledRectangle(Bounds, Color.DarkGray * _alpha);
     }
     
     private Rectangle GetBounds()

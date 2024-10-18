@@ -4,7 +4,7 @@ using System.Net.Mime;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
-namespace PixelariaEngine.Graphics;
+namespace PixelariaEngine;
 
 public class DefaultRenderer(Scene scene) : Renderer(scene)
 {

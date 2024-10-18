@@ -1,4 +1,4 @@
-﻿namespace PixelariaEngine.Graphics;
+﻿namespace PixelariaEngine;
 
 public enum CameraFollowBehavior
 {

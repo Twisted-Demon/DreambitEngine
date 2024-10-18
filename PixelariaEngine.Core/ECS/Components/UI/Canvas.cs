@@ -22,23 +22,21 @@ public class Canvas : UIComponent
             component.OnDrawUI();
         }
     }
-
-    internal Vector2 ConvertToScreenCoord(UIElement uiElement)
+    
+    internal Vector2 ConvertToScreenCoord(Vector2 position)
     {
-        var position = uiElement.Transform.WorldPosToVec2;
-        
         var xScale = _targetWidth / (float)100;
         var yScale = _targetHeight / (float)100;
         
         return new Vector2(position.X * xScale, position.Y * yScale);
     }
 
-    public Vector2 GetUIScaleVec()
+    internal Vector2 ConvertToScreenSize(Vector2 size)
     {
-        var xScale = _targetWidth / (float)100;
-        var yScale = _targetHeight / (float)100;
-        
-        return new Vector2(xScale, yScale);
+        var xScale = _targetWidth / 100;
+        var yScale = _targetHeight / 100;
+
+        return new Vector2(size.X * xScale, size.Y * yScale);
     }
 
     public T CreateUIElement<T>(string name = null) where T : UIElement
@@ -60,6 +58,14 @@ public class Canvas : UIComponent
         var entity = Entity.Create("canvas");
         var canvas = entity.AttachComponent<Canvas>();
 
+        return (canvas, entity);
+    }
+
+    public static (T canvas, Entity entity) Create<T>() where T : Canvas
+    {
+        var entity = Entity.Create(typeof(T).Name);
+        var canvas = entity.AttachComponent<T>();
+        
         return (canvas, entity);
     }
 

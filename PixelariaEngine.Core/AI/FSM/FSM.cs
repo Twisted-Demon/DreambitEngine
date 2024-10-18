@@ -8,10 +8,12 @@ namespace PixelariaEngine;
 public class FSM : Component
 {
     private Logger<FSM> _logger = new();
-    private State CurrentState { get; set; }
+    private State _currentState;
     private State NextState { get; set; } = null;
     private readonly Dictionary<string, State> _statesMap = [];
     public Blackboard Blackboard { get; set; } = new();
+    
+    public State CurrentState => _currentState;
 
     public override void OnUpdate()
     {
@@ -22,12 +24,12 @@ public class FSM : Component
         }
         // else if we do have a state then reason
         // change state if reasoning fails
-        else if (CurrentState != null && !CurrentState.Reason())
+        else if (_currentState != null && !_currentState.Reason())
         {
             ChangeState();
         }
         
-        CurrentState?.OnExecute();
+        _currentState?.OnExecute();
         
     }
 
@@ -55,16 +57,16 @@ public class FSM : Component
         while (true)
         {
             //leave the current state and set the next one
-            CurrentState?.OnEnd();
-            CurrentState = NextState;
+            _currentState?.OnEnd();
+            _currentState = NextState;
             NextState = null;
             
-            if (CurrentState == null) break; // if we never set the next state, we should leave
+            if (_currentState == null) break; // if we never set the next state, we should leave
             
             // reason the state, if false then we should loop back and change states
             // if true (meaning we stay) then we run through the enter function and break
-            if (!CurrentState.Reason()) continue;
-            CurrentState.OnEnter();
+            if (!_currentState.Reason()) continue;
+            _currentState.OnEnter();
             break;
 
         }

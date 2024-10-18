@@ -1,4 +1,5 @@
 ﻿using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Input;
 using PixelariaEngine.ECS;
 
 namespace PixelariaEngine.Sandbox;
@@ -11,7 +12,7 @@ public partial class HolyBell
         var spellEffect = e.AttachComponent<SpellEffect>();
         spellEffect.SpellAnimationPath = "Animations/holybell";
         spellEffect.SoundEffectPath = "Sounds/arthasSpell";
-
+        
         return e;
     }
 }

@@ -17,8 +17,9 @@ public partial class PlayerStart : LDtkEntity<PlayerStart>
         
         CreateCollider(entity);
         
-        entity.AttachComponent<SandboxController>();
+        entity.AttachComponent<AriaController>();
         entity.AttachComponent<CatFollowPoints>();
+        entity.AttachComponent<InputActions>();
 
         SetUpFsm(entity);
         SetUpSmoke(entity);
@@ -46,8 +47,8 @@ public partial class PlayerStart : LDtkEntity<PlayerStart>
 
     private void SetUpSmoke(Entity entity)
     {
-        var e = Entity.Create(tags: ["smoke"]);
-        var fog = e.AttachComponent<Fog>();
+        var e = Entity.Create(tags: ["fog"], name: "fog");
+        var fog = e.AttachComponent<ScreenFog>();
         fog.DrawLayer = 3;
 
         fog.Width = LDtkManager.Instance.CurrentLevel.PxWid;

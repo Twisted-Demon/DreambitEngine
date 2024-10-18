@@ -8,6 +8,7 @@ namespace PixelariaEngine.ECS;
 public class SpriteAnimator : Component
 {
     public bool IsPlaying { get; private set; }
+    public Action OnAnimationEnd;
     
     //internals
     private SpriteDrawer _spriteDrawer;
@@ -73,6 +74,8 @@ public class SpriteAnimator : Component
         //if we are a one shot
         if (_currentAnimation.OneShot)
         {
+            OnAnimationEnd?.Invoke();
+            
             //load next animation if we have one queued
             if (_animationQueue.Count > 0)
             {
@@ -130,7 +133,8 @@ public class SpriteAnimator : Component
         else
         {
             // If the event doesn't exist, create a new one
-            _eventActions[eventName] = eventAction;
+            _eventActions[eventName] = null;
+            _eventActions[eventName] += eventAction;
         }
     }
 

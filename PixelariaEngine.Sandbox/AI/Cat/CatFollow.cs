@@ -33,6 +33,7 @@ public class CatFollow : State<CatFollow>
     {
         _spriteAnimator.ClearAnimationQueue();
         _spriteAnimator.Animation = _runAnimation.Value;
+        _spriteAnimator.Play();
         _followPoints = Entity.FindByName("player").GetComponent<CatFollowPoints>();
         
         if(_followPoints != null)

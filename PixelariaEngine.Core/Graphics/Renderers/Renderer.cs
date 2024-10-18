@@ -1,6 +1,6 @@
 ﻿using Microsoft.Xna.Framework.Graphics;
 
-namespace PixelariaEngine.Graphics;
+namespace PixelariaEngine;
 
 public class Renderer
 {
@@ -16,8 +16,6 @@ public class Renderer
     protected Renderer(Scene scene)
     {
         Scene = scene;
-        Window.WindowResized += OnWindowResized;
-        FinalRenderTarget = CreateRenderTarget();
     }
     protected virtual void OnWindowResized(object sender, WindowEventArgs args)
     {
@@ -27,6 +25,8 @@ public class Renderer
 
     internal void InitializeInternals()
     {
+        Window.WindowResized += OnWindowResized;
+        FinalRenderTarget = CreateRenderTarget();
         DefaultEffect = Resources.LoadAsset<Effect>("Effects/ForwardDiffuse");
         Initialize();
     }
@@ -50,8 +50,22 @@ public class Renderer
     {
         var target = new RenderTarget2D(
             Device,
-            Device.PresentationParameters.BackBufferWidth,
-            Device.PresentationParameters.BackBufferHeight,
+            Window.Width,
+            Window.Height,
+            false,
+            Device.PresentationParameters.BackBufferFormat,
+            DepthFormat.None
+        );
+
+        return target;
+    }
+
+    protected static RenderTarget2D CreateRenderTarget(int width, int height)
+    {
+        var target = new RenderTarget2D(
+            Device,
+            width,
+            height,
             false,
             Device.PresentationParameters.BackBufferFormat,
             DepthFormat.None

@@ -13,11 +13,17 @@ public class LDtkRenderer : DrawableComponent<LDtkRenderer>
     public override void OnCreated()
     {
         _renderer = LDtkManager.Instance.LDtkRenderer;
+        
+    }
+
+    public override void OnAddedToEntity()
+    {
+        _renderer.PrerenderLevel(Level);
     }
 
     public override void OnPreDraw()
     {
-        _renderer.PrerenderLevel(Level);
+        
     }
 
 

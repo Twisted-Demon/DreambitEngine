@@ -1,6 +1,6 @@
-﻿namespace PixelariaEngine.Graphics;
+﻿namespace PixelariaEngine;
 
 public static class Fonts
 {
-    public const string Default = "Fonts/dogica_bmf";
+    public const string Default = "Fonts/monogram-font";
 }

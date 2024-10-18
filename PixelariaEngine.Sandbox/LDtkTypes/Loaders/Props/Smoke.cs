@@ -11,7 +11,7 @@ public partial class Smoke : LDtkEntity<Smoke>
     protected override void SetUp(LDtkLevel level)
     {
         var e = CreateEntity(this, tags: ["smoke"]);
-        var fog = e.AttachComponent<Fog>();
+        var fog = e.AttachComponent<ScreenFog>();
         fog.DrawLayer = 5;
 
         fog.Width = (int)Size.X;

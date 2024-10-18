@@ -21,13 +21,18 @@ public class Core : Game
         PixelariaEngine.Window.Init();
         PixelariaEngine.Window.SetTitle(title);
         PixelariaEngine.Window.SetSize(width, height);
-
-        GraphicsDevice.BlendState = BlendState.NonPremultiplied;
-
-        SetFixedTimeStep(false);
+        
+        //SetFixedTimeStep(false);
 
         TargetElapsedTime = TimeSpan.FromSeconds((double)1 / 120); //set Target fps to 120
+        
+    }
 
+    protected override void Initialize()
+    {
+        base.Initialize();
+        //PixelariaEngine.Window.SetBorderlessFullscreen(true);
+        GraphicsDevice.BlendState = BlendState.NonPremultiplied;
         Input.Init();
     }
 

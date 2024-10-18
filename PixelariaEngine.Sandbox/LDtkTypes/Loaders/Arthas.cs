@@ -36,6 +36,8 @@ public partial class Arthas : LDtkEntity<Arthas>
         iconEntity.Enabled = false;
         
         SetUpFSM(entity);
+
+        entity.AttachComponent<ArthasSpellHandler>();
     }
     
     private void SetUpFSM(Entity entity)
@@ -46,6 +48,7 @@ public partial class Arthas : LDtkEntity<Arthas>
         fsm.Blackboard.CreateVariable("followSpeed", 75.0f);
         fsm.Blackboard.CreateVariable<Entity>("player");
         fsm.Blackboard.CreateVariable("catType", "Arthas");
+        var castingAnimation = fsm.Blackboard.CreateVariable<SpriteSheetAnimation>("castingAnimation");
         var idleAnimation = fsm.Blackboard.CreateVariable<SpriteSheetAnimation>("idleAnimation");
         var lickAnimation = fsm.Blackboard.CreateVariable<SpriteSheetAnimation>("lickAnimation");
         var sleepAnimation = fsm.Blackboard.CreateVariable<SpriteSheetAnimation>("sleepAnimation");
@@ -55,13 +58,15 @@ public partial class Arthas : LDtkEntity<Arthas>
         lickAnimation.Value = Resources.LoadAsset<SpriteSheetAnimation>("Animations/arthas_lick");
         sleepAnimation.Value = Resources.LoadAsset<SpriteSheetAnimation>("Animations/arthas_sleep");
         runAnimation.Value = Resources.LoadAsset<SpriteSheetAnimation>("Animations/arthas_run");
+        castingAnimation.Value = Resources.LoadAsset<SpriteSheetAnimation>("Animations/arthas_cast");
         
         fsm.Blackboard.CreateVariable("isAwake", false);
         
         fsm.RegisterStates([
             typeof(ArthasSleep),
             typeof(CatIdle),
-            typeof(CatFollow)
+            typeof(CatFollow),
+            typeof(CatCasting)
         ]);
         fsm.SetInitialState<ArthasSleep>();
     }

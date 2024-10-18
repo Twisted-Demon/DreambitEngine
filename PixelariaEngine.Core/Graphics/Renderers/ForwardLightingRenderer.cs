@@ -4,7 +4,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using PixelariaEngine.ECS;
 
-namespace PixelariaEngine.Graphics;
+namespace PixelariaEngine;
 
 public class ForwardLightingRenderer(Scene scene) : Renderer(scene)
 {

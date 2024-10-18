@@ -87,9 +87,9 @@ public static class SpriteBatchExtensions
 
         return horizontalAlignment switch
         {
-            HorizontalAlignment.Center => new Vector2(-textSize.X/ 2, textSize.X / 2),
-            HorizontalAlignment.Left => new Vector2(-textSize.X, textSize.X / 2),
-            HorizontalAlignment.Right => new Vector2(textSize.X / 2, textSize.X / 2),
+            HorizontalAlignment.Center => new Vector2(textSize.X/ 2, textSize.Y / 2),
+            HorizontalAlignment.Left => new Vector2(0, textSize.Y / 2),
+            HorizontalAlignment.Right => new Vector2(textSize.X, textSize.Y / 2),
             _ => Vector2.Zero
         };
     }

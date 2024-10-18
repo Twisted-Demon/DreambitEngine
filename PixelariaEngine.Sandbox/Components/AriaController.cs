@@ -8,12 +8,12 @@ using PixelariaEngine.Graphics;
 namespace PixelariaEngine.Sandbox;
 
 [Require(typeof(SpriteAnimator), typeof(TileWallMover))]
-public class SandboxController : Component
+public class AriaController : Component
 {
-    private Logger<SandboxController> _logger = new();
+    private Logger<AriaController> _logger = new();
     private Vector3 _moveDir;
     private Vector2 _facing;
-    private const float Speed = 175f;
+    private const float Speed = 75f;
     
     //animations
     private SpriteSheetAnimation _idleAnimation;
@@ -24,8 +24,8 @@ public class SandboxController : Component
     
     private BoxCollider _collider;
     private TileWallMover _mover;
-
-    public override void OnCreated()
+    
+    public override void OnAddedToEntity()
     {
         _idleAnimation = Resources.LoadAsset<SpriteSheetAnimation>("Animations/aria_idle");
         _runAnimation = Resources.LoadAsset<SpriteSheetAnimation>("Animations/aria_run");
@@ -47,15 +47,31 @@ public class SandboxController : Component
         _mover.AstarGrid = Entity.FindByName("managers").GetComponent<AStarGrid>();
 
         _mover.InterestedTags = ["wall"];
+        
+        TestUi();
     }
 
     private void TestUi()
     {
-        //var (canvas, canvasEntity) = Canvas.Create();
-//
-        //var text = UIText.Create(canvas, "Hello World");
-        //
-        //text.Transform.Position = new Vector3(0, 0, 0);
+        var (canvas, _) = Canvas.Create();
+
+        canvas.Transform.Position.Y = 25f;
+        canvas.Transform.Position.X = -28;
+        
+        var frame = UINineSlice.Create(canvas, 56, 25, "Textures/NineSlice");
+        frame.PivotType = PivotType.TopLeft;
+        
+        var text = UIText.Create(canvas, "Hello World this is a test of my new text rendering system. " +
+                                         "Arthas says hello");
+        text.FontName = "Fonts/monogram-font";
+        text.VTextAlignment = VerticalAlignment.Top;
+        text.HTextAlignment = HorizontalAlignment.Left;
+        text.MaxWidth = 56;
+        text.Transform.Position.X += 1;
+        text.Transform.Position.Y += 1;
+        text.MaxWidth -= 2;
+
+        var texture = UITexture.Create(canvas, "Textures/NineSlice", PivotType.Center);
     }
 
     public override void OnUpdate()
@@ -71,11 +87,8 @@ public class SandboxController : Component
         
         if(Input.IsKeyPressed(Keys.Space))
             Scene.SetNextLDtkScene(Worlds.AriaWorld.Dev_world);
-
-
-        if (Input.IsKeyPressed(Keys.Q))
-            HolyBell.CreateInstance(Transform.WorldPosition);
     }
+    
 
     private void UpdateAnimation()
     {
@@ -107,7 +120,7 @@ public class SandboxController : Component
         _moveDir.X -= Input.IsKeyHeld(Keys.Left)  ? 1 : 0;
         
         _moveDir.Y += Input.IsKeyHeld(Keys.Down)  ? 1 : 0;
-        _moveDir.Y -= Input.IsKeyHeld(Keys.Up)  ? 1 : 0;
+        _moveDir.Y -= Input.IsKeyHeld(Keys.Up)    ? 1 : 0;
         
         if(_moveDir != Vector3.Zero)
             _moveDir.Normalize();

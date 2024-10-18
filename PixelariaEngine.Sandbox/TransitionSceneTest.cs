@@ -16,7 +16,7 @@ public class TransitionSceneTest : Scene
         bgSprite.PivotType = PivotType.BottomCenter;
 
         _playerEntity = Entity.Create("player");
-        _playerEntity.AttachComponent<SandboxController>();
+        _playerEntity.AttachComponent<AriaController>();
 
         MainCamera.IsFollowing = true;
         MainCamera.TransformToFollow = _playerEntity.Transform;

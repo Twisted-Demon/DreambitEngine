@@ -1,4 +1,5 @@
-﻿using Microsoft.Xna.Framework.Audio;
+﻿using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Audio;
 using PixelariaEngine.ECS;
 
 namespace PixelariaEngine.Sandbox;
@@ -36,6 +37,7 @@ public class SpellEffect : Component
 
         soundInstance.Volume = 0.5f;
         soundInstance.Play();
+        
     }
 
     public override void OnUpdate()

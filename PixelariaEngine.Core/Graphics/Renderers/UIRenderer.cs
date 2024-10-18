@@ -5,14 +5,14 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using PixelariaEngine.ECS;
 
-namespace PixelariaEngine.Graphics;
+namespace PixelariaEngine;
 
 [SuppressMessage("ReSharper", "InconsistentNaming")]
 public class UIRenderer(Scene scene) : Renderer(scene)
 {
     private Camera2D _uiCamera;
     private List<RenderTarget2D> _renderTargets = [];
-    private int _targetUIHeight => Window.Height;
+    private int _targetUIHeight => 720;
 
     public override void Initialize()
     {
@@ -51,7 +51,7 @@ public class UIRenderer(Scene scene) : Renderer(scene)
             Device.Clear(Color.Transparent);
             
             Core.SpriteBatch.Begin(transformMatrix:_uiCamera.TopLeftTransformMatrix,
-                sortMode: SpriteSortMode.Immediate,
+                sortMode: SpriteSortMode.Deferred,
                 samplerState: SamplerState.PointClamp,
                 blendState: BlendState.AlphaBlend,
                 effect: DefaultEffect);
@@ -97,6 +97,8 @@ public class UIRenderer(Scene scene) : Renderer(scene)
     protected override void OnWindowResized(object sender, WindowEventArgs args)
     {
         base.OnWindowResized(sender, args);
+
+        if (_uiCamera == null) return;
         
         var renderTargetCount = _renderTargets.Count;
         _uiCamera.SetTargetVerticalResolution(_targetUIHeight);
@@ -122,5 +124,8 @@ public class UIRenderer(Scene scene) : Renderer(scene)
         _renderTargets.Clear();
         _renderTargets = null;
         _uiCamera = null;
+        
     }
+    
+    
 }

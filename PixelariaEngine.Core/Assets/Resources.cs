@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
@@ -69,6 +70,22 @@ public class Resources : Singleton<Resources>
 
             return default;
         }
+    }
+
+    public static Task LoadAssetQueueAsync<T>(AssetQueue<T> assetQueue) where T : class
+    {
+        assetQueue.IsLoading = true;
+
+        for (var i = 0; i < assetQueue.Count; i++)
+        {
+            if (!assetQueue.TryGetNext(out var assetName)) continue;
+            
+            var asset = LoadAsset<T>(assetName);
+
+            assetQueue.AddAsset(assetName, asset);
+        }
+
+        return Task.CompletedTask;
     }
     
     private static Texture2D PremultiplyTexture(Texture2D texture)

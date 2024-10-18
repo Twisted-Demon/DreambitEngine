@@ -2,11 +2,11 @@
 
 public class PlayerFree : State<PlayerFree>
 {
-    private SandboxController _controller;
+    private AriaController _controller;
     
     public override void OnInitialize()
     {
-        _controller = Fsm.Entity.GetComponent<SandboxController>();
+        _controller = Fsm.Entity.GetComponent<AriaController>();
     }
 
     public override void OnEnter()

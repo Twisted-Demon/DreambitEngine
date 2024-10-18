@@ -45,7 +45,13 @@ public static class Window
 
     public static void SetFullscreen(bool value)
     {
+        var w = Core.Instance.GraphicsDevice.Adapter.CurrentDisplayMode.Width;
+        var h = Core.Instance.GraphicsDevice.Adapter.CurrentDisplayMode.Height;
         Core.GraphicsDeviceManager.IsFullScreen = value;
+        
+        Core.GraphicsDeviceManager.PreferredBackBufferWidth = w;
+        Core.GraphicsDeviceManager.PreferredBackBufferHeight = h;
+        
         Core.GraphicsDeviceManager.ApplyChanges();
     }
 
@@ -59,10 +65,15 @@ public static class Window
         if (value)
         {
             var w = Core.Instance.GraphicsDevice.Adapter.CurrentDisplayMode.Width;
-            var h = Core.Instance.GraphicsDevice.Adapter.CurrentDisplayMode.Width;
+            var h = Core.Instance.GraphicsDevice.Adapter.CurrentDisplayMode.Height;
+            
+            Core.GraphicsDeviceManager.PreferredBackBufferWidth = w;
+            Core.GraphicsDeviceManager.PreferredBackBufferHeight = h;
 
-            SetSize(w, h);
-            SetBorderless(true);
+            Core.GraphicsDeviceManager.IsFullScreen = false;
+            GraphicsUtil.DeviceManager.ApplyChanges();
+            Core.Instance.Window.IsBorderless = true;
+            Core.Instance.Window.Position = new Point(0, 0);
         }
     }
 

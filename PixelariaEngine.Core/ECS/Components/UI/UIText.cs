@@ -7,12 +7,13 @@ namespace PixelariaEngine.ECS;
 public class UIText : UIElement
 {
     public string Text { get; set; } = string.Empty;
-    public float MaxWidth { get; set; } = float.MaxValue;
-    public PivotType Pivot { get; set; } = PivotType.Center;
+    public float MaxWidth { get; set; } = int.MaxValue;
+    
+    private string _fontName;
+    public HorizontalAlignment HTextAlignment { get; set; } = HorizontalAlignment.Left;
+    public VerticalAlignment VTextAlignment { get; set; } = VerticalAlignment.Center;
 
-    private string _fontName = string.Empty;
     private SpriteFont _spriteFont;
-
     public string FontName
     {
         get => _fontName;
@@ -27,10 +28,13 @@ public class UIText : UIElement
 
     public override void OnDrawUI()
     {
+        if (_spriteFont == null) return;
+
         var position = GetScreenPos();
-        
+        var size = Canvas.ConvertToScreenSize(new Vector2(MaxWidth, 0));
+            
         Core.SpriteBatch.DrawMultiLineText(_spriteFont, Text, position, 
-            HTextAlignment, VTextAlignment, Color.White, MaxWidth);
+            HTextAlignment, VTextAlignment, Color.White, size.X);
     }
 
     public static UIText Create(Canvas canvas, string text, HorizontalAlignment horizontalAlignment = HorizontalAlignment.Center,

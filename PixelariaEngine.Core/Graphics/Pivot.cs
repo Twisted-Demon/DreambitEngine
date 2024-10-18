@@ -1,6 +1,6 @@
 ﻿using Microsoft.Xna.Framework;
 
-namespace PixelariaEngine.Graphics;
+namespace PixelariaEngine;
 
 public static class PivotHelper
 {
