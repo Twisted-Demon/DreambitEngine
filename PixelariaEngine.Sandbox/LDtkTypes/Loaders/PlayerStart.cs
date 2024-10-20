@@ -42,7 +42,7 @@ public partial class PlayerStart : LDtkEntity<PlayerStart>
             typeof(InDialogue)
         ]);
         
-        fsm.SetInitialState<PlayerFree>();
+        fsm.SetDefaultState<PlayerFree>();
     }
 
     private void SetUpSmoke(Entity entity)

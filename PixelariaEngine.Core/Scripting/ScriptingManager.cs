@@ -11,7 +11,15 @@ public class ScriptingManager
 {
     private readonly Queue<ScriptGroup> _groupQueue = [];
     private readonly Logger<ScriptingManager> _logger = new();
-    public static bool IsCutsceneActive { get; set; }
+    public static ScriptingManager Instance => Scene.Instance.ScriptingManager;
+    public Action OnScriptingStart;
+    public Action OnScriptingEnd;
+    public static bool IsCutsceneActive { get; internal set; }
+
+    public ScriptingManager()
+    {
+        IsCutsceneActive = false;
+    }
 
     public void StartCutscene(string cutsceneName, string fileExtension = ".yaml")
     {
@@ -23,10 +31,16 @@ public class ScriptingManager
 
         try
         {
+            var watch = System.Diagnostics.Stopwatch.StartNew();
             var yamlText = File.ReadAllText("Content/" + cutsceneName + fileExtension);
             var deserializer = new DeserializerBuilder()
                 .WithNamingConvention(CamelCaseNamingConvention.Instance)
                 .Build();
+            
+            watch.Stop();
+            _logger.Info($"reading scripting file took {watch.ElapsedMilliseconds} ms");
+            
+            watch.Restart();
 
             var yamlData = deserializer.Deserialize<List<dynamic>>(yamlText);
 
@@ -45,6 +59,7 @@ public class ScriptingManager
                     if (scriptDict != null)
                     {
                         var script = ScriptFactory.CreateScript(scriptDict);
+                        if (script == null) continue;
                         group.Scripts.Add(script);
                     }
                 }
@@ -55,6 +70,11 @@ public class ScriptingManager
             foreach (var group in groups) _groupQueue.Enqueue(group);
 
             IsCutsceneActive = true;
+            OnScriptingStart?.Invoke();
+            
+            watch.Stop();
+            
+            _logger.Info($"loading scripting data took {watch.ElapsedMilliseconds} ms");
         }
         catch (Exception e)
         {
@@ -84,8 +104,15 @@ public class ScriptingManager
             _groupQueue.Dequeue();
         }
 
-        if (_groupQueue.Count == 0)
-            IsCutsceneActive = false;
+        if (_groupQueue.Count != 0) return;
+        IsCutsceneActive = false;
+        OnScriptingEnd?.Invoke();
+    }
+
+    internal void CleanUp()
+    {
+        OnScriptingStart = null;
+        OnScriptingEnd = null;
     }
 
     // Helper method to convert Dictionary<object, object> to Dictionary<string, object>

@@ -1,22 +1,29 @@
-﻿namespace PixelariaEngine.Sandbox.Player;
+﻿using PixelariaEngine.Scripting;
+
+namespace PixelariaEngine.Sandbox.Player;
 
 public class InDialogue : State<InDialogue>
 {
-    private AriaController _controller;
-
+    
     public override void OnInitialize()
     {
-        _controller = Fsm.Entity.GetComponent<AriaController>();
+        ScriptingManager.Instance.OnScriptingStart += () =>
+        {
+            Fsm.SetNextState<InDialogue>();
+        };
+        
+        ScriptingManager.Instance.OnScriptingEnd += () =>
+        {
+            Fsm.GoToDefaultState();
+        };
     }
 
     public override void OnEnter()
     {
-        _controller.Enabled = false;
     }
 
     public override void OnEnd()
     {
-        _controller.Enabled = true;
     }
 
     public override void OnExecute()

@@ -1,6 +1,8 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
 using PixelariaEngine.ECS;
+using PixelariaEngine.Sandbox.Player;
+using PixelariaEngine.Scripting;
 
 
 namespace PixelariaEngine.Sandbox;
@@ -22,6 +24,8 @@ public class AriaController : Component
     
     private BoxCollider _collider;
     private TileWallMover _mover;
+    
+    private FSM _fsm;
     
     public override void OnAddedToEntity()
     {
@@ -45,6 +49,24 @@ public class AriaController : Component
         _mover.AstarGrid = Entity.FindByName("managers").GetComponent<AStarGrid>();
 
         _mover.InterestedTags = ["wall"];
+        
+        _fsm = Entity.GetComponent<FSM>();
+
+        ScriptingManager.Instance.OnScriptingStart += () =>
+        {
+            _mover.Velocity = Vector3.Zero;
+            _moveDir = Vector3.Zero;
+            _mover.Enabled = false;
+            _fsm.SetNextState<InDialogue>();
+            Enabled = false;
+        };
+        
+        ScriptingManager.Instance.OnScriptingEnd += () =>
+        {
+            Enabled = true;
+            _mover.Enabled = true;
+            _fsm.SetNextState<PlayerFree>();
+        };
     }
     
 

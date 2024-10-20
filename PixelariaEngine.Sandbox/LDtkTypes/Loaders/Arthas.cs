@@ -3,6 +3,7 @@ using LDtk;
 using Microsoft.Xna.Framework;
 using PixelariaEngine.ECS;
 using PixelariaEngine.Sandbox.Drawable;
+using PixelariaEngine.Sandbox.Player;
 using PixelariaEngine.Sandbox.Utils;
 using Vector2 = Microsoft.Xna.Framework.Vector2;
 
@@ -38,6 +39,7 @@ public partial class Arthas : LDtkEntity<Arthas>
         SetUpFSM(entity);
 
         entity.AttachComponent<ArthasSpellHandler>();
+        entity.Enabled = false;
     }
     
     private void SetUpFSM(Entity entity)
@@ -63,12 +65,13 @@ public partial class Arthas : LDtkEntity<Arthas>
         fsm.Blackboard.CreateVariable("isAwake", false);
         
         fsm.RegisterStates([
-            typeof(ArthasSleep),
             typeof(CatIdle),
             typeof(CatFollow),
-            typeof(CatCasting)
+            typeof(CatCasting),
+            typeof(InDialogue)
         ]);
-        fsm.SetInitialState<ArthasSleep>();
+        fsm.SetDefaultState<CatIdle>();
+        fsm.SetNextState<InDialogue>();
     }
 
     private void SetUpSprite(Entity entity)

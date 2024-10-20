@@ -9,9 +9,9 @@ public class FSM : Component
 {
     private readonly Dictionary<string, State> _statesMap = [];
     private readonly Logger<FSM> _logger = new();
+    private string _initialState;
     private State NextState { get; set; }
     public Blackboard Blackboard { get; set; } = new();
-
     public State CurrentState { get; private set; }
 
     public override void OnUpdate()
@@ -64,11 +64,22 @@ public class FSM : Component
         }
     }
 
-    public void SetInitialState<T>() where T : State
+    public void SetDefaultState<T>() where T : State
     {
         if (!_statesMap.TryGetValue(typeof(T).Name, out var value))
         {
             _logger.Warn("State {0} is not registered with {1}", typeof(T).Name, Entity.Name);
+            return;
+        }
+        
+        _initialState = typeof(T).Name;
+    }
+
+    public void GoToDefaultState()
+    {
+        if (!_statesMap.TryGetValue(_initialState, out var value))
+        {
+            _logger.Warn("State {0} is not registered with {1}", _initialState, Entity.Name);
             return;
         }
 

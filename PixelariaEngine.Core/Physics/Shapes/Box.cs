@@ -40,4 +40,18 @@ public class Box : Shape
 
         return box;
     }
+
+    public static Box CreateFromVerts(Vector2[] verts)
+    {
+        var box = new Box();
+        box.Polygon.Vertices = new[]
+        {
+            verts[0],
+            verts[1],
+            verts[2],
+            verts[3]
+        };
+
+        return box;
+    }
 }

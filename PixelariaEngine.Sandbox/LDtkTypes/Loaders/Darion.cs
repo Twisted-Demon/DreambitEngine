@@ -57,7 +57,7 @@ public partial class Darion : LDtkEntity<Darion>
             typeof(CatIdle),
             typeof(CatFollow)
         ]);
-        fsm.SetInitialState<ArthasSleep>();
+        fsm.SetDefaultState<ArthasSleep>();
     }
     
     private void SetUpSprite(Entity entity)
