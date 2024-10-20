@@ -1,5 +1,4 @@
 ﻿using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 
 namespace PixelariaEngine.ECS;
 
@@ -15,5 +14,4 @@ public class BoxCollider : Collider
     {
         Bounds = shape;
     }
-    
 }

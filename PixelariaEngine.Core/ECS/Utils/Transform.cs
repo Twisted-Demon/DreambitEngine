@@ -4,26 +4,26 @@ namespace PixelariaEngine.ECS;
 
 public class Transform
 {
-    public Entity Entity { get; internal set; }
-    
+    internal Vector3 LastWorldPosition = Vector3.Zero;
+
     public Vector3 Position = new(0, 0, 0);
     public Vector3 Rotation = new(0, 0, 0);
     public Vector3 Scale = new(1, 1, 1);
-
-    internal Vector3 LastWorldPosition = Vector3.Zero;
-
-    public Transform Parent => Entity.Parent?.Transform;
 
     internal Transform(Entity owningEntity)
     {
         Entity = owningEntity;
     }
 
+    public Entity Entity { get; internal set; }
+
+    public Transform Parent => Entity.Parent?.Transform;
+
     public Vector3 WorldPosition
     {
         get
         {
-            if(Parent == null)
+            if (Parent == null)
                 return Position;
 
             return Vector3.Transform(Position, Parent.GetTransformationMatrix());
@@ -36,7 +36,7 @@ public class Transform
         {
             if (Parent == null)
                 return Rotation;
-            
+
             return Rotation + Parent.WorldRotation;
         }
     }
@@ -47,7 +47,7 @@ public class Transform
         {
             if (Parent == null)
                 return Scale;
-            
+
             return Scale * Parent.WorldScale;
         }
     }
@@ -63,10 +63,10 @@ public class Transform
                           Matrix.CreateRotationY(Rotation.Y) *
                           Matrix.CreateRotationX(Rotation.X) *
                           Matrix.CreateTranslation(Position);
-        
-        if(Parent == null)
+
+        if (Parent == null)
             return localMatrix;
-        
+
         return Parent.GetTransformationMatrix() * localMatrix;
     }
 }

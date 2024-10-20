@@ -6,8 +6,8 @@ namespace PixelariaEngine;
 public class StopWatch
 {
     private TimeSpan _elapsedTime;
-    private TimeSpan _startTime;
     private bool _isRunning;
+    private TimeSpan _startTime;
 
     public StopWatch()
     {
@@ -17,6 +17,5 @@ public class StopWatch
 
     public void Start(GameTime gameTime)
     {
-        
     }
 }

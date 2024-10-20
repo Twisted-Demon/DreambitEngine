@@ -1,24 +1,23 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using Microsoft.Xna.Framework;
 
 namespace PixelariaEngine.ECS;
 
-public class AStarPathfinder: Component
+public class AStarPathfinder : Component
 {
-    private AStarGrid _grid;
-    private PathNode[,] _pathNodes;
-    private PathNodePool _pathNodePool;
-    private PriorityQueue<PathNode> _openList;
     private HashSet<PathNode> _closedList;
-    private int _gridWidth;
+    private AStarGrid _grid;
     private int _gridHeight;
-    
+    private int _gridWidth;
+    private PriorityQueue<PathNode> _openList;
+    private PathNodePool _pathNodePool;
+    private PathNode[,] _pathNodes;
+
     public override void OnAddedToEntity()
     {
         _grid = Scene.FindEntity("managers").GetComponent<AStarGrid>();
-        
+
         _gridWidth = _grid.Width;
         _gridHeight = _grid.Height;
         _pathNodes = new PathNode[_gridWidth, _gridHeight];
@@ -26,19 +25,16 @@ public class AStarPathfinder: Component
         InitializePathNodes();
         _openList = new PriorityQueue<PathNode>(_gridWidth * _gridHeight);
         _closedList = [];
-        
     }
 
     private void InitializePathNodes()
     {
         for (var x = 0; x < _gridWidth; x++)
+        for (var y = 0; y < _gridHeight; y++)
         {
-            for (var y = 0; y < _gridHeight; y++)
-            {
-                var gridNode = _grid.GetNode(x, y);
-                var pathNode = _pathNodePool.GetNode(x, y, gridNode.IsWalkable);
-                _pathNodes[x, y] = pathNode;
-            }
+            var gridNode = _grid.GetNode(x, y);
+            var pathNode = _pathNodePool.GetNode(x, y, gridNode.IsWalkable);
+            _pathNodes[x, y] = pathNode;
         }
     }
 
@@ -50,11 +46,8 @@ public class AStarPathfinder: Component
         var targetY = (int)targetWorldPosition.Y / _grid.CellSize;
 
         //if start or target is out of bounds
-        if (!_grid.IsInBounds(startX, startY) || !_grid.IsInBounds(targetX, targetY))
-        {
-            return [];
-        }
-        
+        if (!_grid.IsInBounds(startX, startY) || !_grid.IsInBounds(targetX, targetY)) return [];
+
         var startNode = _pathNodes[startX, startY];
         var targetNode = _pathNodes[targetX, targetY];
 
@@ -70,7 +63,7 @@ public class AStarPathfinder: Component
         startNode.GCost = 0;
         startNode.HCost = CalculateHeuristic(startNode, targetNode);
         startNode.Parent = null;
-        
+
         _openList.Enqueue(startNode);
 
         while (_openList.Count > 0)
@@ -87,7 +80,7 @@ public class AStarPathfinder: Component
                 {
                     if (skipFirst && i == 0)
                         continue;
-                    
+
                     pathQueue.Enqueue(path[i]);
                 }
 
@@ -100,33 +93,31 @@ public class AStarPathfinder: Component
             {
                 if (_closedList.Contains(neighbor) || !neighbor.IsWalkable)
                     continue;
-                
+
                 var tentativeGCost = currentNode.GCost + CalculateDistance(currentNode, neighbor);
 
                 if (!(tentativeGCost < neighbor.GCost)) continue;
-                
+
                 neighbor.Parent = currentNode;
                 neighbor.GCost = tentativeGCost;
                 neighbor.HCost = CalculateHeuristic(neighbor, targetNode);
-                    
-                if(!_openList.Contains(neighbor))
+
+                if (!_openList.Contains(neighbor))
                     _openList.Enqueue(neighbor);
             }
         }
 
         return []; // no path found
     }
-    
+
     private void ResetPathNodes()
     {
         for (var x = 0; x < _gridWidth; x++)
+        for (var y = 0; y < _gridHeight; y++)
         {
-            for (var y = 0; y < _gridHeight; y++)
-            {
-                var node = _pathNodes[x, y];
-                node.Reset();
-                node.IsWalkable = _grid.GetNode(x, y).IsWalkable;
-            }
+            var node = _pathNodes[x, y];
+            node.Reset();
+            node.IsWalkable = _grid.GetNode(x, y).IsWalkable;
         }
     }
 
@@ -154,7 +145,7 @@ public class AStarPathfinder: Component
 
         return D * (dx + dy) + (D2 - 2 * D) * Math.Min(dx, dy);
     }
-    
+
     private float CalculateDistance(PathNode a, PathNode b)
     {
         // Assuming movement cost between adjacent nodes is constant
@@ -163,10 +154,10 @@ public class AStarPathfinder: Component
 
         if (dx == 1 && dy == 1)
             return 1.4142f; // Diagonal movement
-        
+
         return 1f; // Horizontal or vertical movement
     }
-    
+
     private IEnumerable<PathNode> GetNeighbors(PathNode node)
     {
         var neighbors = new List<PathNode>(8);
@@ -192,5 +183,4 @@ public class AStarPathfinder: Component
 
         return neighbors;
     }
-    
 }

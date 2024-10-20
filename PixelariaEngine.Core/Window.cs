@@ -7,9 +7,9 @@ public static class Window
 {
     public static int Width => Core.Instance.GraphicsDevice.PresentationParameters.BackBufferWidth;
     public static int Height => Core.Instance.GraphicsDevice.PresentationParameters.BackBufferHeight;
-    
+
     public static Point ScreenSize => new(Width, Height);
-    
+
     public static float AspectRatio => Width / (float)Height;
 
     public static event EventHandler<WindowEventArgs> WindowResized;
@@ -48,10 +48,10 @@ public static class Window
         var w = Core.Instance.GraphicsDevice.Adapter.CurrentDisplayMode.Width;
         var h = Core.Instance.GraphicsDevice.Adapter.CurrentDisplayMode.Height;
         Core.GraphicsDeviceManager.IsFullScreen = value;
-        
+
         Core.GraphicsDeviceManager.PreferredBackBufferWidth = w;
         Core.GraphicsDeviceManager.PreferredBackBufferHeight = h;
-        
+
         Core.GraphicsDeviceManager.ApplyChanges();
     }
 
@@ -66,7 +66,7 @@ public static class Window
         {
             var w = Core.Instance.GraphicsDevice.Adapter.CurrentDisplayMode.Width;
             var h = Core.Instance.GraphicsDevice.Adapter.CurrentDisplayMode.Height;
-            
+
             Core.GraphicsDeviceManager.PreferredBackBufferWidth = w;
             Core.GraphicsDeviceManager.PreferredBackBufferHeight = h;
 

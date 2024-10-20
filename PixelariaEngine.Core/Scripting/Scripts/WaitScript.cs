@@ -10,7 +10,7 @@ public class WaitScript(float duration) : Script
         _elapsedTime += Time.DeltaTime;
 
         if (!(_elapsedTime >= duration)) return;
-        
+
         IsComplete = true;
         _logger.Debug("Wait Complete");
     }

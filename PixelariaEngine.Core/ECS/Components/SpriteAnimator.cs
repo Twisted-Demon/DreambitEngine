@@ -1,25 +1,23 @@
 ﻿using System;
 using System.Collections.Generic;
-using PixelariaEngine.Graphics;
 
 namespace PixelariaEngine.ECS;
 
 [Require(typeof(SpriteDrawer))]
 public class SpriteAnimator : Component
 {
-    public bool IsPlaying { get; private set; }
-    public Action OnAnimationEnd;
-    
+    private readonly Logger<SpriteAnimator> _logger = new();
+    private Queue<SpriteSheetAnimation> _animationQueue = [];
+    private SpriteSheetAnimation _currentAnimation;
+    private int _currentAnimationFrame;
+    private float _elapsedFrameTime;
+    private readonly Dictionary<string, Action> _eventActions = [];
+
     //internals
     private SpriteDrawer _spriteDrawer;
-    private SpriteSheetAnimation _currentAnimation;
-    private Queue<SpriteSheetAnimation> _animationQueue = [];
-    private float _elapsedFrameTime;
     private float _timeToNextFrame;
-    private int _currentAnimationFrame;
-    private Dictionary<string, Action> _eventActions = [];
-
-    private readonly Logger<SpriteAnimator> _logger = new();
+    public Action OnAnimationEnd;
+    public bool IsPlaying { get; private set; }
 
     public SpriteSheetAnimation Animation
     {
@@ -27,7 +25,7 @@ public class SpriteAnimator : Component
         set
         {
             if (_currentAnimation == value) return;
-            UpdateAnimation(value); 
+            UpdateAnimation(value);
         }
     }
 
@@ -44,7 +42,7 @@ public class SpriteAnimator : Component
 
         if (!IsPlaying)
             return;
-        
+
         Run();
     }
 
@@ -53,7 +51,7 @@ public class SpriteAnimator : Component
         _elapsedFrameTime += Time.DeltaTime;
 
         if (!(_elapsedFrameTime >= _timeToNextFrame)) return;
-        
+
         _elapsedFrameTime -= _timeToNextFrame;
         ChangeAnimationFrame();
     }
@@ -66,6 +64,7 @@ public class SpriteAnimator : Component
             SetAnimationFrame(_currentAnimationFrame + 1);
             return;
         }
+
         AnimationEnded(); //end the animation as we have no more frames
     }
 
@@ -75,7 +74,7 @@ public class SpriteAnimator : Component
         if (_currentAnimation.OneShot)
         {
             OnAnimationEnd?.Invoke();
-            
+
             //load next animation if we have one queued
             if (_animationQueue.Count > 0)
             {
@@ -83,9 +82,11 @@ public class SpriteAnimator : Component
                 Animation = _animationQueue.Dequeue();
             }
             else
+            {
                 Pause(); //or else just pause at the end of the oneshot.
+            }
         }
-        else if(!_currentAnimation.OneShot)
+        else if (!_currentAnimation.OneShot)
         {
             SetAnimationFrame(0); //reset and loop.
         }
@@ -140,9 +141,8 @@ public class SpriteAnimator : Component
 
     public void DeregisterEvent(string eventName)
     {
-        if(_eventActions.TryGetValue(eventName, out var eventAction))
+        if (_eventActions.TryGetValue(eventName, out var eventAction))
             _eventActions[eventName] -= eventAction;
-        
     }
 
     private void SetAnimationFrame(int frameNumber)
@@ -154,8 +154,8 @@ public class SpriteAnimator : Component
             _spriteDrawer.Pivot = nextFrame.Pivot;
 
             if (nextFrame.AnimationEvent == null) return;
-            
-            if(_eventActions.TryGetValue(nextFrame.AnimationEvent.Name, out var eventAction))
+
+            if (_eventActions.TryGetValue(nextFrame.AnimationEvent.Name, out var eventAction))
                 eventAction?.Invoke();
         }
     }
@@ -163,12 +163,12 @@ public class SpriteAnimator : Component
     private void UpdateAnimation(SpriteSheetAnimation newAnimation)
     {
         _currentAnimation = newAnimation;
-        
-        if(newAnimation == null)
+
+        if (newAnimation == null)
             return;
-        
+
         _spriteDrawer.SpriteSheetPath = newAnimation.SpriteSheetPath;
-        
+
         SetFrameRate(newAnimation.FrameRate);
         ResetInternals();
         SetAnimationFrame(0);

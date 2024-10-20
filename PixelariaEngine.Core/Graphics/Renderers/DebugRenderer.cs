@@ -16,12 +16,12 @@ public class DebugRenderer(Scene scene) : Renderer(scene)
     {
         IsActive = scene.DebugMode;
         if (!scene.DebugMode) return;
-        
+
         Device.SetRenderTarget(FinalRenderTarget);
         Device.Clear(Color.Transparent);
-        
+
         Core.SpriteBatch.Begin(
-            samplerState: SamplerState.PointClamp, 
+            samplerState: SamplerState.PointClamp,
             blendState: BlendState.AlphaBlend,
             sortMode: SpriteSortMode.FrontToBack,
             transformMatrix: Scene.MainCamera.TransformMatrix,
@@ -30,10 +30,8 @@ public class DebugRenderer(Scene scene) : Renderer(scene)
         foreach (var component in Scene.GetAllActiveEntities()
                      .Select(entity => entity.GetAllActiveComponents())
                      .SelectMany(components => components))
-        {
             component.OnDebugDraw();
-        }
-        
+
         Core.SpriteBatch.End();
     }
 }

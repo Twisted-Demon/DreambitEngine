@@ -1,6 +1,5 @@
 ﻿using System;
 using LDtk;
-using Microsoft.Xna.Framework;
 using PixelariaEngine.ECS;
 
 namespace PixelariaEngine;
@@ -11,7 +10,7 @@ public class LDtkScene : Scene<LDtkScene>
 
     public string LevelIdentifier { get; internal set; }
     public Guid? LevelIid { get; internal init; }
-    
+
     internal bool LoadByGuid { get; init; }
 
     protected override void OnInitialize()
@@ -29,9 +28,10 @@ public class LDtkScene : Scene<LDtkScene>
         }
 
         //set up the level
-        Level = LoadByGuid ? LDtkManager.Instance.LoadLDtkLevel((Guid)LevelIid!) : 
-            LDtkManager.Instance.LoadLDtkLevel(LevelIdentifier);
-        
+        Level = LoadByGuid
+            ? LDtkManager.Instance.LoadLDtkLevel((Guid)LevelIid!)
+            : LDtkManager.Instance.LoadLDtkLevel(LevelIdentifier);
+
 
         //create the LDtk Renderer
         var ldtkRenderer = CreateEntity("LDtkRenderer")

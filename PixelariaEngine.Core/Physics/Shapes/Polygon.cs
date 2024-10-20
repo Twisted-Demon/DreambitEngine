@@ -31,15 +31,15 @@ public struct Polygon
 
     public bool IsConcave()
     {
-        bool isNegative = false;
-        bool isPositive = false;
+        var isNegative = false;
+        var isPositive = false;
 
-        for (int i = 0; i < Vertices.Length; i++)
+        for (var i = 0; i < Vertices.Length; i++)
         {
             var p0 = Vertices[i];
             var p1 = Vertices[(i + 1) % Vertices.Length];
-            var p2 = Vertices[(i + 2)%Vertices.Length];
-            
+            var p2 = Vertices[(i + 2) % Vertices.Length];
+
             var crossProduct = CrossProduct(p0, p1, p2);
 
             if (crossProduct < 0) isNegative = true;
@@ -53,11 +53,11 @@ public struct Polygon
 
     private float CrossProduct(Vector2 p0, Vector2 p1, Vector2 p2)
     {
-        Vector2 d1 = p1 - p0;
-        Vector2 d2 = p2 - p1;
+        var d1 = p1 - p0;
+        var d2 = p2 - p1;
         return d1.X * d2.Y - d1.Y * d2.X;
     }
-    
+
     public (float min, float max) ProjectOntoAxis(Vector2 axis)
     {
         var min = Vector2.Dot(Vertices[0], axis);
@@ -65,33 +65,33 @@ public struct Polygon
 
         for (var i = 1; i < Vertices.Length; i++)
         {
-            float projection = Vector2.Dot(Vertices[i], axis);
-            if(projection < min)
-                min=projection;
-            if(projection > max)
+            var projection = Vector2.Dot(Vertices[i], axis);
+            if (projection < min)
+                min = projection;
+            if (projection > max)
                 max = projection;
         }
 
         return (min, max);
     }
-    
+
     public bool Intersects(Polygon other)
     {
         var axes = new List<Vector2>();
-        
-        foreach(var edge in GetEdges())
+
+        foreach (var edge in GetEdges())
             axes.Add(new Vector2(-edge.Y, edge.X));
-        
-        foreach(Vector2 edge in other.GetEdges())
+
+        foreach (var edge in other.GetEdges())
             axes.Add(new Vector2(-edge.X, edge.Y));
 
         foreach (var axis in axes)
         {
-            if(axis != Vector2.Zero)
+            if (axis != Vector2.Zero)
                 axis.Normalize();
-            
-            var(minA, maxA) = ProjectOntoAxis(axis);
-            var(minB, maxB) = other.ProjectOntoAxis(axis);
+
+            var (minA, maxA) = ProjectOntoAxis(axis);
+            var (minB, maxB) = other.ProjectOntoAxis(axis);
 
             if (maxA < minB || maxB < minA)
                 return false;
@@ -110,11 +110,11 @@ public struct Polygon
             var vertex2 = Vertices[j];
 
             // Check if the point is inside the polygon by casting a ray
-            if (vertex1.Y > point.Y != vertex2.Y > point.Y && // Check if the point's Y is between the Y values of the polygon's edge
-                point.X < (vertex2.X - vertex1.X) * (point.Y - vertex1.Y) / (vertex2.Y - vertex1.Y) + vertex1.X) // Check if the point is to the left of the edge
-            {
+            if (vertex1.Y > point.Y !=
+                vertex2.Y > point.Y && // Check if the point's Y is between the Y values of the polygon's edge
+                point.X < (vertex2.X - vertex1.X) * (point.Y - vertex1.Y) / (vertex2.Y - vertex1.Y) +
+                vertex1.X) // Check if the point is to the left of the edge
                 isInside = !isInside;
-            }
         }
 
         return isInside;
@@ -131,8 +131,8 @@ public struct Polygon
 
             if (LineSegmentsIntersect(rayStart, rayEnd, current, next, out intersection))
                 return true;
-            
         }
+
         return false;
     }
 
@@ -147,7 +147,7 @@ public struct Polygon
         {
             var point3D = new Vector3(Vertices[i], 0);
             var transformedPoint = Vector3.Transform(point3D, transform.GetTransformationMatrix());
-            
+
             polygon.Vertices[i] = new Vector2(transformedPoint.X, transformedPoint.Y);
         }
 
@@ -167,7 +167,7 @@ public struct Polygon
         {
             var point3D = new Vector3(Vertices[i], 0);
             var transformedPoint = Vector3.Transform(point3D, translationMatrix);
-            
+
             polygon.Vertices[i] = new Vector2(transformedPoint.X, transformedPoint.Y);
         }
 
@@ -177,7 +177,7 @@ public struct Polygon
     private bool LineSegmentsIntersect(Vector2 p1, Vector2 p2, Vector2 p3, Vector2 p4, out Vector2 intersection)
     {
         intersection = Vector2.Zero;
-        
+
         var a1 = p2.Y - p1.Y;
         var b1 = p1.X - p2.X;
         var c1 = a1 * p1.X + b1 * p1.Y;
@@ -190,19 +190,19 @@ public struct Polygon
 
         if (denominator == 0)
             return false;
-        
+
         var intersectX = (b2 * c1 - b1 * c2) / denominator;
         var intersectY = (a1 * c2 - a2 * c1) / denominator;
-        
+
         intersection = new Vector2(intersectX, intersectY);
-        
+
         return IsPointOnLineSegment(p1, p2, intersection) && IsPointOnLineSegment(p3, p4, intersection);
     }
 
     private bool IsPointOnLineSegment(Vector2 p1, Vector2 p2, Vector2 point)
     {
-        return (point.X >= Math.Min(p1.X, p2.X) && point.X <= Math.Max(p1.X, p2.X)) &&
-               (point.Y >= Math.Min(p1.Y, p2.Y) && point.Y <= Math.Max(p1.Y, p2.Y));
+        return point.X >= Math.Min(p1.X, p2.X) && point.X <= Math.Max(p1.X, p2.X) &&
+               point.Y >= Math.Min(p1.Y, p2.Y) && point.Y <= Math.Max(p1.Y, p2.Y);
     }
 
     public List<Polygon> SplitPolygon(Polygon polygon)
@@ -212,7 +212,6 @@ public struct Polygon
         var remainingVertices = new List<Vector2>(polygon.Vertices);
 
         while (remainingVertices.Count > 3)
-        {
             for (var i = 0; i < remainingVertices.Count; i++)
             {
                 var prev = remainingVertices[(i - 1 + remainingVertices.Count) % remainingVertices.Count];
@@ -223,7 +222,7 @@ public struct Polygon
                 {
                     triangles.Add(new Polygon
                     {
-                        Vertices = new []
+                        Vertices = new[]
                         {
                             prev, current, next
                         }
@@ -232,44 +231,40 @@ public struct Polygon
                     break;
                 }
             }
-        }
-        
+
         triangles.Add(new Polygon
         {
             Vertices = remainingVertices.ToArray()
         });
         return triangles;
     }
-    
+
     private bool IsEar(Vector2 prev, Vector2 current, Vector2 next, List<Vector2> polygon)
     {
         // Check if the current triangle is convex and no other points are inside it
         if (CrossProduct(prev, current, next) >= 0)
         {
-            for (int i = 0; i < polygon.Count; i++)
-            {
+            for (var i = 0; i < polygon.Count; i++)
                 if (polygon[i] != prev && polygon[i] != current && polygon[i] != next)
-                {
                     if (IsPointInTriangle(polygon[i], prev, current, next))
                         return false;
-                }
-            }
             return true;
         }
+
         return false;
     }
-    
+
     private bool IsPointInTriangle(Vector2 point, Vector2 a, Vector2 b, Vector2 c)
     {
         // Compute the sign of the areas formed by the triangle's edges and the point
-        bool hasSameSignABP = Sign(point, a, b) > 0;
-        bool hasSameSignBCP = Sign(point, b, c) > 0;
-        bool hasSameSignCAP = Sign(point, c, a) > 0;
+        var hasSameSignABP = Sign(point, a, b) > 0;
+        var hasSameSignBCP = Sign(point, b, c) > 0;
+        var hasSameSignCAP = Sign(point, c, a) > 0;
 
         // If all the signs are the same, the point is inside the triangle
         return hasSameSignABP == hasSameSignBCP && hasSameSignBCP == hasSameSignCAP;
     }
-    
+
     private float Sign(Vector2 p1, Vector2 p2, Vector2 p3)
     {
         return (p1.X - p3.X) * (p2.Y - p3.Y) - (p2.X - p3.X) * (p1.Y - p3.Y);

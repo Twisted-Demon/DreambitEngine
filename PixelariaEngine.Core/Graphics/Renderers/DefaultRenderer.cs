@@ -1,6 +1,5 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using System.Net.Mime;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -9,7 +8,7 @@ namespace PixelariaEngine;
 public class DefaultRenderer(Scene scene) : Renderer(scene)
 {
     private List<RenderTarget2D> _layerRenderTargets = [];
-    
+
     public override void OnDraw()
     {
         UpdateRenderTargets();
@@ -36,17 +35,14 @@ public class DefaultRenderer(Scene scene) : Renderer(scene)
 
         _layerRenderTargets.Clear();
 
-        for (var i = 0; i < Scene.Drawables.DrawLayerCount; i++)
-        {
-            _layerRenderTargets.Add(CreateRenderTarget());
-        }
+        for (var i = 0; i < Scene.Drawables.DrawLayerCount; i++) _layerRenderTargets.Add(CreateRenderTarget());
     }
 
     private void RenderToFinalRenderTarget()
     {
         Device.SetRenderTarget(FinalRenderTarget);
         Device.Clear(Color.Transparent);
-        
+
         //fogEffect.Parameters["fogStart"].SetValue(25f);
         //fogEffect.Parameters["fogEnd"].SetValue(1000f);
         //fogEffect.Parameters["fogColor"].SetValue(new Vector4(0.75f, 0.75f, 0.75f, 1f));
@@ -55,7 +51,7 @@ public class DefaultRenderer(Scene scene) : Renderer(scene)
         //fogEffect.Parameters["noiseOffset"].SetValue(Vector2.Zero);
         //
         //fogEffect.Parameters["NoiseSampler"].SetValue(_fogNoiseTexture);
-        
+
 
         Core.SpriteBatch.Begin(samplerState: SamplerState.PointClamp, blendState: BlendState.NonPremultiplied,
             sortMode: SpriteSortMode.Immediate, effect: DefaultEffect);
@@ -64,7 +60,6 @@ public class DefaultRenderer(Scene scene) : Renderer(scene)
             Core.SpriteBatch.Draw(renderTarget, Vector2.Zero, Color.White);
 
         Core.SpriteBatch.End();
-        
     }
 
     private void RenderDrawables()
@@ -73,11 +68,11 @@ public class DefaultRenderer(Scene scene) : Renderer(scene)
         var layerOrder = drawLayers.Keys.OrderBy(x => x).ToList();
         var cameraMatrix = Scene.MainCamera.TransformMatrix;
 
-        for (int i = 0; i < layerOrder.Count; i++)
+        for (var i = 0; i < layerOrder.Count; i++)
         {
             Device.SetRenderTarget(_layerRenderTargets[i]);
             Device.Clear(Color.Transparent);
-            
+
             var drawables = drawLayers[layerOrder[i]]
                 .Where(x => x.Enabled && x.Entity.Enabled && x.DrawLayer != RenderLayers.LightLayer)
                 .ToList();
@@ -94,7 +89,7 @@ public class DefaultRenderer(Scene scene) : Renderer(scene)
                 .ToList();
 
             Effect currentEffect = null;
-            
+
             Core.SpriteBatch.Begin(
                 transformMatrix: cameraMatrix,
                 samplerState: SamplerState.PointClamp,
@@ -105,7 +100,7 @@ public class DefaultRenderer(Scene scene) : Renderer(scene)
 
             foreach (var drawable in sortedDrawables)
             {
-                Effect drawableEffect = drawable.UsesEffect ? drawable.Effect : DefaultEffect;
+                var drawableEffect = drawable.UsesEffect ? drawable.Effect : DefaultEffect;
 
                 if (drawableEffect != currentEffect)
                 {
@@ -119,9 +114,10 @@ public class DefaultRenderer(Scene scene) : Renderer(scene)
                     );
                     currentEffect = drawableEffect;
                 }
+
                 drawable.OnDraw();
             }
-            
+
             Core.SpriteBatch.End();
         }
     }
@@ -129,27 +125,21 @@ public class DefaultRenderer(Scene scene) : Renderer(scene)
     protected override void OnWindowResized(object sender, WindowEventArgs args)
     {
         base.OnWindowResized(sender, args);
-        
+
         var renderTargetCount = _layerRenderTargets.Count;
-        
-        foreach (var renderTarget in _layerRenderTargets)
-        {
-            renderTarget.Dispose();
-        }
-        
+
+        foreach (var renderTarget in _layerRenderTargets) renderTarget.Dispose();
+
         _layerRenderTargets.Clear();
 
-        for (var i = 0; i < renderTargetCount; i++)
-        {
-            _layerRenderTargets.Add(CreateRenderTarget());
-        }
+        for (var i = 0; i < renderTargetCount; i++) _layerRenderTargets.Add(CreateRenderTarget());
     }
 
     protected override void OnCleanUp()
     {
-        foreach(var renderTarget in _layerRenderTargets)
+        foreach (var renderTarget in _layerRenderTargets)
             renderTarget?.Dispose();
-        
+
         _layerRenderTargets.Clear();
         _layerRenderTargets = null;
     }

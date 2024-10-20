@@ -2,14 +2,13 @@
 using System.Linq;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using PixelariaEngine.ECS;
 
 namespace PixelariaEngine;
 
 public class ForwardLightingRenderer(Scene scene) : Renderer(scene)
 {
-    private List<RenderTarget2D> _layerRenderTargets = [];
     private Effect _forwardLightingEffect;
+    private List<RenderTarget2D> _layerRenderTargets = [];
 
     public override void Initialize()
     {
@@ -42,20 +41,17 @@ public class ForwardLightingRenderer(Scene scene) : Renderer(scene)
 
         _layerRenderTargets.Clear();
 
-        for (var i = 0; i < Scene.Drawables.DrawLayerCount; i++)
-        {
-            _layerRenderTargets.Add(CreateRenderTarget());
-        }
+        for (var i = 0; i < Scene.Drawables.DrawLayerCount; i++) _layerRenderTargets.Add(CreateRenderTarget());
     }
 
     private void RenderToFinalRenderTarget()
     {
         Device.SetRenderTarget(FinalRenderTarget);
         Device.Clear(Color.Transparent);
-        
+
         Core.SpriteBatch.Begin(samplerState: SamplerState.PointClamp, blendState: BlendState.NonPremultiplied,
             sortMode: SpriteSortMode.Immediate);
-        
+
         foreach (var renderTarget in _layerRenderTargets)
             Core.SpriteBatch.Draw(renderTarget, Vector2.Zero, Color.White);
 
@@ -117,31 +113,25 @@ public class ForwardLightingRenderer(Scene scene) : Renderer(scene)
     //        Core.SpriteBatch.End();
     //    }
     //}
-    
+
     protected override void OnWindowResized(object sender, WindowEventArgs args)
     {
         base.OnWindowResized(sender, args);
-        
+
         var renderTargetCount = _layerRenderTargets.Count;
-        
-        foreach (var renderTarget in _layerRenderTargets)
-        {
-            renderTarget.Dispose();
-        }
-        
+
+        foreach (var renderTarget in _layerRenderTargets) renderTarget.Dispose();
+
         _layerRenderTargets.Clear();
 
-        for (var i = 0; i < renderTargetCount; i++)
-        {
-            _layerRenderTargets.Add(CreateRenderTarget());
-        }
+        for (var i = 0; i < renderTargetCount; i++) _layerRenderTargets.Add(CreateRenderTarget());
     }
-    
+
     protected override void OnCleanUp()
     {
-        foreach(var renderTarget in _layerRenderTargets)
+        foreach (var renderTarget in _layerRenderTargets)
             renderTarget?.Dispose();
-        
+
         _layerRenderTargets.Clear();
         _layerRenderTargets = null;
     }

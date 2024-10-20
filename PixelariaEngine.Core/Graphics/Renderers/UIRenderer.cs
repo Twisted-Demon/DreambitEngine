@@ -10,8 +10,8 @@ namespace PixelariaEngine;
 [SuppressMessage("ReSharper", "InconsistentNaming")]
 public class UIRenderer(Scene scene) : Renderer(scene)
 {
-    private Camera2D _uiCamera;
     private List<RenderTarget2D> _renderTargets = [];
+    private Camera2D _uiCamera;
     private int _targetUIHeight => 720;
 
     public override void Initialize()
@@ -34,10 +34,7 @@ public class UIRenderer(Scene scene) : Renderer(scene)
 
         _renderTargets.Clear();
 
-        for (var i = 0; i < Scene.Drawables.DrawLayerCount; i++)
-        {
-            _renderTargets.Add(CreateRenderTarget());
-        }
+        for (var i = 0; i < Scene.Drawables.DrawLayerCount; i++) _renderTargets.Add(CreateRenderTarget());
     }
 
     private void DrawUIComponents()
@@ -49,8 +46,8 @@ public class UIRenderer(Scene scene) : Renderer(scene)
         {
             Device.SetRenderTarget(_renderTargets[i]);
             Device.Clear(Color.Transparent);
-            
-            Core.SpriteBatch.Begin(transformMatrix:_uiCamera.TopLeftTransformMatrix,
+
+            Core.SpriteBatch.Begin(transformMatrix: _uiCamera.TopLeftTransformMatrix,
                 sortMode: SpriteSortMode.Deferred,
                 samplerState: SamplerState.PointClamp,
                 blendState: BlendState.AlphaBlend,
@@ -58,14 +55,14 @@ public class UIRenderer(Scene scene) : Renderer(scene)
 
             var drawables = drawLayers[layerOrder[i]]
                 .Where(x => x.Enabled && x.Entity.Enabled && x is Canvas);
-            
-            foreach(var drawableComponent in drawables)
+
+            foreach (var drawableComponent in drawables)
             {
                 var canvas = (Canvas)drawableComponent;
                 canvas.UpdateInternalCanvasSize(_targetUIHeight);
                 canvas.OnDrawUI();
             }
-            
+
             Core.SpriteBatch.End();
         }
     }
@@ -74,15 +71,14 @@ public class UIRenderer(Scene scene) : Renderer(scene)
     {
         Device.SetRenderTarget(FinalRenderTarget);
         Device.Clear(Color.Transparent);
-        
+
         Core.SpriteBatch.Begin(
-            
-            samplerState: SamplerState.PointClamp, 
+            samplerState: SamplerState.PointClamp,
             blendState: BlendState.NonPremultiplied);
-        
-        foreach(var renderTarget in _renderTargets)
+
+        foreach (var renderTarget in _renderTargets)
             Core.SpriteBatch.Draw(renderTarget, Vector2.Zero, Color.White);
-        
+
         Core.SpriteBatch.End();
     }
 
@@ -92,38 +88,31 @@ public class UIRenderer(Scene scene) : Renderer(scene)
         DrawUIComponents();
         RenderToFinalRenderTarget();
     }
-    
+
 
     protected override void OnWindowResized(object sender, WindowEventArgs args)
     {
         base.OnWindowResized(sender, args);
 
         if (_uiCamera == null) return;
-        
+
         var renderTargetCount = _renderTargets.Count;
         _uiCamera.SetTargetVerticalResolution(_targetUIHeight);
-        
-        foreach (var renderTarget in _renderTargets)
-        {
-            renderTarget.Dispose();
-        }
-        
+
+        foreach (var renderTarget in _renderTargets) renderTarget.Dispose();
+
         _renderTargets.Clear();
 
-        for (var i = 0; i < renderTargetCount; i++)
-        {
-            _renderTargets.Add(CreateRenderTarget());
-        }
+        for (var i = 0; i < renderTargetCount; i++) _renderTargets.Add(CreateRenderTarget());
     }
 
     protected override void OnCleanUp()
     {
-        foreach(var renderTarget in _renderTargets)
+        foreach (var renderTarget in _renderTargets)
             renderTarget?.Dispose();
-        
+
         _renderTargets.Clear();
         _renderTargets = null;
         _uiCamera = null;
-        
     }
 }

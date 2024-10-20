@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using Type = System.Type;
 
@@ -8,10 +7,10 @@ namespace PixelariaEngine.ECS;
 public class ComponentList(Scene scene)
 {
     private readonly Logger<ComponentList> _logger = new();
-    
-    private HashSet<Component> _attachedComponents = [];
-    private HashSet<Component> _componentsToAttach = [];
-    private HashSet<Component> _componentsToDetach = [];
+
+    private readonly HashSet<Component> _attachedComponents = [];
+    private readonly HashSet<Component> _componentsToAttach = [];
+    private readonly HashSet<Component> _componentsToDetach = [];
     private Scene _scene = scene;
 
     public void AttachComponent<T>(T component) where T : Component
@@ -21,7 +20,7 @@ public class ComponentList(Scene scene)
 
         if (_attachedComponents.Contains(component) || _componentsToDetach.Contains(component))
             return;
-        
+
         _componentsToAttach.Add(component);
     }
 
@@ -68,7 +67,7 @@ public class ComponentList(Scene scene)
         {
             if (component is DrawableComponent drawableComponent)
                 _scene.Drawables.Remove(drawableComponent);
-            
+
             component.Entity = null;
             component.OnRemovedFromEntity();
             component.Destroy();
@@ -125,7 +124,7 @@ public class ComponentList(Scene scene)
     public IReadOnlyCollection<Component> GetAllComponents()
     {
         var result = new List<Component>();
-        
+
         result.AddRange(_componentsToAttach);
         result.AddRange(_attachedComponents);
 
@@ -165,7 +164,6 @@ public class ComponentList(Scene scene)
 
         //Handle Deletion
         foreach (var componentToRemove in _componentsToDetach)
-        {
             if (_attachedComponents.Remove(componentToRemove))
             {
                 //remove from drawables
@@ -177,7 +175,6 @@ public class ComponentList(Scene scene)
                 componentToRemove.Destroy();
                 componentToRemove.Dispose();
             }
-        }
 
         _componentsToDetach.Clear();
     }

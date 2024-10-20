@@ -5,18 +5,20 @@ namespace PixelariaEngine;
 public class Renderer
 {
     public int Order = 0;
-    protected static GraphicsDevice Device => Core.Instance.GraphicsDevice;
-    protected Effect DefaultEffect { get; private set; }
-    protected Scene Scene { get; private set; }
-    
-    public RenderTarget2D FinalRenderTarget { get; private set; }
-
-    public bool IsActive { get; set; } = true;
 
     protected Renderer(Scene scene)
     {
         Scene = scene;
     }
+
+    protected static GraphicsDevice Device => Core.Instance.GraphicsDevice;
+    protected Effect DefaultEffect { get; private set; }
+    protected Scene Scene { get; private set; }
+
+    public RenderTarget2D FinalRenderTarget { get; private set; }
+
+    public bool IsActive { get; set; } = true;
+
     protected virtual void OnWindowResized(object sender, WindowEventArgs args)
     {
         FinalRenderTarget?.Dispose();
@@ -30,9 +32,14 @@ public class Renderer
         DefaultEffect = Resources.LoadAsset<Effect>("Effects/ForwardDiffuse");
         Initialize();
     }
-    
-    public virtual void Initialize() {}
-    public virtual void OnDraw(){}
+
+    public virtual void Initialize()
+    {
+    }
+
+    public virtual void OnDraw()
+    {
+    }
 
     internal void CleanUpInternal()
     {
@@ -43,7 +50,6 @@ public class Renderer
 
     protected virtual void OnCleanUp()
     {
-        
     }
 
     protected static RenderTarget2D CreateRenderTarget()

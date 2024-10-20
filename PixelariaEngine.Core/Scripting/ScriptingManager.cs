@@ -9,11 +9,10 @@ namespace PixelariaEngine.Scripting;
 
 public class ScriptingManager(Scene scene)
 {
-    private readonly Logger<ScriptingManager> _logger = new();
-    
     private readonly Queue<ScriptGroup> _groupQueue = [];
-    public bool IsCutsceneActive { get; set; }
+    private readonly Logger<ScriptingManager> _logger = new();
     private Scene _scene = scene;
+    public bool IsCutsceneActive { get; set; }
 
     public void StartCutscene(string cutsceneName)
     {
@@ -22,6 +21,7 @@ public class ScriptingManager(Scene scene)
             _logger.Warn("Unable to Start Cutscene {0}, Another cutscene is alreadya active", cutsceneName);
             return;
         }
+
         try
         {
             var yamlText = File.ReadAllText("Content/Cutscenes/" + cutsceneName + ".yaml");
@@ -53,10 +53,7 @@ public class ScriptingManager(Scene scene)
                 groups.Add(group);
             }
 
-            foreach (var group in groups)
-            {
-                _groupQueue.Enqueue(group);
-            }
+            foreach (var group in groups) _groupQueue.Enqueue(group);
 
             IsCutsceneActive = true;
         }
@@ -76,9 +73,7 @@ public class ScriptingManager(Scene scene)
 
         foreach (var script in currentGroup.Scripts
                      .Where(script => !script.IsComplete))
-        {
             script.Update();
-        }
 
         if (currentGroup.Completed())
         {
@@ -89,18 +84,15 @@ public class ScriptingManager(Scene scene)
         if (_groupQueue.Count == 0)
             IsCutsceneActive = false;
     }
-    
+
     // Helper method to convert Dictionary<object, object> to Dictionary<string, object>
     private Dictionary<string, object> ConvertToDictionary(Dictionary<object, object> original)
     {
-        if (original == null)
-        {
-            return null;
-        }
+        if (original == null) return null;
 
         return original.ToDictionary(
             entry => entry.Key.ToString(), // Convert keys to string
-            entry => entry.Value            // Keep values as object
+            entry => entry.Value // Keep values as object
         );
     }
 }

@@ -7,8 +7,10 @@ namespace PixelariaEngine;
 
 public class Core : Game
 {
-    private readonly Logger<Core> _logger = new();
+    private const float FixedPhysicsStep = 1f / 120f;
     public static LogLevel LogLevel = LogLevel.Debug;
+    private readonly Logger<Core> _logger = new();
+    private float accumulatedPhysicsTime;
 
     public Core(string title, int width = 800, int height = 600)
     {
@@ -21,19 +23,10 @@ public class Core : Game
         PixelariaEngine.Window.Init();
         PixelariaEngine.Window.SetTitle(title);
         PixelariaEngine.Window.SetSize(width, height);
-        
+
         //SetFixedTimeStep(false);
 
         TargetElapsedTime = TimeSpan.FromSeconds((double)1 / 120); //set Target fps to 120
-        
-    }
-
-    protected override void Initialize()
-    {
-        base.Initialize();
-        //PixelariaEngine.Window.SetBorderlessFullscreen(true);
-        GraphicsDevice.BlendState = BlendState.NonPremultiplied;
-        Input.Init();
     }
 
     public static Core Instance { get; private set; }
@@ -42,6 +35,14 @@ public class Core : Game
     public Scene CurrentScene { get; private set; }
     public Scene NextScene { get; private set; }
     private static string GameName { get; set; }
+
+    protected override void Initialize()
+    {
+        base.Initialize();
+        //PixelariaEngine.Window.SetBorderlessFullscreen(true);
+        GraphicsDevice.BlendState = BlendState.NonPremultiplied;
+        Input.Init();
+    }
 
     public static void SetFixedTimeStep(bool value)
     {
@@ -66,7 +67,7 @@ public class Core : Game
         {
             if (NextScene != null)
                 ChangeScenes();
-            
+
             HandlePhysics();
             CurrentScene.Tick();
         }
@@ -88,20 +89,15 @@ public class Core : Game
         base.Draw(gameTime);
     }
 
-    private const float FixedPhysicsStep = 1f / 120f;
-    private float accumulatedPhysicsTime = 0f;
-
     private void HandlePhysics()
     {
         accumulatedPhysicsTime += Time.DeltaTime;
 
         if (accumulatedPhysicsTime >= FixedPhysicsStep)
-        {
             //handle physics here;
             accumulatedPhysicsTime = 0f;
-        }
     }
-    
+
     protected override void OnExiting(object sender, ExitingEventArgs args)
     {
         CurrentScene?.Terminate();

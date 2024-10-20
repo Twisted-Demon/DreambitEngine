@@ -1,5 +1,4 @@
-﻿using System;
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 
 namespace PixelariaEngine.ECS;
 
@@ -16,18 +15,18 @@ public class Mover : Component
     {
         var direction = targetPosition - Transform.WorldPosition;
         var distance = direction.Length();
-        
+
         if (distance < float.Epsilon)
         {
             Transform.Position = targetPosition; // Snap to the target to avoid floating-point imprecision
             return true;
         }
-        
+
         direction.Normalize();
 
         var intendedMovement = velocity * Time.DeltaTime;
 
-        
+
         if (intendedMovement >= distance)
         {
             Transform.Position = targetPosition;
@@ -36,6 +35,5 @@ public class Mover : Component
 
         Transform.Position += direction * intendedMovement;
         return false;
-
     }
 }

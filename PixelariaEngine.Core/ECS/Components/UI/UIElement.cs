@@ -1,5 +1,4 @@
 ﻿using Microsoft.Xna.Framework;
-using PixelariaEngine.Graphics;
 
 namespace PixelariaEngine.ECS;
 
@@ -10,9 +9,9 @@ public abstract class UIElement : UIComponent
     public float Alpha { get; set; } = 1.0f;
 
     public Color Color { get; set; } = Color.White;
-    
+
     public PivotType PivotType { get; set; } = PivotType.Center;
-    
+
     public Vector2 Pivot { get; set; }
 
     public Vector2 GetScreenPos()

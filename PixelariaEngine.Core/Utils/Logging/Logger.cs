@@ -68,8 +68,8 @@ public class Logger<T> where T : class
     private bool CheckLogLevel(LogLevel logLevelToCheck)
     {
         var logLevel = Core.LogLevel;
-        
-        if(Level != LogLevel.None)
+
+        if (Level != LogLevel.None)
             logLevel = Level;
 
         return logLevel <= logLevelToCheck;

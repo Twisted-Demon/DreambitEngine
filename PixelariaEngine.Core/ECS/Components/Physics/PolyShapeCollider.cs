@@ -1,6 +1,4 @@
-﻿using Microsoft.Xna.Framework;
-
-namespace PixelariaEngine.ECS;
+﻿namespace PixelariaEngine.ECS;
 
 public class PolyShapeCollider : Collider
 {

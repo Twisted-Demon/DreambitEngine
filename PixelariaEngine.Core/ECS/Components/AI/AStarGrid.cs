@@ -10,7 +10,7 @@ public class AStarGrid : Component
     public int Height { get; private set; }
     public int CellSize { get; private set; }
 
-    public AStarGrid InitializeGrid( LDtkIntGrid collisionGrid, int xOffset = 0, int yOffset = 0)
+    public AStarGrid InitializeGrid(LDtkIntGrid collisionGrid, int xOffset = 0, int yOffset = 0)
     {
         Width = collisionGrid.GridSize.X;
         Height = collisionGrid.GridSize.Y;
@@ -25,7 +25,7 @@ public class AStarGrid : Component
 
             _nodes[nodePos.X, nodePos.Y] = new Node(nodePos.X, nodePos.Y, isWalkable);
         }
-        
+
         return this;
     }
 
@@ -34,9 +34,11 @@ public class AStarGrid : Component
         if (IsInBounds(x, y))
             _nodes[x, y] = new Node(x, y, isWalkable);
     }
-    
-    public bool IsInBounds(int x, int y) => 
-        x >= 0 && x < Width && y >= 0 && y < Height;
+
+    public bool IsInBounds(int x, int y)
+    {
+        return x >= 0 && x < Width && y >= 0 && y < Height;
+    }
 
     public override void OnDebugDraw()
     {
@@ -60,9 +62,9 @@ public class AStarGrid : Component
     {
         var posX = Mathf.FloorToInt(position.X / CellSize);
         var posY = Mathf.FloorToInt(position.Y / CellSize);
-        
+
         var posToCheck = new Point(posX, posY);
-        
+
         var node = GetNode(posToCheck.X, posToCheck.Y);
 
         return node.IsWalkable;

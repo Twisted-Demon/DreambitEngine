@@ -7,7 +7,7 @@ public abstract class DrawableComponent : Component
 {
     private int _drawLayer;
     public abstract Rectangle Bounds { get; }
-    
+
     public Effect Effect { get; set; }
 
     public bool UsesEffect => Effect != null;

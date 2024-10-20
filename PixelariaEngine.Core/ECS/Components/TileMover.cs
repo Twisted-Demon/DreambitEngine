@@ -5,9 +5,9 @@ namespace PixelariaEngine.ECS;
 public class TileMover : Component
 {
     private readonly Logger<TileMover> _logger = new();
-    
-    public Vector3 Velocity;
     private AStarGrid _astarGrid;
+
+    public Vector3 Velocity;
 
     public override void OnAddedToEntity()
     {
@@ -25,8 +25,6 @@ public class TileMover : Component
         var desiredMovement = Velocity * Time.DeltaTime;
 
         if (_astarGrid.IsWalkable(Transform.WorldPosToVec2 + desiredMovement.ToVector2()))
-        {
             Transform.Position += desiredMovement;
-        }
     }
 }

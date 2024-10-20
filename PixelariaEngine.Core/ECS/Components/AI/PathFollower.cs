@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.IO;
 using Microsoft.Xna.Framework;
 
 namespace PixelariaEngine.ECS;
@@ -7,12 +6,12 @@ namespace PixelariaEngine.ECS;
 [Require(typeof(AStarPathfinder), typeof(Mover))]
 public class PathFollower : Component
 {
-    public float SeekSpeed { get; set; }
-    public int PathLength => _path.Count;
-    public bool IsSeeking = false;
-    private AStarPathfinder _pathfinder;
     private Mover _mover;
     private Queue<Node> _path = [];
+    private AStarPathfinder _pathfinder;
+    public bool IsSeeking;
+    public float SeekSpeed { get; set; }
+    public int PathLength => _path.Count;
 
     public override void OnAddedToEntity()
     {
@@ -23,12 +22,12 @@ public class PathFollower : Component
     public override void OnUpdate()
     {
         // Exit if we are not seeking
-        if (!IsSeeking  || _path.Count == 0) return;
-        
+        if (!IsSeeking || _path.Count == 0) return;
+
 
         // peek the next node
         var nextNode = _path.Peek();
-        
+
         //check distance to it
         if (ArrivedToNextNode(nextNode))
         {
@@ -44,8 +43,8 @@ public class PathFollower : Component
         var currentPos = Transform.WorldPosition;
         var nextPos = new Vector3(nextNode.X, nextNode.Y, 0);
         var directionToNextNode = nextPos - currentPos;
-        
-        if(directionToNextNode.Length() > 0)
+
+        if (directionToNextNode.Length() > 0)
             directionToNextNode.Normalize();
 
         _mover.Velocity = directionToNextNode * SeekSpeed;
@@ -55,9 +54,9 @@ public class PathFollower : Component
     {
         var currentPos = Transform.WorldPosition;
         var nextPos = new Vector3(nextNode.X, nextNode.Y, 0);
-        
+
         var distanceToNextNode = (nextPos - currentPos).Length();
-        
+
         return distanceToNextNode <= SeekSpeed * Time.DeltaTime;
     }
 
@@ -83,11 +82,11 @@ public class PathFollower : Component
     public override void OnDebugDraw()
     {
         var pathList = _path.ToArray();
-        for (int i = 0; i < pathList.Length - 1; i++)
+        for (var i = 0; i < pathList.Length - 1; i++)
         {
             var startNode = pathList[i];
             var endNode = pathList[i + 1];
-            
+
             Core.SpriteBatch.DrawLine(startNode.ToVec2(), endNode.ToVec2(), Color.Wheat);
         }
     }

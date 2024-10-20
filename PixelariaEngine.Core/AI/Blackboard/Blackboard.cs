@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace PixelariaEngine;
 
@@ -10,10 +9,10 @@ public class Blackboard
     public BlackboardVar<T> CreateVariable<T>(string name, T defaultValue = default)
     {
         var bbVar = new BlackboardVar<T>(defaultValue);
-        
+
         return Variables.TryAdd(name, bbVar) ? bbVar : null;
     }
-    
+
     public BlackboardVar<T> GetVariable<T>(string variableName)
     {
         if (Variables.TryGetValue(variableName, out var value) && value is BlackboardVar<T> typedValue)

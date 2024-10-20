@@ -2,12 +2,6 @@
 
 public class BlackboardVar<T> : BlackboardVar
 {
-    public T Value
-    {
-        get => (T)InternalValue;
-        set => InternalValue = value;
-    }
-
     public BlackboardVar()
     {
         InternalValue = default;
@@ -16,6 +10,12 @@ public class BlackboardVar<T> : BlackboardVar
     public BlackboardVar(T startingValue)
     {
         InternalValue = startingValue;
+    }
+
+    public T Value
+    {
+        get => (T)InternalValue;
+        set => InternalValue = value;
     }
 }
 

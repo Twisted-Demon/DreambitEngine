@@ -5,10 +5,10 @@ namespace PixelariaEngine.ECS;
 
 public class Canvas : UIComponent
 {
-    private int _targetWidth;
     private int _targetHeight;
+    private int _targetWidth;
     private List<UIElement> _uiComponents = [];
-    
+
     internal void UpdateInternalCanvasSize(int targetHeight)
     {
         _targetHeight = targetHeight;
@@ -17,17 +17,14 @@ public class Canvas : UIComponent
 
     public override void OnDrawUI()
     {
-        foreach (var component in _uiComponents)
-        {
-            component.OnDrawUI();
-        }
+        foreach (var component in _uiComponents) component.OnDrawUI();
     }
-    
+
     internal Vector2 ConvertToScreenCoord(Vector2 position)
     {
         var xScale = _targetWidth / (float)100;
         var yScale = _targetHeight / (float)100;
-        
+
         return new Vector2(position.X * xScale, position.Y * yScale);
     }
 
@@ -46,7 +43,7 @@ public class Canvas : UIComponent
         var entity = Entity.CreateChildOf(Entity, name);
         var uiElement = entity.AttachComponent<T>();
         uiElement.Canvas = this;
-        
+
         _uiComponents.Add(uiElement);
 
         return uiElement;
@@ -65,7 +62,7 @@ public class Canvas : UIComponent
     {
         var entity = Entity.Create(typeof(T).Name);
         var canvas = entity.AttachComponent<T>();
-        
+
         return (canvas, entity);
     }
 

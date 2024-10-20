@@ -12,5 +12,4 @@ public struct Ray2D
 
     public Vector2 Start { get; private set; }
     public Vector2 End { get; private set; }
-    
 }

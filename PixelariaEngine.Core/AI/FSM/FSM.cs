@@ -7,30 +7,23 @@ namespace PixelariaEngine;
 
 public class FSM : Component
 {
-    private Logger<FSM> _logger = new();
-    private State _currentState;
-    private State NextState { get; set; } = null;
     private readonly Dictionary<string, State> _statesMap = [];
+    private readonly Logger<FSM> _logger = new();
+    private State NextState { get; set; }
     public Blackboard Blackboard { get; set; } = new();
-    
-    public State CurrentState => _currentState;
+
+    public State CurrentState { get; private set; }
 
     public override void OnUpdate()
     {
         // if we dont have a state, but set the next one
         if (NextState != null)
-        {
             ChangeState();
-        }
         // else if we do have a state then reason
         // change state if reasoning fails
-        else if (_currentState != null && !_currentState.Reason())
-        {
-            ChangeState();
-        }
-        
-        _currentState?.OnExecute();
-        
+        else if (CurrentState != null && !CurrentState.Reason()) ChangeState();
+
+        CurrentState?.OnExecute();
     }
 
     public void RegisterStates(List<Type> stateTypes)
@@ -40,11 +33,11 @@ public class FSM : Component
             _logger.Warn("Trying to register states more than once");
             return;
         }
-        
+
         foreach (var stateType in stateTypes.Where(stateType => stateType.IsSubclassOf(typeof(State))))
         {
             if (Activator.CreateInstance(stateType) is not State state) continue;
-            
+
             state.Fsm = this;
             state.OnInitialize();
 
@@ -57,18 +50,17 @@ public class FSM : Component
         while (true)
         {
             //leave the current state and set the next one
-            _currentState?.OnEnd();
-            _currentState = NextState;
+            CurrentState?.OnEnd();
+            CurrentState = NextState;
             NextState = null;
-            
-            if (_currentState == null) break; // if we never set the next state, we should leave
-            
+
+            if (CurrentState == null) break; // if we never set the next state, we should leave
+
             // reason the state, if false then we should loop back and change states
             // if true (meaning we stay) then we run through the enter function and break
-            if (!_currentState.Reason()) continue;
-            _currentState.OnEnter();
+            if (!CurrentState.Reason()) continue;
+            CurrentState.OnEnter();
             break;
-
         }
     }
 
@@ -79,7 +71,7 @@ public class FSM : Component
             _logger.Warn("State {0} is not registered with {1}", typeof(T).Name, Entity.Name);
             return;
         }
-        
+
         NextState = value;
     }
 
@@ -90,7 +82,7 @@ public class FSM : Component
             _logger.Warn("State {0} is not registered with {1}", typeof(T).Name, Entity.Name);
             return;
         }
-        
+
         NextState = value;
     }
 }

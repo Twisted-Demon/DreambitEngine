@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.Http.Headers;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using PixelariaEngine.ECS;
@@ -13,20 +12,18 @@ namespace PixelariaEngine;
 public class Scene
 {
     private readonly Logger<Scene> _logger = new();
-
-    public bool DebugMode { get; set; }
     public readonly DrawableList Drawables;
     protected readonly EntityList Entities;
-    public ScriptingManager ScriptingManager;
+    protected readonly List<Renderer> Renderers = [];
+
+    private bool _useDefaultRenderer;
 
     public Color BackgroundColor = Color.CornflowerBlue;
     protected bool IsInitialized;
     protected bool IsPaused;
     protected bool IsStarted;
-    protected readonly List<Renderer> Renderers = [];
+    public ScriptingManager ScriptingManager;
 
-    private bool _useDefaultRenderer;
-    
 
     public Scene()
     {
@@ -38,6 +35,8 @@ public class Scene
         AddRenderer<UIRenderer>();
         _useDefaultRenderer = true;
     }
+
+    public bool DebugMode { get; set; }
 
     public static Scene Instance => Core.Instance.CurrentScene;
 
@@ -59,10 +58,10 @@ public class Scene
 
         if (_useDefaultRenderer)
             AddRenderer<DefaultRenderer>();
-        
-        foreach(var renderer in Renderers)
+
+        foreach (var renderer in Renderers)
             renderer.InitializeInternals();
-        
+
         OnInitialize();
     }
 
@@ -106,7 +105,7 @@ public class Scene
     {
         Entities.ClearLists();
         Drawables.ClearLists();
-        foreach(var renderer in Renderers)
+        foreach (var renderer in Renderers)
             renderer.CleanUpInternal();
     }
 
@@ -114,7 +113,7 @@ public class Scene
     {
         OnEnd();
         Cleanup();
-        
+
         // Force garbage collection
         GC.Collect();
 
@@ -155,18 +154,17 @@ public class Scene
             return;
         }
 
-        foreach(var renderer in Renderers.OrderBy(x => x.Order).ToList())
+        foreach (var renderer in Renderers.OrderBy(x => x.Order).ToList())
             renderer.OnDraw();
-        
+
         Core.Instance.GraphicsDevice.SetRenderTarget(null);
         Core.Instance.GraphicsDevice.Clear(BackgroundColor);
         foreach (var renderer in Renderers.OrderBy(x => x.Order).Where(x => x.IsActive).ToList())
         {
-            
             Core.SpriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp);
 
             Core.SpriteBatch.Draw(renderer.FinalRenderTarget, Vector2.Zero, Color.White);
-            
+
             Core.SpriteBatch.End();
         }
     }

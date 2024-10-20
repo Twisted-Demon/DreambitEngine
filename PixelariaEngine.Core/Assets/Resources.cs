@@ -9,21 +9,23 @@ namespace PixelariaEngine;
 
 public class Resources : Singleton<Resources>
 {
-    private ContentManager Content { get; } = Core.Instance.Content;
     private List<IDisposable> _disposableAssets;
+
+    private Dictionary<string, object> _loadedAssets;
+    private ContentManager Content { get; } = Core.Instance.Content;
+
     private List<IDisposable> DisposableAssets
     {
         get
         {
             if (_disposableAssets != null) return _disposableAssets;
-            
+
             var fieldInfo = ReflectionUtils.GetFieldInfo(typeof(ContentManager), "disposableAssets");
             _disposableAssets = fieldInfo.GetValue(Core.Instance.Content) as List<IDisposable>;
             return _disposableAssets;
         }
     }
-    
-    private Dictionary<string, object> _loadedAssets;
+
     private Dictionary<string, object> LoadedAssets
     {
         get
@@ -34,7 +36,7 @@ public class Resources : Singleton<Resources>
             return _loadedAssets;
         }
     }
-    
+
     /// <summary>
     ///     Tries to Load an asset and returns default if not found
     /// </summary>
@@ -45,10 +47,8 @@ public class Resources : Singleton<Resources>
     {
         //if we already have the asset we will return it
         if (Instance.LoadedAssets.TryGetValue(assetName, out var rawAsset))
-        {
             if (rawAsset is T asset)
                 return asset;
-        }
 
         try
         {
@@ -56,10 +56,7 @@ public class Resources : Singleton<Resources>
             var asset = Instance.Content.Load<T>(assetName);
             Instance.Logger.Debug("Loaded {0} - {1}", typeof(T).Name, assetName);
 
-            if (asset is Texture2D texture)
-            {
-                asset = PremultiplyTexture(texture) as T;
-            }
+            if (asset is Texture2D texture) asset = PremultiplyTexture(texture) as T;
 
             return asset;
         }
@@ -79,7 +76,7 @@ public class Resources : Singleton<Resources>
         for (var i = 0; i < assetQueue.Count; i++)
         {
             if (!assetQueue.TryGetNext(out var assetName)) continue;
-            
+
             var asset = LoadAsset<T>(assetName);
 
             assetQueue.AddAsset(assetName, asset);
@@ -87,20 +84,20 @@ public class Resources : Singleton<Resources>
 
         return Task.CompletedTask;
     }
-    
+
     private static Texture2D PremultiplyTexture(Texture2D texture)
     {
-        Color[] data = new Color[texture.Width * texture.Height];
+        var data = new Color[texture.Width * texture.Height];
         texture.GetData(data);
 
-        for (int i = 0; i < data.Length; i++)
+        for (var i = 0; i < data.Length; i++)
         {
-            Color c = data[i];
-            float alpha = c.A / 255f;
+            var c = data[i];
+            var alpha = c.A / 255f;
             data[i] = new Color((byte)(c.R * alpha), (byte)(c.G * alpha), (byte)(c.B * alpha), c.A);
         }
 
-        Texture2D result = new Texture2D(texture.GraphicsDevice, texture.Width, texture.Height);
+        var result = new Texture2D(texture.GraphicsDevice, texture.Width, texture.Height);
         result.SetData(data);
         return result;
     }

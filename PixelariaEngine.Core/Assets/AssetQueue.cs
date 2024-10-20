@@ -4,20 +4,20 @@ namespace PixelariaEngine;
 
 public class AssetQueue<T> where T : class
 {
-    internal Queue<string> AssetsToLoad = [];
     internal Dictionary<string, T> Assets = [];
-    
-    public int Count => AssetsToLoad.Count;
+    internal Queue<string> AssetsToLoad = [];
+    public bool FinishedLoading = false;
 
     public bool IsLoading = false;
-    public bool FinishedLoading = false;
+
+    public int Count => AssetsToLoad.Count;
 
     public void Enqueue(string directory, params string[] assets)
     {
         foreach (var assetName in assets)
         {
             var assetNameWithDirectory = $"{directory}/{assetName}";
-            
+
             if (AssetsToLoad.Contains(assetNameWithDirectory)) continue;
             AssetsToLoad.Enqueue(assetNameWithDirectory);
         }
@@ -38,9 +38,8 @@ public class AssetQueue<T> where T : class
         assetName = string.Empty;
 
         if (AssetsToLoad.Count == 0) return false;
-        
+
         assetName = AssetsToLoad.Dequeue();
         return true;
-
     }
 }

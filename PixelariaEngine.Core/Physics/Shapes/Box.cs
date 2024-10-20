@@ -4,15 +4,15 @@ namespace PixelariaEngine;
 
 public class Box : Shape
 {
+    private Box() : base(4)
+    {
+    }
+
     public Vector2 TopLeft => Polygon.Vertices[0];
     public Vector2 TopRight => Polygon.Vertices[1];
     public Vector2 BottomLeft => Polygon.Vertices[3];
     public Vector2 BottomRight => Polygon.Vertices[2];
 
-    private Box() : base(4)
-    {
-    }
-    
     public static Box CreateSquare(Vector2 center, float halfExtent)
     {
         var box = new Box();

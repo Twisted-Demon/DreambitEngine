@@ -22,9 +22,9 @@ public static class Time
     public static ulong FrameCount { get; private set; }
 
     public static int FrameRate { get; private set; }
-    
-    public static float PhysicsDeltaTime { get; private set; }
-    public static float UnscaledPhysicsDeltaTime { get; private set; }
+
+    public static float PhysicsDeltaTime { get; }
+    public static float UnscaledPhysicsDeltaTime { get; }
 
     internal static void Update(GameTime gameTime)
     {
@@ -43,7 +43,6 @@ public static class Time
 
     internal static void UpdatePhysicsTime()
     {
-        
     }
 
     internal static void SceneLoaded()

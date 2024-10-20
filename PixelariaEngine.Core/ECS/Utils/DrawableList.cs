@@ -11,6 +11,8 @@ public class DrawableList
     internal int Count => _drawables.Count;
     internal DrawableComponent this[int index] => _drawables[index];
 
+    public int DrawLayerCount => _drawLayers.Count;
+
     internal void Add(DrawableComponent drawable)
     {
         if (_drawables.Contains(drawable)) return;
@@ -60,8 +62,6 @@ public class DrawableList
 
         return _drawLayers[drawLayer];
     }
-    
-    public int DrawLayerCount => _drawLayers.Count;
 
     public Dictionary<int, List<DrawableComponent>> GetDrawLayers()
     {

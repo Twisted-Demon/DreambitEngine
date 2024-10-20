@@ -56,8 +56,8 @@ public abstract class Component : IDisposable
         foreach (var attribute in attributes)
         {
             if (attribute is not RequireAttribute requireAttribute) continue;
-            
-            foreach(var requiredType in requireAttribute.RequiredTypes)
+
+            foreach (var requiredType in requireAttribute.RequiredTypes)
             {
                 var hasRequired = Entity.HasComponentOfType(requiredType);
                 if (hasRequired) continue;
@@ -121,11 +121,10 @@ public abstract class Component : IDisposable
     }
 
     /// <summary>
-    /// Called if debug mode is activated. Used to render debug data.
+    ///     Called if debug mode is activated. Used to render debug data.
     /// </summary>
     public virtual void OnDebugDraw()
     {
-        
     }
 
     internal void Destroy()
@@ -196,11 +195,11 @@ public abstract class Component : IDisposable
 public class SingletonComponent<T> : Component where T : SingletonComponent<T>
 {
     public static T Instance { get; private set; }
-    
+
     internal override Component SetUp(Entity entity, bool enabled)
     {
         Instance = this as T;
-        
+
         return base.SetUp(entity, enabled);
     }
 }

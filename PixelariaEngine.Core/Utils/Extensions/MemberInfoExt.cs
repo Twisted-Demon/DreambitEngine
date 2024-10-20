@@ -6,8 +6,8 @@ namespace PixelariaEngine;
 public static class MemberInfoExt
 {
     /// <summary>
-    /// for some reason, GetCustomAttributes doesnt actually filter properly and throws a "Multiple custom attributes
-    /// of the same type found" Exception if there are multiple (but differnt) attriburtes. This method fixes that issue.
+    ///     for some reason, GetCustomAttributes doesnt actually filter properly and throws a "Multiple custom attributes
+    ///     of the same type found" Exception if there are multiple (but differnt) attriburtes. This method fixes that issue.
     /// </summary>
     /// <param name="self"></param>
     /// <typeparam name="T"></typeparam>
@@ -16,10 +16,8 @@ public static class MemberInfoExt
     {
         var attributes = self.GetCustomAttributes(typeof(T));
         foreach (var attribute in attributes)
-        {
             if (attribute.GetType() == typeof(T))
-                return (T) attribute;
-        }
+                return (T)attribute;
 
         return null;
     }

@@ -21,8 +21,8 @@ public class DeferredRenderer(Scene scene) : Renderer(scene)
     {
         var drawables = Scene.Drawables.GetAllDrawables()
             .Where(x => x.Enabled && x.Entity.Enabled && x.DrawLayer != RenderLayers.LightLayer);
-        
-        foreach(var drawable in drawables)
+
+        foreach (var drawable in drawables)
             drawable.OnPreDraw();
     }
 }

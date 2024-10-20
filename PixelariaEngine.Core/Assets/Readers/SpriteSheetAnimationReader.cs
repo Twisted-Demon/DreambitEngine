@@ -17,7 +17,7 @@ public class SpriteSheetAnimationReader : ContentTypeReader<SpriteSheetAnimation
             AssetName = input.AssetName,
             FrameRate = frameRate,
             SpriteSheetPath = spriteSheetPath,
-            OneShot = oneShot,
+            OneShot = oneShot
         };
 
         for (var i = 0; i < framesCount; i++)

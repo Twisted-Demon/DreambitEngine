@@ -7,19 +7,19 @@ namespace PixelariaEngine.ECS;
 
 public class EntityList(Scene scene)
 {
-    private readonly Logger<EntityList> _logger = new();
-    
+    private readonly List<Entity> _alwaysUpdateEntities = [];
+
     private readonly List<Entity> _entities = [];
     private readonly List<Entity> _entitiesToCreate = [];
     private readonly List<Entity> _entitiesToDestroy = [];
-    private readonly List<Entity> _alwaysUpdateEntities = [];
+    private readonly Logger<EntityList> _logger = new();
 
     private uint _nextEntityId;
 
     internal Entity CreateEntity(string name, HashSet<string> tags, bool enabled, Vector3? createAt)
     {
         tags ??= ["default"];
-        
+
         //create the entity
         var entity = new Entity(_nextEntityId, name, tags, enabled, scene);
         entity.Transform.Entity = entity;
@@ -30,7 +30,7 @@ public class EntityList(Scene scene)
             entity.Transform.Position = createAt.Value;
             entity.Transform.LastWorldPosition = entity.Transform.Position;
         }
-        
+
         _nextEntityId++; //increment for the next entity ID.
 
         return entity;
@@ -76,16 +76,14 @@ public class EntityList(Scene scene)
     {
         foreach (var entity in _entities
                      .Where(e => e.Enabled))
-        {
             entity.Update();
-        }
     }
 
     public void SetEntityAlwaysUpdate(Entity entity, bool value)
     {
         if (value)
         {
-            if(!_alwaysUpdateEntities.Contains(entity))
+            if (!_alwaysUpdateEntities.Contains(entity))
                 _alwaysUpdateEntities.Add(entity);
         }
         else
@@ -105,8 +103,6 @@ public class EntityList(Scene scene)
         }
 
         _entitiesToCreate.Clear();
-
-        
     }
 
     private void HandleEntityDeletions()
@@ -158,7 +154,7 @@ public class EntityList(Scene scene)
 
         return _entities;
     }
-    
+
 
     public List<Entity> GetAllActiveEntitiesEntities()
     {

@@ -6,14 +6,13 @@ namespace PixelariaEngine.ECS;
 
 public class LDtkRenderer : DrawableComponent<LDtkRenderer>
 {
-    public override Rectangle Bounds { get; }
     private ExampleRenderer _renderer;
+    public override Rectangle Bounds { get; }
     public LDtkLevel Level { get; set; }
 
     public override void OnCreated()
     {
         _renderer = LDtkManager.Instance.LDtkRenderer;
-        
     }
 
     public override void OnAddedToEntity()
@@ -23,7 +22,6 @@ public class LDtkRenderer : DrawableComponent<LDtkRenderer>
 
     public override void OnPreDraw()
     {
-        
     }
 
 

@@ -1,51 +1,20 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.Specialized;
 using Microsoft.Xna.Framework;
 
 namespace PixelariaEngine.ECS;
 
 public class Entity : IDisposable
 {
-    private Entity _parent;
-    private ComponentList ComponentList { get; set; }
-    private bool _alwaysUpadte = false;
-    public Transform Transform { get; private set; }
-    public HashSet<string> Tags { get; private set; } = [];
-    internal Scene Scene { get; private set; }
-    
+    private readonly List<Entity> _children = [];
+
     public readonly uint Id;
+    private bool _alwaysUpadte;
     private bool _enabled;
     private bool _isDestroyed;
     private bool _isDisposed;
+    private Entity _parent;
     public string Name;
-    
-    public Entity Parent
-    {
-        get => _parent;
-        set
-        {
-            if(_parent == value) return;
-            SetParent(value);
-        }
-    }
-
-    public bool AlwaysUpdate
-    {
-        get => _alwaysUpadte;
-        set
-        {
-            if(_alwaysUpadte == value) return;
-            _alwaysUpadte = value;
-
-            foreach (var child in _children)
-                child.AlwaysUpdate = value;
-
-            Scene.SetEntityAlwaysUpdate(this, value);
-        }
-    }
-
-    private readonly List<Entity> _children = [];
 
     internal Entity(uint id, string name, HashSet<string> tags, bool enabled, Scene scene)
     {
@@ -69,6 +38,36 @@ public class Entity : IDisposable
 
     private Entity()
     {
+    }
+
+    private ComponentList ComponentList { get; }
+    public Transform Transform { get; }
+    public HashSet<string> Tags { get; } = [];
+    internal Scene Scene { get; private set; }
+
+    public Entity Parent
+    {
+        get => _parent;
+        set
+        {
+            if (_parent == value) return;
+            SetParent(value);
+        }
+    }
+
+    public bool AlwaysUpdate
+    {
+        get => _alwaysUpadte;
+        set
+        {
+            if (_alwaysUpadte == value) return;
+            _alwaysUpadte = value;
+
+            foreach (var child in _children)
+                child.AlwaysUpdate = value;
+
+            Scene.SetEntityAlwaysUpdate(this, value);
+        }
     }
 
     public bool Enabled
@@ -136,7 +135,7 @@ public class Entity : IDisposable
         Core.Instance.CurrentScene.DestroyEntity(entity);
 
         if (entity._children.Count <= 0) return;
-        
+
         foreach (var child in entity._children)
             Destroy(child);
     }
@@ -239,29 +238,29 @@ public class Entity : IDisposable
         {
             //check if we have the component
             var component = child.GetComponent<T>();
-            
+
             //if we do have it, return
             if (component != null) return component;
-            
+
             //if we don't check in children
             component = child.GetComponentInChildren<T>();
         }
-        
+
         //only get here if no children have component
         return null;
     }
 
     /// <summary>
-    /// gets a list of all components that are attached, regardless if they are active
+    ///     gets a list of all components that are attached, regardless if they are active
     /// </summary>
     /// <returns></returns>
     public IReadOnlyCollection<Component> GetAllAttachedComponents()
     {
         return ComponentList.GetAllAttachedComponents();
     }
-    
+
     /// <summary>
-    /// gets a list of all components only if they are active
+    ///     gets a list of all components only if they are active
     /// </summary>
     /// <returns></returns>
     public IReadOnlyCollection<Component> GetAllActiveComponents()
@@ -303,7 +302,7 @@ public class Entity : IDisposable
     {
         if (_parent != null)
             _parent._children.Remove(this);
-        
+
         _parent = parentEntity;
         parentEntity._children.Add(this);
     }

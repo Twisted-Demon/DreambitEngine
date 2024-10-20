@@ -1,10 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using System.Reflection.Metadata.Ecma335;
 using LDtk;
 using Microsoft.Xna.Framework;
 using PixelariaEngine.ECS;
-using PixelariaEngine.Graphics;
 
 namespace PixelariaEngine;
 
@@ -13,7 +11,7 @@ public class LDtkEntity<T> : LDtkEntity where T : new()
     protected Entity CreateEntity<TU>(TU data, string name = null, HashSet<string> tags = null) where TU : ILDtkEntity
     {
         name ??= data.Identifier;
-        
+
         var entity = Entity.Create(name, tags, createAt: new Vector3(data.Position, 0));
         entity.AttachComponent<LDtkIid>().Iid = data.Iid;
 
@@ -46,13 +44,13 @@ public class LDtkEntity<T> : LDtkEntity where T : new()
     }
 
     /// <summary>
-    /// Override this to create the object
+    ///     Override this to create the object
     /// </summary>
     /// <param name="level"></param>
     protected virtual void SetUp(LDtkLevel level)
     {
     }
-    
+
     public static void SetUpEntities(LDtkLevel level)
     {
         var ldtkEntities = level.GetEntities<T>();

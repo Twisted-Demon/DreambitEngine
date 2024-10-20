@@ -1,7 +1,6 @@
 ﻿using System;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using PixelariaEngine.Graphics;
 
 namespace PixelariaEngine.ECS;
 
@@ -17,7 +16,7 @@ public class Camera2D : Component
     public int TargetVerticalResolution { get; private set; } = 288;
     public Matrix TransformMatrix { get; private set; }
     public Matrix UnscaledTransformMatrix { get; private set; }
-    
+
     public Matrix TopLeftTransformMatrix { get; private set; }
 
     public Rectangle BoundsNoZoom
@@ -28,19 +27,19 @@ public class Camera2D : Component
             var pos = Transform.WorldPosToVec2;
 
             // Calculate the width and height of the camera view based on the current zoom
-            var width = (int)(Window.Width);
-            var height = (int)(Window.Height);
+            var width = Window.Width;
+            var height = Window.Height;
 
             // Return the bounds of the camera view
             return new Rectangle(
                 (int)(pos.X - width * 0.5f), // Center the X position based on the zoomed width
                 (int)(pos.Y - height * 0.5f), // Center the Y position based on the zoomed height
-                width, 
+                width,
                 height
             );
         }
     }
-    
+
     public Rectangle Bounds
     {
         get
@@ -56,7 +55,7 @@ public class Camera2D : Component
             return new Rectangle(
                 (int)(pos.X - width * 0.5f), // Center the X position based on the zoomed width
                 (int)(pos.Y - height * 0.5f), // Center the Y position based on the zoomed height
-                width, 
+                width,
                 height
             );
         }
@@ -86,11 +85,11 @@ public class Camera2D : Component
     private Matrix CalculateTransformMatrix(float scaleFactor = 1.0f)
     {
         return Matrix.CreateTranslation(-Transform.WorldPosition) *
-               Matrix.CreateScale(new Vector3(scaleFactor, scaleFactor, 1)) * 
-               Matrix.CreateRotationZ(Transform.WorldZRotation) * 
+               Matrix.CreateScale(new Vector3(scaleFactor, scaleFactor, 1)) *
+               Matrix.CreateRotationZ(Transform.WorldZRotation) *
                Matrix.CreateTranslation(new Vector3(0.5f * Window.ScreenSize.X, 0.5f * Window.ScreenSize.Y, 0f));
     }
-    
+
     private Matrix CalculateTopLeftMatrix(float scaleFactor = 1.0f)
     {
         return Matrix.CreateTranslation(-Transform.WorldPosition) *
@@ -98,7 +97,7 @@ public class Camera2D : Component
                Matrix.CreateRotationZ(Transform.WorldZRotation) *
                Matrix.CreateTranslation(new Vector3(0.5f * Window.ScreenSize.X, 0.5f * Window.ScreenSize.Y, 0f));
     }
-    
+
 
     private void OnViewportResized(object sender, WindowEventArgs e)
     {
@@ -112,7 +111,7 @@ public class Camera2D : Component
 
     public void SetViewPort()
     {
-        var topLeft = new Vector2(Transform.WorldPosition.X - Window.ScreenSize.X / (float)2, 
+        var topLeft = new Vector2(Transform.WorldPosition.X - Window.ScreenSize.X / (float)2,
             Transform.WorldPosition.Y - Window.ScreenSize.Y / (float)2);
 
         Core.Instance.GraphicsDevice.Viewport = new Viewport(
@@ -155,6 +154,7 @@ public class Camera2D : Component
 
     private void LerpBehavior()
     {
-        Transform.Position = Vector3.Lerp(Transform.WorldPosition, TransformToFollow.WorldPosition, LerpSpeed * Time.DeltaTime);
+        Transform.Position = Vector3.Lerp(Transform.WorldPosition, TransformToFollow.WorldPosition,
+            LerpSpeed * Time.DeltaTime);
     }
 }

@@ -10,13 +10,15 @@ namespace PixelariaEngine;
 
 public class LDtkManager : Singleton<LDtkManager>
 {
-    public readonly Dictionary<int, SpriteSheet> SpriteSheets = new();
+    private readonly Dictionary<Guid, Entity> EntityRefs = new();
     public readonly Dictionary<Guid, LDtkLevel> LoadedWorlds = new();
-    private readonly Dictionary<Guid, Entity> EntityRefs = new(); 
-    public LDtkFile LDtkFile;
-    public LDtkWorld LDtkWorld;
+    public readonly Dictionary<int, SpriteSheet> SpriteSheets = new();
     public LDtkLevel CurrentLevel;
+    public LDtkFile LDtkFile;
     public ExampleRenderer LDtkRenderer;
+    public LDtkWorld LDtkWorld;
+
+    public Logger<LDtkManager> Logger { get; set; } = new();
 
     public void SetUp(string ldtkFilePath)
     {
@@ -83,19 +85,19 @@ public class LDtkManager : Singleton<LDtkManager>
             SpriteSheets.Add(tileSet.Uid, spriteSheet);
         }
     }
-    
+
     public LDtkLevel LoadLDtkLevel(Guid iid)
     {
-        if(LoadedWorlds.TryGetValue(iid, out var level))
+        if (LoadedWorlds.TryGetValue(iid, out var level))
         {
             CurrentLevel = level;
             return level;
         }
-        
+
         level = LDtkWorld.LoadLevel(iid);
-        
+
         LoadedWorlds.Add(iid, level);
-        
+
         CurrentLevel = level;
 
         return level;
@@ -114,6 +116,4 @@ public class LDtkManager : Singleton<LDtkManager>
             .Where(type => type.IsClass && !type.IsAbstract && type.IsSubclassOf(typeof(TBase)))
             .ToList();
     }
-
-    public Logger<LDtkManager> Logger { get; set; } = new();
 }
