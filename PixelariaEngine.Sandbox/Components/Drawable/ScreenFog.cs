@@ -15,9 +15,9 @@ public class ScreenFog : DrawableComponent<ScreenFog>
     public Vector2 Pivot { get; set; }
     private Texture2D _fogNoiseTexture;
     
-    private float _alpha  = .5f;
+    private float _alpha  = .6f;
 
-    private readonly float _maxAlpha = 0.5f;
+    private readonly float _maxAlpha = 0.6f;
 
     public Vector2 NoiseOffset;
 
@@ -39,7 +39,6 @@ public class ScreenFog : DrawableComponent<ScreenFog>
         var heightRatio = height / (float)512;
         
         NoiseScale = new Vector2(widthRatio, heightRatio);
-        
     }
 
     public override void OnUpdate()

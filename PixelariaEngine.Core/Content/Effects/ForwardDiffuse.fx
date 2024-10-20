@@ -6,10 +6,15 @@ struct PS_INPUT
 };
 
 sampler2D TextureSampler : register(s0);
+float4 ambientColor;
 
 float4 MainPS(PS_INPUT input) : SV_TARGET
 {
-    return tex2D(TextureSampler, input.TexCoord) * input.Color;
+    float4 fragColor = tex2D(TextureSampler, input.TexCoord) * input.Color;
+
+    float4 ambient = ambientColor;
+
+    return fragColor * ambient;
 }
 
 technique MainTechnique

@@ -119,6 +119,12 @@
 /processorParam:DebugMode=Auto
 /build:Effects/FogEffect.fx
 
+#begin Effects/raymarchFog.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:Effects/raymarchFog.fx
+
 #begin Fonts/monogram-font.spritefont
 /importer:FontDescriptionImporter
 /processor:FontDescriptionProcessor

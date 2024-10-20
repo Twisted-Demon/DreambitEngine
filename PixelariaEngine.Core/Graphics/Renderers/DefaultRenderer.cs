@@ -43,17 +43,9 @@ public class DefaultRenderer(Scene scene) : Renderer(scene)
         Device.SetRenderTarget(FinalRenderTarget);
         Device.Clear(Color.Transparent);
 
-        //fogEffect.Parameters["fogStart"].SetValue(25f);
-        //fogEffect.Parameters["fogEnd"].SetValue(1000f);
-        //fogEffect.Parameters["fogColor"].SetValue(new Vector4(0.75f, 0.75f, 0.75f, 1f));
-        //
-        //fogEffect.Parameters["noiseScale"].SetValue(new Vector2(1f, 1f));
-        //fogEffect.Parameters["noiseOffset"].SetValue(Vector2.Zero);
-        //
-        //fogEffect.Parameters["NoiseSampler"].SetValue(_fogNoiseTexture);
-
-
-        Core.SpriteBatch.Begin(samplerState: SamplerState.PointClamp, blendState: BlendState.NonPremultiplied,
+        DefaultEffect.Parameters["ambientColor"].SetValue(scene.AmbientColor.ToVector4());
+        
+        Core.SpriteBatch.Begin(samplerState: SamplerState.PointClamp, blendState: BlendState.AlphaBlend,
             sortMode: SpriteSortMode.Immediate, effect: DefaultEffect);
 
         foreach (var renderTarget in _layerRenderTargets)

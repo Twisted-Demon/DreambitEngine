@@ -19,6 +19,7 @@ public class Scene
     private bool _useDefaultRenderer;
 
     public Color BackgroundColor = Color.CornflowerBlue;
+    public Color AmbientColor = Color.White;
     protected bool IsInitialized;
     protected bool IsPaused;
     protected bool IsStarted;

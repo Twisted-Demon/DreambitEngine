@@ -44,7 +44,7 @@ public class LDtkScene : Scene<LDtkScene>
         //set up all the entities
         LDtkManager.SetUpEntities(Level);
 
-        BackgroundColor = Level._BgColor;
+        //BackgroundColor = Level._BgColor;
     }
 
     protected override void OnEnd()

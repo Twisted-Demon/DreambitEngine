@@ -44,10 +44,6 @@ public class AreaFogComponent : DrawableComponent<ScreenFog>
         
         Effect.Parameters["globalFogIntensity"].SetValue(2.0f);
         
-        //Effect.Parameters["fogCenter"].SetValue(new Vector2(0.5f, 0.5f)); // Center in texture space
-        //Effect.Parameters["fogRadius"].SetValue(0.5f); // Radius in texture space
-        //Effect.Parameters["edgeSoftness"].SetValue(1.5f); // Adjust edge softness
-        
         var noiseSpeedX = 0.05f;
         var noiseSpeedY = 0.04f;
 

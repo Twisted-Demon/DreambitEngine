@@ -88,7 +88,7 @@ public class AssetPreloader : Component
         }
         
         _timer += Time.DeltaTime;
-        if (_timer < 5.0f)
+        if (_timer < 2.0f)
             return;
 
         var scene = Scene.SetNextLDtkScene(Worlds.AriaWorld.Dev_world);
