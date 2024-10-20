@@ -1,8 +1,8 @@
 - scriptGroup:
   - script: DialogueScript
     entity: Aria
-    text: "It's so dark here..."
+    text: "The forest... It feels like it's closing in. Am I lost?"
 - scriptGroup:
   - script: DialogueScript
     entity: Aria
-    text: "I need to move forward..."
+    text: "No... I can't stop. I have to find a way forward."

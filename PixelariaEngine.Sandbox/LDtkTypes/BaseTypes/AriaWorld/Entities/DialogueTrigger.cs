@@ -36,5 +36,6 @@ public partial class DialogueTrigger : ILDtkEntity
     public Color SmartColor { get; set; }
 
     public Point[]? Vertices { get; set; }
+    public string ScriptPath { get; set; }
 }
 #pragma warning restore

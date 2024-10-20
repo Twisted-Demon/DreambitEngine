@@ -23,6 +23,7 @@ public class AreaFogComponent : DrawableComponent<ScreenFog>
     {
         Effect = Resources.LoadAsset<Effect>("Effects/AreaFogEffect");
         _fogNoiseTexture = Resources.LoadAsset<Texture2D>("Textures/pnoise16x512");
+        DrawLayer = 5;
     }
 
     public override void OnPreDraw()

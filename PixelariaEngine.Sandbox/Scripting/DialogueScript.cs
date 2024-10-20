@@ -29,7 +29,11 @@ public class DialogueScript : Script
     public override void OnUpdate()
     {
         if (!Input.IsKeyPressed(Keys.Enter)) return;
-        Entity.Destroy(_dialogueCanvas.Entity);
         IsComplete = true;
+    }
+
+    public override void OnGroupEnd()
+    {
+        Entity.Destroy(_dialogueCanvas.Entity);
     }
 }

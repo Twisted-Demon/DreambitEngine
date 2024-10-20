@@ -2461,19 +2461,25 @@
 					"height": 32,
 					"defUid": 439,
 					"px": [332,501],
-					"fieldInstances": [{ "__identifier": "Vertices", "__type": "Array<Point>", "__value": [ { "cx": 206, "cy": 394 }, { "cx": 206, "cy": 617 }, { "cx": 514, "cy": 617 }, { "cx": 514, "cy": 389 } ], "__tile": null, "defUid": 440, "realEditorValues": [ {
-						"id": "V_String",
-						"params": ["206,394"]
-					}, {
-						"id": "V_String",
-						"params": ["206,617"]
-					}, {
-						"id": "V_String",
-						"params": ["514,617"]
-					}, {
-						"id": "V_String",
-						"params": ["514,389"]
-					} ] }],
+					"fieldInstances": [
+						{ "__identifier": "Vertices", "__type": "Array<Point>", "__value": [ { "cx": 206, "cy": 394 }, { "cx": 206, "cy": 617 }, { "cx": 514, "cy": 617 }, { "cx": 514, "cy": 389 } ], "__tile": null, "defUid": 440, "realEditorValues": [ {
+							"id": "V_String",
+							"params": ["206,394"]
+						}, {
+							"id": "V_String",
+							"params": ["206,617"]
+						}, {
+							"id": "V_String",
+							"params": ["514,617"]
+						}, {
+							"id": "V_String",
+							"params": ["514,389"]
+						} ] },
+						{ "__identifier": "ScriptPath", "__type": "FilePath", "__value": "Cutscenes/TestCutscene.yaml", "__tile": null, "defUid": 446, "realEditorValues": [{
+							"id": "V_String",
+							"params": ["Cutscenes/TestCutscene.yaml"]
+						}] }
+					],
 					"__worldX": 332,
 					"__worldY": 501
 				}
@@ -2495,7 +2501,7 @@
 			"layerDefUid": 441,
 			"pxOffsetX": 0,
 			"pxOffsetY": 0,
-			"visible": false,
+			"visible": true,
 			"optionalRules": [],
 			"intGridCsv": [],
 			"autoLayerTiles": [],
@@ -2505,19 +2511,67 @@
 			"entityInstances": [
 				{
 					"__identifier": "AreaFog",
-					"__grid": [635,351],
+					"__grid": [560,406],
 					"__pivot": [0,0],
 					"__tags": ["Props"],
 					"__tile": { "tilesetUid": 11, "x": 384, "y": 224, "w": 16, "h": 16 },
 					"__smartColor": "#9F9F9F",
 					"iid": "6a5039f0-73f0-11ef-81b5-9f8481801c02",
-					"width": 315,
-					"height": 315,
+					"width": 411,
+					"height": 411,
 					"defUid": 438,
-					"px": [635,351],
+					"px": [560,406],
 					"fieldInstances": [],
-					"__worldX": 635,
-					"__worldY": 351
+					"__worldX": 560,
+					"__worldY": 406
+				},
+				{
+					"__identifier": "AreaFog",
+					"__grid": [560,406],
+					"__pivot": [0,0],
+					"__tags": ["Props"],
+					"__tile": { "tilesetUid": 11, "x": 384, "y": 224, "w": 16, "h": 16 },
+					"__smartColor": "#9F9F9F",
+					"iid": "3331be60-73f0-11ef-a095-f5c68f023fac",
+					"width": 411,
+					"height": 411,
+					"defUid": 438,
+					"px": [560,406],
+					"fieldInstances": [],
+					"__worldX": 560,
+					"__worldY": 406
+				},
+				{
+					"__identifier": "AreaFog",
+					"__grid": [560,406],
+					"__pivot": [0,0],
+					"__tags": ["Props"],
+					"__tile": { "tilesetUid": 11, "x": 384, "y": 224, "w": 16, "h": 16 },
+					"__smartColor": "#9F9F9F",
+					"iid": "4c267230-73f0-11ef-a095-178ed1ab2c00",
+					"width": 408,
+					"height": 408,
+					"defUid": 438,
+					"px": [560,406],
+					"fieldInstances": [],
+					"__worldX": 560,
+					"__worldY": 406
+				},
+				{
+					"__identifier": "AreaFog",
+					"__grid": [468,580],
+					"__pivot": [0,0],
+					"__tags": ["Props"],
+					"__tile": { "tilesetUid": 11, "x": 384, "y": 224, "w": 16, "h": 16 },
+					"__smartColor": "#9F9F9F",
+					"iid": "a8c08030-73f0-11ef-a095-d9124b72ab3e",
+					"width": 32,
+					"height": 32,
+					"defUid": 438,
+					"px": [468,580],
+					"fieldInstances": [],
+					"__worldX": 468,
+					"__worldY": 580
 				}
 			]
 		},

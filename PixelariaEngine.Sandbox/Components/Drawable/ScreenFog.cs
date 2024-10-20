@@ -29,7 +29,7 @@ public class ScreenFog : DrawableComponent<ScreenFog>
     {
         Effect = Resources.LoadAsset<Effect>("Effects/FogEffect");
         _fogNoiseTexture = Resources.LoadAsset<Texture2D>("Textures/pnoise16x512");
-        DrawLayer = 10;
+        DrawLayer = 5;
 
         var level = LDtkManager.Instance.CurrentLevel;
         var width = level.PxWid;

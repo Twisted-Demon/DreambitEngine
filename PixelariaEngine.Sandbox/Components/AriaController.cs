@@ -45,9 +45,6 @@ public class AriaController : Component
         _mover.AstarGrid = Entity.FindByName("managers").GetComponent<AStarGrid>();
 
         _mover.InterestedTags = ["wall"];
-        
-        Scene.StartCutscene("TestCutscene");
-        
     }
     
 
