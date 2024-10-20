@@ -3,8 +3,8 @@
   "WorkspaceRootPath": "C:\\Dev\\PixelariaEngine\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{50906F51-BF0D-4F85-9C31-2B83E5AF91CB}|PixelariaEngine.Core\\PixelariaEngine.Core.csproj|c:\\dev\\pixelariaengine\\pixelariaengine.core\\ecs\\components\\drawables\\ui\\uinineslice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{50906F51-BF0D-4F85-9C31-2B83E5AF91CB}|PixelariaEngine.Core\\PixelariaEngine.Core.csproj|solutionrelative:pixelariaengine.core\\ecs\\components\\drawables\\ui\\uinineslice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Dev\\PixelariaEngine\\PixelariaEngine.Core\\ECS\\Components\\Drawables\\UI\\UINineSlice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:PixelariaEngine.Core\\ECS\\Components\\Drawables\\UI\\UINineSlice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -24,10 +24,8 @@
               "RelativeDocumentMoniker": "PixelariaEngine.Core\\ECS\\Components\\Drawables\\UI\\UINineSlice.cs",
               "ToolTip": "C:\\Dev\\PixelariaEngine\\PixelariaEngine.Core\\ECS\\Components\\Drawables\\UI\\UINineSlice.cs",
               "RelativeToolTip": "PixelariaEngine.Core\\ECS\\Components\\Drawables\\UI\\UINineSlice.cs",
-              "ViewState": "AgIAADUAAAAAAAAAAAAIwGAAAAAIAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2024-10-18T17:47:59.318Z",
-              "EditorCaption": ""
+              "WhenOpened": "2024-10-18T17:47:59.318Z"
             }
           ]
         }
