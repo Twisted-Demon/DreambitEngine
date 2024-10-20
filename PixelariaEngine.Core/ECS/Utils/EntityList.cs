@@ -94,7 +94,7 @@ public class EntityList(Scene scene)
         }
     }
 
-    private void UpdateLists()
+    private void HandleEntityCreations()
     {
         //Handle Creation
         foreach (var entityToCreate in _entitiesToCreate
@@ -106,6 +106,11 @@ public class EntityList(Scene scene)
 
         _entitiesToCreate.Clear();
 
+        
+    }
+
+    private void HandleEntityDeletions()
+    {
         //Handle Deletion
         foreach (var entityToDestroy in _entitiesToDestroy
                      .Where(e => _entities.Contains(e)))
@@ -121,8 +126,9 @@ public class EntityList(Scene scene)
 
     internal void OnTick()
     {
-        UpdateLists();
+        HandleEntityCreations();
         UpdateEntities();
+        HandleEntityDeletions();
     }
 
     public Entity GetEntity(uint id)
