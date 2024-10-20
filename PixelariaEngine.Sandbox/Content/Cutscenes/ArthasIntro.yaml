@@ -8,6 +8,8 @@
     entity: player
     speed: 75
     moveTo: [746, 525]
+  - script: CameraFollowScript
+    entity: f8f6ef30-73f0-11ef-9f4b-59594f62c41a
 - scriptGroup:
   - script: SetAnimationScript
     entity: player
@@ -23,7 +25,7 @@
   - script: DialogueScript
     entity: ???
     text: "Come on! Don't be afraid!"
-    
+
 #set the camera to follow arthas, and move arthas in frame
 - scriptGroup:
   - script: CameraFollowScript

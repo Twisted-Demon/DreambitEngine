@@ -5,7 +5,7 @@ using PixelariaEngine.Scripting;
 
 namespace PixelariaEngine.Sandbox;
 
-public class DialogueScript : Script
+public class DialogueScript : ScriptAction
 {
     private DialogueCanvas _dialogueCanvas;
     private readonly string _entityName;

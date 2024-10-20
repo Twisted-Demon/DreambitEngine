@@ -9,7 +9,7 @@ internal class ScriptFactory
 {
     private static readonly Logger<ScriptFactory> Logger = new();
 
-    internal static Script CreateScript(Dictionary<string, object> scriptData)
+    internal static ScriptAction CreateScript(Dictionary<string, object> scriptData)
     {
         var className = scriptData["script"].ToString();
 
@@ -45,7 +45,7 @@ internal class ScriptFactory
                 }
             }).ToArray();
 
-            var script = (Script)Activator.CreateInstance(scriptType, paramValues);
+            var script = (ScriptAction)Activator.CreateInstance(scriptType, paramValues);
 
             if (script == null)
             {

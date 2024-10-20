@@ -3,7 +3,7 @@ using PixelariaEngine.ECS;
 
 namespace PixelariaEngine.Scripting;
 
-public class MoveScript : Script
+public class MoveScript : ScriptAction
 {
     private string _entityName;
     private float _speed;

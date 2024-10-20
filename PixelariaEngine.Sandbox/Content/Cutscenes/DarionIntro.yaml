@@ -1,0 +1,31 @@
+- scriptGroup:
+  - script: EnableEntityScript
+    entity: darion
+  - script: SetAnimationScript
+    entity: darion
+    animation: "Animations/darion_sleep"
+  - script: CameraFollowScript
+    entity: darion
+  - script: MoveScript
+    entity: player
+    speed: 75
+    moveTo: [340, 1172]
+  - script: MoveScript
+    entity: arthas
+    speed: 75
+    moveTo: [358, 1172]
+- scriptGroup:
+  - script: DialogueScript
+    entity: ???
+    text: "ZZzzzzzzzz..."
+  - script: SetAnimationScript
+    entity: player
+    animation: "Animations/aria_idle"
+  - script: SetAnimationScript
+    entity: arthas
+    animation: "Animations/arthas_idle"
+
+#end and reset camera to follow player
+- scriptGroup:
+  - script: CameraFollowScript
+    entity: player

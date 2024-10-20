@@ -42,6 +42,7 @@
     </ItemGroup>
     <ItemGroup>
       <Folder Include="AI\FSM\Conditions\" />
+      <Folder Include="Scripting\Scripts\Camera\" />
     </ItemGroup>
     <PropertyGroup>
         <MonoGameExtendedPipelineReferencePath>$(MSBuildThisFileDirectory)../Includes</MonoGameExtendedPipelineReferencePath>

@@ -3,9 +3,9 @@ using System.Linq;
 
 namespace PixelariaEngine.Scripting;
 
-public class ScriptGroup
+public class ScriptActionGroup
 {
-    public readonly List<Script> Scripts = [];
+    public readonly List<ScriptAction> Scripts = [];
 
     public bool Completed()
     {

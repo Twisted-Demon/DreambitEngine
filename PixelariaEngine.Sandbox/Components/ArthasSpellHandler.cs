@@ -36,7 +36,8 @@ public class ArthasSpellHandler : Component
 
     public override void OnRemovedFromEntity()
     {
-        _inputActions.ArthasSpellAction = null;
+        if(_inputActions != null)
+            _inputActions.ArthasSpellAction = null;
     }
 
     private void OnArthasSpellAction()

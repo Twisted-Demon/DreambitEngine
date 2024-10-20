@@ -9,8 +9,9 @@ namespace PixelariaEngine.Scripting;
 
 public class ScriptingManager
 {
-    private readonly Queue<ScriptGroup> _groupQueue = [];
+    private Queue<ScriptActionGroup> _groupQueue = [];
     private readonly Logger<ScriptingManager> _logger = new();
+    private static readonly Dictionary<string, ScriptSequence> PreloadedGroups = [];
     public static ScriptingManager Instance => Scene.Instance.ScriptingManager;
     public Action OnScriptingStart;
     public Action OnScriptingEnd;
@@ -31,56 +32,71 @@ public class ScriptingManager
 
         try
         {
-            var watch = System.Diagnostics.Stopwatch.StartNew();
-            var yamlText = File.ReadAllText("Content/" + cutsceneName + fileExtension);
-            var deserializer = new DeserializerBuilder()
-                .WithNamingConvention(CamelCaseNamingConvention.Instance)
-                .Build();
-            
-            watch.Stop();
-            _logger.Info($"reading scripting file took {watch.ElapsedMilliseconds} ms");
-            
-            watch.Restart();
-
-            var yamlData = deserializer.Deserialize<List<dynamic>>(yamlText);
-
-            var groups = new List<ScriptGroup>();
-
-            foreach (var groupData in yamlData)
+            // check if we have the scene pre-loaded
+            if (PreloadedGroups.ContainsKey(cutsceneName + fileExtension))
             {
-                var group = new ScriptGroup();
-
-                var scriptList = groupData["scriptGroup"] as List<object>;
-
-                foreach (var scriptData in scriptList!)
-                {
-                    var scriptDict = ConvertToDictionary(scriptData as Dictionary<object, object>);
-
-                    if (scriptDict != null)
-                    {
-                        var script = ScriptFactory.CreateScript(scriptDict);
-                        if (script == null) continue;
-                        group.Scripts.Add(script);
-                    }
-                }
-
-                groups.Add(group);
+                var preloadedSequence = PreloadedGroups[cutsceneName + fileExtension];
+                _groupQueue = preloadedSequence.GetScriptGroupQueue();
             }
-
-            foreach (var group in groups) _groupQueue.Enqueue(group);
-
+            else
+            {
+                var sequence = LoadSequenceFromFile(cutsceneName, fileExtension);
+                _groupQueue = sequence.GetScriptGroupQueue();
+            }
+            
             IsCutsceneActive = true;
             OnScriptingStart?.Invoke();
             
-            watch.Stop();
-            
-            _logger.Info($"loading scripting data took {watch.ElapsedMilliseconds} ms");
         }
         catch (Exception e)
         {
             _logger.Warn("Unable to Start Cutscene {0}", cutsceneName);
             _logger.Error(e.Message);
         }
+    }
+
+    public static ScriptSequence LoadSequenceFromFile(string cutsceneName, string fileExtension = ".yaml")
+    {
+        var yamlText = File.ReadAllText("Content/" + cutsceneName + fileExtension);
+        var deserializer = new DeserializerBuilder()
+            .WithNamingConvention(CamelCaseNamingConvention.Instance)
+            .Build();
+                
+        var yamlData = deserializer.Deserialize<List<dynamic>>(yamlText);
+    
+        var sequence = new ScriptSequence();
+        var groups = new List<ScriptActionGroup>();
+
+        foreach (var groupData in yamlData)
+        {
+            var group = new ScriptActionGroup();
+
+            var scriptList = groupData["scriptGroup"] as List<object>;
+
+            foreach (var scriptData in scriptList!)
+            {
+                var scriptDict = ConvertToDictionary(scriptData as Dictionary<object, object>);
+
+                if (scriptDict != null)
+                {
+                    var script = ScriptFactory.CreateScript(scriptDict);
+                    if (script == null) continue;
+                    group.Scripts.Add(script);
+                }
+            }
+
+            groups.Add(group);
+        }
+
+        sequence.RegisterGroups(groups);
+        
+        //register the sequence
+        if (!PreloadedGroups.ContainsKey(cutsceneName + fileExtension))
+        {
+            PreloadedGroups.Add(cutsceneName + fileExtension, sequence);
+        }
+
+        return sequence;
     }
 
     public void Update()
@@ -116,7 +132,7 @@ public class ScriptingManager
     }
 
     // Helper method to convert Dictionary<object, object> to Dictionary<string, object>
-    private Dictionary<string, object> ConvertToDictionary(Dictionary<object, object> original)
+    private static Dictionary<string, object> ConvertToDictionary(Dictionary<object, object> original)
     {
         if (original == null) return null;
 

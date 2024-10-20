@@ -6,17 +6,17 @@ namespace PixelariaEngine.Sandbox;
 using LDtk;
 using Microsoft.Xna.Framework;
 
-public partial class AudioPreloader : ILDtkEntity
+public partial class Preloader : ILDtkEntity
 {
-    public static AudioPreloader Default() => new()
+    public static Preloader Default() => new()
     {
-        Identifier = "AudioPreloader",
-        Uid = 450,
+        Identifier = "Preloader",
+        Uid = 448,
         Size = new Vector2(32f, 32f),
         Pivot = new Vector2(0.5f, 0.5f),
         Tile = new TilesetRectangle()
         {
-            X = 240,
+            X = 48,
             Y = 32,
             W = 16,
             H = 16
@@ -35,6 +35,8 @@ public partial class AudioPreloader : ILDtkEntity
 
     public Color SmartColor { get; set; }
 
-    public string[] FilePaths { get; set; }
+    public string[] Textures { get; set; }
+    public string[] Audios { get; set; }
+    public string[] Scripts { get; set; }
 }
 #pragma warning restore

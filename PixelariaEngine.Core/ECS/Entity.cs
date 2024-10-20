@@ -132,6 +132,8 @@ public class Entity : IDisposable
 
     public static void Destroy(Entity entity)
     {
+        if (entity == null || entity._isDestroyed) return;
+        
         Core.Instance.CurrentScene.DestroyEntity(entity);
 
         if (entity._children.Count <= 0) return;

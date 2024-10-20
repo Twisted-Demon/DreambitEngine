@@ -5,7 +5,7 @@ using PixelariaEngine.Scripting;
 
 namespace PixelariaEngine.Sandbox;
 
-public class ArthasClearFogScript : Script
+public class ArthasClearFogScript : ScriptAction
 {
     private Entity _arthas;
     private SoundEffect _gongEffect;

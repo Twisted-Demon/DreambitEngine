@@ -1,6 +1,6 @@
 ﻿namespace PixelariaEngine.Scripting;
 
-public class WaitScript(float duration) : Script
+public class WaitScript(float duration) : ScriptAction
 {
     private readonly Logger<WaitScript> _logger = new();
     private float _elapsedTime;

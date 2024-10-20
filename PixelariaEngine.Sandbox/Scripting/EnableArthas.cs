@@ -3,7 +3,7 @@ using PixelariaEngine.Scripting;
 
 namespace PixelariaEngine.Sandbox;
 
-public class EnableArthas : Script
+public class EnableArthas : ScriptAction
 {
     public override void OnUpdate()
     {

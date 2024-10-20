@@ -16,14 +16,14 @@
 	"worldDepth": 0,
 	"pxWid": 2618,
 	"pxHei": 2024,
-	"__bgColor": "#696A79",
-	"bgColor": null,
+	"__bgColor": "#000000",
+	"bgColor": "#000000",
 	"useAutoIdentifier": false,
 	"bgRelPath": null,
 	"bgPos": null,
 	"bgPivotX": 0.5,
 	"bgPivotY": 0.5,
-	"__smartColor": "#ADADB5",
+	"__smartColor": "#737373",
 	"__bgPos": null,
 	"externalRelPath": null,
 	"fieldInstances": [],
@@ -2516,6 +2516,40 @@
 					],
 					"__worldX": 775,
 					"__worldY": 521
+				},
+				{
+					"__identifier": "DialogueTrigger",
+					"__grid": [364,1259],
+					"__pivot": [0.5,0.5],
+					"__tags": ["physics"],
+					"__tile": { "tilesetUid": 11, "x": 160, "y": 16, "w": 16, "h": 16 },
+					"__smartColor": "#FFFFFF",
+					"iid": "071fe510-73f0-11ef-9f4b-472481f3ee04",
+					"width": 32,
+					"height": 32,
+					"defUid": 439,
+					"px": [364,1259],
+					"fieldInstances": [
+						{ "__identifier": "Vertices", "__type": "Array<Point>", "__value": [ { "cx": 251, "cy": 1330 }, { "cx": 528, "cy": 1332 }, { "cx": 530, "cy": 1125 }, { "cx": 237, "cy": 1125 } ], "__tile": null, "defUid": 440, "realEditorValues": [ {
+							"id": "V_String",
+							"params": ["251,1330"]
+						}, {
+							"id": "V_String",
+							"params": ["528,1332"]
+						}, {
+							"id": "V_String",
+							"params": ["530,1125"]
+						}, {
+							"id": "V_String",
+							"params": ["237,1125"]
+						} ] },
+						{ "__identifier": "ScriptPath", "__type": "FilePath", "__value": "Cutscenes/DarionIntro.yaml", "__tile": null, "defUid": 446, "realEditorValues": [{
+							"id": "V_String",
+							"params": ["Cutscenes/DarionIntro.yaml"]
+						}] }
+					],
+					"__worldX": 364,
+					"__worldY": 1259
 				}
 			]
 		},
@@ -2535,7 +2569,7 @@
 			"layerDefUid": 441,
 			"pxOffsetX": 0,
 			"pxOffsetY": 0,
-			"visible": true,
+			"visible": false,
 			"optionalRules": [],
 			"intGridCsv": [],
 			"autoLayerTiles": [],
@@ -2709,6 +2743,42 @@
 					],
 					"__worldX": 856,
 					"__worldY": 721
+				},
+				{
+					"__identifier": "VirtualCam",
+					"__grid": [776,521],
+					"__pivot": [0.5,0.5],
+					"__tags": ["utils"],
+					"__tile": { "tilesetUid": 11, "x": 48, "y": 208, "w": 16, "h": 16 },
+					"__smartColor": "#FFFFFF",
+					"iid": "f8f6ef30-73f0-11ef-9f4b-59594f62c41a",
+					"width": 32,
+					"height": 32,
+					"defUid": 457,
+					"px": [776,521],
+					"fieldInstances": [],
+					"__worldX": 776,
+					"__worldY": 521
+				},
+				{
+					"__identifier": "Darion",
+					"__grid": [340,1117],
+					"__pivot": [0.5,1],
+					"__tags": ["npc"],
+					"__tile": { "tilesetUid": 184, "x": 0, "y": 32, "w": 32, "h": 32 },
+					"__smartColor": "#92CCD6",
+					"iid": "58ed7930-73f0-11ef-9f4b-e95a19b0b636",
+					"width": 32,
+					"height": 32,
+					"defUid": 180,
+					"px": [340,1118],
+					"fieldInstances": [
+						{ "__identifier": "IsFlipped", "__type": "Bool", "__value": false, "__tile": null, "defUid": 181, "realEditorValues": [] },
+						{ "__identifier": "RenderTiles", "__type": "Tile", "__value": { "tilesetUid": 184, "x": 0, "y": 32, "w": 32, "h": 32 }, "__tile": { "tilesetUid": 184, "x": 0, "y": 32, "w": 32, "h": 32 }, "defUid": 182, "realEditorValues": [] },
+						{ "__identifier": "WakeUpTriggerEntityRef", "__type": "EntityRef", "__value": null, "__tile": null, "defUid": 188, "realEditorValues": [] }
+					],
+					"__worldX": 340,
+					"__worldY": 1118
 				}
 			]
 		},

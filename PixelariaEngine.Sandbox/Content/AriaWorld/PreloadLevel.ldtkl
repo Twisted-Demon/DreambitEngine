@@ -8,7 +8,7 @@
 		"appVersion": "1.5.3",
 		"url": "https://ldtk.io"
 	},
-	"identifier": "Level_2",
+	"identifier": "PreloadLevel",
 	"iid": "c4a4d080-73f0-11ef-9f4b-87fd57dacf96",
 	"uid": 447,
 	"worldX": 0,
@@ -18,7 +18,7 @@
 	"pxHei": 256,
 	"__bgColor": "#000000",
 	"bgColor": "#000000",
-	"useAutoIdentifier": true,
+	"useAutoIdentifier": false,
 	"bgRelPath": null,
 	"bgPos": null,
 	"bgPivotX": 0.5,
@@ -184,7 +184,7 @@
 			"gridTiles": [],
 			"entityInstances": [
 				{
-					"__identifier": "TexturesPreloader",
+					"__identifier": "Preloader",
 					"__grid": [14,11],
 					"__pivot": [0.5,0.5],
 					"__tags": ["utils"],
@@ -195,88 +195,60 @@
 					"height": 32,
 					"defUid": 448,
 					"px": [14,11],
-					"fieldInstances": [{ "__identifier": "FilePaths", "__type": "Array<FilePath>", "__value": [
-						"Textures/Aria.png",
-						"Textures/ArthasSpriteSheet.png",
-						"Textures/DarionSpriteSheet.png",
-						"Textures/NineSlice.png",
-						"Textures/Spells/HolyBell.png",
-						"Textures/UI/KeyboardIcons.png"
-					], "__tile": null, "defUid": 449, "realEditorValues": [
-						{
+					"fieldInstances": [
+						{ "__identifier": "Textures", "__type": "Array<FilePath>", "__value": [
+							"Textures/Aria.png",
+							"Textures/ArthasSpriteSheet.png",
+							"Textures/DarionSpriteSheet.png",
+							"Textures/NineSlice.png",
+							"Textures/Spells/HolyBell.png",
+							"Textures/UI/KeyboardIcons.png"
+						], "__tile": null, "defUid": 449, "realEditorValues": [
+							{
+								"id": "V_String",
+								"params": ["Textures/Aria.png"]
+							},
+							{
+								"id": "V_String",
+								"params": ["Textures/ArthasSpriteSheet.png"]
+							},
+							{
+								"id": "V_String",
+								"params": ["Textures/DarionSpriteSheet.png"]
+							},
+							{
+								"id": "V_String",
+								"params": ["Textures/NineSlice.png"]
+							},
+							{
+								"id": "V_String",
+								"params": ["Textures/Spells/HolyBell.png"]
+							},
+							{
+								"id": "V_String",
+								"params": ["Textures/UI/KeyboardIcons.png"]
+							}
+						] },
+						{ "__identifier": "Audios", "__type": "Array<FilePath>", "__value": [ "Sounds/arthasSpell.mp3", "Sounds/bellGong.mp3" ], "__tile": null, "defUid": 455, "realEditorValues": [ {
 							"id": "V_String",
-							"params": ["Textures/Aria.png"]
-						},
-						{
+							"params": ["Sounds/arthasSpell.mp3"]
+						}, {
 							"id": "V_String",
-							"params": ["Textures/ArthasSpriteSheet.png"]
-						},
-						{
+							"params": ["Sounds/bellGong.mp3"]
+						} ] },
+						{ "__identifier": "Scripts", "__type": "Array<FilePath>", "__value": [ "Cutscenes/ArthasIntro.yaml", "Cutscenes/IntroScene.yaml", "Cutscenes/TestCutscene.yaml" ], "__tile": null, "defUid": 456, "realEditorValues": [ {
 							"id": "V_String",
-							"params": ["Textures/DarionSpriteSheet.png"]
-						},
-						{
+							"params": ["Cutscenes/ArthasIntro.yaml"]
+						}, {
 							"id": "V_String",
-							"params": ["Textures/NineSlice.png"]
-						},
-						{
+							"params": ["Cutscenes/IntroScene.yaml"]
+						}, {
 							"id": "V_String",
-							"params": ["Textures/Spells/HolyBell.png"]
-						},
-						{
-							"id": "V_String",
-							"params": ["Textures/UI/KeyboardIcons.png"]
-						}
-					] }],
+							"params": ["Cutscenes/TestCutscene.yaml"]
+						} ] }
+					],
 					"__worldX": 14,
 					"__worldY": 11
-				},
-				{
-					"__identifier": "AudioPreloader",
-					"__grid": [46,11],
-					"__pivot": [0.5,0.5],
-					"__tags": ["utils"],
-					"__tile": { "tilesetUid": 11, "x": 240, "y": 32, "w": 16, "h": 16 },
-					"__smartColor": "#FFFFFF",
-					"iid": "6d7fbe40-73f0-11ef-9f4b-4716c6441879",
-					"width": 32,
-					"height": 32,
-					"defUid": 450,
-					"px": [46,11],
-					"fieldInstances": [{ "__identifier": "FilePaths", "__type": "Array<FilePath>", "__value": [ "Sounds/bellGong.mp3", "Sounds/arthasSpell.mp3" ], "__tile": null, "defUid": 451, "realEditorValues": [ {
-						"id": "V_String",
-						"params": ["Sounds/bellGong.mp3"]
-					}, {
-						"id": "V_String",
-						"params": ["Sounds/arthasSpell.mp3"]
-					} ] }],
-					"__worldX": 46,
-					"__worldY": 11
-				},
-				{
-					"__identifier": "ScriptPreloader",
-					"__grid": [14,38],
-					"__pivot": [0.5,0.5],
-					"__tags": ["utils"],
-					"__tile": { "tilesetUid": 11, "x": 48, "y": 16, "w": 16, "h": 16 },
-					"__smartColor": "#FFFFFF",
-					"iid": "c0dd72d0-73f0-11ef-9f4b-3fba530f032e",
-					"width": 32,
-					"height": 32,
-					"defUid": 452,
-					"px": [14,38],
-					"fieldInstances": [{ "__identifier": "FilePaths", "__type": "Array<FilePath>", "__value": [ "Cutscenes/ArthasIntro.yaml", "Cutscenes/IntroScene.yaml", "Cutscenes/TestCutscene.yaml" ], "__tile": null, "defUid": 453, "realEditorValues": [ {
-						"id": "V_String",
-						"params": ["Cutscenes/ArthasIntro.yaml"]
-					}, {
-						"id": "V_String",
-						"params": ["Cutscenes/IntroScene.yaml"]
-					}, {
-						"id": "V_String",
-						"params": ["Cutscenes/TestCutscene.yaml"]
-					} ] }],
-					"__worldX": 14,
-					"__worldY": 38
 				}
 			]
 		},

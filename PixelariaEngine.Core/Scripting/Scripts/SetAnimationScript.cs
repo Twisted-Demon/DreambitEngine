@@ -2,7 +2,7 @@
 
 namespace PixelariaEngine.Scripting;
 
-public class SetAnimationScript : Script
+public class SetAnimationScript : ScriptAction
 {
     private readonly Logger<SetAnimationScript> _logger = new();
     

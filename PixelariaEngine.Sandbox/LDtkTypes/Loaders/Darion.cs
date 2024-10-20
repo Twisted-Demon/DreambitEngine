@@ -3,6 +3,7 @@ using LDtk;
 using Microsoft.Xna.Framework;
 using PixelariaEngine.ECS;
 using PixelariaEngine.Sandbox.Drawable;
+using PixelariaEngine.Sandbox.Player;
 using PixelariaEngine.Sandbox.Utils;
 
 namespace PixelariaEngine.Sandbox;
@@ -11,7 +12,7 @@ public partial class Darion : LDtkEntity<Darion>
 {
     protected override void SetUp(LDtkLevel level)
     {
-        var entity = CreateEntity(this);
+        var entity = CreateEntity(this, "darion");
         //AttachTileSpriteDrawer(this, entity, RenderTiles, Color.White);
         entity.AttachComponent<SpriteAnimator>();
 
@@ -29,7 +30,7 @@ public partial class Darion : LDtkEntity<Darion>
         iconEntity.Enabled = false;
         
         SetUpFSM(entity);
-
+        entity.Enabled = false;
     }
 
     private void SetUpFSM(Entity entity)
@@ -53,11 +54,12 @@ public partial class Darion : LDtkEntity<Darion>
         fsm.Blackboard.CreateVariable("isAwake", false);
         
         fsm.RegisterStates([
-            typeof(ArthasSleep),
             typeof(CatIdle),
-            typeof(CatFollow)
+            typeof(CatFollow),
+            typeof(InDialogue)
         ]);
-        fsm.SetDefaultState<ArthasSleep>();
+        fsm.SetDefaultState<CatIdle>();
+        fsm.SetNextState<InDialogue>();
     }
     
     private void SetUpSprite(Entity entity)

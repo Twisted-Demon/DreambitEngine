@@ -2,26 +2,27 @@
 
 namespace PixelariaEngine.Scripting;
 
-public class CameraFollowScript : Script
+public class CameraFollowScript : ScriptAction
 {
-    private readonly Entity _entityToFollow;
+    private string _entityName;
 
     public CameraFollowScript(string entity)
     {
-        _entityToFollow = Scene.Instance.FindEntity(entity);
+        _entityName = entity;
     }
 
 
     public override void OnUpdate()
     {
-        if (_entityToFollow is null)
+        var e = Scene.Instance.FindEntity(_entityName);
+        if (e is null)
         {
             IsComplete = true;
             return;
         }
 
         Scene.Instance.MainCamera.IsFollowing = true;
-        Scene.Instance.MainCamera.TransformToFollow = _entityToFollow.Transform;
+        Scene.Instance.MainCamera.TransformToFollow = e.Transform;
 
         IsComplete = true;
     }

@@ -90,8 +90,16 @@
 /processor:LDtkLevelProcessor
 /build:AriaWorld/EntityTest.ldtkl
 
+#begin AriaWorld/PreloadLevel.ldtkl
+/importer:LDtkLevelImporter
+/processor:LDtkLevelProcessor
+/build:AriaWorld/PreloadLevel.ldtkl
+
 #begin Cutscenes/ArthasIntro.yaml
 /copy:Cutscenes/ArthasIntro.yaml
+
+#begin Cutscenes/DarionIntro.yaml
+/copy:Cutscenes/DarionIntro.yaml
 
 #begin Cutscenes/IntroScene.yaml
 /copy:Cutscenes/IntroScene.yaml

@@ -1,8 +1,8 @@
 ﻿namespace PixelariaEngine.Scripting;
 
-public abstract class Script
+public abstract class ScriptAction
 {
-    private bool _isStarted;
+    internal bool IsStarted;
     public bool IsComplete { get; set; } = false;
 
     /// <summary>
@@ -34,10 +34,10 @@ public abstract class Script
 
     internal void Update()
     {
-        if (!_isStarted)
+        if (!IsStarted)
         {
             OnStart();
-            _isStarted = true;
+            IsStarted = true;
         }
 
         OnUpdate();
