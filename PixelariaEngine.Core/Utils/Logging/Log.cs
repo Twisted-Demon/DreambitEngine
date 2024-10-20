@@ -58,12 +58,12 @@ internal static class Log
     public static void Error(string header, string format, params object[] args)
     {
         AnsiConsole.ResetColors();
-        AnsiConsole.MarkupLine($"[white]{header}: [/][red1]{format}[/]", args);
+        AnsiConsole.MarkupLine($"[white]{header}: [/][orange1]{format}[/]", args);
     }
 
     public static void Error(string header, string message)
     {
         AnsiConsole.ResetColors();
-        AnsiConsole.MarkupLine($"[white]{header}: [/][red1]{message}[/]");
+        AnsiConsole.MarkupLine($"[white]{header}: [/][orange1]{message}[/]");
     }
 }

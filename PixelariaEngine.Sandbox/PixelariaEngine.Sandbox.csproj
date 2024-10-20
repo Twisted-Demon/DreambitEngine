@@ -53,9 +53,6 @@
         <HintPath>..\Includes\Newtonsoft.Json.dll</HintPath>
       </Reference>
     </ItemGroup>
-    <ItemGroup>
-      <Folder Include="Components\UI\" />
-    </ItemGroup>
     <Target Name="RestoreDotnetTools" BeforeTargets="Restore">
         <Message Text="Restoring dotnet tools" Importance="High"/>
         <Exec Command="dotnet tool restore"/>

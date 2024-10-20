@@ -52,7 +52,7 @@ public class CatIdle : State<CatIdle>
     private void CheckForPlayer()
     {
         if(_player.Value == null)
-            _player.Value = Scene.GetEntity("player");
+            _player.Value = Scene.FindEntity("player");
         
         if(_player.Value == null)
             Logger.Warn("Could not find player");

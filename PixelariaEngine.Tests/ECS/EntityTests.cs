@@ -32,7 +32,7 @@ public class EntityTests
         scene.Tick();
 
         
-        var entity2 = scene.GetEntity(idToCheck);
+        var entity2 = scene.FindEntity(idToCheck);
         Assert.Multiple(() =>
         {
             Assert.That(entity2, Is.Null);
@@ -84,11 +84,11 @@ public class EntityTests
         
         scene.Tick();
         
-        var entityToCheck = scene.GetEntity(entityId);
+        var entityToCheck = scene.FindEntity(entityId);
         
         Assert.That(entityToCheck, Is.Not.Null);
         
-        entityToCheck = scene.GetEntity(123455);
+        entityToCheck = scene.FindEntity(123455);
         Assert.That(entityToCheck, Is.Null);
     }
 
@@ -102,11 +102,11 @@ public class EntityTests
         
         scene.Tick();
         
-        var entityToCheck = scene.GetEntity("Test Entity");
+        var entityToCheck = scene.FindEntity("Test Entity");
         
         Assert.That(entityToCheck, Is.Not.Null);
         
-        entityToCheck = scene.GetEntity("WRONG NAME");
+        entityToCheck = scene.FindEntity("WRONG NAME");
         
         Assert.That(entityToCheck, Is.Null);
     }

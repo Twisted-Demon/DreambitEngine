@@ -12,7 +12,7 @@ public partial class Arthas : LDtkEntity<Arthas>
 {
     protected override void SetUp(LDtkLevel level)
     {
-        var entity = CreateEntity(this);
+        var entity = CreateEntity(this, "arthas");
         //AttachTileSpriteDrawer(this, entity, RenderTiles, Color.White);
         entity.AttachComponent<SpriteAnimator>();
 

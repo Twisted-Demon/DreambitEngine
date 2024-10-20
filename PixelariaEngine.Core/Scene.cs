@@ -6,6 +6,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using PixelariaEngine.ECS;
 using PixelariaEngine.Graphics;
+using PixelariaEngine.Scripting;
 
 namespace PixelariaEngine;
 
@@ -16,6 +17,7 @@ public class Scene
     public bool DebugMode { get; set; }
     public readonly DrawableList Drawables;
     protected readonly EntityList Entities;
+    public ScriptingManager ScriptingManager;
 
     public Color BackgroundColor = Color.CornflowerBlue;
     protected bool IsInitialized;
@@ -30,11 +32,14 @@ public class Scene
     {
         Entities = new EntityList(this);
         Drawables = new DrawableList();
+        ScriptingManager = new ScriptingManager(this);
 
         AddRenderer<DebugRenderer>();
         AddRenderer<UIRenderer>();
         _useDefaultRenderer = true;
     }
+
+    public static Scene Instance => Core.Instance.CurrentScene;
 
     public Camera2D MainCamera { get; private set; }
 
@@ -86,6 +91,7 @@ public class Scene
 
     private void UpdateInternals()
     {
+        ScriptingManager.Update();
         Entities.OnTick();
     }
 
@@ -182,12 +188,12 @@ public class Scene
         Entities.DestroyEntity(entity);
     }
 
-    public Entity GetEntity(uint id)
+    public Entity FindEntity(uint id)
     {
         return Entities.GetEntity(id);
     }
 
-    public Entity GetEntity(string name)
+    public Entity FindEntity(string name)
     {
         return Entities.GetEntity(name);
     }
@@ -221,6 +227,11 @@ public class Scene
         SetNextScene(scene);
 
         return scene;
+    }
+
+    public static void StartCutscene(string cutsceneName)
+    {
+        Core.Instance.CurrentScene.ScriptingManager.StartCutscene(cutsceneName);
     }
 }
 

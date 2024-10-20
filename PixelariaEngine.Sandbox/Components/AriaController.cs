@@ -4,6 +4,7 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using PixelariaEngine.ECS;
 using PixelariaEngine.Graphics;
+using PixelariaEngine.Sandbox.UI;
 
 namespace PixelariaEngine.Sandbox;
 
@@ -48,31 +49,10 @@ public class AriaController : Component
 
         _mover.InterestedTags = ["wall"];
         
-        TestUi();
-    }
-
-    private void TestUi()
-    {
-        var (canvas, _) = Canvas.Create();
-
-        canvas.Transform.Position.Y = 25f;
-        canvas.Transform.Position.X = -28;
+        Scene.StartCutscene("TestCutscene");
         
-        var frame = UINineSlice.Create(canvas, 56, 25, "Textures/NineSlice");
-        frame.PivotType = PivotType.TopLeft;
-        
-        var text = UIText.Create(canvas, "Hello World this is a test of my new text rendering system. " +
-                                         "Arthas says hello");
-        text.FontName = "Fonts/monogram-font";
-        text.VTextAlignment = VerticalAlignment.Top;
-        text.HTextAlignment = HorizontalAlignment.Left;
-        text.MaxWidth = 56;
-        text.Transform.Position.X += 1;
-        text.Transform.Position.Y += 1;
-        text.MaxWidth -= 2;
-
-        var texture = UITexture.Create(canvas, "Textures/NineSlice", PivotType.Center);
     }
+    
 
     public override void OnUpdate()
     {

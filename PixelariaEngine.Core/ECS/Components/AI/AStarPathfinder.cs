@@ -17,7 +17,7 @@ public class AStarPathfinder: Component
     
     public override void OnAddedToEntity()
     {
-        _grid = Scene.GetEntity("managers").GetComponent<AStarGrid>();
+        _grid = Scene.FindEntity("managers").GetComponent<AStarGrid>();
         
         _gridWidth = _grid.Width;
         _gridHeight = _grid.Height;

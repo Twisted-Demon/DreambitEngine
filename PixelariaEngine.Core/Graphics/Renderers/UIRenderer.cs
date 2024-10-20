@@ -126,6 +126,4 @@ public class UIRenderer(Scene scene) : Renderer(scene)
         _uiCamera = null;
         
     }
-    
-    
 }

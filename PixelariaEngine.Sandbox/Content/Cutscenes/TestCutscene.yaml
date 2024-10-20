@@ -1,0 +1,8 @@
+- scriptGroup:
+  - script: DialogueScript
+    entity: Aria
+    text: "It's so dark here..."
+- scriptGroup:
+  - script: DialogueScript
+    entity: Aria
+    text: "I need to move forward..."

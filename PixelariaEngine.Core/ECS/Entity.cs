@@ -118,7 +118,7 @@ public class Entity : IDisposable
 
     public static Entity FindByName(string name)
     {
-        var entity = Core.Instance.CurrentScene.GetEntity(name);
+        var entity = Core.Instance.CurrentScene.FindEntity(name);
 
         return entity;
     }

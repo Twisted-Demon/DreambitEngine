@@ -90,6 +90,9 @@
 /processor:LDtkLevelProcessor
 /build:AriaWorld/EntityTest.ldtkl
 
+#begin Cutscenes/TestCutscene.yaml
+/copy:Cutscenes/TestCutscene.yaml
+
 #begin Effects/AreaFogEffect.fx
 /importer:EffectImporter
 /processor:EffectProcessor
