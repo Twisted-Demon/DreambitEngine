@@ -29,7 +29,7 @@ public class Scene
     {
         Entities = new EntityList(this);
         Drawables = new DrawableList();
-        ScriptingManager = new ScriptingManager(this);
+        ScriptingManager = new ScriptingManager();
 
         AddRenderer<DebugRenderer>();
         AddRenderer<UIRenderer>();
@@ -227,9 +227,9 @@ public class Scene
         return scene;
     }
 
-    public static void StartCutscene(string cutsceneName)
+    public static void StartCutscene(string cutsceneName, string fileExtension = ".yaml")
     {
-        Core.Instance.CurrentScene.ScriptingManager.StartCutscene(cutsceneName);
+        Core.Instance.CurrentScene.ScriptingManager.StartCutscene(cutsceneName, fileExtension);
     }
 }
 

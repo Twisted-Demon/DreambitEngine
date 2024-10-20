@@ -7,14 +7,13 @@ using YamlDotNet.Serialization.NamingConventions;
 
 namespace PixelariaEngine.Scripting;
 
-public class ScriptingManager(Scene scene)
+public class ScriptingManager
 {
     private readonly Queue<ScriptGroup> _groupQueue = [];
     private readonly Logger<ScriptingManager> _logger = new();
-    private Scene _scene = scene;
-    public bool IsCutsceneActive { get; set; }
+    public static bool IsCutsceneActive { get; set; }
 
-    public void StartCutscene(string cutsceneName)
+    public void StartCutscene(string cutsceneName, string fileExtension = ".yaml")
     {
         if (IsCutsceneActive || _groupQueue.Count != 0)
         {
@@ -24,7 +23,7 @@ public class ScriptingManager(Scene scene)
 
         try
         {
-            var yamlText = File.ReadAllText("Content/Cutscenes/" + cutsceneName + ".yaml");
+            var yamlText = File.ReadAllText("Content/" + cutsceneName + fileExtension);
             var deserializer = new DeserializerBuilder()
                 .WithNamingConvention(CamelCaseNamingConvention.Instance)
                 .Build();
@@ -45,7 +44,7 @@ public class ScriptingManager(Scene scene)
 
                     if (scriptDict != null)
                     {
-                        var script = ScriptFactory.CreateScript(scene, scriptDict);
+                        var script = ScriptFactory.CreateScript(scriptDict);
                         group.Scripts.Add(script);
                     }
                 }
@@ -78,6 +77,10 @@ public class ScriptingManager(Scene scene)
         if (currentGroup.Completed())
         {
             _logger.Debug("Script Group Completed");
+            foreach (var script in currentGroup.Scripts)
+            {
+                script.OnGroupEnd();
+            }
             _groupQueue.Dequeue();
         }
 

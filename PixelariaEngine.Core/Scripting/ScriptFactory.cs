@@ -8,7 +8,7 @@ internal class ScriptFactory
 {
     private static readonly Logger<ScriptFactory> Logger = new();
 
-    internal static Script CreateScript(Scene scene, Dictionary<string, object> scriptData)
+    internal static Script CreateScript(Dictionary<string, object> scriptData)
     {
         var className = scriptData["script"].ToString();
 
