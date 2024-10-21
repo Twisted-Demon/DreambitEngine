@@ -21,9 +21,11 @@
     <ItemGroup>
         <Using Include="NUnit.Framework"/>
     </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\DreambitEngine\DreambitEngine.csproj" />
+    </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\PixelariaEngine.Core\PixelariaEngine.Core.csproj" />
     </ItemGroup>
 
 </Project>

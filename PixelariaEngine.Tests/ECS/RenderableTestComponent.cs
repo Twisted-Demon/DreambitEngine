@@ -1,5 +1,5 @@
 ﻿using Microsoft.Xna.Framework.Graphics;
-using PixelariaEngine.ECS;
+using Dreambit.ECS;
 
-namespace PixelariaEngine.Tests;
+namespace Dreambit.Tests;
 

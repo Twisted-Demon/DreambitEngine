@@ -1,8 +1,8 @@
 ﻿using Microsoft.Xna.Framework.Content.Pipeline;
 
-namespace PixelariaEngine;
+namespace Dreambit;
 
-[ContentProcessor(DisplayName = "Sprite Sheet Processor - PixelariaEngine")]
+[ContentProcessor(DisplayName = "Sprite Sheet Processor - Dreambit Engine")]
 public class SpriteSheetProcessor : ContentProcessor<SpriteSheet, SpriteSheet>
 {
     public override SpriteSheet Process(SpriteSheet input, ContentProcessorContext context)

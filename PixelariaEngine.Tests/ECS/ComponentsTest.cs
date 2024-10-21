@@ -1,7 +1,7 @@
-﻿using PixelariaEngine;
-using PixelariaEngine.ECS;
+﻿using Dreambit.ECS;
+using Dreambit;
 
-namespace PixelariaEngine.Tests;
+namespace Dreambit.Tests;
 
 public class ComponentsTest
 {

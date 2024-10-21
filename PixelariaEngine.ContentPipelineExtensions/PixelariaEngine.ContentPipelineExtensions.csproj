@@ -2,7 +2,8 @@
     <PropertyGroup>
         <TargetFramework>net8.0</TargetFramework>
         <BaseOutputPath>Build\</BaseOutputPath>
-        <RootNamespace>PixelariaEngine</RootNamespace>
+        <RootNamespace>Dreambit</RootNamespace>
+        <AssemblyName>Dreambit.ContentPipelineExtensions</AssemblyName>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
         <OutputPath>$(BaseOutputPath)</OutputPath> <!-- No version folder for Debug -->
@@ -20,7 +21,7 @@
         </PackageReference>
     </ItemGroup>
     <ItemGroup>
-      <ProjectReference Include="..\PixelariaEngine.Core\PixelariaEngine.Core.csproj" />
+      <ProjectReference Include="..\DreambitEngine\DreambitEngine.csproj" />
     </ItemGroup>
     <ItemGroup>
       <Reference Include="Newtonsoft.Json">

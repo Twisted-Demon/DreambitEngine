@@ -1,0 +1,35 @@
+
+#----------------------------- Global Properties ----------------------------#
+
+/outputDir:../../DreambitEngine.Sandbox/Build/Content
+/intermediateDir:obj/$(Platform)
+/platform:DesktopGL
+/config:
+/profile:Reach
+/compress:False
+
+#-------------------------------- References --------------------------------#
+
+/reference:../../Includes/Dreambit.ContentPipelineExtensions.dll
+/reference:../../Includes/LDtk.ContentPipeline.dll
+
+#---------------------------------- Content ---------------------------------#
+
+#begin Effects/ColorCorrection.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:Effects/ColorCorrection.fx
+
+#begin Effects/ForwardDiffuse.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:Effects/ForwardDiffuse.fx
+
+#begin Effects/ForwardLighting.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:Effects/ForwardLighting.fx
+
