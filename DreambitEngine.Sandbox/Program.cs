@@ -9,6 +9,7 @@ using Dreambit.Sandbox;
 using var game = new Core(1280, 720);
 
 Window.SetAllowUserResizing(true); //allow user resizing
+Window.SetVsync(false);
 
 LDtkManager.Instance.SetUp("AriaWorld");
 

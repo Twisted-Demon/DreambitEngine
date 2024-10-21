@@ -23,9 +23,7 @@ public class Core : Game
         Dreambit.Window.Init();
         Dreambit.Window.SetTitle(title);
         Dreambit.Window.SetSize(width, height);
-
-        SetFixedTimeStep(false);
-
+        
         TargetElapsedTime = TimeSpan.FromSeconds((double)1 / 120); //set Target fps to 120
     }
 
@@ -39,7 +37,7 @@ public class Core : Game
     protected override void Initialize()
     {
         base.Initialize();
-        //PixelariaEngine.Window.SetBorderlessFullscreen(true);
+
         GraphicsDevice.BlendState = BlendState.NonPremultiplied;
         Input.Init();
     }
