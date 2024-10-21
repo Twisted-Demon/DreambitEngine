@@ -12,29 +12,36 @@ namespace Dreambit;
 public class Scene
 {
     private readonly Logger<Scene> _logger = new();
-    public readonly DrawableList Drawables;
-    protected readonly EntityList Entities;
-    protected readonly List<Renderer> Renderers = [];
+
+    public readonly ScriptingManager ScriptingManager;
+
+    internal readonly DrawableList Drawables;
+    internal readonly EntityList Entities;
 
     private bool _useDefaultRenderer;
-
-    public Color BackgroundColor = Color.CornflowerBlue;
-    public Color AmbientColor = Color.White;
     protected bool IsInitialized;
-    protected bool IsPaused;
     protected bool IsStarted;
-    public ScriptingManager ScriptingManager;
+    protected bool IsPaused;
+    
+    public Color BackgroundColor = Color.CornflowerBlue;
 
-
+    private Renderer _sceneRenderer;
+    private readonly DebugRenderer _debugRenderer;
+    private readonly UIRenderer _uiRenderer;
+    private readonly PostProcessRenderer _postProcessRenderer;
+    
     public Scene()
     {
         Entities = new EntityList(this);
         Drawables = new DrawableList();
         ScriptingManager = new ScriptingManager();
-
-        AddRenderer<DebugRenderer>();
-        AddRenderer<UIRenderer>();
+        
         _useDefaultRenderer = true;
+
+        _sceneRenderer = new DefaultRenderer(this);
+        _debugRenderer = new DebugRenderer(this);
+        _uiRenderer = new UIRenderer(this);
+        _postProcessRenderer = new PostProcessRenderer(this, _sceneRenderer);
     }
 
     public bool DebugMode { get; set; }
@@ -56,23 +63,21 @@ public class Scene
         _logger.Debug("Initializing Scene");
         MainCamera = Entity.Create("main-camera").AttachComponent<Camera2D>();
         MainCamera.Entity.AlwaysUpdate = true;
-
-        if (_useDefaultRenderer)
-            AddRenderer<DefaultRenderer>();
-
-        foreach (var renderer in Renderers)
-            renderer.InitializeInternals();
+        
+        _sceneRenderer.InitializeInternals();
+        _debugRenderer.InitializeInternals();
+        _uiRenderer.InitializeInternals();
+        _postProcessRenderer.InitializeInternals();
 
         OnInitialize();
     }
 
-    public Scene AddRenderer<T>() where T : Renderer
-    {
-        var renderer = (T)Activator.CreateInstance(typeof(T), this);
-        Renderers.Add(renderer);
-        _useDefaultRenderer = false;
-        return this;
-    }
+    //public Scene SetRenderer<T>() where T : Renderer
+    //{
+    //    _sceneRenderer = (T)Activator.CreateInstance(typeof(T), this);
+    //    _useDefaultRenderer = false;
+    //    return this;
+    //}
 
     /// <summary>
     ///     Called after the scene has been initialized and has actually begun.
@@ -106,8 +111,11 @@ public class Scene
     {
         Entities.ClearLists();
         Drawables.ClearLists();
-        foreach (var renderer in Renderers)
-            renderer.CleanUpInternal();
+        
+        _sceneRenderer.CleanUpInternal();
+        _debugRenderer.CleanUpInternal();
+        _uiRenderer.CleanUpInternal();
+        _postProcessRenderer.CleanUpInternal();
     }
 
     internal void Terminate()
@@ -118,10 +126,10 @@ public class Scene
         // Force garbage collection
         GC.Collect();
 
-// Wait for finalizers to run
+        // Wait for finalizers to run
         GC.WaitForPendingFinalizers();
 
-// Optionally, force another GC collection to clean up finalized objects
+        // Optionally, force another GC collection to clean up finalized objects
         GC.Collect();
     }
 
@@ -149,25 +157,24 @@ public class Scene
 
     public virtual void OnDraw()
     {
-        if (Renderers.Count == 0)
-        {
-            _logger.Error("The Current Scene does not have a Renderer");
-            return;
-        }
+        // rune the draw methods of the renderers
+        _sceneRenderer.OnDraw();
+        _debugRenderer.OnDraw();
+        _uiRenderer.OnDraw();
+        _postProcessRenderer.OnDraw();
 
-        foreach (var renderer in Renderers.OrderBy(x => x.Order).ToList())
-            renderer.OnDraw();
-
+        // draw to the screen
         Core.Instance.GraphicsDevice.SetRenderTarget(null);
         Core.Instance.GraphicsDevice.Clear(BackgroundColor);
-        foreach (var renderer in Renderers.OrderBy(x => x.Order).Where(x => x.IsActive).ToList())
-        {
-            Core.SpriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp);
+        
+        Core.SpriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
+        
+        Core.SpriteBatch.Draw(_postProcessRenderer.FinalRenderTarget, Vector2.Zero, Color.White);
+        Core.SpriteBatch.Draw(_debugRenderer.FinalRenderTarget, Vector2.Zero, Color.White);
+        Core.SpriteBatch.Draw(_uiRenderer.FinalRenderTarget, Vector2.Zero, Color.White);
+        
+        Core.SpriteBatch.End();
 
-            Core.SpriteBatch.Draw(renderer.FinalRenderTarget, Vector2.Zero, Color.White);
-
-            Core.SpriteBatch.End();
-        }
     }
 
     public Entity CreateEntity(string name = "entity", HashSet<string> tags = null

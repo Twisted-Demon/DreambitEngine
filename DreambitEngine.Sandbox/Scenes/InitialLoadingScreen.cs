@@ -68,7 +68,6 @@ public class InitialLoadingScreen : Scene
         LDtkManager.Instance.SetUp("AriaWorld");
 
         var scene = SetNextLDtkScene(Worlds.AriaWorld.Dev_world);
-        scene.AddRenderer<DefaultRenderer>();
         
     }
 }

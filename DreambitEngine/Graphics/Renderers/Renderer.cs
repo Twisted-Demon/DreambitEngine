@@ -46,6 +46,7 @@ public class Renderer
         Window.WindowResized -= OnWindowResized;
         FinalRenderTarget?.Dispose();
         FinalRenderTarget = null;
+        OnCleanUp();
     }
 
     protected virtual void OnCleanUp()

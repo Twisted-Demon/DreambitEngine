@@ -86,12 +86,7 @@ public class AssetPreloader : Component
 
             return;
         }
-        
-        _timer += Time.DeltaTime;
-        if (_timer < 2.0f)
-            return;
 
         var scene = Scene.SetNextLDtkScene(Worlds.AriaWorld.Dev_world);
-        scene.AddRenderer<DefaultRenderer>();
     }
 }

@@ -24,7 +24,7 @@ public class Core : Game
         Dreambit.Window.SetTitle(title);
         Dreambit.Window.SetSize(width, height);
 
-        //SetFixedTimeStep(false);
+        SetFixedTimeStep(false);
 
         TargetElapsedTime = TimeSpan.FromSeconds((double)1 / 120); //set Target fps to 120
     }

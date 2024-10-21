@@ -18,6 +18,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DreambitEngine.Sandbox", "D
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DreambitEngine.ContentPipelineExtensions", "DreambitEngine.ContentPipelineExtensions\DreambitEngine.ContentPipelineExtensions.csproj", "{0E058C4B-AEEB-4D49-A942-7648779DE8C5}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Externals", "Externals", "{8AEE4555-EE28-4EE3-8A41-008E6A3C7FD8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -67,5 +69,11 @@ Global
 		{0E058C4B-AEEB-4D49-A942-7648779DE8C5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0E058C4B-AEEB-4D49-A942-7648779DE8C5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0E058C4B-AEEB-4D49-A942-7648779DE8C5}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{CED15BC2-4D9E-47AF-8406-ECC04164CED8} = {8AEE4555-EE28-4EE3-8A41-008E6A3C7FD8}
+		{C8A3F0A3-9E26-4A5A-A2F7-7CB119D24127} = {8AEE4555-EE28-4EE3-8A41-008E6A3C7FD8}
+		{11C325DA-4AC7-4ADB-9D93-D8D238DC4D79} = {8AEE4555-EE28-4EE3-8A41-008E6A3C7FD8}
+		{8956D720-FE7E-4617-AA1F-5890680B2B91} = {8AEE4555-EE28-4EE3-8A41-008E6A3C7FD8}
 	EndGlobalSection
 EndGlobal
