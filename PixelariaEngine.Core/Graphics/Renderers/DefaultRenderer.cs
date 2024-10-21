@@ -7,14 +7,11 @@ namespace PixelariaEngine;
 
 public class DefaultRenderer(Scene scene) : Renderer(scene)
 {
-    private List<RenderTarget2D> _layerRenderTargets = [];
 
     public override void OnDraw()
     {
-        UpdateRenderTargets();
         PreRender();
         RenderDrawables();
-        RenderToFinalRenderTarget();
     }
 
     private void PreRender()
@@ -26,45 +23,17 @@ public class DefaultRenderer(Scene scene) : Renderer(scene)
             drawable.OnPreDraw();
     }
 
-    private void UpdateRenderTargets()
-    {
-        if (_layerRenderTargets.Count == Scene.Drawables.DrawLayerCount) return;
-
-        foreach (var renderTarget in _layerRenderTargets)
-            renderTarget.Dispose();
-
-        _layerRenderTargets.Clear();
-
-        for (var i = 0; i < Scene.Drawables.DrawLayerCount; i++) _layerRenderTargets.Add(CreateRenderTarget());
-    }
-
-    private void RenderToFinalRenderTarget()
-    {
-        Device.SetRenderTarget(FinalRenderTarget);
-        Device.Clear(Color.Transparent);
-
-        DefaultEffect.Parameters["ambientColor"].SetValue(scene.AmbientColor.ToVector4());
-        
-        Core.SpriteBatch.Begin(samplerState: SamplerState.PointClamp, blendState: BlendState.AlphaBlend,
-            sortMode: SpriteSortMode.Immediate, effect: DefaultEffect);
-
-        foreach (var renderTarget in _layerRenderTargets)
-            Core.SpriteBatch.Draw(renderTarget, Vector2.Zero, Color.White);
-
-        Core.SpriteBatch.End();
-    }
-
     private void RenderDrawables()
     {
         var drawLayers = Scene.Drawables.GetDrawLayers();
         var layerOrder = drawLayers.Keys.OrderBy(x => x).ToList();
         var cameraMatrix = Scene.MainCamera.TransformMatrix;
+        
+        Device.SetRenderTarget(FinalRenderTarget);
+        Device.Clear(Color.Transparent);
 
         for (var i = 0; i < layerOrder.Count; i++)
         {
-            Device.SetRenderTarget(_layerRenderTargets[i]);
-            Device.Clear(Color.Transparent);
-
             var drawables = drawLayers[layerOrder[i]]
                 .Where(x => x.Enabled && x.Entity.Enabled && x.DrawLayer != RenderLayers.LightLayer)
                 .ToList();
@@ -113,26 +82,5 @@ public class DefaultRenderer(Scene scene) : Renderer(scene)
             Core.SpriteBatch.End();
         }
     }
-
-    protected override void OnWindowResized(object sender, WindowEventArgs args)
-    {
-        base.OnWindowResized(sender, args);
-
-        var renderTargetCount = _layerRenderTargets.Count;
-
-        foreach (var renderTarget in _layerRenderTargets) renderTarget.Dispose();
-
-        _layerRenderTargets.Clear();
-
-        for (var i = 0; i < renderTargetCount; i++) _layerRenderTargets.Add(CreateRenderTarget());
-    }
-
-    protected override void OnCleanUp()
-    {
-        foreach (var renderTarget in _layerRenderTargets)
-            renderTarget?.Dispose();
-
-        _layerRenderTargets.Clear();
-        _layerRenderTargets = null;
-    }
+    
 }

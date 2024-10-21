@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -10,7 +9,6 @@ namespace PixelariaEngine;
 [SuppressMessage("ReSharper", "InconsistentNaming")]
 public class UIRenderer(Scene scene) : Renderer(scene)
 {
-    private List<RenderTarget2D> _renderTargets = [];
     private Camera2D _uiCamera;
     private int _targetUIHeight => 720;
 
@@ -24,29 +22,17 @@ public class UIRenderer(Scene scene) : Renderer(scene)
         _uiCamera.SetTargetVerticalResolution(_targetUIHeight);
         _uiCamera.Zoom = 1.0f;
     }
-
-    private void UpdateRenderTargets()
-    {
-        if (_renderTargets.Count == Scene.Drawables.DrawLayerCount) return;
-
-        foreach (var renderTarget in _renderTargets)
-            renderTarget.Dispose();
-
-        _renderTargets.Clear();
-
-        for (var i = 0; i < Scene.Drawables.DrawLayerCount; i++) _renderTargets.Add(CreateRenderTarget());
-    }
-
+    
     private void DrawUIComponents()
     {
         var drawLayers = Scene.Drawables.GetDrawLayers();
         var layerOrder = drawLayers.Keys.OrderBy(x => x).ToList();
 
+        Device.SetRenderTarget(FinalRenderTarget);
+        Device.Clear(Color.Transparent);
+        
         for (var i = 0; i < layerOrder.Count; i++)
         {
-            Device.SetRenderTarget(_renderTargets[i]);
-            Device.Clear(Color.Transparent);
-
             Core.SpriteBatch.Begin(transformMatrix: _uiCamera.TopLeftTransformMatrix,
                 sortMode: SpriteSortMode.Deferred,
                 samplerState: SamplerState.PointClamp,
@@ -67,52 +53,9 @@ public class UIRenderer(Scene scene) : Renderer(scene)
         }
     }
 
-    private void RenderToFinalRenderTarget()
-    {
-        Device.SetRenderTarget(FinalRenderTarget);
-        Device.Clear(Color.Transparent);
-
-        Core.SpriteBatch.Begin(
-            samplerState: SamplerState.PointClamp,
-            blendState: BlendState.NonPremultiplied);
-
-        foreach (var renderTarget in _renderTargets)
-            Core.SpriteBatch.Draw(renderTarget, Vector2.Zero, Color.White);
-
-        Core.SpriteBatch.End();
-    }
-
     public override void OnDraw()
     {
-        UpdateRenderTargets();
         DrawUIComponents();
-        RenderToFinalRenderTarget();
     }
-
-
-    protected override void OnWindowResized(object sender, WindowEventArgs args)
-    {
-        base.OnWindowResized(sender, args);
-
-        if (_uiCamera == null) return;
-
-        var renderTargetCount = _renderTargets.Count;
-        _uiCamera.SetTargetVerticalResolution(_targetUIHeight);
-
-        foreach (var renderTarget in _renderTargets) renderTarget.Dispose();
-
-        _renderTargets.Clear();
-
-        for (var i = 0; i < renderTargetCount; i++) _renderTargets.Add(CreateRenderTarget());
-    }
-
-    protected override void OnCleanUp()
-    {
-        foreach (var renderTarget in _renderTargets)
-            renderTarget?.Dispose();
-
-        _renderTargets.Clear();
-        _renderTargets = null;
-        _uiCamera = null;
-    }
+    
 }

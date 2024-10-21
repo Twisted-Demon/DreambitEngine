@@ -23,7 +23,7 @@ public class DebugRenderer(Scene scene) : Renderer(scene)
         Core.SpriteBatch.Begin(
             samplerState: SamplerState.PointClamp,
             blendState: BlendState.AlphaBlend,
-            sortMode: SpriteSortMode.FrontToBack,
+            sortMode: SpriteSortMode.Deferred,
             transformMatrix: Scene.MainCamera.TransformMatrix,
             effect: DefaultEffect);
 
