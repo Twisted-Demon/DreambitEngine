@@ -1,2 +1,2 @@
 @echo off
-dotnet mgcb-editor
+dotnet mgcb-editor --project Content.mgcb
