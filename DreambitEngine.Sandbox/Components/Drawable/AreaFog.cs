@@ -42,7 +42,7 @@ public class AreaFogComponent : DrawableComponent<ScreenFog>
         Effect.Parameters["fogStart"].SetValue(0);
         Effect.Parameters["fogEnd"].SetValue(Window.Height);
         
-        Effect.Parameters["globalFogIntensity"].SetValue(2.0f);
+        Effect.Parameters["globalFogIntensity"].SetValue(1.0f);
         
         var noiseSpeedX = 0.05f;
         var noiseSpeedY = 0.04f;
