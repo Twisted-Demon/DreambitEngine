@@ -3,9 +3,9 @@ using System.IO;
 using Microsoft.Xna.Framework.Content.Pipeline;
 using Newtonsoft.Json;
 
-namespace PixelariaEngine;
+namespace Dreambit;
 
-[ContentImporter(".animation", DisplayName = "Animation Importer - Pixelaria Engine",
+[ContentImporter(".animation", DisplayName = "Animation Importer - Dreambit Engine",
     DefaultProcessor = nameof(AnimationProcessor))]
 public class AnimationImporter : ContentImporter<SpriteSheetAnimation>
 {

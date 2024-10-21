@@ -1,0 +1,15 @@
+﻿using LDtk;
+
+namespace Dreambit.Sandbox;
+
+public partial class DialogueTrigger : LDtkEntity<DialogueTrigger>
+{
+    protected override void SetUp(LDtkLevel level)
+    {
+        var e = CreateEntity(this, "dialogueTrigger",["dialogueTrigger"]);
+
+        CreatePolyCollider(e, Vertices, Position);
+        var dialogueComponent = e.AttachComponent<DialogueTriggerComponent>();
+        dialogueComponent.CutscenePath = ScriptPath;
+    }
+}

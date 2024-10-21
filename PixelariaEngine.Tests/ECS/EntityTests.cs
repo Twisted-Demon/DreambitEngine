@@ -1,7 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
-using PixelariaEngine.ECS;
+using Dreambit.ECS;
 
-namespace PixelariaEngine.Tests;
+namespace Dreambit.Tests;
 
 [SuppressMessage("ReSharper", "ConditionIsAlwaysTrueOrFalse")]
 public class EntityTests

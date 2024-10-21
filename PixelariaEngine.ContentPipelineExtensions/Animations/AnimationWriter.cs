@@ -3,7 +3,7 @@ using Microsoft.Xna.Framework.Content.Pipeline;
 using Microsoft.Xna.Framework.Content.Pipeline.Serialization.Compiler;
 using Newtonsoft.Json;
 
-namespace PixelariaEngine;
+namespace Dreambit;
 
 [ContentTypeWriter]
 public class AnimationWriter : ContentTypeWriter<SpriteSheetAnimation>

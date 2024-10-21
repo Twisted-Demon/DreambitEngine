@@ -3,9 +3,9 @@ using System.IO;
 using Microsoft.Xna.Framework.Content.Pipeline;
 using Newtonsoft.Json;
 
-namespace PixelariaEngine;
+namespace Dreambit;
 
-[ContentImporter(".spritesheet", DisplayName = "SpriteSheet Importer - Pixelaria Engine", DefaultProcessor = nameof(SpriteSheetProcessor))]
+[ContentImporter(".spritesheet", DisplayName = "SpriteSheet Importer - Dreambit Engine", DefaultProcessor = nameof(SpriteSheetProcessor))]
 public class SpriteSheetImporter : ContentImporter<SpriteSheet>
 {
     public override SpriteSheet Import(string filename, ContentImporterContext context)

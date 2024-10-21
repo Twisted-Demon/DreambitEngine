@@ -1,6 +1,6 @@
-﻿using PixelariaEngine.ECS;
+﻿using Dreambit.ECS;
 
-namespace PixelariaEngine.Tests;
+namespace Dreambit.Tests;
 
 public class UnitTestComponent : Component
 {

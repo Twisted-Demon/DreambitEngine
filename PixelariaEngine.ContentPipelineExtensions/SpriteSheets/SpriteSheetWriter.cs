@@ -1,7 +1,7 @@
 ﻿using Microsoft.Xna.Framework.Content.Pipeline;
 using Microsoft.Xna.Framework.Content.Pipeline.Serialization.Compiler;
 
-namespace PixelariaEngine;
+namespace Dreambit;
 
 [ContentTypeWriter]
 public class SpriteSheetWriter : ContentTypeWriter<SpriteSheet>

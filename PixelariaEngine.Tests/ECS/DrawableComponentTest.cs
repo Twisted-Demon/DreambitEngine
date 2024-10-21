@@ -1,5 +1,4 @@
-﻿namespace PixelariaEngine.Tests;
-
+﻿namespace Dreambit.Tests;
 public class DrawableComponentTest
 {
     private Scene _scene;
