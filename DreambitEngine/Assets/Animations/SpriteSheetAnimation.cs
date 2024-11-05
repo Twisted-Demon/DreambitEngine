@@ -4,7 +4,7 @@ using Newtonsoft.Json;
 
 namespace Dreambit;
 
-public class SpriteSheetAnimation : PixelariaAsset
+public class SpriteSheetAnimation : DreambitAsset
 {
     [JsonProperty("frames")] private AnimationFrame[] _frames;
 

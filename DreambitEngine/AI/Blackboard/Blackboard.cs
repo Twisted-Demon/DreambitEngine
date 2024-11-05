@@ -4,18 +4,18 @@ namespace Dreambit;
 
 public class Blackboard
 {
-    public readonly Dictionary<string, BlackboardVar> Variables = [];
+    private readonly Dictionary<string, BlackboardVar> _variables = [];
 
     public BlackboardVar<T> CreateVariable<T>(string name, T defaultValue = default)
     {
         var bbVar = new BlackboardVar<T>(defaultValue);
 
-        return Variables.TryAdd(name, bbVar) ? bbVar : null;
+        return _variables.TryAdd(name, bbVar) ? bbVar : null;
     }
 
     public BlackboardVar<T> GetVariable<T>(string variableName)
     {
-        if (Variables.TryGetValue(variableName, out var value) && value is BlackboardVar<T> typedValue)
+        if (_variables.TryGetValue(variableName, out var value) && value is BlackboardVar<T> typedValue)
             return typedValue;
 
         return default;

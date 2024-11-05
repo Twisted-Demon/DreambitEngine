@@ -178,9 +178,9 @@ public class Scene
     }
 
     public Entity CreateEntity(string name = "entity", HashSet<string> tags = null
-        , bool enabled = true, Vector3? createAt = null)
+        , bool enabled = true, Vector3? createAt = null, Guid? guidOverride = null)
     {
-        var entity = Entities.CreateEntity(name, tags, enabled, createAt);
+        var entity = Entities.CreateEntity(name, tags, enabled, createAt, guidOverride);
         return entity;
     }
 
@@ -194,7 +194,7 @@ public class Scene
         Entities.DestroyEntity(entity);
     }
 
-    public Entity FindEntity(uint id)
+    public Entity FindEntity(Guid id)
     {
         return Entities.GetEntity(id);
     }

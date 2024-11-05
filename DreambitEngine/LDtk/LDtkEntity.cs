@@ -12,7 +12,7 @@ public class LDtkEntity<T> : LDtkEntity where T : new()
     {
         name ??= data.Identifier;
 
-        var entity = Entity.Create(name, tags, createAt: new Vector3(data.Position, 0));
+        var entity = Entity.Create(name, tags, createAt: new Vector3(data.Position, 0), guidOverride: data.Iid);
         entity.AttachComponent<LDtkIid>().Iid = data.Iid;
 
         return entity;

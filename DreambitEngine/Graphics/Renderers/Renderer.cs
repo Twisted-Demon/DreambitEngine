@@ -2,7 +2,7 @@
 
 namespace Dreambit;
 
-public class Renderer
+public abstract class Renderer
 {
     public int Order = 0;
 

@@ -54,7 +54,7 @@ public class DefaultRenderer(Scene scene) : Renderer(scene)
             Core.SpriteBatch.Begin(
                 transformMatrix: cameraMatrix,
                 samplerState: SamplerState.PointClamp,
-                sortMode: SpriteSortMode.FrontToBack,
+                sortMode: SpriteSortMode.Deferred,
                 blendState: BlendState.AlphaBlend,
                 effect: DefaultEffect
             );

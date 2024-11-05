@@ -109,5 +109,8 @@ public class PostProcessRenderer : Renderer
     {
         _colorCorrectionPass?.Dispose();
         _colorCorrectionPass = null;
+        
+        _tintPass?.Dispose();
+        _tintPass = null;
     }
 }

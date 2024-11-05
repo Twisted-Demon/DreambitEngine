@@ -8,7 +8,7 @@ namespace Dreambit;
 public class Core : Game
 {
     private const float FixedPhysicsStep = 1f / 120f;
-    public static LogLevel LogLevel = LogLevel.Debug;
+    public static readonly LogLevel LogLevel = LogLevel.Debug;
     private readonly Logger<Core> _logger = new();
     private float accumulatedPhysicsTime;
 
@@ -20,6 +20,7 @@ public class Core : Game
         Instance = this;
 
         GameName = title;
+        
         Dreambit.Window.Init();
         Dreambit.Window.SetTitle(title);
         Dreambit.Window.SetSize(width, height);

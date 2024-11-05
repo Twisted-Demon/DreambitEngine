@@ -4,7 +4,7 @@ using Newtonsoft.Json;
 
 namespace Dreambit;
 
-public class SpriteSheet : PixelariaAsset
+public class SpriteSheet : DreambitAsset
 {
     [JsonIgnore] private static readonly Logger<SpriteSheet> Logger = new();
 

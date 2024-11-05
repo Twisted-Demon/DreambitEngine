@@ -34,7 +34,7 @@ public class AreaFogComponent : DrawableComponent<ScreenFog>
         // Set the wind direction (e.g., diagonal wind towards top-right)
         Effect.Parameters["windDirection"].SetValue(new Vector2(0.5f, 0.3f));
         
-        Effect.Parameters["fogColor"].SetValue(new Vector4(1f, 1f, 1f, 1.0f));
+        Effect.Parameters["fogColor"].SetValue(new Vector4(.75f, .75f, .75f, 1.0f));
         
         Effect.Parameters["noiseScale1"].SetValue(NoiseScale);
         Effect.Parameters["noiseScale2"].SetValue(NoiseScale * 2);
@@ -44,8 +44,8 @@ public class AreaFogComponent : DrawableComponent<ScreenFog>
         
         Effect.Parameters["globalFogIntensity"].SetValue(1.0f);
         
-        var noiseSpeedX = 0.05f;
-        var noiseSpeedY = 0.04f;
+        const float noiseSpeedX = 0.05f;
+        const float noiseSpeedY = 0.04f;
 
         NoiseOffset.X += noiseSpeedX * Time.DeltaTime;
         NoiseOffset.Y += noiseSpeedY * Time.DeltaTime;

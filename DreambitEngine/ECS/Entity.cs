@@ -8,7 +8,7 @@ public class Entity : IDisposable
 {
     private readonly List<Entity> _children = [];
 
-    public readonly uint Id;
+    public readonly Guid Id;
     private bool _alwaysUpadte;
     private bool _enabled;
     private bool _isDestroyed;
@@ -16,7 +16,7 @@ public class Entity : IDisposable
     private Entity _parent;
     public string Name;
 
-    internal Entity(uint id, string name, HashSet<string> tags, bool enabled, Scene scene)
+    internal Entity(Guid id, string name, HashSet<string> tags, bool enabled, Scene scene)
     {
         Id = id;
         Name = name;
@@ -72,12 +72,18 @@ public class Entity : IDisposable
 
     public bool Enabled
     {
-        get => _enabled;
+        get
+        {
+            if(Parent == null)
+                return _enabled;
+            
+            return Parent.Enabled && _enabled;
+        }
         set
         {
             if (_enabled == value) return;
             _enabled = value;
-
+            
             if (_enabled)
                 OnEnabled();
             else
@@ -97,13 +103,14 @@ public class Entity : IDisposable
     }
 
     public static Entity Create(string name = "entity", HashSet<string> tags = null
-        , bool enabled = true, Vector3? createAt = null)
+        , bool enabled = true, Vector3? createAt = null, Guid? guidOverride = null)
     {
-        var entity = Core.Instance.CurrentScene.CreateEntity(name, tags, enabled, createAt);
+        var entity = Core.Instance.CurrentScene.CreateEntity(name, tags, enabled, createAt, guidOverride);
 
         entity.Transform.LastWorldPosition = entity.Transform.WorldPosition;
         return entity;
     }
+    
 
     public static Entity CreateChildOf(Entity parent, string name = "entity", HashSet<string> tags = null,
         bool enabled = true)
@@ -118,6 +125,13 @@ public class Entity : IDisposable
     public static Entity FindByName(string name)
     {
         var entity = Core.Instance.CurrentScene.FindEntity(name);
+
+        return entity;
+    }
+
+    public static Entity FindById(Guid iid)
+    {
+        var entity = Core.Instance.CurrentScene.FindEntity(iid);
 
         return entity;
     }
@@ -184,6 +198,12 @@ public class Entity : IDisposable
         return component;
     }
 
+    /// <summary>
+    ///     Attaches a component to the entity, if it already exists
+    ///     it will return the existing component
+    /// </summary>
+    /// <param name="type"></param>
+    /// <returns></returns>
     public Component AttachComponent(Type type)
     {
         var component = ComponentList.GetComponent(type);

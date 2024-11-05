@@ -14,14 +14,13 @@ public class EntityList(Scene scene)
     private readonly List<Entity> _entitiesToDestroy = [];
     private readonly Logger<EntityList> _logger = new();
 
-    private uint _nextEntityId;
-
-    internal Entity CreateEntity(string name, HashSet<string> tags, bool enabled, Vector3? createAt)
+    internal Entity CreateEntity(string name, HashSet<string> tags, bool enabled, Vector3? createAt, Guid? guidOverride = null)
     {
         tags ??= ["default"];
 
         //create the entity
-        var entity = new Entity(_nextEntityId, name, tags, enabled, scene);
+        var guid = guidOverride ?? Guid.NewGuid();
+        var entity = new Entity(guid, name, tags, enabled, scene);
         entity.Transform.Entity = entity;
         _entitiesToCreate.Add(entity);
 
@@ -30,9 +29,6 @@ public class EntityList(Scene scene)
             entity.Transform.Position = createAt.Value;
             entity.Transform.LastWorldPosition = entity.Transform.Position;
         }
-
-        _nextEntityId++; //increment for the next entity ID.
-
         return entity;
     }
 
@@ -127,7 +123,7 @@ public class EntityList(Scene scene)
         HandleEntityDeletions();
     }
 
-    public Entity GetEntity(uint id)
+    public Entity GetEntity(Guid id)
     {
         var entityResult = _entities.FirstOrDefault(entity => entity.Id == id);
         if (entityResult != null)

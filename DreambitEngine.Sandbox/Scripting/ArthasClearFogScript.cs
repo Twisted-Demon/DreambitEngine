@@ -50,7 +50,8 @@ public class ArthasClearFogScript : ScriptAction
 
         foreach (var fog in _fogsToClear)
         {
-            var e = Entity.FindByName(fog);
+            var iid = Guid.Parse(fog);
+            var e = Entity.FindById(iid);
             e.Enabled = false;
         }
     }

@@ -2,12 +2,7 @@
 
 public class BlackboardVar<T> : BlackboardVar
 {
-    public BlackboardVar()
-    {
-        InternalValue = default;
-    }
-
-    public BlackboardVar(T startingValue)
+    internal BlackboardVar(T startingValue = default)
     {
         InternalValue = startingValue;
     }

@@ -91,7 +91,7 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
             originToUse = new Vector2(relative.X * spriteFrame.Width, relative.Y * spriteFrame.Height);
         }
 
-        var depth = Transform.WorldPosition.Y / float.MaxValue;
+        //var depth = Transform.WorldPosition.Y / float.MaxValue;
 
         var spriteEffect = SpriteEffects.None;
 
@@ -110,7 +110,7 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
             originToUse,
             Transform.WorldScaleToVec2,
             spriteEffect,
-            depth
+            0f
         );
     }
 
