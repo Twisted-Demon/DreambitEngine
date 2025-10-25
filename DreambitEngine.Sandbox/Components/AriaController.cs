@@ -112,11 +112,11 @@ public class AriaController : Component
     {
         _moveDir = Vector3.Zero;
         
-        _moveDir.X += Input.IsKeyHeld(Keys.Right) ? 1 : 0;
-        _moveDir.X -= Input.IsKeyHeld(Keys.Left)  ? 1 : 0;
+        _moveDir.X += Input.IsKeyHeld(Keys.D)  ? 1 : 0;
+        _moveDir.X -= Input.IsKeyHeld(Keys.A)  ? 1 : 0;
         
-        _moveDir.Y += Input.IsKeyHeld(Keys.Down)  ? 1 : 0;
-        _moveDir.Y -= Input.IsKeyHeld(Keys.Up)    ? 1 : 0;
+        _moveDir.Y += Input.IsKeyHeld(Keys.S)  ? 1 : 0;
+        _moveDir.Y -= Input.IsKeyHeld(Keys.W)  ? 1 : 0;
         
         if(_moveDir != Vector3.Zero)
             _moveDir.Normalize();

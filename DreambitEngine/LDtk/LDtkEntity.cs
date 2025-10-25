@@ -8,6 +8,8 @@ namespace Dreambit;
 
 public class LDtkEntity<T> : LDtkEntity where T : new()
 {
+    protected Scene Scene = Core.Instance.CurrentScene;
+    
     protected Entity CreateEntity<TU>(TU data, string name = null, HashSet<string> tags = null) where TU : ILDtkEntity
     {
         name ??= data.Identifier;

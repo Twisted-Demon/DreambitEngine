@@ -17,8 +17,7 @@ public class Scene
 
     internal readonly DrawableList Drawables;
     internal readonly EntityList Entities;
-
-    private bool _useDefaultRenderer;
+    
     protected bool IsInitialized;
     protected bool IsStarted;
     protected bool IsPaused;
@@ -30,18 +29,20 @@ public class Scene
     private readonly UIRenderer _uiRenderer;
     private readonly PostProcessRenderer _postProcessRenderer;
     
+    public PostProcessSettings PostProcessSettings;
+    
     public Scene()
     {
         Entities = new EntityList(this);
         Drawables = new DrawableList();
         ScriptingManager = new ScriptingManager();
         
-        _useDefaultRenderer = true;
-
-        _sceneRenderer = new DefaultRenderer(this);
+        PostProcessSettings = new PostProcessSettings();
+        
+        _sceneRenderer = new Basic2dLightingRenderer(this);
         _debugRenderer = new DebugRenderer(this);
         _uiRenderer = new UIRenderer(this);
-        _postProcessRenderer = new PostProcessRenderer(this, _sceneRenderer);
+        _postProcessRenderer = new PostProcessRenderer(this, _sceneRenderer, PostProcessSettings);
     }
 
     public bool DebugMode { get; set; }
@@ -71,13 +72,6 @@ public class Scene
 
         OnInitialize();
     }
-
-    //public Scene SetRenderer<T>() where T : Renderer
-    //{
-    //    _sceneRenderer = (T)Activator.CreateInstance(typeof(T), this);
-    //    _useDefaultRenderer = false;
-    //    return this;
-    //}
 
     /// <summary>
     ///     Called after the scene has been initialized and has actually begun.

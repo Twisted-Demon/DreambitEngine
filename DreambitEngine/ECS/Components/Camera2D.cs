@@ -61,6 +61,26 @@ public class Camera2D : Component
         }
     }
 
+    public RectangleF BoundsF
+    {
+        get
+        {
+            // Get the 2D world position of the object the camera is following
+            var pos = Transform.WorldPosToVec2;
+
+            // Calculate the width and height of the camera view based on the current zoom
+            var width = (int)(Window.Width / TotalZoom);
+            var height = (int)(Window.Height / TotalZoom);
+
+            // Return the bounds of the camera view
+            return new RectangleF(
+                (int)(pos.X - width * 0.5f), // Center the X position based on the zoomed width
+                (int)(pos.Y - height * 0.5f), // Center the Y position based on the zoomed height
+                width,
+                height
+            );
+        }
+    }
 
     public override void OnCreated()
     {

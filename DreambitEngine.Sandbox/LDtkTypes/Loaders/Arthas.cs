@@ -1,11 +1,10 @@
-﻿using System.Collections.Generic;
+﻿
 using Dreambit.ECS;
 using Dreambit.Sandbox.Drawable;
 using Dreambit.Sandbox.Player;
 using Dreambit.Sandbox.Utils;
 using LDtk;
 using Microsoft.Xna.Framework;
-using Vector2 = Microsoft.Xna.Framework.Vector2;
 
 namespace Dreambit.Sandbox;
 
@@ -23,8 +22,8 @@ public partial class Arthas : LDtkEntity<Arthas>
 
         var lightEntity = Entity.CreateChildOf(entity, "light", ["light"]);
         var light = lightEntity.AttachComponent<PointLight2D>();
-        
-        light.Color = new Vector3(253/(float)255, 251/(float)255, 251/(float)211);
+
+        light.Color = Color.White;
         light.Intensity = 0.75f;
         light.Radius = 125.0f;
         

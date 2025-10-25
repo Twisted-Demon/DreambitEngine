@@ -1,0 +1,3191 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>LDtkMonogame</name>
+    </assembly>
+    <members>
+        <member name="T:LDtk.Constants">
+            <summary> General Constants used in LDtkMonogame. </summary>
+        </member>
+        <member name="F:LDtk.Constants.SupportedLDtkVersion">
+            <summary> The supported version of ldtk so you are in a newer version any new features may not be added yet please create an issue on the github requesting them. </summary>
+        </member>
+        <member name="F:LDtk.Constants.SerializeOptions">
+            <summary> The converter used internally with JsonSerializer.Deserialize(..., Constants.SerializeOptions) not needed by the user just use .FromFileReflection instead. </summary>
+        </member>
+        <member name="F:LDtk.Constants.JsonSourceGenerator">
+            <summary> The converter used internally with JsonSerializer.Deserialize(..., Constants.SerializeOptions) not needed by the user just use .FromFile instead. </summary>
+        </member>
+        <member name="F:LDtk.Constants.SerializeOptionsFull">
+            <summary> The converter used internally by LDtkFileFull with JsonSerializer.Deserialize(..., Constants.SerializeOptionsFull) not needed by the user just use .FromFile instead. </summary>
+        </member>
+        <member name="F:LDtk.Constants.JsonSourceGeneratorFull">
+            <summary> The converter used internally by LDtkFileFull with JsonSerializer.Deserialize(..., Constants.SerializeOptions) not needed by the user just use .FromFile instead. </summary>
+        </member>
+        <member name="T:LDtk.ContentPipeline.LDtkFileReader">
+            <summary> LDtkFileReader. </summary>
+        </member>
+        <member name="M:LDtk.ContentPipeline.LDtkFileReader.Read(Microsoft.Xna.Framework.Content.ContentReader,LDtk.LDtkFile)">
+            <summary> Read. </summary>
+            <param name="input"> The ContentReader. </param>
+            <param name="existingInstance"> The existingInstance. </param>
+            <returns> The LDtkFile read from the content pipeline. </returns>
+        </member>
+        <member name="T:LDtk.ContentPipeline.LDtkLevelReader">
+            <summary> LDtkLevelReader. </summary>
+        </member>
+        <member name="M:LDtk.ContentPipeline.LDtkLevelReader.Read(Microsoft.Xna.Framework.Content.ContentReader,LDtk.LDtkLevel)">
+            <summary> Read. </summary>
+            <param name="input"> The ContentReader. </param>
+            <param name="existingInstance"> The existingInstance. </param>
+            <returns> The LDtkLevel read from the content pipeline. </returns>
+        </member>
+        <member name="T:LDtk.Full.LDtkFileFull">
+            <summary> This is the root of any Project JSON file. It contains:  - the project settings, - an array of levels, - a group of definitions (that can probably be safely ignored for most users). </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.AppBuildId">
+            <summary> LDtk application build identifier.<br/>  This is only used to identify the LDtk version that generated this particular project file, which can be useful for specific bug fixing. Note that the build identifier is just the date of the release, so it's not unique to each user (one single global ID per LDtk public release), and as a result, completely anonymous. </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.BackupLimit">
+            <summary> Number of backup files to keep, if the <c>backupOnSave</c> is TRUE </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.BackupOnSave">
+            <summary> If TRUE, an extra copy of the project will be created in a sub folder, when saving. </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.BackupRelPath">
+            <summary> Target relative path to store backup files </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.BgColor">
+            <summary> Project background color </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.CustomCommands">
+            <summary> An array of command lines that can be ran manually by the user </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.DefaultEntityHeight">
+            <summary> Default height for new entities </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.DefaultEntityWidth">
+            <summary> Default width for new entities </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.DefaultGridSize">
+            <summary> Default grid size for new layers </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.DefaultLevelBgColor">
+            <summary> Default background color of levels </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.DefaultLevelHeight">
+            <summary> <b>WARNING</b>: this field will move to the <c>worlds</c> array after the "multi-worlds" update. It will then be <c>null</c>. You can enable the Multi-worlds advanced project option to enable the change immediately.<br/><br/>  Default new level height </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.DefaultLevelWidth">
+            <summary> <b>WARNING</b>: this field will move to the <c>worlds</c> array after the "multi-worlds" update. It will then be <c>null</c>. You can enable the Multi-worlds advanced project option to enable the change immediately.<br/><br/>  Default new level width </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.DefaultPivotX">
+            <summary> Default X pivot (0 to 1) for new entities </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.DefaultPivotY">
+            <summary> Default Y pivot (0 to 1) for new entities </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.Defs">
+            <summary> A structure containing all the definitions of this project </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.DummyWorldIid">
+            <summary> If the project isn't in MultiWorlds mode, this is the IID of the internal "dummy" World. </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.ExportLevelBg">
+            <summary> If TRUE, the exported PNGs will include the level background (color or image). </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.ExportPng">
+            <summary> <b>WARNING</b>: this deprecated value is no longer exported since version 0.9.3  Replaced by: <c>imageExportMode</c> </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.ExportTiled">
+            <summary> If TRUE, a Tiled compatible file will also be generated along with the LDtk JSON file (default is FALSE) </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.ExternalLevels">
+            <summary> If TRUE, one file will be saved for the project (incl. all its definitions) and one file in a sub-folder for each level. </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.Flags">
+            <summary> An array containing various advanced flags (ie. options or other states). Possible values: <c>DiscardPreCsvIntGrid</c>, <c>ExportOldTableOfContentData</c>, <c>ExportPreCsvIntGridFormat</c>, <c>IgnoreBackupSuggest</c>, <c>PrependIndexToLevelFileNames</c>, <c>MultiWorlds</c>, <c>UseMultilinesType</c> </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull._FORCED_REFS">
+            <summary> This object is not actually used by LDtk. It ONLY exists to force explicit references to all types, to make sure QuickType finds them and integrate all of them. Otherwise, Quicktype will drop types that are not explicitely used. </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.IdentifierStyle">
+            <summary> Naming convention for Identifiers (first-letter uppercase, full uppercase etc.) Possible values: <c>Capitalize</c>, <c>Uppercase</c>, <c>Lowercase</c>, <c>Free</c> </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.Iid">
+            <summary> Unique project identifier </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.ImageExportMode">
+            <summary> "Image export" option when saving project. Possible values: <c>None</c>, <c>OneImagePerLayer</c>, <c>OneImagePerLevel</c>, <c>LayersAndLevels</c> </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.JsonVersion">
+            <summary> File format version </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.LevelNamePattern">
+            <summary> The default naming convention for level identifiers. </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.Levels">
+            <summary> All levels. The order of this array is only relevant in <c>LinearHorizontal</c> and <c>linearVertical</c> world layouts (see <c>worldLayout</c> value).<br/>  Otherwise, you should refer to the <c>worldX</c>,<c>worldY</c> coordinates of each Level. </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.MinifyJson">
+            <summary> If TRUE, the Json is partially minified (no indentation, nor line breaks, default is FALSE) </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.NextUid">
+            <summary> Next Unique integer ID available </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.PngFilePattern">
+            <summary> File naming pattern for exported PNGs </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.SimplifiedExport">
+            <summary> If TRUE, a very simplified will be generated on saving, for quicker &amp; easier engine integration. </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.Toc">
+            <summary> All instances of entities that have their <c>exportToToc</c> flag enabled are listed in this array. </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.TutorialDesc">
+            <summary> This optional description is used by LDtk Samples to show up some informations and instructions. </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.WorldGridHeight">
+            <summary> <b>WARNING</b>: this field will move to the <c>worlds</c> array after the "multi-worlds" update. It will then be <c>null</c>. You can enable the Multi-worlds advanced project option to enable the change immediately.<br/><br/>  Height of the world grid in pixels. </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.WorldGridWidth">
+            <summary> <b>WARNING</b>: this field will move to the <c>worlds</c> array after the "multi-worlds" update. It will then be <c>null</c>. You can enable the Multi-worlds advanced project option to enable the change immediately.<br/><br/>  Width of the world grid in pixels. </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.WorldLayout">
+            <summary> <b>WARNING</b>: this field will move to the <c>worlds</c> array after the "multi-worlds" update. It will then be <c>null</c>. You can enable the Multi-worlds advanced project option to enable the change immediately.<br/><br/>  An enum that describes how levels are organized in this project (ie. linearly or in a 2D space). Possible values: &lt;<c>null</c>&gt;, <c>Free</c>, <c>GridVania</c>, <c>LinearHorizontal</c>, <c>LinearVertical</c> </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.Worlds">
+            <summary> This array will be empty, unless you enable the Multi-Worlds in the project advanced settings.<br/><br/> - in current version, a LDtk project file can only contain a single world with multiple levels in it. In this case, levels and world layout related settings are stored in the root of the JSON.<br/> - with "Multi-worlds" enabled, there will be a <c>worlds</c> array in root, each world containing levels and layout settings. Basically, it's pretty much only about moving the <c>levels</c> array to the <c>worlds</c> array, along with world layout related values (eg. <c>worldGridWidth</c> etc).<br/><br/>If you want to start supporting this future update easily, please refer to this documentation: https://github.com/deepnight/ldtk/issues/231 </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkFileFull.FilePath">
+            <summary> Gets or sets the absolute path to the ldtkFile. </summary>
+        </member>
+        <member name="M:LDtk.Full.LDtkFileFull.FromFile(System.String)">
+            <summary> Loads the ldtk world file from disk directly using json source generator. </summary>
+            <param name="filePath"> Path to the .ldtk file. </param>
+            <returns> Returns the file loaded from the path. </returns>
+        </member>
+        <member name="T:LDtk.Full.AutoLayerRuleGroup">
+            <summary> Auto-layer rule group </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoLayerRuleGroup.Active">
+            <summary> Active </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoLayerRuleGroup.BiomeRequirementMode">
+            <summary> BiomeRequirementMode </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoLayerRuleGroup.Collapsed">
+            <summary> *This field was removed in 1.0.0 and should no longer be used.* </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoLayerRuleGroup.Color">
+            <summary> Color </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoLayerRuleGroup.Icon">
+            <summary> Icon </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoLayerRuleGroup.IsOptional">
+            <summary> IsOptional </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoLayerRuleGroup.Name">
+            <summary> Name </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoLayerRuleGroup.RequiredBiomeValues">
+            <summary> RequiredBiomeValues </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoLayerRuleGroup.Rules">
+            <summary> Rules </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoLayerRuleGroup.Uid">
+            <summary> Uid </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoLayerRuleGroup.UsesWizard">
+            <summary> UsesWizard </summary>
+        </member>
+        <member name="T:LDtk.Full.AutoRuleDef">
+            <summary> This complex section isn't meant to be used by game devs at all, as these rules are completely resolved internally by the editor before any saving. You should just ignore this part. </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.Active">
+            <summary> If FALSE, the rule effect isn't applied, and no tiles are generated. </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.Alpha">
+            <summary> Alpha </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.BreakOnMatch">
+            <summary> When TRUE, the rule will prevent other rules to be applied in the same cell if it matches (TRUE by default). </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.Chance">
+            <summary> Chances for this rule to be applied (0 to 1) </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.Checker">
+            <summary> Checker mode Possible values: <c>None</c>, <c>Horizontal</c>, <c>Vertical</c> </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.FlipX">
+            <summary> If TRUE, allow rule to be matched by flipping its pattern horizontally </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.FlipY">
+            <summary> If TRUE, allow rule to be matched by flipping its pattern vertically </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.Invalidated">
+            <summary> If TRUE, then the rule should be re-evaluated by the editor at one point </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.OutOfBoundsValue">
+            <summary> Default IntGrid value when checking cells outside of level bounds </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.Pattern">
+            <summary> Rule pattern (size x size) </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.PerlinActive">
+            <summary> If TRUE, enable Perlin filtering to only apply rule on specific random area </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.PerlinOctaves">
+            <summary> PerlinOctaves </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.PerlinScale">
+            <summary> PerlinScale </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.PerlinSeed">
+            <summary> PerlinSeed </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.PivotX">
+            <summary> X pivot of a tile stamp (0-1) </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.PivotY">
+            <summary> Y pivot of a tile stamp (0-1) </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.Size">
+            <summary> Pattern width &amp; height. Should only be 1,3,5 or 7. </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.TileIds">
+            <summary> <b>WARNING</b>: this deprecated value is no longer exported since version 1.5.0  Replaced by: <c>tileRectsIds</c> </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.TileMode">
+            <summary> Defines how tileIds array is used Possible values: <c>Single</c>, <c>Stamp</c> </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.TileRandomXMax">
+            <summary> Max random offset for X tile pos </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.TileRandomXMin">
+            <summary> Min random offset for X tile pos </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.TileRandomYMax">
+            <summary> Max random offset for Y tile pos </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.TileRandomYMin">
+            <summary> Min random offset for Y tile pos </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.TileRectsIds">
+            <summary> Array containing all the possible tile IDs rectangles (picked randomly). </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.TileXOffset">
+            <summary> Tile X offset </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.TileYOffset">
+            <summary> Tile Y offset </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.Uid">
+            <summary> Unique Int identifier </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.XModulo">
+            <summary> X cell coord modulo </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.XOffset">
+            <summary> X cell start offset </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.YModulo">
+            <summary> Y cell coord modulo </summary>
+        </member>
+        <member name="P:LDtk.Full.AutoRuleDef.YOffset">
+            <summary> Y cell start offset </summary>
+        </member>
+        <member name="T:LDtk.Full.CustomCommand">
+            <summary> CustomCommand run by LDtk </summary>
+        </member>
+        <member name="P:LDtk.Full.CustomCommand.Command">
+            <summary> Command </summary>
+        </member>
+        <member name="P:LDtk.Full.CustomCommand.When">
+            <summary> Possible values: <c>Manual</c>, <c>AfterLoad</c>, <c>BeforeSave</c>, <c>AfterSave</c> </summary>
+        </member>
+        <member name="T:LDtk.Full.Definitions">
+            <summary> If you're writing your own LDtk importer, you should probably just ignore *most* stuff in the <c>defs</c> section, as it contains data that are mostly important to the editor. To keep you away from the <c>defs</c> section and avoid some unnecessary JSON parsing, important data from definitions is often duplicated in fields prefixed with a double underscore (eg. <c>__identifier</c> or <c>__type</c>).  The 2 only definition types you might need here are <b>Tilesets</b> and <b>Enums</b>. </summary>
+        </member>
+        <member name="P:LDtk.Full.Definitions.Entities">
+            <summary> All entities definitions, including their custom fields </summary>
+        </member>
+        <member name="P:LDtk.Full.Definitions.Enums">
+            <summary> All internal enums </summary>
+        </member>
+        <member name="P:LDtk.Full.Definitions.ExternalEnums">
+            <summary> Note: external enums are exactly the same as <c>enums</c>, except they have a <c>relPath</c> to point to an external source file. </summary>
+        </member>
+        <member name="P:LDtk.Full.Definitions.Layers">
+            <summary> All layer definitions </summary>
+        </member>
+        <member name="P:LDtk.Full.Definitions.LevelFields">
+            <summary> All custom fields available to all levels. </summary>
+        </member>
+        <member name="P:LDtk.Full.Definitions.Tilesets">
+            <summary> All tilesets </summary>
+        </member>
+        <member name="T:LDtk.Full.EntityDefinition">
+            <summary> Entity definition </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.AllowOutOfBounds">
+            <summary> If enabled, this entity is allowed to stay outside of the current level bounds </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.Color">
+            <summary> Base entity color </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.Doc">
+            <summary> User defined documentation for this element to provide help/tips to level designers. </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.ExportToToc">
+            <summary> If enabled, all instances of this entity will be listed in the project "Table of content" object. </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.FieldDefs">
+            <summary> Array of field definitions </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.FillOpacity">
+            <summary> FillOpacity </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.Height">
+            <summary> Pixel height </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.Hollow">
+            <summary> Hollow </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.Identifier">
+            <summary> User defined unique identifier </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.KeepAspectRatio">
+            <summary> Only applies to entities resizable on both X/Y. If TRUE, the entity instance width/height will keep the same aspect ratio as the definition. </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.LimitBehavior">
+            <summary> Possible values: <c>DiscardOldOnes</c>, <c>PreventAdding</c>, <c>MoveLastOne</c> </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.LimitScope">
+            <summary> If TRUE, the maxCount is a "per world" limit, if FALSE, it's a "per level". Possible values: <c>PerLayer</c>, <c>PerLevel</c>, <c>PerWorld</c> </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.LineOpacity">
+            <summary> LineOpacity </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.MaxCount">
+            <summary> Max instances count </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.MaxHeight">
+            <summary> Max pixel height (only applies if the entity is resizable on Y) </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.MaxWidth">
+            <summary> Max pixel width (only applies if the entity is resizable on X) </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.MinHeight">
+            <summary> Min pixel height (only applies if the entity is resizable on Y) </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.MinWidth">
+            <summary> Min pixel width (only applies if the entity is resizable on X) </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.NineSliceBorders">
+            <summary> An array of 4 dimensions for the up/right/down/left borders (in this order) when using 9-slice mode for <c>tileRenderMode</c>.<br/>  If the tileRenderMode is not NineSlice, then this array is empty.<br/>  See: https://en.wikipedia.org/wiki/9-slice_scaling </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.PivotX">
+            <summary> Pivot X coordinate (from 0 to 1.0) </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.PivotY">
+            <summary> Pivot Y coordinate (from 0 to 1.0) </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.RenderMode">
+            <summary> Possible values: <c>Rectangle</c>, <c>Ellipse</c>, <c>Tile</c>, <c>Cross</c> </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.ResizableX">
+            <summary> If TRUE, the entity instances will be resizable horizontally </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.ResizableY">
+            <summary> If TRUE, the entity instances will be resizable vertically </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.ShowName">
+            <summary> Display entity name in editor </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.Tags">
+            <summary> An array of strings that classifies this entity </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.TileId">
+            <summary> <b>WARNING</b>: this deprecated value is no longer exported since version 1.2.0  Replaced by: <c>tileRect</c> </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.TileOpacity">
+            <summary> TileOpacity </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.TileRect">
+            <summary> An object representing a rectangle from an existing Tileset </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.TileRenderMode">
+            <summary> An enum describing how the Entity tile is rendered inside the Entity bounds. Possible values: <c>Cover</c>, <c>FitInside</c>, <c>Repeat</c>, <c>Stretch</c>, <c>FullSizeCropped</c>, <c>FullSizeUncropped</c>, <c>NineSlice</c> </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.TilesetId">
+            <summary> Tileset ID used for optional tile display </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.Uid">
+            <summary> Unique Int identifier </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.UiTileRect">
+            <summary> This tile overrides the one defined in <c>tileRect</c> in the UI </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityDefinition.Width">
+            <summary> Pixel width </summary>
+        </member>
+        <member name="T:LDtk.Full.EntityInstance">
+            <summary> Entity instance </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityInstance.DefUid">
+            <summary> Reference of the <b>Entity definition</b> UID </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityInstance.FieldInstances">
+            <summary> An array of all custom fields and their values. </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityInstance._Grid">
+            <summary> Grid-based coordinates (<c>[x,y]</c> format) </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityInstance.Height">
+            <summary> Entity height in pixels. For non-resizable entities, it will be the same as Entity definition. </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityInstance._Identifier">
+            <summary> Entity definition identifier </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityInstance.Iid">
+            <summary> Unique instance identifier </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityInstance._Pivot">
+            <summary> Pivot coordinates  (<c>[x,y]</c> format, values are from 0 to 1) of the Entity </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityInstance.Px">
+            <summary> Pixel coordinates (<c>[x,y]</c> format) in current level coordinate space. Don't forget optional layer offsets, if they exist! </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityInstance._SmartColor">
+            <summary> The entity "smart" color, guessed from either Entity definition, or one its field instances. </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityInstance._Tags">
+            <summary> Array of tags defined in this Entity definition </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityInstance._Tile">
+            <summary> Optional TilesetRect used to display this entity (it could either be the default Entity tile, or some tile provided by a field value, like an Enum). </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityInstance.Width">
+            <summary> Entity width in pixels. For non-resizable entities, it will be the same as Entity definition. </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityInstance._WorldX">
+            <summary> X world coordinate in pixels. Only available in GridVania or Free world layouts. </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityInstance._WorldY">
+            <summary> Y world coordinate in pixels Only available in GridVania or Free world layouts. </summary>
+        </member>
+        <member name="T:LDtk.Full.EntityReference">
+            <summary> This object describes the "location" of an Entity instance in the project worlds. </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityReference.EntityIid">
+            <summary> IID of the refered EntityInstance </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityReference.LayerIid">
+            <summary> IID of the LayerInstance containing the refered EntityInstance </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityReference.LevelIid">
+            <summary> IID of the Level containing the refered EntityInstance </summary>
+        </member>
+        <member name="P:LDtk.Full.EntityReference.WorldIid">
+            <summary> IID of the World containing the refered EntityInstance </summary>
+        </member>
+        <member name="T:LDtk.Full.EnumDefinition">
+            <summary> Enum definition </summary>
+        </member>
+        <member name="P:LDtk.Full.EnumDefinition.ExternalFileChecksum">
+            <summary> ExternalFileChecksum </summary>
+        </member>
+        <member name="P:LDtk.Full.EnumDefinition.ExternalRelPath">
+            <summary> Relative path to the external file providing this Enum </summary>
+        </member>
+        <member name="P:LDtk.Full.EnumDefinition.IconTilesetUid">
+            <summary> Tileset UID if provided </summary>
+        </member>
+        <member name="P:LDtk.Full.EnumDefinition.Identifier">
+            <summary> User defined unique identifier </summary>
+        </member>
+        <member name="P:LDtk.Full.EnumDefinition.Tags">
+            <summary> An array of user-defined tags to organize the Enums </summary>
+        </member>
+        <member name="P:LDtk.Full.EnumDefinition.Uid">
+            <summary> Unique Int identifier </summary>
+        </member>
+        <member name="P:LDtk.Full.EnumDefinition.Values">
+            <summary> All possible enum values, with their optional Tile infos. </summary>
+        </member>
+        <member name="T:LDtk.Full.EnumValueDefinition">
+            <summary> Enum value definition </summary>
+        </member>
+        <member name="P:LDtk.Full.EnumValueDefinition.Color">
+            <summary> Optional color </summary>
+        </member>
+        <member name="P:LDtk.Full.EnumValueDefinition.Id">
+            <summary> Enum value </summary>
+        </member>
+        <member name="P:LDtk.Full.EnumValueDefinition.TileId">
+            <summary> <b>WARNING</b>: this deprecated value is no longer exported since version 1.4.0  Replaced by: <c>tileRect</c> </summary>
+        </member>
+        <member name="P:LDtk.Full.EnumValueDefinition.TileRect">
+            <summary> Optional tileset rectangle to represents this value </summary>
+        </member>
+        <member name="P:LDtk.Full.EnumValueDefinition._TileSrcRect">
+            <summary> <b>WARNING</b>: this deprecated value is no longer exported since version 1.4.0  Replaced by: <c>tileRect</c> </summary>
+        </member>
+        <member name="T:LDtk.Full.EnumTagValue">
+            <summary> In a tileset definition, enum based tag infos </summary>
+        </member>
+        <member name="P:LDtk.Full.EnumTagValue.EnumValueId">
+            <summary> EnumValueId </summary>
+        </member>
+        <member name="P:LDtk.Full.EnumTagValue.TileIds">
+            <summary> TileIds </summary>
+        </member>
+        <member name="T:LDtk.Full.FieldDefinition">
+            <summary> This section is mostly only intended for the LDtk editor app itself. You can safely ignore it. </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.AcceptFileTypes">
+            <summary> Optional list of accepted file extensions for FilePath value type. Includes the dot: <c>.ext</c> </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.AllowedRefs">
+            <summary> Possible values: <c>Any</c>, <c>OnlySame</c>, <c>OnlyTags</c>, <c>OnlySpecificEntity</c> </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.AllowedRefsEntityUid">
+            <summary> AllowedRefsEntityUid </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.AllowedRefTags">
+            <summary> AllowedRefTags </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.AllowOutOfLevelRef">
+            <summary> AllowOutOfLevelRef </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.ArrayMaxLength">
+            <summary> Array max length </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.ArrayMinLength">
+            <summary> Array min length </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.AutoChainRef">
+            <summary> AutoChainRef </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.CanBeNull">
+            <summary> TRUE if the value can be null. For arrays, TRUE means it can contain null values (exception: array of Points can't have null values). </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.DefaultOverride">
+            <summary> Default value if selected value is null or invalid. </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.Doc">
+            <summary> User defined documentation for this field to provide help/tips to level designers about accepted values. </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.EditorAlwaysShow">
+            <summary> EditorAlwaysShow </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.EditorCutLongValues">
+            <summary> EditorCutLongValues </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.EditorDisplayColor">
+            <summary> EditorDisplayColor </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.EditorDisplayMode">
+            <summary> Possible values: <c>Hidden</c>, <c>ValueOnly</c>, <c>NameAndValue</c>, <c>EntityTile</c>, <c>LevelTile</c>, <c>Points</c>, <c>PointStar</c>, <c>PointPath</c>, <c>PointPathLoop</c>, <c>RadiusPx</c>, <c>RadiusGrid</c>, <c>ArrayCountWithLabel</c>, <c>ArrayCountNoLabel</c>, <c>RefLinkBetweenPivots</c>, <c>RefLinkBetweenCenters</c> </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.EditorDisplayPos">
+            <summary> Possible values: <c>Above</c>, <c>Center</c>, <c>Beneath</c> </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.EditorDisplayScale">
+            <summary> EditorDisplayScale </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.EditorLinkStyle">
+            <summary> Possible values: <c>ZigZag</c>, <c>StraightArrow</c>, <c>CurvedArrow</c>, <c>ArrowsLine</c>, <c>DashedLine</c> </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.EditorShowInWorld">
+            <summary> EditorShowInWorld </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.EditorTextPrefix">
+            <summary> EditorTextPrefix </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.EditorTextSuffix">
+            <summary> EditorTextSuffix </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.ExportToToc">
+            <summary> If TRUE, the field value will be exported to the <c>toc</c> project JSON field. Only applies to Entity fields. </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.Identifier">
+            <summary> User defined unique identifier </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.IsArray">
+            <summary> TRUE if the value is an array of multiple values </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.Max">
+            <summary> Max limit for value, if applicable </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.Min">
+            <summary> Min limit for value, if applicable </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.Regex">
+            <summary> Optional regular expression that needs to be matched to accept values. Expected format: <c>/some_reg_ex/g</c>, with optional "i" flag. </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.Searchable">
+            <summary> If enabled, this field will be searchable through LDtk command palette </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.SymmetricalRef">
+            <summary> SymmetricalRef </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.TextLanguageMode">
+            <summary> Possible values: &lt;<c>null</c>&gt;, <c>LangPython</c>, <c>LangRuby</c>, <c>LangJS</c>, <c>LangLua</c>, <c>LangC</c>, <c>LangHaxe</c>, <c>LangMarkdown</c>, <c>LangJson</c>, <c>LangXml</c>, <c>LangLog</c> </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.TilesetUid">
+            <summary> UID of the tileset used for a Tile </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition._Type">
+            <summary> Human readable value type. Possible values: <c>Int, Float, String, Bool, Color, ExternEnum.XXX, LocalEnum.XXX, Point, FilePath</c>.<br/>  If the field is an array, this field will look like <c>Array&lt;...&gt;</c> (eg. <c>Array&lt;Int&gt;</c>, <c>Array&lt;Point&gt;</c> etc.)<br/>  NOTE: if you enable the advanced option <b>Use Multilines type</b>, you will have "*Multilines*" instead of "*String*" when relevant. </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.Type">
+            <summary> Internal enum representing the possible field types. Possible values: F_Int, F_Float, F_String, F_Text, F_Bool, F_Color, F_Enum(...), F_Point, F_Path, F_EntityRef, F_Tile </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.Uid">
+            <summary> Unique Int identifier </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldDefinition.UseForSmartColor">
+            <summary> If TRUE, the color associated with this field will override the Entity or Level default color in the editor UI. For Enum fields, this would be the color associated to their values. </summary>
+        </member>
+        <member name="T:LDtk.Full.FieldInstance">
+            <summary> Field instance </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldInstance.DefUid">
+            <summary> Reference of the <b>Field definition</b> UID </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldInstance._Identifier">
+            <summary> Field definition identifier </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldInstance.RealEditorValues">
+            <summary> Editor internal raw values </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldInstance._Tile">
+            <summary> Optional TilesetRect used to display this field (this can be the field own Tile, or some other Tile guessed from the value, like an Enum). </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldInstance._Type">
+            <summary> Type of the field, such as <c>Int</c>, <c>Float</c>, <c>String</c>, <c>Enum(my_enum_name)</c>, <c>Bool</c>, etc.<br/>  NOTE: if you enable the advanced option <b>Use Multilines type</b>, you will have "*Multilines*" instead of "*String*" when relevant. </summary>
+        </member>
+        <member name="P:LDtk.Full.FieldInstance._Value">
+            <summary> Actual value of the field instance. The value type varies, depending on <c>__type</c>:<br/>   - For <b>classic types</b> (ie. Integer, Float, Boolean, String, Text and FilePath), you just get the actual value with the expected type.<br/>   - For <b>Color</b>, the value is an hexadecimal string using "#rrggbb" format.<br/>   - For <b>Enum</b>, the value is a String representing the selected enum value.<br/>   - For <b>Point</b>, the value is a [GridPoint](#ldtk-GridPoint) object.<br/>   - For <b>Tile</b>, the value is a [TilesetRect](#ldtk-TilesetRect) object.<br/>   - For <b>EntityRef</b>, the value is an [EntityReferenceInfos](#ldtk-EntityReferenceInfos) object.<br/><br/>  If the field is an array, then this <c>__value</c> will also be a JSON array. </summary>
+        </member>
+        <member name="T:LDtk.Full.GridPoint">
+            <summary> This object is just a grid-based coordinate used in Field values. </summary>
+        </member>
+        <member name="P:LDtk.Full.GridPoint.Cx">
+            <summary> X grid-based coordinate </summary>
+        </member>
+        <member name="P:LDtk.Full.GridPoint.Cy">
+            <summary> Y grid-based coordinate </summary>
+        </member>
+        <member name="T:LDtk.Full.IntGridValueDefinition">
+            <summary> IntGrid value definition </summary>
+        </member>
+        <member name="P:LDtk.Full.IntGridValueDefinition.Color">
+            <summary> Color </summary>
+        </member>
+        <member name="P:LDtk.Full.IntGridValueDefinition.GroupUid">
+            <summary> Parent group identifier (0 if none) </summary>
+        </member>
+        <member name="P:LDtk.Full.IntGridValueDefinition.Identifier">
+            <summary> User defined unique identifier </summary>
+        </member>
+        <member name="P:LDtk.Full.IntGridValueDefinition.Tile">
+            <summary> Tile </summary>
+        </member>
+        <member name="P:LDtk.Full.IntGridValueDefinition.Value">
+            <summary> The IntGrid value itself </summary>
+        </member>
+        <member name="T:LDtk.Full.IntGridValueGroupDefinition">
+            <summary> IntGrid value group definition </summary>
+        </member>
+        <member name="P:LDtk.Full.IntGridValueGroupDefinition.Color">
+            <summary> User defined color </summary>
+        </member>
+        <member name="P:LDtk.Full.IntGridValueGroupDefinition.Identifier">
+            <summary> User defined string identifier </summary>
+        </member>
+        <member name="P:LDtk.Full.IntGridValueGroupDefinition.Uid">
+            <summary> Group unique ID </summary>
+        </member>
+        <member name="T:LDtk.Full.IntGridValueInstance">
+            <summary> IntGrid value instance </summary>
+        </member>
+        <member name="P:LDtk.Full.IntGridValueInstance.CoordId">
+            <summary> Coordinate ID in the layer grid </summary>
+        </member>
+        <member name="P:LDtk.Full.IntGridValueInstance.V">
+            <summary> IntGrid value </summary>
+        </member>
+        <member name="T:LDtk.Full.LayerDefinition">
+            <summary> Layer definition </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.AutoRuleGroups">
+            <summary> Contains all the auto-layer rule definitions. </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.AutoSourceLayerDefUid">
+            <summary> AutoSourceLayerDefUid </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.AutoTilesetDefUid">
+            <summary> <b>WARNING</b>: this deprecated value is no longer exported since version 1.2.0  Replaced by: <c>tilesetDefUid</c> </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.AutoTilesKilledByOtherLayerUid">
+            <summary> AutoTilesKilledByOtherLayerUid </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.BiomeFieldUid">
+            <summary> BiomeFieldUid </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.CanSelectWhenInactive">
+            <summary> Allow editor selections when the layer is not currently active. </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.DisplayOpacity">
+            <summary> Opacity of the layer (0 to 1.0) </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.Doc">
+            <summary> User defined documentation for this element to provide help/tips to level designers. </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.ExcludedTags">
+            <summary> An array of tags to forbid some Entities in this layer </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.GridSize">
+            <summary> Width and height of the grid in pixels </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.GuideGridHei">
+            <summary> Height of the optional "guide" grid in pixels </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.GuideGridWid">
+            <summary> Width of the optional "guide" grid in pixels </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.HideFieldsWhenInactive">
+            <summary> HideFieldsWhenInactive </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.HideInList">
+            <summary> Hide the layer from the list on the side of the editor view. </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.Identifier">
+            <summary> User defined unique identifier </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.InactiveOpacity">
+            <summary> Alpha of this layer when it is not the active one. </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.IntGridValues">
+            <summary> An array that defines extra optional info for each IntGrid value.<br/>  WARNING: the array order is not related to actual IntGrid values! As user can re-order IntGrid values freely, you may value "2" before value "1" in this array. </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.IntGridValuesGroups">
+            <summary> Group informations for IntGrid values </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.ParallaxFactorX">
+            <summary> Parallax horizontal factor (from -1 to 1, defaults to 0) which affects the scrolling speed of this layer, creating a fake 3D (parallax) effect. </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.ParallaxFactorY">
+            <summary> Parallax vertical factor (from -1 to 1, defaults to 0) which affects the scrolling speed of this layer, creating a fake 3D (parallax) effect. </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.ParallaxScaling">
+            <summary> If true (default), a layer with a parallax factor will also be scaled up/down accordingly. </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.PxOffsetX">
+            <summary> X offset of the layer, in pixels (IMPORTANT: this should be added to the <c>LayerInstance</c> optional offset) </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.PxOffsetY">
+            <summary> Y offset of the layer, in pixels (IMPORTANT: this should be added to the <c>LayerInstance</c> optional offset) </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.RenderInWorldView">
+            <summary> If TRUE, the content of this layer will be used when rendering levels in a simplified way for the world view </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.RequiredTags">
+            <summary> An array of tags to filter Entities that can be added to this layer </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.TilePivotX">
+            <summary> If the tiles are smaller or larger than the layer grid, the pivot value will be used to position the tile relatively its grid cell. </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.TilePivotY">
+            <summary> If the tiles are smaller or larger than the layer grid, the pivot value will be used to position the tile relatively its grid cell. </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.TilesetDefUid">
+            <summary> Reference to the default Tileset UID being used by this layer definition.<br/>  <b>WARNING</b>: some layer *instances* might use a different tileset. So most of the time, you should probably use the <c>__tilesetDefUid</c> value found in layer instances.<br/>  Note: since version 1.0.0, the old <c>autoTilesetDefUid</c> was removed and merged into this value. </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition._Type">
+            <summary> Type of the layer (*IntGrid, Entities, Tiles or AutoLayer*) </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.Type">
+            <summary> Type of the layer as Haxe Enum Possible values: <c>IntGrid</c>, <c>Entities</c>, <c>Tiles</c>, <c>AutoLayer</c> </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.UiColor">
+            <summary> User defined color for the UI </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.Uid">
+            <summary> Unique Int identifier </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.UiFilterTags">
+            <summary> Display tags </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerDefinition.UseAsyncRender">
+            <summary> Asynchronous rendering option for large/complex layers </summary>
+        </member>
+        <member name="T:LDtk.Full.LayerInstance">
+            <summary> Layer instance </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerInstance.AutoLayerTiles">
+            <summary> An array containing all tiles generated by Auto-layer rules. The array is already sorted in display order (ie. 1st tile is beneath 2nd, which is beneath 3rd etc.).<br/><br/>  Note: if multiple tiles are stacked in the same cell as the result of different rules, all tiles behind opaque ones will be discarded. </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerInstance._CHei">
+            <summary> Grid-based height </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerInstance._CWid">
+            <summary> Grid-based width </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerInstance.EntityInstances">
+            <summary> EntityInstances </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerInstance._GridSize">
+            <summary> Grid size </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerInstance.GridTiles">
+            <summary> GridTiles </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerInstance._Identifier">
+            <summary> Layer definition identifier </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerInstance.Iid">
+            <summary> Unique layer instance identifier </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerInstance.IntGrid">
+            <summary> <b>WARNING</b>: this deprecated value is no longer exported since version 1.0.0  Replaced by: <c>intGridCsv</c> </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerInstance.IntGridCsv">
+            <summary> A list of all values in the IntGrid layer, stored in CSV format (Comma Separated Values).<br/>  Order is from left to right, and top to bottom (ie. first row from left to right, followed by second row, etc).<br/>  <c>0</c> means "empty cell" and IntGrid values start at 1.<br/>  The array size is <c>__cWid</c> x <c>__cHei</c> cells. </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerInstance.LayerDefUid">
+            <summary> Reference the Layer definition UID </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerInstance.LevelId">
+            <summary> Reference to the UID of the level containing this layer instance </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerInstance._Opacity">
+            <summary> Layer opacity as Float [0-1] </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerInstance.OptionalRules">
+            <summary> An Array containing the UIDs of optional rules that were enabled in this specific layer instance. </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerInstance.OverrideTilesetUid">
+            <summary> This layer can use another tileset by overriding the tileset UID here. </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerInstance.PxOffsetX">
+            <summary> X offset in pixels to render this layer, usually 0 (IMPORTANT: this should be added to the <c>LayerDef</c> optional offset, so you should probably prefer using <c>__pxTotalOffsetX</c> which contains the total offset value) </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerInstance.PxOffsetY">
+            <summary> Y offset in pixels to render this layer, usually 0 (IMPORTANT: this should be added to the <c>LayerDef</c> optional offset, so you should probably prefer using <c>__pxTotalOffsetX</c> which contains the total offset value) </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerInstance._PxTotalOffsetX">
+            <summary> Total layer X pixel offset, including both instance and definition offsets. </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerInstance._PxTotalOffsetY">
+            <summary> Total layer Y pixel offset, including both instance and definition offsets. </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerInstance.Seed">
+            <summary> Random seed used for Auto-Layers rendering </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerInstance._TilesetDefUid">
+            <summary> The definition UID of corresponding Tileset, if any. </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerInstance._TilesetRelPath">
+            <summary> The relative path to corresponding Tileset, if any. </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerInstance._Type">
+            <summary> Layer type (possible values: IntGrid, Entities, Tiles or AutoLayer) </summary>
+        </member>
+        <member name="P:LDtk.Full.LayerInstance.Visible">
+            <summary> Layer instance visibility </summary>
+        </member>
+        <member name="T:LDtk.Full.LDtkLevel">
+            <summary> This section contains all the level data. It can be found in 2 distinct forms, depending on Project current settings:  - If "*Separate level files*" is <b>disabled</b> (default): full level data is *embedded* inside the main Project JSON file, - If "*Separate level files*" is <b>enabled</b>: level data is stored in *separate* standalone <c>.ldtkl</c> files (one per level). In this case, the main Project JSON file will still contain most level data, except heavy sections, like the <c>layerInstances</c> array (which will be null). The <c>externalRelPath</c> string points to the <c>ldtkl</c> file.  A <c>ldtkl</c> file is just a JSON file containing exactly what is described below. </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkLevel._BgColor">
+            <summary> Background color of the level (same as <c>bgColor</c>, except the default value is automatically used here if its value is <c>null</c>) </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkLevel.BgColor">
+            <summary> Background color of the level. If <c>null</c>, the project <c>defaultLevelBgColor</c> should be used. </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkLevel.BgPivotX">
+            <summary> Background image X pivot (0-1) </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkLevel.BgPivotY">
+            <summary> Background image Y pivot (0-1) </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkLevel.BgPos">
+            <summary> An enum defining the way the background image (if any) is positioned on the level. See <c>__bgPos</c> for resulting position info. Possible values: &lt;<c>null</c>&gt;, <c>Unscaled</c>, <c>Contain</c>, <c>Cover</c>, <c>CoverDirty</c>, <c>Repeat</c> </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkLevel._BgPos">
+            <summary> Position informations of the background image, if there is one. </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkLevel.BgRelPath">
+            <summary> The *optional* relative path to the level background image. </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkLevel.ExternalRelPath">
+            <summary> This value is not null if the project option "*Save levels separately*" is enabled. In this case, this <b>relative</b> path points to the level Json file. </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkLevel.FieldInstances">
+            <summary> An array containing this level custom field values. </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkLevel.Identifier">
+            <summary> User defined unique identifier </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkLevel.Iid">
+            <summary> Unique instance identifier </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkLevel.LayerInstances">
+            <summary> An array containing all Layer instances. <b>IMPORTANT</b>: if the project option "*Save levels separately*" is enabled, this field will be <c>null</c>.<br/>  This array is <b>sorted in display order</b>: the 1st layer is the top-most and the last is behind. </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkLevel._Neighbours">
+            <summary> An array listing all other levels touching this one on the world map. Since 1.4.0, this includes levels that overlap in the same world layer, or in nearby world layers.<br/>  Only relevant for world layouts where level spatial positioning is manual (ie. GridVania, Free). For Horizontal and Vertical layouts, this array is always empty. </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkLevel.PxHei">
+            <summary> Height of the level in pixels </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkLevel.PxWid">
+            <summary> Width of the level in pixels </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkLevel._SmartColor">
+            <summary> The "guessed" color for this level in the editor, decided using either the background color or an existing custom field. </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkLevel.Uid">
+            <summary> Unique Int identifier </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkLevel.UseAutoIdentifier">
+            <summary> If TRUE, the level identifier will always automatically use the naming pattern as defined in <c>Project.levelNamePattern</c>. Becomes FALSE if the identifier is manually modified by user. </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkLevel.WorldDepth">
+            <summary> Index that represents the "depth" of the level in the world. Default is 0, greater means "above", lower means "below".<br/>  This value is mostly used for display only and is intended to make stacking of levels easier to manage. </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkLevel.WorldX">
+            <summary> World X coordinate in pixels.<br/>  Only relevant for world layouts where level spatial positioning is manual (ie. GridVania, Free). For Horizontal and Vertical layouts, the value is always -1 here. </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkLevel.WorldY">
+            <summary> World Y coordinate in pixels.<br/>  Only relevant for world layouts where level spatial positioning is manual (ie. GridVania, Free). For Horizontal and Vertical layouts, the value is always -1 here. </summary>
+        </member>
+        <member name="T:LDtk.Full.LevelBackgroundPosition">
+            <summary> Level background image position info </summary>
+        </member>
+        <member name="P:LDtk.Full.LevelBackgroundPosition.CropRect">
+            <summary> An array of 4 float values describing the cropped sub-rectangle of the displayed background image. This cropping happens when original is larger than the level bounds. Array format: <c>[ cropX, cropY, cropWidth, cropHeight ]</c> </summary>
+        </member>
+        <member name="P:LDtk.Full.LevelBackgroundPosition.Scale">
+            <summary> An array containing the <c>[scaleX,scaleY]</c> values of the <b>cropped</b> background image, depending on <c>bgPos</c> option. </summary>
+        </member>
+        <member name="P:LDtk.Full.LevelBackgroundPosition.TopLeftPx">
+            <summary> An array containing the <c>[x,y]</c> pixel coordinates of the top-left corner of the <b>cropped</b> background image, depending on <c>bgPos</c> option. </summary>
+        </member>
+        <member name="T:LDtk.Full.NeighbourLevel">
+            <summary> Nearby level info </summary>
+        </member>
+        <member name="P:LDtk.Full.NeighbourLevel.Dir">
+            <summary> A lowercase string tipping on the level location (<c>n</c>orth, <c>s</c>outh, <c>w</c>est, <c>e</c>ast).<br/>  Since 1.4.0, this value can also be &lt; (neighbour depth is lower), &gt; (neighbour depth is greater) or <c>o</c> (levels overlap and share the same world depth).<br/>  Since 1.5.3, this value can also be <c>nw</c>,<c>ne</c>,<c>sw</c> or <c>se</c> for levels only touching corners. </summary>
+        </member>
+        <member name="P:LDtk.Full.NeighbourLevel.LevelIid">
+            <summary> Neighbour Instance Identifier </summary>
+        </member>
+        <member name="P:LDtk.Full.NeighbourLevel.LevelUid">
+            <summary> <b>WARNING</b>: this deprecated value is no longer exported since version 1.2.0  Replaced by: <c>levelIid</c> </summary>
+        </member>
+        <member name="T:LDtk.Full.LDtkTableOfContentEntry">
+            <summary> ldtk.TableOfContentEntry </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkTableOfContentEntry.Identifier">
+            <summary> Identifier </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkTableOfContentEntry.Instances">
+            <summary> <b>WARNING</b>: this deprecated value will be *removed* completely on version 1.7.0+  Replaced by: <c>instancesData</c> </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkTableOfContentEntry.InstancesData">
+            <summary> InstancesData </summary>
+        </member>
+        <member name="T:LDtk.Full.TileInstance">
+            <summary> This structure represents a single tile from a given Tileset. </summary>
+        </member>
+        <member name="P:LDtk.Full.TileInstance.A">
+            <summary> Alpha/opacity of the tile (0-1, defaults to 1) </summary>
+        </member>
+        <member name="P:LDtk.Full.TileInstance.D">
+            <summary> Internal data used by the editor.<br/>  For auto-layer tiles: <c>[ruleId, coordId]</c>.<br/>  For tile-layer tiles: <c>[coordId]</c>. </summary>
+        </member>
+        <member name="P:LDtk.Full.TileInstance.F">
+            <summary> "Flip bits", a 2-bits integer to represent the mirror transformations of the tile.<br/>   - Bit 0 = X flip<br/>   - Bit 1 = Y flip<br/>   Examples: f=0 (no flip), f=1 (X flip only), f=2 (Y flip only), f=3 (both flips) </summary>
+        </member>
+        <member name="P:LDtk.Full.TileInstance.Px">
+            <summary> Pixel coordinates of the tile in the <b>layer</b> (<c>[x,y]</c> format). Don't forget optional layer offsets, if they exist! </summary>
+        </member>
+        <member name="P:LDtk.Full.TileInstance.Src">
+            <summary> Pixel coordinates of the tile in the <b>tileset</b> (<c>[x,y]</c> format) </summary>
+        </member>
+        <member name="P:LDtk.Full.TileInstance.T">
+            <summary> The *Tile ID* in the corresponding tileset. </summary>
+        </member>
+        <member name="T:LDtk.Full.TileCustomMetadata">
+            <summary> In a tileset definition, user defined meta-data of a tile. </summary>
+        </member>
+        <member name="P:LDtk.Full.TileCustomMetadata.Data">
+            <summary> Data </summary>
+        </member>
+        <member name="P:LDtk.Full.TileCustomMetadata.TileId">
+            <summary> TileId </summary>
+        </member>
+        <member name="T:LDtk.Full.TilesetDefinition">
+            <summary> The <c>Tileset</c> definition is the most important part among project definitions. It contains some extra informations about each integrated tileset. If you only had to parse one definition section, that would be the one. </summary>
+        </member>
+        <member name="P:LDtk.Full.TilesetDefinition.CachedPixelData">
+            <summary> The following data is used internally for various optimizations. It's always synced with source image changes. </summary>
+        </member>
+        <member name="P:LDtk.Full.TilesetDefinition._CHei">
+            <summary> Grid-based height </summary>
+        </member>
+        <member name="P:LDtk.Full.TilesetDefinition.CustomData">
+            <summary> An array of custom tile metadata </summary>
+        </member>
+        <member name="P:LDtk.Full.TilesetDefinition._CWid">
+            <summary> Grid-based width </summary>
+        </member>
+        <member name="P:LDtk.Full.TilesetDefinition.EmbedAtlas">
+            <summary> If this value is set, then it means that this atlas uses an internal LDtk atlas image instead of a loaded one. Possible values: &lt;<c>null</c>&gt;, <c>LdtkIcons</c> </summary>
+        </member>
+        <member name="P:LDtk.Full.TilesetDefinition.EnumTags">
+            <summary> Tileset tags using Enum values specified by <c>tagsSourceEnumId</c>. This array contains 1 element per Enum value, which contains an array of all Tile IDs that are tagged with it. </summary>
+        </member>
+        <member name="P:LDtk.Full.TilesetDefinition.Identifier">
+            <summary> User defined unique identifier </summary>
+        </member>
+        <member name="P:LDtk.Full.TilesetDefinition.Padding">
+            <summary> Distance in pixels from image borders </summary>
+        </member>
+        <member name="P:LDtk.Full.TilesetDefinition.PxHei">
+            <summary> Image height in pixels </summary>
+        </member>
+        <member name="P:LDtk.Full.TilesetDefinition.PxWid">
+            <summary> Image width in pixels </summary>
+        </member>
+        <member name="P:LDtk.Full.TilesetDefinition.RelPath">
+            <summary> Path to the source file, relative to the current project JSON file<br/>  It can be null if no image was provided, or when using an embed atlas. </summary>
+        </member>
+        <member name="P:LDtk.Full.TilesetDefinition.SavedSelections">
+            <summary> Array of group of tiles selections, only meant to be used in the editor </summary>
+        </member>
+        <member name="P:LDtk.Full.TilesetDefinition.Spacing">
+            <summary> Space in pixels between all tiles </summary>
+        </member>
+        <member name="P:LDtk.Full.TilesetDefinition.Tags">
+            <summary> An array of user-defined tags to organize the Tilesets </summary>
+        </member>
+        <member name="P:LDtk.Full.TilesetDefinition.TagsSourceEnumUid">
+            <summary> Optional Enum definition UID used for this tileset meta-data </summary>
+        </member>
+        <member name="P:LDtk.Full.TilesetDefinition.TileGridSize">
+            <summary> TileGridSize </summary>
+        </member>
+        <member name="P:LDtk.Full.TilesetDefinition.Uid">
+            <summary> Unique Intidentifier </summary>
+        </member>
+        <member name="T:LDtk.Full.TilesetRectangle">
+            <summary> This object represents a custom sub rectangle in a Tileset image. </summary>
+        </member>
+        <member name="P:LDtk.Full.TilesetRectangle.H">
+            <summary> Height in pixels </summary>
+        </member>
+        <member name="P:LDtk.Full.TilesetRectangle.TilesetUid">
+            <summary> UID of the tileset </summary>
+        </member>
+        <member name="P:LDtk.Full.TilesetRectangle.W">
+            <summary> Width in pixels </summary>
+        </member>
+        <member name="P:LDtk.Full.TilesetRectangle.X">
+            <summary> X pixels coordinate of the top-left corner in the Tileset image </summary>
+        </member>
+        <member name="P:LDtk.Full.TilesetRectangle.Y">
+            <summary> Y pixels coordinate of the top-left corner in the Tileset image </summary>
+        </member>
+        <member name="T:LDtk.Full.TocInstanceData">
+            <summary> ldtk.TocInstanceData </summary>
+        </member>
+        <member name="P:LDtk.Full.TocInstanceData.Fields">
+            <summary> An object containing the values of all entity fields with the <c>exportToToc</c> option enabled. This object typing depends on actual field value types. </summary>
+        </member>
+        <member name="P:LDtk.Full.TocInstanceData.HeiPx">
+            <summary> HeiPx </summary>
+        </member>
+        <member name="P:LDtk.Full.TocInstanceData.Iids">
+            <summary> IID information of this instance </summary>
+        </member>
+        <member name="P:LDtk.Full.TocInstanceData.WidPx">
+            <summary> WidPx </summary>
+        </member>
+        <member name="P:LDtk.Full.TocInstanceData.WorldX">
+            <summary> WorldX </summary>
+        </member>
+        <member name="P:LDtk.Full.TocInstanceData.WorldY">
+            <summary> WorldY </summary>
+        </member>
+        <member name="T:LDtk.Full.LDtkWorld">
+            <summary> <b>IMPORTANT</b>: this type is available as a preview. You can rely on it to update your importers, for when it will be officially available.  A World contains multiple levels, and it has its own layout settings. </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkWorld.DefaultLevelHeight">
+            <summary> Default new level height </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkWorld.DefaultLevelWidth">
+            <summary> Default new level width </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkWorld.Identifier">
+            <summary> User defined unique identifier </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkWorld.Iid">
+            <summary> Unique instance identifer </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkWorld.Levels">
+            <summary> All levels from this world. The order of this array is only relevant in <c>LinearHorizontal</c> and <c>linearVertical</c> world layouts (see <c>worldLayout</c> value). Otherwise, you should refer to the <c>worldX</c>,<c>worldY</c> coordinates of each Level. </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkWorld.WorldGridHeight">
+            <summary> Height of the world grid in pixels. </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkWorld.WorldGridWidth">
+            <summary> Width of the world grid in pixels. </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkWorld.WorldLayout">
+            <summary> An enum that describes how levels are organized in this project (ie. linearly or in a 2D space). Possible values: <c>Free</c>, <c>GridVania</c>, <c>LinearHorizontal</c>, <c>LinearVertical</c>, <c>null</c> </summary>
+        </member>
+        <member name="T:LDtk.Full.AllowedRefs">
+            <summary> Possible values: <c>Any</c>, <c>OnlySame</c>, <c>OnlyTags</c>, <c>OnlySpecificEntity</c> </summary>
+        </member>
+        <member name="T:LDtk.Full.BgPos">
+            <summary> An enum defining the way the background image (if any) is positioned on the level. See <c>__bgPos</c> for resulting position info. Possible values: &lt;<c>null</c>&gt;, <c>Unscaled</c>, <c>Contain</c>, <c>Cover</c>, <c>CoverDirty</c>, <c>Repeat</c> </summary>
+        </member>
+        <member name="T:LDtk.Full.Checker">
+            <summary> Checker mode Possible values: <c>None</c>, <c>Horizontal</c>, <c>Vertical</c> </summary>
+        </member>
+        <member name="T:LDtk.Full.EditorDisplayMode">
+            <summary> Possible values: <c>Hidden</c>, <c>ValueOnly</c>, <c>NameAndValue</c>, <c>EntityTile</c>, <c>LevelTile</c>, <c>Points</c>, <c>PointStar</c>, <c>PointPath</c>, <c>PointPathLoop</c>, <c>RadiusPx</c>, <c>RadiusGrid</c>, <c>ArrayCountWithLabel</c>, <c>ArrayCountNoLabel</c>, <c>RefLinkBetweenPivots</c>, <c>RefLinkBetweenCenters</c> </summary>
+        </member>
+        <member name="T:LDtk.Full.EditorDisplayPos">
+            <summary> Possible values: <c>Above</c>, <c>Center</c>, <c>Beneath</c> </summary>
+        </member>
+        <member name="T:LDtk.Full.EditorLinkStyle">
+            <summary> Possible values: <c>ZigZag</c>, <c>StraightArrow</c>, <c>CurvedArrow</c>, <c>ArrowsLine</c>, <c>DashedLine</c> </summary>
+        </member>
+        <member name="T:LDtk.Full.EmbedAtlas">
+            <summary> If this value is set, then it means that this atlas uses an internal LDtk atlas image instead of a loaded one. Possible values: &lt;<c>null</c>&gt;, <c>LdtkIcons</c>, <c>null</c> </summary>
+        </member>
+        <member name="T:LDtk.Full.Flag">
+            <summary> An array containing various advanced flags (ie. options or other states). Possible values: <c>DiscardPreCsvIntGrid</c>, <c>ExportOldTableOfContentData</c>, <c>ExportPreCsvIntGridFormat</c>, <c>IgnoreBackupSuggest</c>, <c>PrependIndexToLevelFileNames</c>, <c>MultiWorlds</c>, <c>UseMultilinesType</c> </summary>
+        </member>
+        <member name="T:LDtk.Full.IdentifierStyle">
+            <summary> Naming convention for Identifiers (first-letter uppercase, full uppercase etc.) Possible values: <c>Capitalize</c>, <c>Uppercase</c>, <c>Lowercase</c>, <c>Free</c> </summary>
+        </member>
+        <member name="T:LDtk.Full.ImageExportMode">
+            <summary> "Image export" option when saving project. Possible values: <c>None</c>, <c>OneImagePerLayer</c>, <c>OneImagePerLevel</c>, <c>LayersAndLevels</c> </summary>
+        </member>
+        <member name="T:LDtk.Full.LimitBehavior">
+            <summary> Possible values: <c>DiscardOldOnes</c>, <c>PreventAdding</c>, <c>MoveLastOne</c> </summary>
+        </member>
+        <member name="T:LDtk.Full.LimitScope">
+            <summary> If TRUE, the maxCount is a "per world" limit, if FALSE, it's a "per level". Possible values: <c>PerLayer</c>, <c>PerLevel</c>, <c>PerWorld</c> </summary>
+        </member>
+        <member name="T:LDtk.Full.RenderMode">
+            <summary> Possible values: <c>Rectangle</c>, <c>Ellipse</c>, <c>Tile</c>, <c>Cross</c> </summary>
+        </member>
+        <member name="T:LDtk.Full.TextLanguageMode">
+            <summary> Possible values: &lt;<c>null</c>&gt;, <c>LangPython</c>, <c>LangRuby</c>, <c>LangJS</c>, <c>LangLua</c>, <c>LangC</c>, <c>LangHaxe</c>, <c>LangMarkdown</c>, <c>LangJson</c>, <c>LangXml</c>, <c>LangLog</c> </summary>
+        </member>
+        <member name="T:LDtk.Full.TileMode">
+            <summary> Defines how tileIds array is used Possible values: <c>Single</c>, <c>Stamp</c> </summary>
+        </member>
+        <member name="T:LDtk.Full.TileRenderMode">
+            <summary> An enum describing how the Entity tile is rendered inside the Entity bounds. Possible values: <c>Cover</c>, <c>FitInside</c>, <c>Repeat</c>, <c>Stretch</c>, <c>FullSizeCropped</c>, <c>FullSizeUncropped</c>, <c>NineSlice</c> </summary>
+        </member>
+        <member name="T:LDtk.Full.Type">
+            <summary> Type of the layer as Haxe Enum Possible values: <c>IntGrid</c>, <c>Entities</c>, <c>Tiles</c>, <c>AutoLayer</c> </summary>
+        </member>
+        <member name="T:LDtk.Full.When">
+            <summary> Possible values: <c>Manual</c>, <c>AfterLoad</c>, <c>BeforeSave</c>, <c>AfterSave</c> </summary>
+        </member>
+        <member name="T:LDtk.Full.WorldLayout">
+            <summary> <b>WARNING</b>: this field will move to the <c>worlds</c> array after the "multi-worlds" update. It will then be <c>null</c>. You can enable the Multi-worlds advanced project option to enable the change immediately.<br/><br/>  An enum that describes how levels are organized in this project (ie. linearly or in a 2D space). Possible values: &lt;<c>null</c>&gt;, <c>Free</c>, <c>GridVania</c>, <c>LinearHorizontal</c>, <c>LinearVertical</c>, <c>null</c> </summary>
+        </member>
+        <member name="T:LDtk.Full.LDtkJsonFullSourceGenerator">
+            <summary> The json source generator for LDtk files. </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.Boolean">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.NullableBoolean">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.BooleanArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.Byte">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.Single">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.NullableSingle">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.SingleArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.DefaultOverride">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.AllowedRefs">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.NullableAllowedRefs">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.AutoLayerRuleGroup">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.AutoLayerRuleGroupArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.BgPos">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.NullableBgPos">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.CustomCommand">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.CustomCommandArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.Definitions">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.EditorDisplayMode">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.NullableEditorDisplayMode">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.EditorDisplayPos">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.NullableEditorDisplayPos">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.EditorLinkStyle">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.NullableEditorLinkStyle">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.EmbedAtlas">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.NullableEmbedAtlas">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.EntityDefinition">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.EntityDefinitionArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.EntityInstance">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.EntityInstanceArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.EntityReference">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.EntityReferenceArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.EnumDefinition">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.EnumDefinitionArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.EnumTagValue">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.EnumTagValueArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.EnumValueDefinition">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.EnumValueDefinitionArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.FieldDefinition">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.FieldDefinitionArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.FieldInstance">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.FieldInstanceArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.Flag">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.FlagArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.IdentifierStyle">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.NullableIdentifierStyle">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.ImageExportMode">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.NullableImageExportMode">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.IntGridValueDefinition">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.IntGridValueDefinitionArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.IntGridValueGroupDefinition">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.IntGridValueGroupDefinitionArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.IntGridValueInstance">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.IntGridValueInstanceArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.LayerDefinition">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.LayerDefinitionArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.LayerInstance">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.LayerInstanceArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.LDtkFileFull">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.LDtkLevel">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.LDtkLevelArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.LDtkTableOfContentEntry">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.LDtkTableOfContentEntryArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.LDtkWorld">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.LDtkWorldArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.LevelBackgroundPosition">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.LimitBehavior">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.NullableLimitBehavior">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.LimitScope">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.NullableLimitScope">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.NeighbourLevel">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.NeighbourLevelArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.RenderMode">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.NullableRenderMode">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.TextLanguageMode">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.NullableTextLanguageMode">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.TileCustomMetadata">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.TileCustomMetadataArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.TileInstance">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.TileInstanceArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.TileRenderMode">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.NullableTileRenderMode">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.TilesetDefinition">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.TilesetDefinitionArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.TilesetRectangle">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.TilesetRectangleArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.TocInstanceData">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.TocInstanceDataArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.Type">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.NullableType">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.When">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.NullableWhen">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.WorldLayout">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.NullableWorldLayout">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.LayerType">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.Color">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.NullableColor">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.ColorArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.Point">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.PointArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.Vector2">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.Vector2Array">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.Guid">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.JsonElement">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.Int32">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.NullableInt32">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.Int32Array">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.Object">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.ObjectArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.String">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.StringArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.UInt32">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.Default">
+            <summary>
+            The default <see cref="T:System.Text.Json.Serialization.JsonSerializerContext"/> associated with a default <see cref="T:System.Text.Json.JsonSerializerOptions"/> instance.
+            </summary>
+        </member>
+        <member name="P:LDtk.Full.LDtkJsonFullSourceGenerator.GeneratedSerializerOptions">
+            <summary>
+            The source-generated options associated with this context.
+            </summary>
+        </member>
+        <member name="M:LDtk.Full.LDtkJsonFullSourceGenerator.#ctor">
+            <inheritdoc/>
+        </member>
+        <member name="M:LDtk.Full.LDtkJsonFullSourceGenerator.#ctor(System.Text.Json.JsonSerializerOptions)">
+            <inheritdoc/>
+        </member>
+        <member name="M:LDtk.Full.LDtkJsonFullSourceGenerator.GetTypeInfo(System.Type)">
+            <inheritdoc/>
+        </member>
+        <member name="T:LDtk.ILDtkEntity">
+            <summary>
+            Interface that implements the Entity.
+            </summary>
+        </member>
+        <member name="P:LDtk.ILDtkEntity.Identifier">
+            <summary> Gets or sets identifier. </summary>
+        </member>
+        <member name="P:LDtk.ILDtkEntity.Iid">
+            <summary> Gets or sets iid. </summary>
+        </member>
+        <member name="P:LDtk.ILDtkEntity.Uid">
+            <summary> Gets or sets uid. </summary>
+        </member>
+        <member name="P:LDtk.ILDtkEntity.Position">
+            <summary> Gets or sets position. </summary>
+        </member>
+        <member name="P:LDtk.ILDtkEntity.Size">
+            <summary> Gets or sets size. </summary>
+        </member>
+        <member name="P:LDtk.ILDtkEntity.Pivot">
+            <summary> Gets or sets pivot. </summary>
+        </member>
+        <member name="P:LDtk.ILDtkEntity.Tile">
+            <summary> Gets or sets tile. </summary>
+        </member>
+        <member name="P:LDtk.ILDtkEntity.SmartColor">
+            <summary> Gets or sets editorVisualColor. </summary>
+        </member>
+        <member name="T:LDtk.LDtkFile">
+            <summary> This is the root of any Project JSON file. It contains:  - the project settings, - an array of levels, - a group of definitions (that can probably be safely ignored for most users). </summary>
+        </member>
+        <member name="M:LDtk.LDtkFile.#ctor">
+            <summary> Initializes a new instance of the <see cref="T:LDtk.LDtkFile"/> class. Used by json deserializer not for use by user. </summary>
+        </member>
+        <member name="P:LDtk.LDtkFile.FilePath">
+            <summary> Gets or sets the absolute path to the ldtkFile. </summary>
+        </member>
+        <member name="P:LDtk.LDtkFile.Content">
+            <summary> Gets or sets the content manager used if you are using the contentpipeline. </summary>
+        </member>
+        <member name="P:LDtk.LDtkFile.Flags">
+            <summary> An array containing various advanced flags (ie. options or other states). Possible values: <c>DiscardPreCsvIntGrid</c>, <c>ExportOldTableOfContentData</c>, <c>ExportPreCsvIntGridFormat</c>, <c>IgnoreBackupSuggest</c>, <c>PrependIndexToLevelFileNames</c>, <c>MultiWorlds</c>, <c>UseMultilinesType</c> </summary>
+        </member>
+        <member name="M:LDtk.LDtkFile.FromFile(System.String)">
+            <summary> Loads the ldtk world file from disk directly using json source generator. </summary>
+            <param name="filePath"> Path to the .ldtk file. </param>
+            <returns> Returns the file loaded from the path. </returns>
+        </member>
+        <member name="M:LDtk.LDtkFile.FromFileReflection(System.String)">
+            <summary> Loads the ldtk world file from disk directly. </summary>
+            <param name="filePath"> Path to the .ldtk file. </param>
+            <returns> Returns the file loaded from the path. </returns>
+        </member>
+        <member name="M:LDtk.LDtkFile.FromFile(System.String,Microsoft.Xna.Framework.Content.ContentManager)">
+            <summary> Loads the ldtk world file from disk directly. </summary>
+            <param name="filePath">Path to the .ldtk file excluding file extension.</param>
+            <param name="content">The optional content manager if you are using the content pipeline.</param>
+            <returns> Returns the file loaded from the path. </returns>
+        </member>
+        <member name="M:LDtk.LDtkFile.LoadWorld(System.Guid)">
+            <summary> Loads the ldtkl world file from disk directly or from the embeded one depending on if the file uses externalworlds. </summary>
+            <param name="iid" > The iid of the world to load. </param>
+            <returns> Returns the world from the iid. </returns>
+        </member>
+        <member name="M:LDtk.LDtkFile.LoadSingleWorld">
+            <summary> Loads the one and only ldtkl world file from disk directly or from the embeded one depending on if the file uses externalworlds. </summary>
+            <returns> Returns the world from the iid. </returns>
+            <exception cref="T:LDtk.LDtkException">Throws if more than 1 world exsists</exception>
+        </member>
+        <member name="M:LDtk.LDtkFile.GetEntityRef``1(LDtk.EntityReference)">
+            <summary> Gets an entity from an <paramref name="reference"/> converted to <typeparamref name="T"/>. </summary>
+            <typeparam name="T"> The type to convert the entity to. </typeparam>
+            <param name="reference"> The entityRef to convert. </param>
+            <returns> The converted entity. </returns>
+        </member>
+        <member name="P:LDtk.LDtkFile.BgColor">
+            <summary> Project background color </summary>
+        </member>
+        <member name="P:LDtk.LDtkFile.Defs">
+            <summary> A structure containing all the definitions of this project </summary>
+        </member>
+        <member name="P:LDtk.LDtkFile.ExternalLevels">
+            <summary> If TRUE, one file will be saved for the project (incl. all its definitions) and one file in a sub-folder for each level. </summary>
+        </member>
+        <member name="P:LDtk.LDtkFile.Iid">
+            <summary> Unique project identifier </summary>
+        </member>
+        <member name="P:LDtk.LDtkFile.JsonVersion">
+            <summary> File format version </summary>
+        </member>
+        <member name="P:LDtk.LDtkFile.Levels">
+            <summary> All levels. The order of this array is only relevant in <c>LinearHorizontal</c> and <c>linearVertical</c> world layouts (see <c>worldLayout</c> value).<br/>  Otherwise, you should refer to the <c>worldX</c>,<c>worldY</c> coordinates of each Level. </summary>
+        </member>
+        <member name="P:LDtk.LDtkFile.Toc">
+            <summary> All instances of entities that have their <c>exportToToc</c> flag enabled are listed in this array. </summary>
+        </member>
+        <member name="P:LDtk.LDtkFile.WorldGridHeight">
+            <summary> <b>WARNING</b>: this field will move to the <c>worlds</c> array after the "multi-worlds" update. It will then be <c>null</c>. You can enable the Multi-worlds advanced project option to enable the change immediately.<br/><br/>  Height of the world grid in pixels. </summary>
+        </member>
+        <member name="P:LDtk.LDtkFile.WorldGridWidth">
+            <summary> <b>WARNING</b>: this field will move to the <c>worlds</c> array after the "multi-worlds" update. It will then be <c>null</c>. You can enable the Multi-worlds advanced project option to enable the change immediately.<br/><br/>  Width of the world grid in pixels. </summary>
+        </member>
+        <member name="P:LDtk.LDtkFile.WorldLayout">
+            <summary> <b>WARNING</b>: this field will move to the <c>worlds</c> array after the "multi-worlds" update. It will then be <c>null</c>. You can enable the Multi-worlds advanced project option to enable the change immediately.<br/><br/>  An enum that describes how levels are organized in this project (ie. linearly or in a 2D space). Possible values: &lt;<c>null</c>&gt;, <c>Free</c>, <c>GridVania</c>, <c>LinearHorizontal</c>, <c>LinearVertical</c>, <c>null</c> </summary>
+        </member>
+        <member name="P:LDtk.LDtkFile.Worlds">
+            <summary> This array will be empty, unless you enable the Multi-Worlds in the project advanced settings.<br/><br/> - in current version, a LDtk project file can only contain a single world with multiple levels in it. In this case, levels and world layout related settings are stored in the root of the JSON.<br/> - with "Multi-worlds" enabled, there will be a <c>worlds</c> array in root, each world containing levels and layout settings. Basically, it's pretty much only about moving the <c>levels</c> array to the <c>worlds</c> array, along with world layout related values (eg. <c>worldGridWidth</c> etc).<br/><br/>If you want to start supporting this future update easily, please refer to this documentation: https://github.com/deepnight/ldtk/issues/231 </summary>
+        </member>
+        <member name="T:LDtk.Flag">
+            <summary> An array containing various advanced flags (ie. options or other states). Possible values: <c>DiscardPreCsvIntGrid</c>, <c>ExportOldTableOfContentData</c>, <c>ExportPreCsvIntGridFormat</c>, <c>IgnoreBackupSuggest</c>, <c>PrependIndexToLevelFileNames</c>, <c>MultiWorlds</c>, <c>UseMultilinesType</c> </summary>
+        </member>
+        <member name="T:LDtk.LDtkIntGrid">
+            <summary> LDtk IntGrid. </summary>
+        </member>
+        <member name="P:LDtk.LDtkIntGrid.TileSize">
+            <summary> Gets or sets the size of a tile in pixels. </summary>
+        </member>
+        <member name="P:LDtk.LDtkIntGrid.Values">
+            <summary> Gets or sets the underlying values of the int grid. </summary>
+        </member>
+        <member name="P:LDtk.LDtkIntGrid.WorldPosition">
+            <summary> Gets or sets the worldspace start Position of the int grid. </summary>
+        </member>
+        <member name="P:LDtk.LDtkIntGrid.GridSize">
+            <summary> Gets or sets the size of the int grid in tiles. </summary>
+        </member>
+        <member name="M:LDtk.LDtkIntGrid.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:LDtk.LDtkIntGrid"/> class. Used by json deserializer not for use by user!. </summary>
+        </member>
+        <member name="M:LDtk.LDtkIntGrid.GetValueAt(System.Int32,System.Int32)">
+            <summary> Gets the int value at location and return 0 if out of bounds. </summary>
+        </member>
+        <member name="M:LDtk.LDtkIntGrid.GetValueAt(Microsoft.Xna.Framework.Point)">
+            <summary> Gets the int value at location and return 0 if out of bounds. </summary>
+        </member>
+        <member name="M:LDtk.LDtkIntGrid.GetValueAt(Microsoft.Xna.Framework.Vector2)">
+            <summary> Gets the int value at location and return 0 if out of bounds. </summary>
+        </member>
+        <member name="M:LDtk.LDtkIntGrid.Contains(Microsoft.Xna.Framework.Point)">
+            <summary> Check if point is inside of a grid. </summary>
+        </member>
+        <member name="M:LDtk.LDtkIntGrid.Contains(Microsoft.Xna.Framework.Vector2)">
+            <summary> Check if point is inside of a grid. </summary>
+        </member>
+        <member name="M:LDtk.LDtkIntGrid.FromWorldToGridSpace(Microsoft.Xna.Framework.Vector2)">
+            <summary> Convert from world pixel space to int grid space. Floors the value based on <see cref="P:LDtk.LDtkIntGrid.TileSize"/> to an Integer. </summary>
+        </member>
+        <member name="M:LDtk.LDtkIntGrid.FromWorldToGridSpace(Microsoft.Xna.Framework.Point)">
+            <summary> Convert from world pixel space to int grid space. Floors the value based on <see cref="P:LDtk.LDtkIntGrid.TileSize"/> to an Integer. </summary>
+        </member>
+        <member name="T:LDtk.LDtkLevel">
+            <summary> This section contains all the level data. It can be found in 2 distinct forms, depending on Project current settings:  - If "*Separate level files*" is <b>disabled</b> (default): full level data is *embedded* inside the main Project JSON file, - If "*Separate level files*" is <b>enabled</b>: level data is stored in *separate* standalone <c>.ldtkl</c> files (one per level). In this case, the main Project JSON file will still contain most level data, except heavy sections, like the <c>layerInstances</c> array (which will be null). The <c>externalRelPath</c> string points to the <c>ldtkl</c> file.  A <c>ldtkl</c> file is just a JSON file containing exactly what is described below. </summary>
+        </member>
+        <member name="P:LDtk.LDtkLevel.FilePath">
+            <summary> Gets or sets the absolute filepath to the level. </summary>
+        </member>
+        <member name="P:LDtk.LDtkLevel.WorldFilePath">
+            <summary> Gets or sets the absolute filepath to the world. </summary>
+        </member>
+        <member name="P:LDtk.LDtkLevel.Position">
+            <summary> Gets world Position of the level in pixels. </summary>
+        </member>
+        <member name="P:LDtk.LDtkLevel.Size">
+            <summary> Gets world size of the level in pixels. </summary>
+        </member>
+        <member name="P:LDtk.LDtkLevel.Loaded">
+            <summary> Gets a value indicating whether the file been loaded externaly. </summary>
+        </member>
+        <member name="M:LDtk.LDtkLevel.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:LDtk.LDtkLevel"/> class. Used by json deserializer not for use by user!. </summary>
+        </member>
+        <member name="M:LDtk.LDtkLevel.FromFile(System.String)">
+            <summary> Loads the ldtk world file from disk directly using json source generator. </summary>
+            <param name="filePath"> Path to the .ldtk file. </param>
+        </member>
+        <member name="M:LDtk.LDtkLevel.FromFileReflection(System.String)">
+            <summary> Loads the ldtk world file from disk directly. </summary>
+            <param name="filePath"> Path to the .ldtk file. </param>
+        </member>
+        <member name="M:LDtk.LDtkLevel.FromFile(System.String,Microsoft.Xna.Framework.Content.ContentManager)">
+            <summary> Loads the ldtk world file from disk directly. </summary>
+            <param name="filePath">Path to the .ldtk file excluding file extension.</param>
+            <param name="content">The optional content manager if you are using the content pipeline.</param>
+        </member>
+        <member name="M:LDtk.LDtkLevel.GetIntGrid(System.String)">
+            <summary> Gets an intgrid with the <paramref name="identifier"/> in a <see cref="T:LDtk.LDtkLevel"/>. </summary>
+            <param name="identifier"></param>
+            <exception cref="T:LDtk.LDtkException">Throws when identifier is not valid</exception>
+        </member>
+        <member name="M:LDtk.LDtkLevel.GetCustomFields``1">
+            <summary> Gets the custom fields of the level. </summary>
+        </member>
+        <member name="M:LDtk.LDtkLevel.GetEntity``1">
+            <summary> Gets one entity of type T in the current level best used with 1 per level constraint. </summary>
+            <exception cref="T:LDtk.LDtkException"></exception>
+        </member>
+        <member name="M:LDtk.LDtkLevel.GetEntityRef``1(LDtk.EntityReference)">
+            <summary> Gets an entity from an <paramref name="reference"/> converted to <typeparamref name="T"/>. </summary>
+            <param name="reference"></param>
+            <exception cref="T:LDtk.LDtkException"></exception>
+        </member>
+        <member name="M:LDtk.LDtkLevel.GetEntities``1">
+            <summary> Gets an array of entities of type <typeparamref name="T"/> in the current level. </summary>
+        </member>
+        <member name="M:LDtk.LDtkLevel.Contains(Microsoft.Xna.Framework.Vector2)">
+            <summary> Check if point is inside of a level. </summary>
+            <param name="point"></param>
+            <returns> True if point is inside level. </returns>
+        </member>
+        <member name="M:LDtk.LDtkLevel.Contains(Microsoft.Xna.Framework.Point)">
+            <summary> Check if point is inside of a level. </summary>
+            <param name="point"></param>
+            <returns> True if point is inside level. </returns>
+        </member>
+        <member name="P:LDtk.LDtkLevel._BgColor">
+            <summary> Background color of the level (same as <c>bgColor</c>, except the default value is automatically used here if its value is <c>null</c>) </summary>
+        </member>
+        <member name="P:LDtk.LDtkLevel._BgPos">
+            <summary> Position informations of the background image, if there is one. </summary>
+        </member>
+        <member name="P:LDtk.LDtkLevel.BgRelPath">
+            <summary> The *optional* relative path to the level background image. </summary>
+        </member>
+        <member name="P:LDtk.LDtkLevel.ExternalRelPath">
+            <summary> This value is not null if the project option "*Save levels separately*" is enabled. In this case, this <b>relative</b> path points to the level Json file. </summary>
+        </member>
+        <member name="P:LDtk.LDtkLevel.FieldInstances">
+            <summary> An array containing this level custom field values. </summary>
+        </member>
+        <member name="P:LDtk.LDtkLevel.Identifier">
+            <summary> User defined unique identifier </summary>
+        </member>
+        <member name="P:LDtk.LDtkLevel.Iid">
+            <summary> Unique instance identifier </summary>
+        </member>
+        <member name="P:LDtk.LDtkLevel.LayerInstances">
+            <summary> An array containing all Layer instances. <b>IMPORTANT</b>: if the project option "*Save levels separately*" is enabled, this field will be <c>null</c>.<br/>  This array is <b>sorted in display order</b>: the 1st layer is the top-most and the last is behind. </summary>
+        </member>
+        <member name="P:LDtk.LDtkLevel._Neighbours">
+            <summary> An array listing all other levels touching this one on the world map. Since 1.4.0, this includes levels that overlap in the same world layer, or in nearby world layers.<br/>  Only relevant for world layouts where level spatial positioning is manual (ie. GridVania, Free). For Horizontal and Vertical layouts, this array is always empty. </summary>
+        </member>
+        <member name="P:LDtk.LDtkLevel.PxHei">
+            <summary> Height of the level in pixels </summary>
+        </member>
+        <member name="P:LDtk.LDtkLevel.PxWid">
+            <summary> Width of the level in pixels </summary>
+        </member>
+        <member name="P:LDtk.LDtkLevel.Uid">
+            <summary> Unique Int identifier </summary>
+        </member>
+        <member name="P:LDtk.LDtkLevel.WorldDepth">
+            <summary> Index that represents the "depth" of the level in the world. Default is 0, greater means "above", lower means "below".<br/>  This value is mostly used for display only and is intended to make stacking of levels easier to manage. </summary>
+        </member>
+        <member name="P:LDtk.LDtkLevel.WorldX">
+            <summary> World X coordinate in pixels.<br/>  Only relevant for world layouts where level spatial positioning is manual (ie. GridVania, Free). For Horizontal and Vertical layouts, the value is always -1 here. </summary>
+        </member>
+        <member name="P:LDtk.LDtkLevel.WorldY">
+            <summary> World Y coordinate in pixels.<br/>  Only relevant for world layouts where level spatial positioning is manual (ie. GridVania, Free). For Horizontal and Vertical layouts, the value is always -1 here. </summary>
+        </member>
+        <member name="T:LDtk.LDtkWorld">
+            <summary> <b>IMPORTANT</b>: this type is available as a preview. You can rely on it to update your importers, for when it will be officially available.  A World contains multiple levels, and it has its own layout settings. </summary>
+        </member>
+        <member name="P:LDtk.LDtkWorld.FilePath">
+            <summary> Gets or sets the absolute filepath to the world. </summary>
+        </member>
+        <member name="P:LDtk.LDtkWorld.WorldGridSize">
+            <summary> Gets size of the world grid in pixels. </summary>
+        </member>
+        <member name="M:LDtk.LDtkWorld.#ctor">
+            <summary> Initializes a new instance of the <see cref="T:LDtk.LDtkWorld"/> class. Used by json deserializer not for use by user!. </summary>
+        </member>
+        <member name="P:LDtk.LDtkWorld.Content">
+            <summary> Gets or sets the content manager used if you are using the contentpipeline. </summary>
+        </member>
+        <member name="M:LDtk.LDtkWorld.GetEntity``1">
+            <summary> Goes through all the loaded levels looking for the entity. </summary>
+        </member>
+        <member name="M:LDtk.LDtkWorld.LoadLevel(System.String)">
+            <summary> Get the level with an identifier. </summary>
+        </member>
+        <member name="M:LDtk.LDtkWorld.LoadLevel(System.Guid)">
+            <summary> Get the level with an iid. </summary>
+        </member>
+        <member name="M:LDtk.LDtkWorld.LoadLevel(System.Int32)">
+            <summary> Get the level with an index. </summary>
+        </member>
+        <member name="M:LDtk.LDtkWorld.LoadLevel(LDtk.LDtkLevel)">
+            <summary> Get the level with an index. </summary>
+        </member>
+        <member name="M:LDtk.LDtkWorld.GetEntityRef``1(LDtk.EntityReference)">
+            <summary> Gets an entity from an <paramref name="reference"/> converted to <typeparamref name="T"/>. </summary>
+        </member>
+        <member name="P:LDtk.LDtkWorld.Identifier">
+            <summary> User defined unique identifier </summary>
+        </member>
+        <member name="P:LDtk.LDtkWorld.Iid">
+            <summary> Unique instance identifer </summary>
+        </member>
+        <member name="P:LDtk.LDtkWorld.Levels">
+            <summary> All levels from this world. The order of this array is only relevant in <c>LinearHorizontal</c> and <c>linearVertical</c> world layouts (see <c>worldLayout</c> value). Otherwise, you should refer to the <c>worldX</c>,<c>worldY</c> coordinates of each Level. </summary>
+        </member>
+        <member name="P:LDtk.LDtkWorld.WorldGridHeight">
+            <summary> Height of the world grid in pixels. </summary>
+        </member>
+        <member name="P:LDtk.LDtkWorld.WorldGridWidth">
+            <summary> Width of the world grid in pixels. </summary>
+        </member>
+        <member name="P:LDtk.LDtkWorld.WorldLayout">
+            <summary> An enum that describes how levels are organized in this project (ie. linearly or in a 2D space). Possible values: <c>Free</c>, <c>GridVania</c>, <c>LinearHorizontal</c>, <c>LinearVertical</c>, <c>null</c>, <c>null</c> </summary>
+        </member>
+        <member name="T:LDtk.TilesetRectangle">
+            <summary> This object represents a custom sub rectangle in a Tileset image. </summary>
+        </member>
+        <member name="M:LDtk.TilesetRectangle.op_Implicit(LDtk.TilesetRectangle)~Microsoft.Xna.Framework.Rectangle">
+            <summary> Monogame Implicit Rectangle Cast. </summary>
+        </member>
+        <member name="P:LDtk.TilesetRectangle.H">
+            <summary> Height in pixels </summary>
+        </member>
+        <member name="P:LDtk.TilesetRectangle.TilesetUid">
+            <summary> UID of the tileset </summary>
+        </member>
+        <member name="P:LDtk.TilesetRectangle.W">
+            <summary> Width in pixels </summary>
+        </member>
+        <member name="P:LDtk.TilesetRectangle.X">
+            <summary> X pixels coordinate of the top-left corner in the Tileset image </summary>
+        </member>
+        <member name="P:LDtk.TilesetRectangle.Y">
+            <summary> Y pixels coordinate of the top-left corner in the Tileset image </summary>
+        </member>
+        <member name="T:LDtk.LayerType">
+            <summary> The Type of layer. </summary>
+        </member>
+        <member name="F:LDtk.LayerType.Entities">
+            <summary> Entities Layer. </summary>
+        </member>
+        <member name="F:LDtk.LayerType.IntGrid">
+            <summary> IntGrid Layer. </summary>
+        </member>
+        <member name="F:LDtk.LayerType.Tiles">
+            <summary> Tiles Layer. </summary>
+        </member>
+        <member name="F:LDtk.LayerType.AutoLayer">
+            <summary> AutoLayer Layer. </summary>
+        </member>
+        <member name="T:LDtk.LDtkException">
+            <summary>
+            Generic LDtk Exception.
+            </summary>
+        </member>
+        <member name="M:LDtk.LDtkException.#ctor(System.String)">
+            <summary> Initializes a new instance of the <see cref="T:LDtk.LDtkException"/> class. </summary>
+            <param name="message"> The message. </param>
+        </member>
+        <member name="M:LDtk.LDtkException.#ctor">
+            <summary> Initializes a new instance of the <see cref="T:LDtk.LDtkException"/> class. </summary>
+        </member>
+        <member name="M:LDtk.LDtkException.#ctor(System.String,System.Exception)">
+            <summary> LDtk Exception </summary>
+        </member>
+        <member name="T:LDtk.LDtkFieldParser">
+            <summary> Utility for parsing ldtk json data into more typed versions. </summary>
+        </member>
+        <member name="M:LDtk.LDtkFieldParser.ParseCustomLevelFields``1(``0,LDtk.FieldInstance[])">
+            <summary> Parses the custom level fields. </summary>
+            <typeparam name="T"> Generic type parameter. </typeparam>
+            <param name="level"> The level. </param>
+            <param name="fields"> The fields. </param>
+        </member>
+        <member name="M:LDtk.LDtkFieldParser.ParseCustomEntityFields``1(``0,LDtk.FieldInstance[],LDtk.LDtkLevel)">
+            <summary> Parses the custom fields. </summary>
+            <typeparam name="T"> Generic type parameter. </typeparam>
+            <param name="entity"> The entity. </param>
+            <param name="fields"> The fields. </param>
+            <param name="level"> The level. </param>
+        </member>
+        <member name="M:LDtk.LDtkFieldParser.ParseBaseEntityFields``1(``0,LDtk.EntityInstance,LDtk.LDtkLevel)">
+            <summary> Parses the base entity fields. </summary>
+            <typeparam name="T"> Generic type parameter. </typeparam>
+            <param name="entity"> The entity. </param>
+            <param name="entityInstance"> The entity instance. </param>
+            <param name="level"> The level. </param>
+        </member>
+        <member name="T:LDtk.AutoLayerRuleGroup">
+            <summary> Auto-layer rule group </summary>
+        </member>
+        <member name="P:LDtk.AutoLayerRuleGroup.Active">
+            <summary> Active </summary>
+        </member>
+        <member name="P:LDtk.AutoLayerRuleGroup.BiomeRequirementMode">
+            <summary> BiomeRequirementMode </summary>
+        </member>
+        <member name="P:LDtk.AutoLayerRuleGroup.Color">
+            <summary> Color </summary>
+        </member>
+        <member name="P:LDtk.AutoLayerRuleGroup.Icon">
+            <summary> Icon </summary>
+        </member>
+        <member name="P:LDtk.AutoLayerRuleGroup.IsOptional">
+            <summary> IsOptional </summary>
+        </member>
+        <member name="P:LDtk.AutoLayerRuleGroup.Name">
+            <summary> Name </summary>
+        </member>
+        <member name="P:LDtk.AutoLayerRuleGroup.RequiredBiomeValues">
+            <summary> RequiredBiomeValues </summary>
+        </member>
+        <member name="P:LDtk.AutoLayerRuleGroup.Rules">
+            <summary> Rules </summary>
+        </member>
+        <member name="P:LDtk.AutoLayerRuleGroup.Uid">
+            <summary> Uid </summary>
+        </member>
+        <member name="P:LDtk.AutoLayerRuleGroup.UsesWizard">
+            <summary> UsesWizard </summary>
+        </member>
+        <member name="T:LDtk.CustomCommand">
+            <summary> ldtk.CustomCommand </summary>
+        </member>
+        <member name="P:LDtk.CustomCommand.Command">
+            <summary> Command </summary>
+        </member>
+        <member name="P:LDtk.CustomCommand.When">
+            <summary> Possible values: <c>Manual</c>, <c>AfterLoad</c>, <c>BeforeSave</c>, <c>AfterSave</c> </summary>
+        </member>
+        <member name="T:LDtk.Definitions">
+            <summary> If you're writing your own LDtk importer, you should probably just ignore *most* stuff in the <c>defs</c> section, as it contains data that are mostly important to the editor. To keep you away from the <c>defs</c> section and avoid some unnecessary JSON parsing, important data from definitions is often duplicated in fields prefixed with a double underscore (eg. <c>__identifier</c> or <c>__type</c>).  The 2 only definition types you might need here are <b>Tilesets</b> and <b>Enums</b>. </summary>
+        </member>
+        <member name="P:LDtk.Definitions.Entities">
+            <summary> All entities definitions, including their custom fields </summary>
+        </member>
+        <member name="P:LDtk.Definitions.Enums">
+            <summary> All internal enums </summary>
+        </member>
+        <member name="P:LDtk.Definitions.ExternalEnums">
+            <summary> Note: external enums are exactly the same as <c>enums</c>, except they have a <c>relPath</c> to point to an external source file. </summary>
+        </member>
+        <member name="P:LDtk.Definitions.Layers">
+            <summary> All layer definitions </summary>
+        </member>
+        <member name="P:LDtk.Definitions.Tilesets">
+            <summary> All tilesets </summary>
+        </member>
+        <member name="T:LDtk.EntityDefinition">
+            <summary> Entity definition </summary>
+        </member>
+        <member name="P:LDtk.EntityDefinition.Color">
+            <summary> Base entity color </summary>
+        </member>
+        <member name="P:LDtk.EntityDefinition.Height">
+            <summary> Pixel height </summary>
+        </member>
+        <member name="P:LDtk.EntityDefinition.Identifier">
+            <summary> User defined unique identifier </summary>
+        </member>
+        <member name="P:LDtk.EntityDefinition.NineSliceBorders">
+            <summary> An array of 4 dimensions for the up/right/down/left borders (in this order) when using 9-slice mode for <c>tileRenderMode</c>.<br/>  If the tileRenderMode is not NineSlice, then this array is empty.<br/>  See: https://en.wikipedia.org/wiki/9-slice_scaling </summary>
+        </member>
+        <member name="P:LDtk.EntityDefinition.PivotX">
+            <summary> Pivot X coordinate (from 0 to 1.0) </summary>
+        </member>
+        <member name="P:LDtk.EntityDefinition.PivotY">
+            <summary> Pivot Y coordinate (from 0 to 1.0) </summary>
+        </member>
+        <member name="P:LDtk.EntityDefinition.TileRect">
+            <summary> An object representing a rectangle from an existing Tileset </summary>
+        </member>
+        <member name="P:LDtk.EntityDefinition.TileRenderMode">
+            <summary> An enum describing how the Entity tile is rendered inside the Entity bounds. Possible values: <c>Cover</c>, <c>FitInside</c>, <c>Repeat</c>, <c>Stretch</c>, <c>FullSizeCropped</c>, <c>FullSizeUncropped</c>, <c>NineSlice</c> </summary>
+        </member>
+        <member name="P:LDtk.EntityDefinition.TilesetId">
+            <summary> Tileset ID used for optional tile display </summary>
+        </member>
+        <member name="P:LDtk.EntityDefinition.Uid">
+            <summary> Unique Int identifier </summary>
+        </member>
+        <member name="P:LDtk.EntityDefinition.UiTileRect">
+            <summary> This tile overrides the one defined in <c>tileRect</c> in the UI </summary>
+        </member>
+        <member name="P:LDtk.EntityDefinition.Width">
+            <summary> Pixel width </summary>
+        </member>
+        <member name="T:LDtk.EntityInstance">
+            <summary> Entity instance </summary>
+        </member>
+        <member name="P:LDtk.EntityInstance.DefUid">
+            <summary> Reference of the <b>Entity definition</b> UID </summary>
+        </member>
+        <member name="P:LDtk.EntityInstance.FieldInstances">
+            <summary> An array of all custom fields and their values. </summary>
+        </member>
+        <member name="P:LDtk.EntityInstance._Grid">
+            <summary> Grid-based coordinates (<c>[x,y]</c> format) </summary>
+        </member>
+        <member name="P:LDtk.EntityInstance.Height">
+            <summary> Entity height in pixels. For non-resizable entities, it will be the same as Entity definition. </summary>
+        </member>
+        <member name="P:LDtk.EntityInstance._Identifier">
+            <summary> Entity definition identifier </summary>
+        </member>
+        <member name="P:LDtk.EntityInstance.Iid">
+            <summary> Unique instance identifier </summary>
+        </member>
+        <member name="P:LDtk.EntityInstance._Pivot">
+            <summary> Pivot coordinates  (<c>[x,y]</c> format, values are from 0 to 1) of the Entity </summary>
+        </member>
+        <member name="P:LDtk.EntityInstance.Px">
+            <summary> Pixel coordinates (<c>[x,y]</c> format) in current level coordinate space. Don't forget optional layer offsets, if they exist! </summary>
+        </member>
+        <member name="P:LDtk.EntityInstance._SmartColor">
+            <summary> The entity "smart" color, guessed from either Entity definition, or one its field instances. </summary>
+        </member>
+        <member name="P:LDtk.EntityInstance._Tags">
+            <summary> Array of tags defined in this Entity definition </summary>
+        </member>
+        <member name="P:LDtk.EntityInstance._Tile">
+            <summary> Optional TilesetRect used to display this entity (it could either be the default Entity tile, or some tile provided by a field value, like an Enum). </summary>
+        </member>
+        <member name="P:LDtk.EntityInstance.Width">
+            <summary> Entity width in pixels. For non-resizable entities, it will be the same as Entity definition. </summary>
+        </member>
+        <member name="P:LDtk.EntityInstance._WorldX">
+            <summary> X world coordinate in pixels. Only available in GridVania or Free world layouts. </summary>
+        </member>
+        <member name="P:LDtk.EntityInstance._WorldY">
+            <summary> Y world coordinate in pixels Only available in GridVania or Free world layouts. </summary>
+        </member>
+        <member name="T:LDtk.EntityReference">
+            <summary> This object describes the "location" of an Entity instance in the project worlds. </summary>
+        </member>
+        <member name="P:LDtk.EntityReference.EntityIid">
+            <summary> IID of the refered EntityInstance </summary>
+        </member>
+        <member name="P:LDtk.EntityReference.LayerIid">
+            <summary> IID of the LayerInstance containing the refered EntityInstance </summary>
+        </member>
+        <member name="P:LDtk.EntityReference.LevelIid">
+            <summary> IID of the Level containing the refered EntityInstance </summary>
+        </member>
+        <member name="P:LDtk.EntityReference.WorldIid">
+            <summary> IID of the World containing the refered EntityInstance </summary>
+        </member>
+        <member name="T:LDtk.EnumDefinition">
+            <summary> Enum definition </summary>
+        </member>
+        <member name="P:LDtk.EnumDefinition.ExternalRelPath">
+            <summary> Relative path to the external file providing this Enum </summary>
+        </member>
+        <member name="P:LDtk.EnumDefinition.IconTilesetUid">
+            <summary> Tileset UID if provided </summary>
+        </member>
+        <member name="P:LDtk.EnumDefinition.Identifier">
+            <summary> User defined unique identifier </summary>
+        </member>
+        <member name="P:LDtk.EnumDefinition.Tags">
+            <summary> An array of user-defined tags to organize the Enums </summary>
+        </member>
+        <member name="P:LDtk.EnumDefinition.Uid">
+            <summary> Unique Int identifier </summary>
+        </member>
+        <member name="P:LDtk.EnumDefinition.Values">
+            <summary> All possible enum values, with their optional Tile infos. </summary>
+        </member>
+        <member name="T:LDtk.EnumValueDefinition">
+            <summary> Enum value definition </summary>
+        </member>
+        <member name="P:LDtk.EnumValueDefinition.Color">
+            <summary> Optional color </summary>
+        </member>
+        <member name="P:LDtk.EnumValueDefinition.Id">
+            <summary> Enum value </summary>
+        </member>
+        <member name="P:LDtk.EnumValueDefinition.TileRect">
+            <summary> Optional tileset rectangle to represents this value </summary>
+        </member>
+        <member name="T:LDtk.EnumTagValue">
+            <summary> In a tileset definition, enum based tag infos </summary>
+        </member>
+        <member name="P:LDtk.EnumTagValue.EnumValueId">
+            <summary> EnumValueId </summary>
+        </member>
+        <member name="P:LDtk.EnumTagValue.TileIds">
+            <summary> TileIds </summary>
+        </member>
+        <member name="T:LDtk.FieldInstance">
+            <summary> Field instance </summary>
+        </member>
+        <member name="P:LDtk.FieldInstance.DefUid">
+            <summary> Reference of the <b>Field definition</b> UID </summary>
+        </member>
+        <member name="P:LDtk.FieldInstance._Identifier">
+            <summary> Field definition identifier </summary>
+        </member>
+        <member name="P:LDtk.FieldInstance._Tile">
+            <summary> Optional TilesetRect used to display this field (this can be the field own Tile, or some other Tile guessed from the value, like an Enum). </summary>
+        </member>
+        <member name="P:LDtk.FieldInstance._Type">
+            <summary> Type of the field, such as <c>Int</c>, <c>Float</c>, <c>String</c>, <c>Enum(my_enum_name)</c>, <c>Bool</c>, etc.<br/>  NOTE: if you enable the advanced option <b>Use Multilines type</b>, you will have "*Multilines*" instead of "*String*" when relevant. </summary>
+        </member>
+        <member name="P:LDtk.FieldInstance._Value">
+            <summary> Actual value of the field instance. The value type varies, depending on <c>__type</c>:<br/>   - For <b>classic types</b> (ie. Integer, Float, Boolean, String, Text and FilePath), you just get the actual value with the expected type.<br/>   - For <b>Color</b>, the value is an hexadecimal string using "#rrggbb" format.<br/>   - For <b>Enum</b>, the value is a String representing the selected enum value.<br/>   - For <b>Point</b>, the value is a [GridPoint](#ldtk-GridPoint) object.<br/>   - For <b>Tile</b>, the value is a [TilesetRect](#ldtk-TilesetRect) object.<br/>   - For <b>EntityRef</b>, the value is an [EntityReferenceInfos](#ldtk-EntityReferenceInfos) object.<br/><br/>  If the field is an array, then this <c>__value</c> will also be a JSON array. </summary>
+        </member>
+        <member name="T:LDtk.GridPoint">
+            <summary> This object is just a grid-based coordinate used in Field values. </summary>
+        </member>
+        <member name="P:LDtk.GridPoint.Cx">
+            <summary> X grid-based coordinate </summary>
+        </member>
+        <member name="P:LDtk.GridPoint.Cy">
+            <summary> Y grid-based coordinate </summary>
+        </member>
+        <member name="T:LDtk.IntGridValueDefinition">
+            <summary> IntGrid value definition </summary>
+        </member>
+        <member name="P:LDtk.IntGridValueDefinition.Color">
+            <summary> Color </summary>
+        </member>
+        <member name="P:LDtk.IntGridValueDefinition.GroupUid">
+            <summary> Parent group identifier (0 if none) </summary>
+        </member>
+        <member name="P:LDtk.IntGridValueDefinition.Identifier">
+            <summary> User defined unique identifier </summary>
+        </member>
+        <member name="P:LDtk.IntGridValueDefinition.Tile">
+            <summary> Tile </summary>
+        </member>
+        <member name="P:LDtk.IntGridValueDefinition.Value">
+            <summary> The IntGrid value itself </summary>
+        </member>
+        <member name="T:LDtk.IntGridValueGroupDefinition">
+            <summary> IntGrid value group definition </summary>
+        </member>
+        <member name="P:LDtk.IntGridValueGroupDefinition.Color">
+            <summary> User defined color </summary>
+        </member>
+        <member name="P:LDtk.IntGridValueGroupDefinition.Identifier">
+            <summary> User defined string identifier </summary>
+        </member>
+        <member name="P:LDtk.IntGridValueGroupDefinition.Uid">
+            <summary> Group unique ID </summary>
+        </member>
+        <member name="T:LDtk.IntGridValueInstance">
+            <summary> IntGrid value instance </summary>
+        </member>
+        <member name="P:LDtk.IntGridValueInstance.CoordId">
+            <summary> Coordinate ID in the layer grid </summary>
+        </member>
+        <member name="P:LDtk.IntGridValueInstance.V">
+            <summary> IntGrid value </summary>
+        </member>
+        <member name="T:LDtk.LayerDefinition">
+            <summary> Layer definition </summary>
+        </member>
+        <member name="P:LDtk.LayerDefinition.AutoSourceLayerDefUid">
+            <summary> AutoSourceLayerDefUid </summary>
+        </member>
+        <member name="P:LDtk.LayerDefinition.DisplayOpacity">
+            <summary> Opacity of the layer (0 to 1.0) </summary>
+        </member>
+        <member name="P:LDtk.LayerDefinition.GridSize">
+            <summary> Width and height of the grid in pixels </summary>
+        </member>
+        <member name="P:LDtk.LayerDefinition.Identifier">
+            <summary> User defined unique identifier </summary>
+        </member>
+        <member name="P:LDtk.LayerDefinition.IntGridValues">
+            <summary> An array that defines extra optional info for each IntGrid value.<br/>  WARNING: the array order is not related to actual IntGrid values! As user can re-order IntGrid values freely, you may value "2" before value "1" in this array. </summary>
+        </member>
+        <member name="P:LDtk.LayerDefinition.IntGridValuesGroups">
+            <summary> Group informations for IntGrid values </summary>
+        </member>
+        <member name="P:LDtk.LayerDefinition.ParallaxFactorX">
+            <summary> Parallax horizontal factor (from -1 to 1, defaults to 0) which affects the scrolling speed of this layer, creating a fake 3D (parallax) effect. </summary>
+        </member>
+        <member name="P:LDtk.LayerDefinition.ParallaxFactorY">
+            <summary> Parallax vertical factor (from -1 to 1, defaults to 0) which affects the scrolling speed of this layer, creating a fake 3D (parallax) effect. </summary>
+        </member>
+        <member name="P:LDtk.LayerDefinition.ParallaxScaling">
+            <summary> If true (default), a layer with a parallax factor will also be scaled up/down accordingly. </summary>
+        </member>
+        <member name="P:LDtk.LayerDefinition.PxOffsetX">
+            <summary> X offset of the layer, in pixels (IMPORTANT: this should be added to the <c>LayerInstance</c> optional offset) </summary>
+        </member>
+        <member name="P:LDtk.LayerDefinition.PxOffsetY">
+            <summary> Y offset of the layer, in pixels (IMPORTANT: this should be added to the <c>LayerInstance</c> optional offset) </summary>
+        </member>
+        <member name="P:LDtk.LayerDefinition.TilesetDefUid">
+            <summary> Reference to the default Tileset UID being used by this layer definition.<br/>  <b>WARNING</b>: some layer *instances* might use a different tileset. So most of the time, you should probably use the <c>__tilesetDefUid</c> value found in layer instances.<br/>  Note: since version 1.0.0, the old <c>autoTilesetDefUid</c> was removed and merged into this value. </summary>
+        </member>
+        <member name="P:LDtk.LayerDefinition._Type">
+            <summary> Type of the layer (*IntGrid, Entities, Tiles or AutoLayer*) </summary>
+        </member>
+        <member name="P:LDtk.LayerDefinition.Uid">
+            <summary> Unique Int identifier </summary>
+        </member>
+        <member name="T:LDtk.LayerInstance">
+            <summary> Layer instance </summary>
+        </member>
+        <member name="P:LDtk.LayerInstance.AutoLayerTiles">
+            <summary> An array containing all tiles generated by Auto-layer rules. The array is already sorted in display order (ie. 1st tile is beneath 2nd, which is beneath 3rd etc.).<br/><br/>  Note: if multiple tiles are stacked in the same cell as the result of different rules, all tiles behind opaque ones will be discarded. </summary>
+        </member>
+        <member name="P:LDtk.LayerInstance._CHei">
+            <summary> Grid-based height </summary>
+        </member>
+        <member name="P:LDtk.LayerInstance._CWid">
+            <summary> Grid-based width </summary>
+        </member>
+        <member name="P:LDtk.LayerInstance.EntityInstances">
+            <summary> EntityInstances </summary>
+        </member>
+        <member name="P:LDtk.LayerInstance._GridSize">
+            <summary> Grid size </summary>
+        </member>
+        <member name="P:LDtk.LayerInstance.GridTiles">
+            <summary> GridTiles </summary>
+        </member>
+        <member name="P:LDtk.LayerInstance._Identifier">
+            <summary> Layer definition identifier </summary>
+        </member>
+        <member name="P:LDtk.LayerInstance.Iid">
+            <summary> Unique layer instance identifier </summary>
+        </member>
+        <member name="P:LDtk.LayerInstance.IntGridCsv">
+            <summary> A list of all values in the IntGrid layer, stored in CSV format (Comma Separated Values).<br/>  Order is from left to right, and top to bottom (ie. first row from left to right, followed by second row, etc).<br/>  <c>0</c> means "empty cell" and IntGrid values start at 1.<br/>  The array size is <c>__cWid</c> x <c>__cHei</c> cells. </summary>
+        </member>
+        <member name="P:LDtk.LayerInstance.LayerDefUid">
+            <summary> Reference the Layer definition UID </summary>
+        </member>
+        <member name="P:LDtk.LayerInstance.LevelId">
+            <summary> Reference to the UID of the level containing this layer instance </summary>
+        </member>
+        <member name="P:LDtk.LayerInstance._Opacity">
+            <summary> Layer opacity as Float [0-1] </summary>
+        </member>
+        <member name="P:LDtk.LayerInstance.OverrideTilesetUid">
+            <summary> This layer can use another tileset by overriding the tileset UID here. </summary>
+        </member>
+        <member name="P:LDtk.LayerInstance.PxOffsetX">
+            <summary> X offset in pixels to render this layer, usually 0 (IMPORTANT: this should be added to the <c>LayerDef</c> optional offset, so you should probably prefer using <c>__pxTotalOffsetX</c> which contains the total offset value) </summary>
+        </member>
+        <member name="P:LDtk.LayerInstance.PxOffsetY">
+            <summary> Y offset in pixels to render this layer, usually 0 (IMPORTANT: this should be added to the <c>LayerDef</c> optional offset, so you should probably prefer using <c>__pxTotalOffsetX</c> which contains the total offset value) </summary>
+        </member>
+        <member name="P:LDtk.LayerInstance._PxTotalOffsetX">
+            <summary> Total layer X pixel offset, including both instance and definition offsets. </summary>
+        </member>
+        <member name="P:LDtk.LayerInstance._PxTotalOffsetY">
+            <summary> Total layer Y pixel offset, including both instance and definition offsets. </summary>
+        </member>
+        <member name="P:LDtk.LayerInstance._TilesetDefUid">
+            <summary> The definition UID of corresponding Tileset, if any. </summary>
+        </member>
+        <member name="P:LDtk.LayerInstance._TilesetRelPath">
+            <summary> The relative path to corresponding Tileset, if any. </summary>
+        </member>
+        <member name="P:LDtk.LayerInstance._Type">
+            <summary> Layer type (possible values: IntGrid, Entities, Tiles or AutoLayer) </summary>
+        </member>
+        <member name="P:LDtk.LayerInstance.Visible">
+            <summary> Layer instance visibility </summary>
+        </member>
+        <member name="T:LDtk.LevelBackgroundPosition">
+            <summary> Level background image position info </summary>
+        </member>
+        <member name="P:LDtk.LevelBackgroundPosition.CropRect">
+            <summary> An array of 4 float values describing the cropped sub-rectangle of the displayed background image. This cropping happens when original is larger than the level bounds. Array format: <c>[ cropX, cropY, cropWidth, cropHeight ]</c> </summary>
+        </member>
+        <member name="P:LDtk.LevelBackgroundPosition.Scale">
+            <summary> An array containing the <c>[scaleX,scaleY]</c> values of the <b>cropped</b> background image, depending on <c>bgPos</c> option. </summary>
+        </member>
+        <member name="P:LDtk.LevelBackgroundPosition.TopLeftPx">
+            <summary> An array containing the <c>[x,y]</c> pixel coordinates of the top-left corner of the <b>cropped</b> background image, depending on <c>bgPos</c> option. </summary>
+        </member>
+        <member name="T:LDtk.NeighbourLevel">
+            <summary> Nearby level info </summary>
+        </member>
+        <member name="P:LDtk.NeighbourLevel.Dir">
+            <summary> A lowercase string tipping on the level location (<c>n</c>orth, <c>s</c>outh, <c>w</c>est, <c>e</c>ast).<br/>  Since 1.4.0, this value can also be &lt; (neighbour depth is lower), &gt; (neighbour depth is greater) or <c>o</c> (levels overlap and share the same world depth).<br/>  Since 1.5.3, this value can also be <c>nw</c>,<c>ne</c>,<c>sw</c> or <c>se</c> for levels only touching corners. </summary>
+        </member>
+        <member name="P:LDtk.NeighbourLevel.LevelIid">
+            <summary> Neighbour Instance Identifier </summary>
+        </member>
+        <member name="T:LDtk.LDtkTableOfContentEntry">
+            <summary> ldtk.TableOfContentEntry </summary>
+        </member>
+        <member name="P:LDtk.LDtkTableOfContentEntry.Identifier">
+            <summary> Identifier </summary>
+        </member>
+        <member name="P:LDtk.LDtkTableOfContentEntry.InstancesData">
+            <summary> InstancesData </summary>
+        </member>
+        <member name="T:LDtk.TileInstance">
+            <summary> This structure represents a single tile from a given Tileset. </summary>
+        </member>
+        <member name="P:LDtk.TileInstance.A">
+            <summary> Alpha/opacity of the tile (0-1, defaults to 1) </summary>
+        </member>
+        <member name="P:LDtk.TileInstance.F">
+            <summary> "Flip bits", a 2-bits integer to represent the mirror transformations of the tile.<br/>   - Bit 0 = X flip<br/>   - Bit 1 = Y flip<br/>   Examples: f=0 (no flip), f=1 (X flip only), f=2 (Y flip only), f=3 (both flips) </summary>
+        </member>
+        <member name="P:LDtk.TileInstance.Px">
+            <summary> Pixel coordinates of the tile in the <b>layer</b> (<c>[x,y]</c> format). Don't forget optional layer offsets, if they exist! </summary>
+        </member>
+        <member name="P:LDtk.TileInstance.Src">
+            <summary> Pixel coordinates of the tile in the <b>tileset</b> (<c>[x,y]</c> format) </summary>
+        </member>
+        <member name="P:LDtk.TileInstance.T">
+            <summary> The *Tile ID* in the corresponding tileset. </summary>
+        </member>
+        <member name="T:LDtk.TileCustomMetadata">
+            <summary> In a tileset definition, user defined meta-data of a tile. </summary>
+        </member>
+        <member name="P:LDtk.TileCustomMetadata.Data">
+            <summary> Data </summary>
+        </member>
+        <member name="P:LDtk.TileCustomMetadata.TileId">
+            <summary> TileId </summary>
+        </member>
+        <member name="T:LDtk.TilesetDefinition">
+            <summary> The <c>Tileset</c> definition is the most important part among project definitions. It contains some extra informations about each integrated tileset. If you only had to parse one definition section, that would be the one. </summary>
+        </member>
+        <member name="P:LDtk.TilesetDefinition._CHei">
+            <summary> Grid-based height </summary>
+        </member>
+        <member name="P:LDtk.TilesetDefinition.CustomData">
+            <summary> An array of custom tile metadata </summary>
+        </member>
+        <member name="P:LDtk.TilesetDefinition._CWid">
+            <summary> Grid-based width </summary>
+        </member>
+        <member name="P:LDtk.TilesetDefinition.EmbedAtlas">
+            <summary> If this value is set, then it means that this atlas uses an internal LDtk atlas image instead of a loaded one. Possible values: &lt;<c>null</c>&gt;, <c>LdtkIcons</c>, <c>null</c> </summary>
+        </member>
+        <member name="P:LDtk.TilesetDefinition.EnumTags">
+            <summary> Tileset tags using Enum values specified by <c>tagsSourceEnumId</c>. This array contains 1 element per Enum value, which contains an array of all Tile IDs that are tagged with it. </summary>
+        </member>
+        <member name="P:LDtk.TilesetDefinition.Identifier">
+            <summary> User defined unique identifier </summary>
+        </member>
+        <member name="P:LDtk.TilesetDefinition.Padding">
+            <summary> Distance in pixels from image borders </summary>
+        </member>
+        <member name="P:LDtk.TilesetDefinition.PxHei">
+            <summary> Image height in pixels </summary>
+        </member>
+        <member name="P:LDtk.TilesetDefinition.PxWid">
+            <summary> Image width in pixels </summary>
+        </member>
+        <member name="P:LDtk.TilesetDefinition.RelPath">
+            <summary> Path to the source file, relative to the current project JSON file<br/>  It can be null if no image was provided, or when using an embed atlas. </summary>
+        </member>
+        <member name="P:LDtk.TilesetDefinition.Spacing">
+            <summary> Space in pixels between all tiles </summary>
+        </member>
+        <member name="P:LDtk.TilesetDefinition.Tags">
+            <summary> An array of user-defined tags to organize the Tilesets </summary>
+        </member>
+        <member name="P:LDtk.TilesetDefinition.TagsSourceEnumUid">
+            <summary> Optional Enum definition UID used for this tileset meta-data </summary>
+        </member>
+        <member name="P:LDtk.TilesetDefinition.TileGridSize">
+            <summary> TileGridSize </summary>
+        </member>
+        <member name="P:LDtk.TilesetDefinition.Uid">
+            <summary> Unique Intidentifier </summary>
+        </member>
+        <member name="T:LDtk.TocInstanceData">
+            <summary> ldtk.TocInstanceData </summary>
+        </member>
+        <member name="P:LDtk.TocInstanceData.Fields">
+            <summary> An object containing the values of all entity fields with the <c>exportToToc</c> option enabled. This object typing depends on actual field value types. </summary>
+        </member>
+        <member name="P:LDtk.TocInstanceData.HeiPx">
+            <summary> HeiPx </summary>
+        </member>
+        <member name="P:LDtk.TocInstanceData.Iids">
+            <summary> IID information of this instance </summary>
+        </member>
+        <member name="P:LDtk.TocInstanceData.WidPx">
+            <summary> WidPx </summary>
+        </member>
+        <member name="P:LDtk.TocInstanceData.WorldX">
+            <summary> WorldX </summary>
+        </member>
+        <member name="P:LDtk.TocInstanceData.WorldY">
+            <summary> WorldY </summary>
+        </member>
+        <member name="T:LDtk.EmbedAtlas">
+            <summary> If this value is set, then it means that this atlas uses an internal LDtk atlas image instead of a loaded one. Possible values: &lt;<c>null</c>&gt;, <c>LdtkIcons</c>, <c>null</c> </summary>
+        </member>
+        <member name="T:LDtk.TileRenderMode">
+            <summary> An enum describing how the Entity tile is rendered inside the Entity bounds. Possible values: <c>Cover</c>, <c>FitInside</c>, <c>Repeat</c>, <c>Stretch</c>, <c>FullSizeCropped</c>, <c>FullSizeUncropped</c>, <c>NineSlice</c> </summary>
+        </member>
+        <member name="T:LDtk.When">
+            <summary> Possible values: <c>Manual</c>, <c>AfterLoad</c>, <c>BeforeSave</c>, <c>AfterSave</c> </summary>
+        </member>
+        <member name="T:LDtk.WorldLayout">
+            <summary> <b>WARNING</b>: this field will move to the <c>worlds</c> array after the "multi-worlds" update. It will then be <c>null</c>. You can enable the Multi-worlds advanced project option to enable the change immediately.<br/><br/>  An enum that describes how levels are organized in this project (ie. linearly or in a 2D space). Possible values: &lt;<c>null</c>&gt;, <c>Free</c>, <c>GridVania</c>, <c>LinearHorizontal</c>, <c>LinearVertical</c>, <c>null</c> </summary>
+        </member>
+        <member name="T:LDtk.LDtkJsonSourceGenerator">
+            <summary> The json source generator for LDtk files. </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.Boolean">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.BooleanArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.Byte">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.Single">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.SingleArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.Definitions">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.EmbedAtlas">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.NullableEmbedAtlas">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.EntityDefinition">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.EntityDefinitionArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.EntityInstance">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.EntityInstanceArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.EntityReference">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.EntityReferenceArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.EnumDefinition">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.EnumDefinitionArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.EnumTagValue">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.EnumTagValueArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.EnumValueDefinition">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.EnumValueDefinitionArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.FieldInstance">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.FieldInstanceArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.Flag">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.FlagArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.IntGridValueDefinition">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.IntGridValueDefinitionArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.IntGridValueGroupDefinition">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.IntGridValueGroupDefinitionArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.LayerDefinition">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.LayerDefinitionArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.LayerInstance">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.LayerInstanceArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.LayerType">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.LDtkFile">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.LDtkLevel">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.LDtkLevelArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.LDtkTableOfContentEntry">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.LDtkTableOfContentEntryArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.LDtkWorld">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.LDtkWorldArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.LevelBackgroundPosition">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.NeighbourLevel">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.NeighbourLevelArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.TileCustomMetadata">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.TileCustomMetadataArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.TileInstance">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.TileInstanceArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.TileRenderMode">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.NullableTileRenderMode">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.TilesetDefinition">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.TilesetDefinitionArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.TilesetRectangle">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.TilesetRectangleArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.TocInstanceData">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.TocInstanceDataArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.WorldLayout">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.NullableWorldLayout">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.Color">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.NullableColor">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.ColorArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.ContentManager">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.Point">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.PointArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.Vector2">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.Vector2Array">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.Guid">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.IServiceProvider">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.JsonElement">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.Int32">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.NullableInt32">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.Int32Array">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.Object">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.String">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.StringArray">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.UInt32">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.Default">
+            <summary>
+            The default <see cref="T:System.Text.Json.Serialization.JsonSerializerContext"/> associated with a default <see cref="T:System.Text.Json.JsonSerializerOptions"/> instance.
+            </summary>
+        </member>
+        <member name="P:LDtk.LDtkJsonSourceGenerator.GeneratedSerializerOptions">
+            <summary>
+            The source-generated options associated with this context.
+            </summary>
+        </member>
+        <member name="M:LDtk.LDtkJsonSourceGenerator.#ctor">
+            <inheritdoc/>
+        </member>
+        <member name="M:LDtk.LDtkJsonSourceGenerator.#ctor(System.Text.Json.JsonSerializerOptions)">
+            <inheritdoc/>
+        </member>
+        <member name="M:LDtk.LDtkJsonSourceGenerator.GetTypeInfo(System.Type)">
+            <inheritdoc/>
+        </member>
+        <member name="T:LDtk.Renderer.ExampleRenderer">
+            <summary>
+            Renderer for the ldtkWorld, ldtkLevel, intgrids and entities.
+            This can all be done in your own class if you want to reimplement it and customize it differently
+            this one is mostly here to get you up and running quickly.
+            </summary>
+        </member>
+        <member name="P:LDtk.Renderer.ExampleRenderer.SpriteBatch">
+            <summary> Gets or sets the spritebatch used for rendering with this Renderer. </summary>
+        </member>
+        <member name="P:LDtk.Renderer.ExampleRenderer.PrerenderedLevels">
+            <summary> Gets or sets the levels identifier to layers Dictionary. </summary>
+        </member>
+        <member name="P:LDtk.Renderer.ExampleRenderer.TilemapCache">
+            <summary> Gets or sets the levels identifier to layers Dictionary. </summary>
+        </member>
+        <member name="M:LDtk.Renderer.ExampleRenderer.#ctor(Microsoft.Xna.Framework.Graphics.SpriteBatch)">
+            <summary> Initializes a new instance of the <see cref="T:LDtk.Renderer.ExampleRenderer"/> class. This is used to intizialize the renderer for use with direct file loading. </summary>
+            <param name="spriteBatch">Spritebatch</param>
+        </member>
+        <member name="M:LDtk.Renderer.ExampleRenderer.#ctor(Microsoft.Xna.Framework.Graphics.SpriteBatch,Microsoft.Xna.Framework.Content.ContentManager)">
+            <summary> Initializes a new instance of the <see cref="T:LDtk.Renderer.ExampleRenderer"/> class. This is used to intizialize the renderer for use with content Pipeline. </summary>
+            <param name="spriteBatch">SpriteBatch</param>
+            <param name="content">Optional ContentManager</param>
+        </member>
+        <member name="M:LDtk.Renderer.ExampleRenderer.PrerenderLevel(LDtk.LDtkLevel)">
+            <summary> Prerender out the level to textures to optimize the rendering process. </summary>
+            <param name="level">The level to prerender.</param>
+            <returns>The prerendered level.</returns>
+            <exception cref="T:System.Exception">The level already has been prerendered.</exception>
+        </member>
+        <member name="M:LDtk.Renderer.ExampleRenderer.RenderPrerenderedLevel(LDtk.LDtkLevel)">
+            <summary> Render the prerendered level you created from PrerenderLevel(). </summary>
+            <param name="level">Level to prerender</param>
+            <exception cref="T:LDtk.LDtkException"></exception>
+        </member>
+        <member name="M:LDtk.Renderer.ExampleRenderer.RenderLevel(LDtk.LDtkLevel)">
+            <summary> Render the level directly without prerendering the layers alot slower than prerendering. </summary>
+            <param name="level">Level to render</param>
+        </member>
+        <member name="M:LDtk.Renderer.ExampleRenderer.RenderIntGrid(LDtk.LDtkIntGrid)">
+            <summary> Render intgrids by displaying the intgrid as solidcolor squares. </summary>
+            <param name="intGrid">Render intgrid</param>
+        </member>
+        <member name="M:LDtk.Renderer.ExampleRenderer.RenderEntity``1(``0,Microsoft.Xna.Framework.Graphics.Texture2D)">
+            <summary> Renders the entity with the tile it includes. </summary>
+            <param name="entity">The entity you want to render.</param>
+            <param name="texture">The spritesheet/texture for rendering the entity.</param>
+        </member>
+        <member name="M:LDtk.Renderer.ExampleRenderer.RenderEntity``1(``0,Microsoft.Xna.Framework.Graphics.Texture2D,Microsoft.Xna.Framework.Graphics.SpriteEffects)">
+            <summary> Renders the entity with the tile it includes. </summary>
+            <param name="entity">The entity you want to render.</param>
+            <param name="texture">The spritesheet/texture for rendering the entity.</param>
+            <param name="flipDirection">The direction to flip the entity when rendering.</param>
+        </member>
+        <member name="M:LDtk.Renderer.ExampleRenderer.RenderEntity``1(``0,Microsoft.Xna.Framework.Graphics.Texture2D,System.Int32)">
+            <summary> Renders the entity with the tile it includes. </summary>
+            <param name="entity">The entity you want to render.</param>
+            <param name="texture">The spritesheet/texture for rendering the entity.</param>
+            <param name="animationFrame">The current frame of animation. Is a very basic entity animation frames must be to the right of them and be the same size.</param>
+        </member>
+        <member name="M:LDtk.Renderer.ExampleRenderer.RenderEntity``1(``0,Microsoft.Xna.Framework.Graphics.Texture2D,Microsoft.Xna.Framework.Graphics.SpriteEffects,System.Int32)">
+            <summary> Renders the entity with the tile it includes. </summary>
+            <param name="entity">The entity you want to render.</param>
+            <param name="texture">The spritesheet/texture for rendering the entity.</param>
+            <param name="flipDirection">The direction to flip the entity when rendering.</param>
+            <param name="animationFrame">The current frame of animation. Is a very basic entity animation frames must be to the right of them and be the same size.</param>
+        </member>
+        <member name="M:LDtk.Renderer.ExampleRenderer.Dispose">
+            <summary> Dispose Renderer </summary>
+        </member>
+        <member name="T:LDtk.Renderer.RenderedLevel">
+            <summary> The level struct containting the rendered out textures. </summary>
+        </member>
+        <member name="P:LDtk.Renderer.RenderedLevel.Layers">
+            <summary> Gets or sets the layers of the level in order. </summary>
+        </member>
+        <member name="M:LDtk.Renderer.RenderedLevel.op_Equality(LDtk.Renderer.RenderedLevel,LDtk.Renderer.RenderedLevel)">
+            <summary> Checks if the two RenderedLevels are equal. </summary>
+            <param name="left"></param>
+            <param name="right"></param>
+        </member>
+        <member name="M:LDtk.Renderer.RenderedLevel.op_Inequality(LDtk.Renderer.RenderedLevel,LDtk.Renderer.RenderedLevel)">
+            <summary> Checks if the two RenderedLevels are not equal. </summary>
+            <param name="left"></param>
+            <param name="right"></param>
+        </member>
+        <member name="M:LDtk.Renderer.RenderedLevel.Equals(LDtk.Renderer.RenderedLevel,LDtk.Renderer.RenderedLevel)">
+            <summary> Checks if the two RenderedLevels are equal. </summary>
+            <param name="left"></param>
+            <param name="right"></param>
+        </member>
+        <member name="M:LDtk.Renderer.RenderedLevel.Equals(System.Object)">
+            <summary> Comparison </summary>
+            <param name="obj">Other</param>
+            <returns>If equal</returns>
+        </member>
+        <member name="M:LDtk.Renderer.RenderedLevel.GetHashCode">
+            <summary> Get hashcode </summary>
+            <returns></returns>
+        </member>
+    </members>
+</doc>

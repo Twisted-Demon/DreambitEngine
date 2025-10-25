@@ -32,6 +32,7 @@ public class LDtkScene : Scene<LDtkScene>
             ? LDtkManager.Instance.LoadLDtkLevel((Guid)LevelIid!)
             : LDtkManager.Instance.LoadLDtkLevel(LevelIdentifier);
 
+        BackgroundColor = Level._BgColor;
 
         //create the LDtk Renderer
         var ldtkRenderer = CreateEntity("LDtkRenderer")

@@ -13,9 +13,12 @@ public class PostProcessRenderer : Renderer
     private RenderTarget2D _colorCorrectionPass;
     private RenderTarget2D _tintPass;
     
-    public PostProcessRenderer(Scene scene, Renderer sceneRenderer) : base(scene)
+    private PostProcessSettings _postProcessSettings;
+    
+    public PostProcessRenderer(Scene scene, Renderer sceneRenderer, PostProcessSettings settings) : base(scene)
     {
         _sceneRenderer = sceneRenderer;
+        _postProcessSettings = settings;
     }
 
     public override void Initialize()
@@ -41,13 +44,13 @@ public class PostProcessRenderer : Renderer
 
     private void ApplyColorCorrectionValues()
     {
-        _colorCorrectionEffect.Parameters["hueShift"].SetValue(0.0f);
-        _colorCorrectionEffect.Parameters["saturation"].SetValue(.75f);
+        _colorCorrectionEffect.Parameters["hueShift"].SetValue(_postProcessSettings.HueShift);
+        _colorCorrectionEffect.Parameters["saturation"].SetValue(_postProcessSettings.Saturation);
     }
 
     private void ApplyTintValues()
     {
-        _tintEffect.Parameters["tintColor"].SetValue(new Color(180, 180, 220, 255).ToVector4());
+        _tintEffect.Parameters["tintColor"].SetValue(_postProcessSettings.TintColor.ToVector4());
     }
     
     private void Draw()

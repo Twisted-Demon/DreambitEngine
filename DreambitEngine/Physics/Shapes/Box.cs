@@ -10,8 +10,8 @@ public class Box : Shape
 
     public Vector2 TopLeft => Polygon.Vertices[0];
     public Vector2 TopRight => Polygon.Vertices[1];
-    public Vector2 BottomLeft => Polygon.Vertices[3];
     public Vector2 BottomRight => Polygon.Vertices[2];
+    public Vector2 BottomLeft => Polygon.Vertices[3];
 
     public static Box CreateSquare(Vector2 center, float halfExtent)
     {

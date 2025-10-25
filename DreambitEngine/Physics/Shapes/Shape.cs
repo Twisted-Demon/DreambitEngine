@@ -16,10 +16,15 @@ public class Shape
     {
         return Polygon.Vertices;
     }
+    
+    public bool Intersects(Shape other, out Vector2 mtvAxis, out float mtvDepth)
+    {
+        return Polygon.IntersectsGeneral(other.Polygon, out mtvAxis, out mtvDepth);
+    }
 
     public bool Intersects(Shape other)
     {
-        return Polygon.Intersects(other.Polygon);
+        return Polygon.IntersectsGeneral(other.Polygon, out _, out _);
     }
 
     public Polygon TransformPolygon(Transform transform)

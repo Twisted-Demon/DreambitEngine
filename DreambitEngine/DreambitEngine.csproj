@@ -44,6 +44,10 @@
       <Folder Include="AI\FSM\Conditions\" />
       <Folder Include="Scripting\Scripts\Camera\" />
     </ItemGroup>
+    <ItemGroup>
+      <ClCompile Include="Content\Effects\DefferedRenderCombine.fx" />
+      <ClCompile Include="Content\Effects\PointLight2D.fx" />
+    </ItemGroup>
     <PropertyGroup>
         <MonoGameExtendedPipelineReferencePath>$(MSBuildThisFileDirectory)../Includes</MonoGameExtendedPipelineReferencePath>
     </PropertyGroup>

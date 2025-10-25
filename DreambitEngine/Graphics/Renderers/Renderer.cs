@@ -1,4 +1,5 @@
-﻿using Microsoft.Xna.Framework.Graphics;
+﻿using Dreambit.ECS;
+using Microsoft.Xna.Framework.Graphics;
 
 namespace Dreambit;
 
@@ -14,6 +15,7 @@ public abstract class Renderer
     protected static GraphicsDevice Device => Core.Instance.GraphicsDevice;
     protected Effect DefaultEffect { get; private set; }
     protected Scene Scene { get; private set; }
+    protected DrawableList Drawables => Scene.Drawables;
 
     public RenderTarget2D FinalRenderTarget { get; private set; }
 

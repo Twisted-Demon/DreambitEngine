@@ -1,7 +1,7 @@
 
 #----------------------------- Global Properties ----------------------------#
 
-/outputDir:../../DreambitEngine.Sandbox/Build/Content
+/outputDir:../../Dreambit.BriGame/Build/Debug/Content
 /intermediateDir:obj/$(Platform)
 /platform:DesktopGL
 /config:
@@ -21,6 +21,12 @@
 /processorParam:DebugMode=Auto
 /build:Effects/ColorCorrection.fx
 
+#begin Effects/DefferedRenderCombine.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:Effects/DefferedRenderCombine.fx
+
 #begin Effects/ForwardDiffuse.fx
 /importer:EffectImporter
 /processor:EffectProcessor
@@ -32,6 +38,18 @@
 /processor:EffectProcessor
 /processorParam:DebugMode=Auto
 /build:Effects/ForwardLighting.fx
+
+#begin Effects/ForwardLighting2D.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:Effects/ForwardLighting2D.fx
+
+#begin Effects/PointLight2D.fx
+/importer:EffectImporter
+/processor:EffectProcessor
+/processorParam:DebugMode=Auto
+/build:Effects/PointLight2D.fx
 
 #begin Effects/Tint.fx
 /importer:EffectImporter

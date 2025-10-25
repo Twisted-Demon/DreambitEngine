@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PipelineBuildEvent xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <SourceFile>C:/Dev/DreambitEngine/Dreambit.BriGame/Content/Animations/bri_idle.animation</SourceFile>
+  <SourceTime>2025-10-19T15:27:31.3504081-05:00</SourceTime>
+  <DestFile>C:/Dev/DreambitEngine/Dreambit.BriGame/Build/Debug/Content/Animations/bri_idle.xnb</DestFile>
+  <DestTime>2025-10-23T14:45:35.9639555-05:00</DestTime>
+  <Importer>AnimationImporter</Importer>
+  <ImporterTime>2024-10-21T01:07:08.6065211-05:00</ImporterTime>
+  <Processor>AnimationProcessor</Processor>
+  <ProcessorTime>2024-10-21T01:07:08.6065211-05:00</ProcessorTime>
+  <Dependencies />
+  <BuildAsset />
+  <BuildOutput />
+</PipelineBuildEvent>

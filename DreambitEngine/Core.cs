@@ -10,7 +10,7 @@ public class Core : Game
     private const float FixedPhysicsStep = 1f / 120f;
     public static readonly LogLevel LogLevel = LogLevel.Debug;
     private readonly Logger<Core> _logger = new();
-    private float accumulatedPhysicsTime;
+    private float _accumulatedPhysicsTime;
 
     public Core(int width = 800, int height = 600, string title = "Dreambit Engine")
     {
@@ -90,11 +90,11 @@ public class Core : Game
 
     private void HandlePhysics()
     {
-        accumulatedPhysicsTime += Time.DeltaTime;
+        _accumulatedPhysicsTime += Time.DeltaTime;
 
-        if (accumulatedPhysicsTime >= FixedPhysicsStep)
+        if (_accumulatedPhysicsTime >= FixedPhysicsStep)
             //handle physics here;
-            accumulatedPhysicsTime = 0f;
+            _accumulatedPhysicsTime = 0f;
     }
 
     protected override void OnExiting(object sender, ExitingEventArgs args)
@@ -110,7 +110,7 @@ public class Core : Game
         CurrentScene?.Terminate();
         CurrentScene = NextScene;
         NextScene = null;
-        accumulatedPhysicsTime = 0f;
+        _accumulatedPhysicsTime = 0f;
 
         PhysicsSystem.Instance.CleanUp();
         Time.SceneLoaded();

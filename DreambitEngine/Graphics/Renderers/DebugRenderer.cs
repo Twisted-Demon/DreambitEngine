@@ -15,10 +15,15 @@ public class DebugRenderer(Scene scene) : Renderer(scene)
     public override void OnDraw()
     {
         IsActive = scene.DebugMode;
-        if (!scene.DebugMode) return;
-
+        
         Device.SetRenderTarget(FinalRenderTarget);
         Device.Clear(Color.Transparent);
+
+        if (!scene.DebugMode)
+        {
+            Device.SetRenderTarget(null);
+            return;
+        }
 
         Core.SpriteBatch.Begin(
             samplerState: SamplerState.PointClamp,
@@ -27,10 +32,20 @@ public class DebugRenderer(Scene scene) : Renderer(scene)
             transformMatrix: Scene.MainCamera.TransformMatrix,
             effect: DefaultEffect);
 
-        foreach (var component in Scene.GetAllActiveEntities()
-                     .Select(entity => entity.GetAllActiveComponents())
-                     .SelectMany(components => components))
-            component.OnDebugDraw();
+        var entities = Scene.GetAllActiveEntities(); // ideally IReadOnlyList<Entity>
+        foreach (var entity in entities)
+        {
+            var comps = entity.GetAllActiveComponents();
+            foreach (var c in comps)
+            {
+                c.OnDebugDraw();
+            }
+        }
+        
+        //foreach (var component in Scene.GetAllActiveEntities()
+        //             .Select(entity => entity.GetAllActiveComponents())
+        //             .SelectMany(components => components))
+        //    component.OnDebugDraw();
 
         Core.SpriteBatch.End();
     }

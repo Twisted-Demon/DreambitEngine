@@ -1,12 +1,20 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using Dreambit.ECS;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
 namespace Dreambit;
 
-public class DefaultRenderer(Scene scene) : Renderer(scene)
+public class ForwardRenderer2D(Scene scene) : Renderer(scene)
 {
+    private Effect _forwardLightingEffect;
+        
+    public override void Initialize()
+    {
+        base.Initialize();
+        _forwardLightingEffect = Resources.LoadAsset<Effect>("Effects/ForwardLighting2D");
+    }
 
     public override void OnDraw()
     {
@@ -17,10 +25,20 @@ public class DefaultRenderer(Scene scene) : Renderer(scene)
     private void PreRender()
     {
         var drawables = Scene.Drawables.GetAllDrawables()
-            .Where(x => x.Enabled && x.Entity.Enabled && x.DrawLayer != RenderLayers.LightLayer);
+            .Where(x => x.Enabled && x.Entity.Enabled && x.DrawLayer != DrawLayers.LightLayer);
 
         foreach (var drawable in drawables)
             drawable.OnPreDraw();
+    }
+
+    private void HandleLighting()
+    {
+        var lights = Scene.Drawables.GetAllDrawablesByType<PointLight2D>();
+        var ambientLights = Scene.Drawables.GetAllDrawablesByType<AmbientLight2D>().FirstOrDefault();
+        
+        var ambientColor = ambientLights != null? ambientLights.Color : Color.Black;
+        
+        LightingUniforms.Apply(_forwardLightingEffect, lights, Scene.MainCamera, ambientColor.ToVector3());
     }
 
     private void RenderDrawables()
@@ -32,10 +50,12 @@ public class DefaultRenderer(Scene scene) : Renderer(scene)
         Device.SetRenderTarget(FinalRenderTarget);
         Device.Clear(Color.Transparent);
 
+        HandleLighting();
+
         for (var i = 0; i < layerOrder.Count; i++)
         {
             var drawables = drawLayers[layerOrder[i]]
-                .Where(x => x.Enabled && x.Entity.Enabled && x.DrawLayer != RenderLayers.LightLayer)
+                .Where(x => x.Enabled && x.Entity.Enabled && x.DrawLayer != DrawLayers.LightLayer)
                 .ToList();
 
             var visibleDrawables = drawables
@@ -56,12 +76,12 @@ public class DefaultRenderer(Scene scene) : Renderer(scene)
                 samplerState: SamplerState.PointClamp,
                 sortMode: SpriteSortMode.Deferred,
                 blendState: BlendState.AlphaBlend,
-                effect: DefaultEffect
+                effect: _forwardLightingEffect
             );
 
             foreach (var drawable in sortedDrawables)
             {
-                var drawableEffect = drawable.UsesEffect ? drawable.Effect : DefaultEffect;
+                var drawableEffect = drawable.UsesEffect ? drawable.Effect : _forwardLightingEffect;
 
                 if (drawableEffect != currentEffect)
                 {
