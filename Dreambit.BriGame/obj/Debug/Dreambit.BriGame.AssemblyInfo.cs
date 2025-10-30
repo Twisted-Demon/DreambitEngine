@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Brigame")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+4fd21cb1ca750142191daf610132da5139766718")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b39e265a97641976c4138c3023119d4c6c4d0342")]
 [assembly: System.Reflection.AssemblyProductAttribute("Brigame")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Brigame")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
