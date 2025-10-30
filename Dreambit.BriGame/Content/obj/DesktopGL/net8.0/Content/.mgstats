@@ -1,5 +1,5 @@
 Source File,Dest File,Processor Type,Content Type,Source File Size,Dest File Size,Build Seconds
 "C:/Dev/DreambitEngine/Dreambit.BriGame/Content/Animations/bri_idle.animation","C:/Dev/DreambitEngine/Dreambit.BriGame/Content/bin/DesktopGL/Content/Animations/bri_idle.xnb","AnimationProcessor","SpriteSheetAnimation",631,172,0.1424727
-"C:/Dev/DreambitEngine/Dreambit.BriGame/Content/BriWorld.ldtk","C:/Dev/DreambitEngine/Dreambit.BriGame/Content/bin/DesktopGL/Content/BriWorld.xnb","LDtkFileProcessor","LDtkFile",43143,4198,0.1925004
-"C:/Dev/DreambitEngine/Dreambit.BriGame/Content/BriWorld/Level_0.ldtkl","C:/Dev/DreambitEngine/Dreambit.BriGame/Content/bin/DesktopGL/Content/BriWorld/Level_0.xnb","LDtkLevelProcessor","LDtkLevel",40123,25908,0.0117318
+"C:/Dev/DreambitEngine/Dreambit.BriGame/Content/BriWorld.ldtk","C:/Dev/DreambitEngine/Dreambit.BriGame/Content/bin/DesktopGL/Content/BriWorld.xnb","LDtkFileProcessor","LDtkFile",52026,4478,0.1834429
+"C:/Dev/DreambitEngine/Dreambit.BriGame/Content/BriWorld/Level_0.ldtkl","C:/Dev/DreambitEngine/Dreambit.BriGame/Content/bin/DesktopGL/Content/BriWorld/Level_0.xnb","LDtkLevelProcessor","LDtkLevel",48032,31043,0.012965
 "C:/Dev/DreambitEngine/Dreambit.BriGame/Content/SpriteSheets/bri_idle.spritesheet","C:/Dev/DreambitEngine/Dreambit.BriGame/Content/bin/DesktopGL/Content/SpriteSheets/bri_idle.xnb","SpriteSheetProcessor","SpriteSheet",87,84,0.1506487

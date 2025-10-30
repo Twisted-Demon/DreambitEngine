@@ -15,7 +15,7 @@ public class Resources : Singleton<Resources>
 
     private Dictionary<string, object> _loadedAssets;
     private ContentManager Content { get; } = Core.Instance.Content;
-    private static string ContentDirectory => Path.Combine(AppContext.BaseDirectory, "Content");
+    private static string ContentDirectory => Path.Combine(AppContext.BaseDirectory, Instance.Content.RootDirectory);
     public static bool UsePak { get; set; } = true;
     public static string PakName { get; set; } = "content.pak";
 

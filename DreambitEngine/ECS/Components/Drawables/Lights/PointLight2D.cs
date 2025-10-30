@@ -1,4 +1,5 @@
-﻿using Microsoft.Xna.Framework;
+﻿using System;
+using Microsoft.Xna.Framework;
 
 namespace Dreambit.ECS;
 
@@ -10,10 +11,16 @@ public class PointLight2D : Light2D
     {
         get
         {
-            var halfRadius = Radius * 0.5f;
-            
-            var rect = new Rectangle((int)Position.X - (int)halfRadius, (int)Position.Y - (int)halfRadius, (int)halfRadius, (int)halfRadius);
-            return rect;
+            float r = MathF.Max(0f, Radius); // safety
+            int left  = (int)MathF.Floor(Position.X - r);
+            int top   = (int)MathF.Floor(Position.Y - r);
+            int size  = (int)MathF.Ceiling(r * 2f);
+            return new Rectangle(left, top, size, size);
         }
+    }
+
+    public override void OnDebugDraw()
+    {
+        Core.SpriteBatch.DrawHollowRectangle(Bounds, Color.White);
     }
 }

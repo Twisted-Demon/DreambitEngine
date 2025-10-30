@@ -3117,9 +3117,10 @@
             <returns>The prerendered level.</returns>
             <exception cref="T:System.Exception">The level already has been prerendered.</exception>
         </member>
-        <member name="M:LDtk.Renderer.ExampleRenderer.RenderPrerenderedLevel(LDtk.LDtkLevel)">
+        <member name="M:LDtk.Renderer.ExampleRenderer.RenderPrerenderedLevel(LDtk.LDtkLevel,System.Single)">
             <summary> Render the prerendered level you created from PrerenderLevel(). </summary>
             <param name="level">Level to prerender</param>
+            <param name="layerDepth">A depth of the layer of this level.</param>
             <exception cref="T:LDtk.LDtkException"></exception>
         </member>
         <member name="M:LDtk.Renderer.ExampleRenderer.RenderLevel(LDtk.LDtkLevel)">

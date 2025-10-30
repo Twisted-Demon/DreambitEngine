@@ -14,5 +14,10 @@ public class DebugToggleComponent : Component
     {
         if (Input.IsKeyPressed(Keys.F8))
             Scene.DebugMode = !Scene.DebugMode;
+
+        if (Input.IsKeyHeld(Keys.Up))
+            Scene.MainCamera.Zoom += Time.DeltaTime;
+        if (Input.IsKeyHeld(Keys.Down))
+            Scene.MainCamera.Zoom -= Time.DeltaTime;
     }
 }

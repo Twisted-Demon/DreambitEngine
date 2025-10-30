@@ -25,7 +25,7 @@ public sealed class PakReader
         _entries = ReadToc(_fs);
     }
 
-    public bool TryOpen(string logicalPath, out Stream? stream, out Entry? entry)
+    public bool TryOpen(string logicalPath, out Stream stream, out Entry entry)
     {
         var key = Normalize(logicalPath);
         if (_entries.TryGetValue(key, out var e))
@@ -61,8 +61,8 @@ public sealed class PakReader
 
         fs.ReadExactly(b[..2]); var count = BinaryPrimitives.ReadUInt16LittleEndian(b[..2]);
 
-        fs.ReadExactly(b[..8]); long tocOffset = (long)BinaryPrimitives.ReadUInt64LittleEndian(b[..8]);
-        fs.ReadExactly(b[..8]); long dataOffset = (long)BinaryPrimitives.ReadUInt64LittleEndian(b[..8]);
+        fs.ReadExactly(b[..8]); var tocOffset = (long)BinaryPrimitives.ReadUInt64LittleEndian(b[..8]);
+        fs.ReadExactly(b[..8]); var dataOffset = (long)BinaryPrimitives.ReadUInt64LittleEndian(b[..8]);
 
         fs.Position = tocOffset;
 
@@ -74,10 +74,10 @@ public sealed class PakReader
             fs.ReadExactly(pbuf);
             var path = System.Text.Encoding.UTF8.GetString(pbuf);
 
-            fs.ReadExactly(b[..2]); ushort type = BinaryPrimitives.ReadUInt16LittleEndian(b[..2]);
-            fs.ReadExactly(b[..8]); long off  = (long)BinaryPrimitives.ReadUInt64LittleEndian(b[..8]);
-            fs.ReadExactly(b[..8]); long size = (long)BinaryPrimitives.ReadUInt64LittleEndian(b[..8]);
-            fs.ReadExactly(b[..4]); uint crc  = BinaryPrimitives.ReadUInt32LittleEndian(b[..4]);
+            fs.ReadExactly(b[..2]); var type = BinaryPrimitives.ReadUInt16LittleEndian(b[..2]);
+            fs.ReadExactly(b[..8]); var off  = (long)BinaryPrimitives.ReadUInt64LittleEndian(b[..8]);
+            fs.ReadExactly(b[..8]); var size = (long)BinaryPrimitives.ReadUInt64LittleEndian(b[..8]);
+            fs.ReadExactly(b[..4]); var crc  = BinaryPrimitives.ReadUInt32LittleEndian(b[..4]);
 
             map[Normalize(path)] = new Entry { Path = path, Type = type, Offset = off, Size = size, Crc32 = crc };
         }

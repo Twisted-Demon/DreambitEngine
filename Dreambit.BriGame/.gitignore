@@ -1,6 +1,7 @@
 ﻿bin/
 obj/
 Build/
+Build/Debug
 
 Content/bin/
 Content/obj/

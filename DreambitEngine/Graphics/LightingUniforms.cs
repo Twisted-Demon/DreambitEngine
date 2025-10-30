@@ -26,7 +26,7 @@ public static class LightingUniforms
             var screen = Vector2.Transform(light.Position, camera.TransformMatrix);
 
             LightPos[count] = screen;
-            LightRadius[count] = MathF.Max(1f, light.Radius * camera.TotalZoom);      
+            LightRadius[count] = MathF.Max(1f, light.Radius * camera.Scale);      
             LightColor[count] = light.Color.ToVector3();
             LightIntensity[count] = light.Intensity;
             count++;
