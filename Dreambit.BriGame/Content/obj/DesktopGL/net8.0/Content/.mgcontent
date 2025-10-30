@@ -8,26 +8,8 @@
     <File>C:/Dev/DreambitEngine/Dreambit.BriGame/Content/BriWorld.ldtk</File>
     <File>C:/Dev/DreambitEngine/Dreambit.BriGame/Content/BriWorld/Level_0.ldtkl</File>
     <File>C:/Dev/DreambitEngine/Dreambit.BriGame/Content/SpriteSheets/bri_idle.spritesheet</File>
-    <File>C:/Dev/DreambitEngine/Dreambit.BriGame/Content/Textures/Bri/bri_attack.png</File>
-    <File>C:/Dev/DreambitEngine/Dreambit.BriGame/Content/Textures/Bri/bri_charge.png</File>
-    <File>C:/Dev/DreambitEngine/Dreambit.BriGame/Content/Textures/Bri/bri_death.png</File>
-    <File>C:/Dev/DreambitEngine/Dreambit.BriGame/Content/Textures/Bri/bri_idle.png</File>
-    <File>C:/Dev/DreambitEngine/Dreambit.BriGame/Content/Textures/Bri/bri_run.png</File>
-    <File>C:/Dev/DreambitEngine/Dreambit.BriGame/Content/Textures/Bri/bri_take_damage.png</File>
-    <File>C:/Dev/DreambitEngine/Dreambit.BriGame/Content/Textures/Forest/flooded grass1.png</File>
-    <File>C:/Dev/DreambitEngine/Dreambit.BriGame/Content/Textures/Forest/full tile water.png</File>
-    <File>C:/Dev/DreambitEngine/Dreambit.BriGame/Content/Textures/Forest/grass1 to water.png</File>
   </SourceFiles>
   <DestFiles>
-    <File xsi:nil="true" />
-    <File xsi:nil="true" />
-    <File xsi:nil="true" />
-    <File xsi:nil="true" />
-    <File xsi:nil="true" />
-    <File xsi:nil="true" />
-    <File xsi:nil="true" />
-    <File xsi:nil="true" />
-    <File xsi:nil="true" />
     <File xsi:nil="true" />
     <File xsi:nil="true" />
     <File xsi:nil="true" />

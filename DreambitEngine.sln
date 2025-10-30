@@ -22,6 +22,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DreambitEngine.Sandbox", "D
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dreambit.BriGame", "Dreambit.BriGame\Dreambit.BriGame.csproj", "{58ACBFEF-03FE-4A3A-8C3E-01832ED0D7E9}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DreambitEngine.AssetBaker", "DreambitEngine.AssetBaker\DreambitEngine.AssetBaker.csproj", "{83B2DF61-8534-4418-BC7A-ACF38B4FCBB0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -75,6 +77,10 @@ Global
 		{58ACBFEF-03FE-4A3A-8C3E-01832ED0D7E9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{58ACBFEF-03FE-4A3A-8C3E-01832ED0D7E9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{58ACBFEF-03FE-4A3A-8C3E-01832ED0D7E9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{83B2DF61-8534-4418-BC7A-ACF38B4FCBB0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{83B2DF61-8534-4418-BC7A-ACF38B4FCBB0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{83B2DF61-8534-4418-BC7A-ACF38B4FCBB0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{83B2DF61-8534-4418-BC7A-ACF38B4FCBB0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{CED15BC2-4D9E-47AF-8406-ECC04164CED8} = {8AEE4555-EE28-4EE3-8A41-008E6A3C7FD8}

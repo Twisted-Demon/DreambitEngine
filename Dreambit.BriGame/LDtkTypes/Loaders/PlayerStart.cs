@@ -1,5 +1,6 @@
 ﻿using Dreambit.BriGame.Components;
 using Dreambit.ECS;
+using Dreambit.ECS.Audio;
 using LDtk;
 using Microsoft.Xna.Framework;
 
@@ -22,5 +23,7 @@ public partial class PlayerStart : LDtkEntity<PlayerStart>
         lightComponent.Color = Color.White;
         lightComponent.Radius = 75f;
         lightComponent.Intensity = 0.5f;
+
+        entity.AttachComponent<SoundListener2d>();
     }
 }

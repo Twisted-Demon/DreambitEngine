@@ -5,10 +5,12 @@ using Dreambit.BriGame;
 
 using var game = new Core(1280, 720, "Bri Game") as Core;
 
-Core.SetFixedTimeStep(false);
+Core.SetFixedTimeStep(true);
 
 Window.SetAllowUserResizing(true);
 Window.SetVsync(false);
+
+Core.Level = LogLevel.Trace;
 
 LDtkManager.Instance.SetUp("BriWorld");
 

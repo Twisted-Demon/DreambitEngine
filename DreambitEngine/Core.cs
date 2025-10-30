@@ -8,7 +8,7 @@ namespace Dreambit;
 public class Core : Game
 {
     private const float FixedPhysicsStep = 1f / 120f;
-    public static readonly LogLevel LogLevel = LogLevel.Debug;
+    public static LogLevel Level { get; set; } = LogLevel.Debug;
     private readonly Logger<Core> _logger = new();
     private float _accumulatedPhysicsTime;
 
@@ -46,6 +46,11 @@ public class Core : Game
     public static void SetFixedTimeStep(bool value)
     {
         Instance.IsFixedTimeStep = value;
+    }
+
+    public static void SetTargetFps(int fps)
+    {
+        Instance.TargetElapsedTime =  TimeSpan.FromSeconds((double)1 / fps);
     }
 
     protected override void LoadContent()
@@ -113,6 +118,7 @@ public class Core : Game
         _accumulatedPhysicsTime = 0f;
 
         PhysicsSystem.Instance.CleanUp();
+        AudioSystem.Instance.CleanUp();
         Time.SceneLoaded();
     }
 

@@ -7,26 +7,26 @@ internal static class Log
     public static void Trace(string header, string format, params object[] args)
     {
         AnsiConsole.ResetColors();
-        AnsiConsole.MarkupLine($"[white]{header}: [/][grey69]{format}[/]", args);
+        AnsiConsole.MarkupLine($"[blue]{header}: [/][grey69]{format}[/]", args);
     }
 
     public static void Trace(string header, string message)
     {
         AnsiConsole.ResetColors();
-        AnsiConsole.MarkupLine($"[white]{header}: [/][grey69]{message}[/]");
+        AnsiConsole.MarkupLine($"[blue]{header}: [/][grey69]{message}[/]");
     }
 
 
     public static void Debug(string header, string format, params object[] args)
     {
         AnsiConsole.ResetColors();
-        AnsiConsole.MarkupLine($"[white]{header}: [/][cyan]{format}[/]", args);
+        AnsiConsole.MarkupLine($"[green]{header}: [/][cyan]{format}[/]", args);
     }
 
     public static void Debug(string header, string message)
     {
         AnsiConsole.ResetColors();
-        AnsiConsole.MarkupLine($"[white]{header}: [/][cyan]{message}[/]");
+        AnsiConsole.MarkupLine($"[green]{header}: [/][cyan]{message}[/]");
     }
 
 

@@ -139,6 +139,26 @@
 					],
 					"__worldX": 351,
 					"__worldY": 143
+				},
+				{
+					"__identifier": "SoundLight",
+					"__grid": [480,277],
+					"__pivot": [0.5,0.5],
+					"__tags": ["light"],
+					"__tile": { "tilesetUid": 3, "x": 400, "y": 0, "w": 16, "h": 16 },
+					"__smartColor": "#D058FF",
+					"iid": "db3d4610-ac70-11f0-bb0e-1b8bd9d0c058",
+					"width": 1,
+					"height": 1,
+					"defUid": 34,
+					"px": [480,277],
+					"fieldInstances": [
+						{ "__identifier": "Intensity", "__type": "Float", "__value": 1, "__tile": null, "defUid": 35, "realEditorValues": [] },
+						{ "__identifier": "Radius", "__type": "Float", "__value": 100, "__tile": null, "defUid": 36, "realEditorValues": [] },
+						{ "__identifier": "Color", "__type": "Color", "__value": "#D058FF", "__tile": null, "defUid": 37, "realEditorValues": [{ "id": "V_Int", "params": [13654271] }] }
+					],
+					"__worldX": 480,
+					"__worldY": 277
 				}
 			]
 		},

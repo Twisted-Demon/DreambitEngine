@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Net.Mime;
 using Dreambit.ECS;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -395,7 +396,7 @@ public struct Polygon
                         return false;
             return true;
         }
-
+        
         return false;
     }
 

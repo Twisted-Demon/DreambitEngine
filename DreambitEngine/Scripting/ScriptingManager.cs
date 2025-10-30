@@ -26,7 +26,7 @@ public class ScriptingManager
     {
         if (IsCutsceneActive || _groupQueue.Count != 0)
         {
-            _logger.Warn("Unable to Start Cutscene {0}, Another cutscene is alreadya active", cutsceneName);
+            _logger.Warn("Unable to Start Cutscene {0}, Another cutscene is already active", cutsceneName);
             return;
         }
 

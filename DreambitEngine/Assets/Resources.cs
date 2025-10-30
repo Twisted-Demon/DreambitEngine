@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
@@ -13,6 +15,9 @@ public class Resources : Singleton<Resources>
 
     private Dictionary<string, object> _loadedAssets;
     private ContentManager Content { get; } = Core.Instance.Content;
+    private static string ContentDirectory => Path.Combine(AppContext.BaseDirectory, "Content");
+    public static bool UsePak { get; set; } = true;
+    public static string PakName { get; set; } = "content.pak";
 
     private List<IDisposable> DisposableAssets
     {
@@ -34,6 +39,7 @@ public class Resources : Singleton<Resources>
             var fieldInfo = ReflectionUtils.GetFieldInfo(typeof(ContentManager), "loadedAssets");
             _loadedAssets = fieldInfo.GetValue(Core.Instance.Content) as Dictionary<string, object>;
             return _loadedAssets;
+            
         }
     }
 
@@ -52,12 +58,34 @@ public class Resources : Singleton<Resources>
 
         try
         {
-            Instance.Logger.Trace("Loading {0} - {1}", typeof(T).Name, assetName);
-            var asset = Instance.Content.Load<T>(assetName);
+            T asset;
+            
+            switch (typeof(T).Name)
+            {
+                case "Texture2D":
+                {
+                    Instance.Logger.Trace("Loading {0}: {1}; From Pak File: {2}", typeof(T).Name, assetName, PakName);
+                    using var s = GetStream(assetName + ".texb");
+                    asset = TexbLoader.LoadTexture(s) as T;
+                    break;
+                }
+                case "SoundEffect":
+                {
+                    Instance.Logger.Trace("Loading {0}: {1}; From Pak File: {2}", typeof(T).Name, assetName, PakName);
+                    using var s = GetStream(assetName + ".audb");
+                    asset = AudbLoader.LoadSoundEffect(s) as T;
+                    break;
+                }
+                default:
+                    Instance.Logger.Trace("Loading {0} - {1}", typeof(T).Name, assetName);
+                    asset = Instance.Content.Load<T>(assetName);
+                    break;
+            }
+            
             Instance.Logger.Debug("Loaded {0} - {1}", typeof(T).Name, assetName);
-
-            if (asset is Texture2D texture) asset = PremultiplyTexture(texture) as T;
-
+            
+            Instance.LoadedAssets[assetName] = asset;
+            
             return asset;
         }
         catch (Exception e)
@@ -65,9 +93,23 @@ public class Resources : Singleton<Resources>
             Instance.Logger.Warn("Could not load {0} | {1}", typeof(T).Name, assetName);
             Instance.Logger.Error(e.Message);
 
-            return default;
+            return null;
         }
     }
+
+    private static Stream GetStream(string assetName)
+    {
+        if (UsePak)
+        {
+            var pak = new PakReader(Path.Combine(ContentDirectory, PakName));
+            return pak.Open(assetName);
+        }
+        else
+        {
+            return File.OpenRead(Path.Combine(ContentDirectory, assetName));
+        }
+    }
+    
 
     public static Task LoadAssetQueueAsync<T>(AssetQueue<T> assetQueue) where T : class
     {

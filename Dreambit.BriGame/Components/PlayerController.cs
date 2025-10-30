@@ -1,5 +1,7 @@
 ﻿using Dreambit.ECS;
+using Dreambit.ECS.Audio;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Audio;
 using Microsoft.Xna.Framework.Input;
 
 namespace Dreambit.BriGame.Components;
@@ -57,6 +59,5 @@ public class PlayerController : Component
             _moveDir.Normalize();
         
         _mover.Velocity = _moveDir * Speed;
-        
     }
 }
