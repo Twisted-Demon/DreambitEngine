@@ -111,13 +111,13 @@ public class Resources : Singleton<Resources>
     public static SpriteFontBase LoadSpriteFont(string assetName, float fontSize = 12f)
     {
         //if we already have the asset we will return it
-        if (Instance.LoadedAssets.TryGetValue(assetName, out var rawAsset))
+        if (Instance.LoadedAssets.TryGetValue(assetName + fontSize, out var rawAsset))
             if (rawAsset is SpriteFontBase font)
                 return font;
 
         try
         {
-            Instance.Logger.Trace("Loading SpriteFontBase - {0}", assetName);
+            Instance.Logger.Trace("Loading SpriteFontBase - {0}", assetName + fontSize);
 
             SpriteFontBase font;
             if (Loaders.TryGetValue(typeof(SpriteFontBaseLoader), out var loader))
@@ -128,11 +128,11 @@ public class Resources : Singleton<Resources>
             }
             else
             {
-                Instance.Logger.Warn("Could not load {0} | {1}", nameof(SpriteFontBase), assetName);
+                Instance.Logger.Warn("Could not load {0} | {1}", nameof(SpriteFontBase), assetName + fontSize);
                 return null;
             }
             
-            Instance.LoadedAssets[assetName] = font;
+            Instance.LoadedAssets[assetName + fontSize] = font;
 
             var disposable = font as IDisposable;
             if (disposable != null)

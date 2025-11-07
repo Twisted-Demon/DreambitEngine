@@ -1,4 +1,5 @@
 ﻿using System;
+using Microsoft.Xna.Framework;
 
 namespace Dreambit;
 
@@ -8,4 +9,6 @@ public static class RandomExtensions
     {
         return random.NextSingle() * (max - min) + min;
     }
+
+
 }

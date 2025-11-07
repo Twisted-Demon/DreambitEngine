@@ -21,9 +21,9 @@ public class Camera2D : Component
     
     // Convenience: full pixels-per-world-unit including camera zoom
     private float ScreenPixelsPerWorldUnit => TotalZoom * PixelsPerUnit;                  
-    private float WorldUnitsPerScreenPixel => 1f / ScreenPixelsPerWorldUnit;    
-    
-    public int TargetVerticalResolution { get; private set; } = 1080;
+    private float WorldUnitsPerScreenPixel => 1f / ScreenPixelsPerWorldUnit;
+
+    public int TargetVerticalResolution { get; private set; } = Window.Height;
     public Matrix TransformMatrix { get; private set; }
     public Matrix UnscaledTransformMatrix { get; private set; }
 

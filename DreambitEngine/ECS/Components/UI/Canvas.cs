@@ -17,17 +17,20 @@ public class Canvas : UIComponent
 
     internal Vector2 ConvertToScreenCoord(Vector2 position)
     {
+        var camera = Scene.UICamera;
         
-        var xScale = Window.Width / (float)100;
-        var yScale = Window.Height / (float)100;
+        var xScale = camera.Bounds.Width / (float)100;
+        var yScale = camera.Bounds.Height / (float)100;
 
         return new Vector2(position.X * xScale, position.Y * yScale);
     }
 
     internal Vector2 ConvertToScreenSize(Vector2 size)
     {
-        var xScale = Window.Width / 100;
-        var yScale = Window.Height / 100;
+        var camera = Scene.UICamera;
+        
+        var xScale = camera.Bounds.Width / 100;
+        var yScale = camera.Bounds.Height / 100;
 
         return new Vector2(size.X * xScale, size.Y * yScale);
     }

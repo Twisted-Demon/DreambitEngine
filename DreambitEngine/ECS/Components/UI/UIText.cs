@@ -35,7 +35,7 @@ public class UIText : UIElement
 
     private float _fontSize = 12f;
 
-    private float FontSize
+    public float FontSize
     {
         get => _fontSize;
         set

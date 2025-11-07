@@ -24,8 +24,8 @@ public class SpriteFontBaseLoader : AssetLoaderBase<SpriteFontBaseLoader>
     public SpriteFontBase LoadFont(string assetName, string contentPath, float fontSize)
     {
         FontSystemDefaults.FontResolutionFactor = 6.0f;
-        FontSystemDefaults.KernelWidth = 0;
-        FontSystemDefaults.KernelHeight = 0;
+        FontSystemDefaults.KernelWidth = 2;
+        FontSystemDefaults.KernelHeight = 2;
         
         if (!_byName.TryGetValue(assetName, out var value))
         {
@@ -36,6 +36,8 @@ public class SpriteFontBaseLoader : AssetLoaderBase<SpriteFontBaseLoader>
             _byName.Add(assetName, value);
         }
 
-        return value.GetFont(fontSize);
+        var font = value.GetFont(fontSize);
+
+        return font;
     }
 }
