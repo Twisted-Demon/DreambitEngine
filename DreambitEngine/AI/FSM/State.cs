@@ -4,42 +4,53 @@ namespace Dreambit;
 
 public abstract class State
 {
-    public FSM Fsm;
-
-    internal bool IsStarted = false;
-    public string Identifier { get; internal set; }
-    protected Blackboard Blackboard => Fsm.Blackboard;
-    public Scene Scene => Fsm?.Scene;
-    public Transform Transform => Fsm?.Transform;
-
-    public virtual void OnInitialize()
-    {
-    }
-
-    public virtual void OnEnter()
-    {
-    }
+    /// <summary>
+    /// back reference to the owning FSM
+    /// </summary>
+    public FSM Fsm { get; internal set; }
 
     /// <summary>
-    ///     Here is where we should check if we should switch states
-    ///     true for we should continue to run the current state
-    ///     false for we should be switching states
+    /// fully-qualified identifier
+    /// </summary>
+    public string Identifier { get; internal set; } = null;
+
+    /// <summary>
+    /// Called once after the State instance is created and registered.
+    /// </summary>
+    public virtual void OnInitialize() { }
+
+    /// <summary>
+    /// Called every time the FSM switches into this state
+    /// </summary>
+    public virtual void OnEnter() { }
+
+    /// <summary>
+    /// Called every frame while this state is active (game loop tick)
+    /// </summary>
+    public virtual void OnExecute() { }
+
+    /// <summary>
+    /// Decide whether to remain in this state (true) or request a transition (false).
     /// </summary>
     /// <returns></returns>
-    public virtual bool Reason()
-    {
-        return true;
-    }
+    public virtual bool Reason() => true;
+    
+    /// <summary>
+    /// Called every time the FSM is leaving this state.
+    /// </summary>
+    public virtual void OnEnd(){ }
+    
+    /// <summary>
+    /// request a transition to the given state type
+    /// </summary>
+    /// <typeparam name="TState"></typeparam>
+    protected void Go<TState>() where TState : State => Fsm?.SetNextState<TState>();
 
-    public abstract void OnExecute();
-
-    public virtual void OnEnd()
-    {
-    }
+    public override string ToString() => Identifier ?? GetType().FullName;
 }
 
 public abstract class State<T> : State where T : class
 {
     protected readonly Logger<T> Logger = new();
-    public new string Identifier = typeof(T).Name;
+    public new string Identifier = typeof(T).FullName;
 }

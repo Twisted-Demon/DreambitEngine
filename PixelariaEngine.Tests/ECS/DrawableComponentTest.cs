@@ -3,6 +3,7 @@ public class DrawableComponentTest
 {
     private Scene _scene;
 
+    [TearDown]
     [SetUp]
     public void SetUp()
     {

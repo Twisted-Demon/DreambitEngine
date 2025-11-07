@@ -14,7 +14,7 @@ public class Camera2D : Component
     public float LerpSpeed { get; set; } = 5f;
     public float Zoom { get; set; } = 1f;
 
-    public float PixelsPerUnit { get; set; } = 4f;
+    public float PixelsPerUnit { get; set; } = 1f;
     
     public float TotalZoom => Zoom * ResolutionZoom;
     public float Scale => PixelsPerUnit * Zoom * ResolutionZoom;
@@ -129,7 +129,7 @@ public class Camera2D : Component
     }
 
 
-    private void OnViewportResized(object sender, WindowEventArgs e)
+    private void OnViewportResized(object sender, WindowResizedEventArgs e)
     {
         SetResolutionZoom();
     }
@@ -199,6 +199,17 @@ public class Camera2D : Component
     public Vector2 ScreenToWorld(Vector2 screenPos)
     {
         var inverse = Matrix.Invert(TransformMatrix);
+        return Vector2.Transform(screenPos, inverse);
+    }
+
+    public Vector2 WorldToUiScreen(Vector2 worldPos)
+    {
+        return Vector2.Transform(worldPos, TopLeftTransformMatrix);
+    }
+
+    public Vector2 UIScreenToWorld(Vector2 screenPos)
+    {
+        var inverse = Matrix.Invert(TopLeftTransformMatrix);
         return Vector2.Transform(screenPos, inverse);
     }
 }

@@ -4,8 +4,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PixelariaEngine.Tests", "PixelariaEngine.Tests\PixelariaEngine.Tests.csproj", "{8956D720-FE7E-4617-AA1F-5890680B2B91}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LDtk", "LDtkMonogame\LDtk\LDtk.csproj", "{11C325DA-4AC7-4ADB-9D93-D8D238DC4D79}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LDtk.ContentPipeline", "LDtkMonogame\LDtk.ContentPipeline\LDtk.ContentPipeline.csproj", "{C8A3F0A3-9E26-4A5A-A2F7-7CB119D24127}"
@@ -17,8 +15,6 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DreambitEngine.ContentPipelineExtensions", "DreambitEngine.ContentPipelineExtensions\DreambitEngine.ContentPipelineExtensions.csproj", "{0E058C4B-AEEB-4D49-A942-7648779DE8C5}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Externals", "Externals", "{8AEE4555-EE28-4EE3-8A41-008E6A3C7FD8}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DreambitEngine.Sandbox", "DreambitEngine.Sandbox\DreambitEngine.Sandbox.csproj", "{78062B43-890F-4325-B01E-E8D0FD015BF0}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dreambit.BriGame", "Dreambit.BriGame\Dreambit.BriGame.csproj", "{58ACBFEF-03FE-4A3A-8C3E-01832ED0D7E9}"
 EndProject
@@ -41,10 +37,6 @@ Global
 		{A6AD1C0D-11A4-45BE-83C2-E601C34025AE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A6AD1C0D-11A4-45BE-83C2-E601C34025AE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A6AD1C0D-11A4-45BE-83C2-E601C34025AE}.Release|Any CPU.Build.0 = Release|Any CPU
-		{8956D720-FE7E-4617-AA1F-5890680B2B91}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{8956D720-FE7E-4617-AA1F-5890680B2B91}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{8956D720-FE7E-4617-AA1F-5890680B2B91}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{8956D720-FE7E-4617-AA1F-5890680B2B91}.Release|Any CPU.Build.0 = Release|Any CPU
 		{6A9F3624-04A1-4603-9982-B313543F9F8C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{6A9F3624-04A1-4603-9982-B313543F9F8C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6A9F3624-04A1-4603-9982-B313543F9F8C}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -69,10 +61,6 @@ Global
 		{0E058C4B-AEEB-4D49-A942-7648779DE8C5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0E058C4B-AEEB-4D49-A942-7648779DE8C5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0E058C4B-AEEB-4D49-A942-7648779DE8C5}.Release|Any CPU.Build.0 = Release|Any CPU
-		{78062B43-890F-4325-B01E-E8D0FD015BF0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{78062B43-890F-4325-B01E-E8D0FD015BF0}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{78062B43-890F-4325-B01E-E8D0FD015BF0}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{78062B43-890F-4325-B01E-E8D0FD015BF0}.Release|Any CPU.Build.0 = Release|Any CPU
 		{58ACBFEF-03FE-4A3A-8C3E-01832ED0D7E9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{58ACBFEF-03FE-4A3A-8C3E-01832ED0D7E9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{58ACBFEF-03FE-4A3A-8C3E-01832ED0D7E9}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -86,6 +74,5 @@ Global
 		{CED15BC2-4D9E-47AF-8406-ECC04164CED8} = {8AEE4555-EE28-4EE3-8A41-008E6A3C7FD8}
 		{C8A3F0A3-9E26-4A5A-A2F7-7CB119D24127} = {8AEE4555-EE28-4EE3-8A41-008E6A3C7FD8}
 		{11C325DA-4AC7-4ADB-9D93-D8D238DC4D79} = {8AEE4555-EE28-4EE3-8A41-008E6A3C7FD8}
-		{8956D720-FE7E-4617-AA1F-5890680B2B91} = {8AEE4555-EE28-4EE3-8A41-008E6A3C7FD8}
 	EndGlobalSection
 EndGlobal

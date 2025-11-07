@@ -2,10 +2,16 @@
 
 namespace Dreambit.ECS;
 
+public abstract class Component<T> : Component where T : Component
+{
+    protected ILogger Logger = new Logger<T>();
+}
+
 public abstract class Component : IDisposable
 {
     private bool _enabled;
     private bool _isDisposed;
+    private bool _guarded = true;
     internal bool IsDestroyed;
 
     public Transform Transform => Entity?.Transform;
@@ -23,9 +29,9 @@ public abstract class Component : IDisposable
             _enabled = value;
 
             if (value)
-                OnEnabled();
+                Enable();
             else
-                OnDisabled();
+                Disable();
         }
     }
 
@@ -68,7 +74,7 @@ public abstract class Component : IDisposable
     }
 
     /// <summary>
-    ///     Gets called immediately when the component is created. Imagine this is an Initialization function
+    ///     Gets called immediately when the component is instantiated.
     /// </summary>
     public virtual void OnCreated()
     {
@@ -119,6 +125,12 @@ public abstract class Component : IDisposable
     public virtual void OnUpdate()
     {
     }
+    
+    /// <summary>
+    /// Called every physics update during the loop of the game
+    /// </summary>
+    public virtual void OnPhysicsUpdate()
+    {}
 
     /// <summary>
     ///     Called if debug mode is activated. Used to render debug data.
@@ -127,10 +139,47 @@ public abstract class Component : IDisposable
     {
     }
 
+    internal void Update()
+    {
+        if (!_guarded) return;
+        _guarded = Guard.SafeCall(OnUpdate, "OnUpdate");
+    }
+
+    internal void PhysicsUpdate()
+    {
+        if (!_guarded) return;
+        _guarded = Guard.SafeCall(OnPhysicsUpdate, "OnPhysicsUpdate");
+    }
+
+    internal void Create()
+    {
+        _guarded = Guard.SafeCall(OnCreated, "OnCreated");
+    }
+
+    internal void AddToEntity()
+    {
+        _guarded = Guard.SafeCall(OnAddedToEntity, "OnAddedToEntity");
+    }
+
+    internal void RemoveFromEntity()
+    {
+        _guarded = Guard.SafeCall(OnRemovedFromEntity, "OnRemovedFromEntity");
+    }
+
+    internal void Enable()
+    {
+        _guarded = Guard.SafeCall(OnEnabled, "OnEnable");
+    }
+
+    internal void Disable()
+    {
+        _guarded = Guard.SafeCall(OnDisabled, "OnDisable");
+    }
+
     internal void Destroy()
     {
         IsDestroyed = true;
-        OnDestroyed();
+        _guarded = Guard.SafeCall(OnDestroyed, "OnDestroyed");
     }
 
     public static bool operator ==(Component a, Component b)

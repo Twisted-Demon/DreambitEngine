@@ -1,0 +1,9 @@
+﻿{
+  "takes": [
+    "Sounds/SnakeGame/food"
+  ],
+  "loop": false,
+  "volume": 1.0,
+  "pitch": 0.00,
+  "pan" : 0.00
+}

@@ -33,7 +33,6 @@ public static class ReflectionUtils
                 if (onlyIncludeParameterlessConstructors)
                     if (type.GetConstructor(Type.EmptyTypes) == null)
                     {
-                        Log.Warn("ReflectionUtils: ", "no go: " + type.Name);
                         continue;
                     }
 

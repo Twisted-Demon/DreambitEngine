@@ -12,7 +12,7 @@ public sealed class JsonbBaker : AssetBakerBase
 
 
     public override string AssetTypeName => "Json";
-    public override string[] SupportedInputs => [".json"];
+    public override string[] SupportedInputs => [".json", ".ldtk", ".ldtkl"];
     public override string OutputExtension => ".jsonb";
 
     public override void Bake(BakeContext ctx)

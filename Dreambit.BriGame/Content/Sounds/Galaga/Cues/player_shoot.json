@@ -1,0 +1,9 @@
+﻿{
+  "takes": [
+    "Sounds/Galaga/fighter_shot1"
+  ],
+  "loop": false,
+  "volume": 1.0,
+  "pitch": 0.00,
+  "pan": 0.00
+}

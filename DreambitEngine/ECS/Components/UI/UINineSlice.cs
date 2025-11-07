@@ -5,8 +5,23 @@ namespace Dreambit.ECS;
 public class UINineSlice : UIElement
 {
     private SpriteSheet _spriteSheet;
-    public float Width { get; set; }
-    public float Height { get; set; }
+
+    private string _texturePath;
+
+    public string TexturePath
+    {
+        get => _texturePath;
+        set
+        {
+            if (_texturePath == value) return;
+            _texturePath = value;
+
+            _spriteSheet = SpriteSheet.Create(3, 3, _texturePath);
+        }
+    }
+
+    public float Width { get; set; } = 1f;
+    public float Height { get; set; } = 1f;
 
 
     public static UINineSlice Create(Canvas canvas, float width, float height, string texturePath)
@@ -15,11 +30,7 @@ public class UINineSlice : UIElement
         ns.Width = width;
         ns.Height = height;
 
-        var spriteSheet = SpriteSheet.Create(3, 3, texturePath);
-
-        if (spriteSheet == null) return ns;
-
-        ns._spriteSheet = spriteSheet;
+        ns.TexturePath = texturePath;
 
         return ns;
     }

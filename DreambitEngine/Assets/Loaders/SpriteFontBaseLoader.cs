@@ -1,0 +1,41 @@
+﻿using System.Collections.Generic;
+using System.IO;
+using FontStashSharp;
+
+using Microsoft.Xna.Framework.Graphics;
+
+namespace Dreambit;
+
+public class SpriteFontBaseLoader : AssetLoaderBase<SpriteFontBaseLoader>
+{
+    public override string Extension { get; } = ".ttf";
+    public override bool AddToDisposableList { get; } = true;
+
+    private readonly List<FontSystem> _fontSystems = new(32);
+    private readonly Dictionary<string, FontSystem> _byName = new(32);
+    
+    
+    public override object Load(string assetName, string pakName, bool usePak, string contentDirectory)
+    {
+        Logger.Warn("Font not loaded, please use Resources.LoadFont() instead");
+        return null;
+    }
+
+    public SpriteFontBase LoadFont(string assetName, string contentPath, float fontSize)
+    {
+        FontSystemDefaults.FontResolutionFactor = 6.0f;
+        FontSystemDefaults.KernelWidth = 0;
+        FontSystemDefaults.KernelHeight = 0;
+        
+        if (!_byName.TryGetValue(assetName, out var value))
+        {
+            var fontSystem = new FontSystem();
+            var ttf = File.ReadAllBytes(Path.Combine(contentPath, assetName + Extension));
+            fontSystem.AddFont(ttf);
+            value = fontSystem;
+            _byName.Add(assetName, value);
+        }
+
+        return value.GetFont(fontSize);
+    }
+}

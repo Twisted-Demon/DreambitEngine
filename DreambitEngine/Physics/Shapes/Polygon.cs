@@ -281,6 +281,52 @@ public struct Polygon
         return false;
     }
 
+    public bool ContainsPoint(Vector2 p, bool includeBoundary = true)
+    {
+        if (Vertices == null || Length < 3) return false;
+
+        for (int i = 0, j = Length - 1; i < Length; j = i++)
+        {
+            if(PointOnSegment(Vertices[j], Vertices[i], p))
+                return includeBoundary;
+        }
+
+        bool inside = false;
+        for (int i = 0, j = Length - 1; i < Length; j = i++)
+        {
+            var a = Vertices[j];
+            var b = Vertices[i];
+
+            bool cond = ((a.Y > p.Y) != (b.Y > p.Y));
+            if (!cond) continue;
+
+            float t = (p.Y - a.Y) / (b.Y - a.Y);
+            float xAtY = a.X + t * (b.X - a.X);
+
+            if (xAtY > p.X) inside = !inside;
+        }
+
+        return inside;
+    }
+    
+    private bool PointOnSegment(Vector2 a, Vector2 b, Vector2 p)
+    {
+        // Collinearity via cross product
+        var ab = b - a;
+        var ap = p - a;
+        float cross = ab.X * ap.Y - ab.Y * ap.X;
+        if (MathF.Abs(cross) > EPS) return false;
+
+        // Within segment bounds via dot products
+        float dot = Vector2.Dot(ap, ab);
+        if (dot < -EPS) return false;
+
+        float abLenSq = Vector2.Dot(ab, ab);
+        if (dot > abLenSq + EPS) return false;
+
+        return true;
+    }
+
     public Polygon Transform(Transform transform)
     {
         var polygon = new Polygon

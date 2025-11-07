@@ -1,77 +1,80 @@
-﻿namespace Dreambit;
+﻿using System.Diagnostics;
+using System.Runtime.CompilerServices;
 
-public class Logger<T> where T : class
+namespace Dreambit;
+
+public class Logger<T> : ILogger where T : class
 {
-    private readonly string _baseType = typeof(T).Name;
-    public LogLevel Level { get; set; } = LogLevel.None;
+    private readonly string _prefix = typeof(T).Name;
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private bool Enabled(LogLevel check)
+    {
+        var level = Core.Level;
+        if (Level != LogLevel.None) level = Level;
+        return level <= check;
+    }
+
+    public LogLevel Level { get; set; } = LogLevel.None;
+    
     public void Trace(string format, params object[] args)
     {
-        if (!CheckLogLevel(LogLevel.Trace)) return;
-        Log.Trace(_baseType, format, args);
+        if(!Enabled(LogLevel.Trace)) return;
+        LogSink.Enqueue(new LogEntry(LogLevel.Trace, _prefix, format, args));
     }
 
     public void Trace(string message)
     {
-        if (!CheckLogLevel(LogLevel.Trace)) return;
-        Log.Trace(_baseType, message);
+        if(!Enabled(LogLevel.Trace)) return;
+        LogSink.Enqueue(new LogEntry(LogLevel.Trace, _prefix, message, null));
     }
 
     public void Info(string format, params object[] args)
     {
-        if (!CheckLogLevel(LogLevel.Info)) return;
-        Log.Info(_baseType, format, args);
+        if(!Enabled(LogLevel.Info)) return;
+        LogSink.Enqueue(new LogEntry(LogLevel.Info, _prefix, format, args));
     }
 
     public void Info(string message)
     {
-        if (!CheckLogLevel(LogLevel.Info)) return;
-        Log.Info(_baseType, message);
+        if(!Enabled(LogLevel.Info)) return;
+        LogSink.Enqueue(new LogEntry(LogLevel.Info, _prefix, message, null));
     }
 
     public void Debug(string format, params object[] args)
     {
-        if (!CheckLogLevel(LogLevel.Debug)) return;
-        Log.Debug(_baseType, format, args);
+        if(!Enabled(LogLevel.Debug)) return;
+        LogSink.Enqueue(new LogEntry(LogLevel.Debug, _prefix, format, args));
     }
 
     public void Debug(string message)
     {
-        if (!CheckLogLevel(LogLevel.Debug)) return;
-        Log.Debug(_baseType, message);
+        if(!Enabled(LogLevel.Debug)) return;
+        LogSink.Enqueue(new LogEntry(LogLevel.Debug, _prefix, message, null));
     }
 
     public void Warn(string format, params object[] args)
     {
-        if (!CheckLogLevel(LogLevel.Warn)) return;
-        Log.Warn(_baseType, format, args);
+        if(!Enabled(LogLevel.Warn)) return;
+        LogSink.Enqueue(new LogEntry(LogLevel.Warn, _prefix, format, args));
     }
 
     public void Warn(string message)
     {
-        if (!CheckLogLevel(LogLevel.Warn)) return;
-        Log.Warn(_baseType, message);
+        if(!Enabled(LogLevel.Warn)) return;
+        LogSink.Enqueue(new LogEntry(LogLevel.Warn, _prefix, message, null));
     }
 
     public void Error(string format, params object[] args)
     {
-        if (!CheckLogLevel(LogLevel.Error)) return;
-        Log.Error(_baseType, format, args);
+        if(!Enabled(LogLevel.Error)) return;
+        LogSink.Enqueue(new LogEntry(LogLevel.Error, _prefix, format, args));
     }
 
     public void Error(string message)
     {
-        if (!CheckLogLevel(LogLevel.Error)) return;
-        Log.Error(_baseType, message);
+        if(!Enabled(LogLevel.Error)) return;
+        LogSink.Enqueue(new LogEntry(LogLevel.Error, _prefix, message, null));
     }
-
-    private bool CheckLogLevel(LogLevel logLevelToCheck)
-    {
-        var logLevel = Core.Level;
-
-        if (Level != LogLevel.None)
-            logLevel = Level;
-
-        return logLevel <= logLevelToCheck;
-    }
+    
 }

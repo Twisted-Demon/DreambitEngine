@@ -61,6 +61,8 @@ public sealed class BakePakCommand : Command<BakePakSettings>
                 var ext = Path.GetExtension(file);
                 var baker = registry.GetByExt(ext);
 
+                if (baker is null) continue;
+
                 var rel = Path.GetRelativePath(inputRoot, file);
                 var logicalRoot = inputRoot;
 

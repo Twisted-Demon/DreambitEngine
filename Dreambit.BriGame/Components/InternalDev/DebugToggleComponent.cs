@@ -7,7 +7,6 @@ public class DebugToggleComponent : Component
 {
     public override void OnAddedToEntity()
     {
-        Scene.DebugMode = false;
     }
 
     public override void OnUpdate()

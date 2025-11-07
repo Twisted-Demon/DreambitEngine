@@ -7,9 +7,8 @@ namespace Dreambit;
 
 public class Core : Game
 {
-    private const float FixedPhysicsStep = 1f / 120f;
-    public static LogLevel Level { get; set; } = LogLevel.Debug;
-    private readonly Logger<Core> _logger = new();
+    private const float FixedPhysicsStep = 1f / 60f;
+    public static readonly Logger<Core> Logger = new();
     private float _accumulatedPhysicsTime;
 
     public Core(int width = 800, int height = 600, string title = "Dreambit Engine")
@@ -20,13 +19,15 @@ public class Core : Game
         Instance = this;
 
         GameName = title;
-        
+
         Dreambit.Window.Init();
         Dreambit.Window.SetTitle(title);
         Dreambit.Window.SetSize(width, height);
-        
+
         TargetElapsedTime = TimeSpan.FromSeconds((double)1 / 120); //set Target fps to 120
     }
+
+    public static LogLevel Level { get; set; } = LogLevel.Debug;
 
     public static Core Instance { get; private set; }
     public static GraphicsDeviceManager GraphicsDeviceManager { get; private set; }
@@ -34,6 +35,7 @@ public class Core : Game
     public Scene CurrentScene { get; private set; }
     public Scene NextScene { get; private set; }
     private static string GameName { get; set; }
+
 
     protected override void Initialize()
     {
@@ -50,7 +52,7 @@ public class Core : Game
 
     public static void SetTargetFps(int fps)
     {
-        Instance.TargetElapsedTime =  TimeSpan.FromSeconds((double)1 / fps);
+        Instance.TargetElapsedTime = TimeSpan.FromSeconds((double)1 / fps);
     }
 
     protected override void LoadContent()
@@ -64,6 +66,7 @@ public class Core : Game
     protected override void Update(GameTime gameTime)
     {
         Time.Update(gameTime);
+        Dreambit.Window.Tick(gameTime);
 
         UpdateDebug();
 
@@ -98,8 +101,11 @@ public class Core : Game
         _accumulatedPhysicsTime += Time.DeltaTime;
 
         if (_accumulatedPhysicsTime >= FixedPhysicsStep)
-            //handle physics here;
+        {
+            CurrentScene.PhysicsTick();
+
             _accumulatedPhysicsTime = 0f;
+        }
     }
 
     protected override void OnExiting(object sender, ExitingEventArgs args)
@@ -111,7 +117,7 @@ public class Core : Game
 
     private void ChangeScenes()
     {
-        _logger.Info("Changing Scenes");
+        Logger.Info("Changing Scenes");
         CurrentScene?.Terminate();
         CurrentScene = NextScene;
         NextScene = null;
@@ -139,7 +145,10 @@ public class Core : Game
         var memory = Process.GetCurrentProcess().PrivateMemorySize64;
         var megabytes = (double)memory / (1024 * 1024);
         megabytes = Math.Round(megabytes, 2);
-        Dreambit.Window.SetTitle($"{GameName} {Time.FrameRate}fps | memory: {megabytes}MB");
+
+        var entities = CurrentScene.Entities.GetAllEntities().Count;
+
+        Dreambit.Window.SetTitle($"{GameName} {Time.FrameRate}fps | memory: {megabytes}MB | entities: {entities}");
     }
 #endif
 }

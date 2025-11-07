@@ -15,23 +15,3 @@
 
 #---------------------------------- Content ---------------------------------#
 
-#begin Animations/bri_idle.animation
-/importer:AnimationImporter
-/processor:AnimationProcessor
-/build:Animations/bri_idle.animation
-
-#begin BriWorld.ldtk
-/importer:LDtkFileImporter
-/processor:LDtkFileProcessor
-/build:BriWorld.ldtk
-
-#begin BriWorld/Level_0.ldtkl
-/importer:LDtkLevelImporter
-/processor:LDtkLevelProcessor
-/build:BriWorld/Level_0.ldtkl
-
-#begin SpriteSheets/bri_idle.spritesheet
-/importer:SpriteSheetImporter
-/processor:SpriteSheetProcessor
-/build:SpriteSheets/bri_idle.spritesheet
-

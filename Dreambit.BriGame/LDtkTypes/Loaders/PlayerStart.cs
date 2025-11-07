@@ -25,5 +25,14 @@ public partial class PlayerStart : LDtkEntity<PlayerStart>
         lightComponent.Intensity = 0.5f;
 
         entity.AttachComponent<SoundListener2d>();
+
+        var collider = Entity.CreateChildOf(entity, "Player Collider", ["player"])
+            .AttachComponent<BoxCollider>();
+        
+        collider.SetShape(Box.CreateRectangle(new Vector2(0, -5), 5, 10));
+        collider.IsTrigger = true;
+        collider.IsSilent = false;
+        collider.IsQueryable = false;
+        collider.InterestedIn = ["foliage"];
     }
 }

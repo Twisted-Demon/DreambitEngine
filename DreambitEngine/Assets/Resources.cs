@@ -3,9 +3,13 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using FontStashSharp;
+using LDtk;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Audio;
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
+using Microsoft.Xna.Framework.Media;
 
 namespace Dreambit;
 
@@ -43,6 +47,19 @@ public class Resources : Singleton<Resources>
         }
     }
 
+    private static readonly Dictionary<Type, IAssetLoader> Loaders = new()
+    {
+        { typeof(Texture2D), new Texture2dLoader() },
+        { typeof(SoundEffect), new SoundEffectLoader() },
+        { typeof(Song), new SongLoader() },
+        { typeof(SpriteSheet), new SpriteSheetLoader() },
+        { typeof(SpriteSheetAnimation), new SpriteSheetAnimationLoader() },
+        { typeof(LDtkFile), new LDtkFileLoader() },
+        { typeof(LDtkLevel), new LDtkLevelLoader() },
+        { typeof(SoundCue), new SoundCueLoader() },
+        { typeof(SpriteFontBaseLoader), new SpriteFontBaseLoader()}
+    };
+
     /// <summary>
     ///     Tries to Load an asset and returns default if not found
     /// </summary>
@@ -55,38 +72,27 @@ public class Resources : Singleton<Resources>
         if (Instance.LoadedAssets.TryGetValue(assetName, out var rawAsset))
             if (rawAsset is T asset)
                 return asset;
-
+        
         try
         {
-            T asset;
+            Instance.Logger.Trace("Loading {0} - {1}", typeof(T).Name, assetName);
             
-            switch (typeof(T).Name)
+            object asset;
+            if (Loaders.TryGetValue(typeof(T), out var loader))
             {
-                case "Texture2D":
-                {
-                    Instance.Logger.Trace("Loading {0}: {1}; From Pak File: {2}", typeof(T).Name, assetName, PakName);
-                    using var s = GetStream(assetName + ".texb");
-                    asset = TexbLoader.LoadTexture(s) as T;
-                    break;
-                }
-                case "SoundEffect":
-                {
-                    Instance.Logger.Trace("Loading {0}: {1}; From Pak File: {2}", typeof(T).Name, assetName, PakName);
-                    using var s = GetStream(assetName + ".audb");
-                    asset = AudbLoader.LoadSoundEffect(s) as T;
-                    break;
-                }
-                default:
-                    Instance.Logger.Trace("Loading {0} - {1}", typeof(T).Name, assetName);
-                    asset = Instance.Content.Load<T>(assetName);
-                    break;
+                asset = loader.Load(assetName, PakName, UsePak, ContentDirectory);
             }
+            else
+            {
+                asset = Instance.Content.Load<T>(assetName);
+            }
+
+            Instance.LoadedAssets[assetName] = (T)asset;
             
-            Instance.Logger.Debug("Loaded {0} - {1}", typeof(T).Name, assetName);
-            
-            Instance.LoadedAssets[assetName] = asset;
-            
-            return asset;
+            if (asset is IDisposable disposable)
+                Instance.DisposableAssets.Add(disposable);
+
+            return (T)asset;
         }
         catch (Exception e)
         {
@@ -97,36 +103,51 @@ public class Resources : Singleton<Resources>
         }
     }
 
-    private static Stream GetStream(string assetName)
+    public static void UnloadAsset(string assetName)
     {
-        if (UsePak)
+        Instance.Content.UnloadAsset(assetName);
+    }
+
+    public static SpriteFontBase LoadSpriteFont(string assetName, float fontSize = 12f)
+    {
+        //if we already have the asset we will return it
+        if (Instance.LoadedAssets.TryGetValue(assetName, out var rawAsset))
+            if (rawAsset is SpriteFontBase font)
+                return font;
+
+        try
         {
-            var pak = new PakReader(Path.Combine(ContentDirectory, PakName));
-            return pak.Open(assetName);
+            Instance.Logger.Trace("Loading SpriteFontBase - {0}", assetName);
+
+            SpriteFontBase font;
+            if (Loaders.TryGetValue(typeof(SpriteFontBaseLoader), out var loader))
+            {
+                var sfLoader = (SpriteFontBaseLoader)loader;
+                
+                font = sfLoader.LoadFont(assetName, ContentDirectory, fontSize);
+            }
+            else
+            {
+                Instance.Logger.Warn("Could not load {0} | {1}", nameof(SpriteFontBase), assetName);
+                return null;
+            }
+            
+            Instance.LoadedAssets[assetName] = font;
+
+            var disposable = font as IDisposable;
+            if (disposable != null)
+                Instance.DisposableAssets.Add(disposable);
+
+            return font;
         }
-        else
+        catch (Exception e)
         {
-            return File.OpenRead(Path.Combine(ContentDirectory, assetName));
+            Console.WriteLine(e);
+            throw;
         }
     }
     
-
-    public static Task LoadAssetQueueAsync<T>(AssetQueue<T> assetQueue) where T : class
-    {
-        assetQueue.IsLoading = true;
-
-        for (var i = 0; i < assetQueue.Count; i++)
-        {
-            if (!assetQueue.TryGetNext(out var assetName)) continue;
-
-            var asset = LoadAsset<T>(assetName);
-
-            assetQueue.AddAsset(assetName, asset);
-        }
-
-        return Task.CompletedTask;
-    }
-
+    
     private static Texture2D PremultiplyTexture(Texture2D texture)
     {
         var data = new Color[texture.Width * texture.Height];

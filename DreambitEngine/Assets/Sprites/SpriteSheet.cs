@@ -61,7 +61,14 @@ public class SpriteSheet : DreambitAsset
         return texture == null ? null : new SpriteSheet(gridSize, texturePath, texture);
     }
 
-    public void SplitSprite()
+    internal void LoadSpriteSheet()
+    {
+        Texture = Resources.LoadAsset<Texture2D>(_texturePath);
+        SplitSprite();
+        AssetName = _texturePath;
+    }
+    
+    private void SplitSprite()
     {
         if (Columns < 1 || Rows < 1) return;
         if (Texture == null) return;

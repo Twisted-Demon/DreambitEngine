@@ -4,14 +4,10 @@
   <Platform>DesktopGL</Platform>
   <Config />
   <SourceFiles>
-    <File>C:/Dev/DreambitEngine/Dreambit.BriGame/Content/Animations/bri_idle.animation</File>
     <File>C:/Dev/DreambitEngine/Dreambit.BriGame/Content/BriWorld.ldtk</File>
     <File>C:/Dev/DreambitEngine/Dreambit.BriGame/Content/BriWorld/Level_0.ldtkl</File>
-    <File>C:/Dev/DreambitEngine/Dreambit.BriGame/Content/SpriteSheets/bri_idle.spritesheet</File>
   </SourceFiles>
   <DestFiles>
-    <File xsi:nil="true" />
-    <File xsi:nil="true" />
     <File xsi:nil="true" />
     <File xsi:nil="true" />
   </DestFiles>

@@ -27,12 +27,12 @@ public class LDtkEntity<T> : LDtkEntity where T : new()
 
         var sprite = entity.AttachComponent<SpriteDrawer>();
 
-        sprite.Pivot = new Vector2(data.Pivot.X * tilesetRect.W, data.Pivot.Y * tilesetRect.H);
-        sprite.PivotType = PivotType.Custom;
-        sprite.Color = color ?? data.SmartColor;
+        sprite.WithPivot(new Vector2(data.Pivot.X * tilesetRect.W, data.Pivot.Y * tilesetRect.H));
+        sprite.WithPivot(PivotType.Custom);
+        sprite.WithTint(color ?? data.SmartColor);
 
         sprite.SpriteSheet = LDtkManager.Instance.SpriteSheets[tilesetRect.TilesetUid];
-        sprite.FrameRect = tilesetRect;
+        sprite.SetFrameRect(tilesetRect);
     }
 
     protected PolyShapeCollider CreatePolyCollider(Entity entity, Point[] points, Vector2 entityPosition)

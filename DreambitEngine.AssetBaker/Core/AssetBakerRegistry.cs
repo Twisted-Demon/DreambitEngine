@@ -22,10 +22,10 @@ public sealed class AssetBakerRegistry
         => _byType.TryGetValue(type, out var b) ? b : 
             throw new InvalidOperationException($"no baker registered for {type}.");
 
-    public IAssetBaker GetByExt(string ext)
+    public IAssetBaker? GetByExt(string ext)
     {
-        return _byExtension.TryGetValue(ext, out var b)
-            ? b
-            : throw new InvalidMemoryOperationException($"no baker registered for extension {ext}");
+        _byExtension.TryGetValue(ext, out var b);
+
+        return b;
     }
 }
