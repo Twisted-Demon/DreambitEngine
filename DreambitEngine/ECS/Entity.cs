@@ -10,12 +10,28 @@ public class Entity : IDisposable
     private readonly List<Entity> _children = [];
 
     public readonly Guid Id;
+    public string Name;
+    
+    private ComponentRepository ComponentRepository { get; }
+    public Transform Transform { get; }
+    public HashSet<string> Tags { get; } = [];
+    internal Scene Scene { get; private set; }
+
+    public Entity Parent
+    {
+        get => _parent;
+        set
+        {
+            if (_parent == value) return;
+            SetParent(value);
+        }
+    }
+    
     private bool _alwaysUpdate;
     private bool _enabled;
     private bool _isDestroyed;
     private bool _isDisposed;
     private Entity _parent;
-    public string Name;
     
     private readonly ILogger _logger = new Logger<Entity>();
 
@@ -42,22 +58,7 @@ public class Entity : IDisposable
     private Entity()
     {
     }
-
-    private ComponentRepository ComponentRepository { get; }
-    public Transform Transform { get; }
-    public HashSet<string> Tags { get; } = [];
-    internal Scene Scene { get; private set; }
-
-    public Entity Parent
-    {
-        get => _parent;
-        set
-        {
-            if (_parent == value) return;
-            SetParent(value);
-        }
-    }
-
+    
     public bool AlwaysUpdate
     {
         get => _alwaysUpdate;
