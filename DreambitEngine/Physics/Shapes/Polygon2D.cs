@@ -7,7 +7,7 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace Dreambit;
 
-public struct Polygon
+public struct Polygon2D
 {
     public Vector2[] Vertices;
     public int Length => Vertices.Length;
@@ -62,7 +62,7 @@ public struct Polygon
     }
 
     /// <summary>Robust SAT that also outputs MTV axis and depth.</summary>
-    public bool IntersectsSAT(Polygon other, ref Vector2 mtvAxis, ref float mtvDepth)
+    public bool IntersectsSAT(Polygon2D other, ref Vector2 mtvAxis, ref float mtvDepth)
     {
         mtvDepth = float.MaxValue;
         mtvAxis = Vector2.Zero;
@@ -100,7 +100,7 @@ public struct Polygon
     }
 
     /// <summary>General intersection supporting concave by triangulation.</summary>
-    public bool IntersectsGeneral(Polygon other, out Vector2 mtvAxis, out float mtvDepth)
+    public bool IntersectsGeneral(Polygon2D other, out Vector2 mtvAxis, out float mtvDepth)
     {
         mtvAxis = Vector2.Zero; mtvDepth = float.MaxValue;
         // Clean and normalize once
@@ -220,7 +220,7 @@ public struct Polygon
         return (min, max);
     }
 
-    public bool Intersects(Polygon other)
+    public bool Intersects(Polygon2D other)
     {
         var axes = new List<Vector2>();
 
@@ -327,9 +327,9 @@ public struct Polygon
         return true;
     }
 
-    public Polygon Transform(Transform transform)
+    public Polygon2D Transform(Transform transform)
     {
-        var polygon = new Polygon
+        var polygon = new Polygon2D
         {
             Vertices = new Vector2[Length]
         };
@@ -345,9 +345,9 @@ public struct Polygon
         return polygon;
     }
 
-    public Polygon TransformWithDesiredPos(Transform transform, Vector3 desiredPos)
+    public Polygon2D TransformWithDesiredPos(Transform transform, Vector3 desiredPos)
     {
-        var polygon = new Polygon
+        var polygon = new Polygon2D
         {
             Vertices = new Vector2[Length]
         };
@@ -396,12 +396,12 @@ public struct Polygon
                point.Y >= Math.Min(p1.Y, p2.Y) && point.Y <= Math.Max(p1.Y, p2.Y);
     }
 
-    public List<Polygon> SplitPolygon(Polygon polygon)
+    public List<Polygon2D> SplitPolygon(Polygon2D polygon2D)
     {
-        polygon.CleanAndNormalize();
-        var triangles = new List<Polygon>();
+        polygon2D.CleanAndNormalize();
+        var triangles = new List<Polygon2D>();
 
-        var remainingVertices = new List<Vector2>(polygon.Vertices);
+        var remainingVertices = new List<Vector2>(polygon2D.Vertices);
 
         while (remainingVertices.Count > 3)
             for (var i = 0; i < remainingVertices.Count; i++)
@@ -412,7 +412,7 @@ public struct Polygon
 
                 if (IsEar(prev, current, next, remainingVertices))
                 {
-                    triangles.Add(new Polygon
+                    triangles.Add(new Polygon2D
                     {
                         Vertices = new[]
                         {
@@ -424,7 +424,7 @@ public struct Polygon
                 }
             }
 
-        triangles.Add(new Polygon
+        triangles.Add(new Polygon2D
         {
             Vertices = remainingVertices.ToArray()
         });

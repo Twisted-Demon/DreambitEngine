@@ -37,7 +37,7 @@ public static class LDtkIntGridToColliders
         FloodFill(grid, visited, x, y - 1, region);
     }
 
-    public static Polygon TracePolygon(List<Point> region)
+    public static Polygon2D TracePolygon(List<Point> region)
     {
         var vertices = new List<Point>();
 
@@ -51,7 +51,7 @@ public static class LDtkIntGridToColliders
             current = GetNextEdge(region, current, ref direction);
         } while (current != start);
 
-        return new Polygon
+        return new Polygon2D
         {
             Vertices = vertices.Select(p => new Vector2(p.X, p.Y)).ToArray()
         };

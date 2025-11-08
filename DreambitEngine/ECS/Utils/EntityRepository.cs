@@ -30,7 +30,7 @@ public class EntityRepository
 
         public EntityRepository(Scene scene) { _scene = scene; }
 
-        internal Entity CreateEntity(string name, HashSet<string> tags, bool enabled, Vector3? createAt, Guid? guidOverride = null)
+        internal Entity CreateEntity(string name, HashSet<string> tags, bool enabled, Vector3? createAt, Vector3? rotation, Vector3? scale, Guid? guidOverride = null)
         {
             tags ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "default" };
 
@@ -44,6 +44,12 @@ public class EntityRepository
                 entity.Transform.LastWorldPosition = entity.Transform.Position;
             }
 
+            if (rotation.HasValue)
+                entity.Transform.Rotation = rotation.Value;
+            
+            if(scale.HasValue)
+                entity.Transform.Scale = scale.Value;
+
             // Queue creation if not already queued/added
             if (!_entitiesSet.Contains(entity) && !_entitiesToCreateSet.Contains(entity))
             {
@@ -51,10 +57,10 @@ public class EntityRepository
                 _entitiesToCreateSet.Add(entity);
                 _toCreateById[entity.Id] = entity;
             }
-
+            
             return entity;
         }
-
+        
         internal void DestroyEntity(Entity entity)
         {
             if (entity == null)

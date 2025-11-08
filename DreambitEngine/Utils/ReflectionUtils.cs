@@ -57,7 +57,7 @@ public static class ReflectionUtils
         var typeList = new List<Type>();
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
         foreach (var type in assembly.GetTypes())
-            if (baseClassType.IsAssignableFrom(type) && !type.IsAbstract)
+            if (baseClassType.IsAssignableFrom(type) && !type.IsAbstract && !type.IsGenericType)
             {
                 if (onlyIncludeParameterlessConstructors)
                     if (type.GetConstructor(Type.EmptyTypes) == null)

@@ -339,11 +339,51 @@ public class Scene : IDisposable
         HashSet<string> tags = null,
         bool enabled = true,
         Vector3? createAt = null,
+        Vector3? rotation = null,
+        Vector3? scale = null,
         Guid? guidOverride = null)
     {
-        var entity = Entities.CreateEntity(name, tags, enabled, createAt, guidOverride);
+        var entity = Entities.CreateEntity(name, tags, enabled, createAt, rotation, scale, guidOverride);
         return entity;
     }
+
+    /// <summary>
+    ///  Creates an entity based on a blueprint, forwarded to the repository
+    /// </summary>
+    /// <param name="blueprint"></param>
+    /// <param name="enabled"></param>
+    /// <param name="createAt"></param>
+    /// <param name="rotation"></param>
+    /// <param name="scale"></param>
+    /// <returns></returns>
+    public Entity CreateEntity(
+        EntityBlueprint blueprint, 
+        bool enabled = true,
+        Vector3? createAt = null, 
+        Vector3? rotation = null,
+        Vector3? scale = null)
+    {
+        var pos = blueprint.Position;
+        var rot = blueprint.Rotation;
+        var scl = blueprint.Scale;
+        var en = blueprint.Enabled;
+
+        if (createAt.HasValue)
+            pos = createAt.Value;
+        if (rotation.HasValue)
+            rot = rotation.Value;
+        if (scale.HasValue)
+            scl = scale.Value;
+        
+        var entity = Entities.CreateEntity(blueprint.Name, blueprint.Tags, enabled, pos, rot, scl);
+
+        entity.BuildComponentsFromBlueprint(blueprint);
+        entity.DeserializeComponentsFromBlueprints(blueprint);
+        entity.CallComponentOnCreateAfterDeserialized();
+
+        return entity;
+    }
+    
 
     /// <summary>Sets AlwaysUpdate on a specific entity.</summary>
     public void SetEntityAlwaysUpdate(Entity entity, bool value)

@@ -11,6 +11,7 @@ public sealed class Texture2dLoader : AssetLoaderBase
     {
         using var s = GetStream(GetPath(assetName), pakName, usePak,  contentDirectory);
         var asset = TexbLoader.LoadTexture(s);
+        asset.Name = assetName;
         
         return asset;
     }

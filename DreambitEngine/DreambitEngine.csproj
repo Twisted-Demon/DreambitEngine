@@ -18,6 +18,7 @@
         <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.4.1">
             <PrivateAssets>All</PrivateAssets>
         </PackageReference>
+        <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
         <PackageReference Include="Spectre.Console" Version="0.53.0" />
         <PackageReference Include="YamlDotNet" Version="16.3.0" />
     </ItemGroup>
@@ -34,20 +35,7 @@
       <None Remove="Content\obj\**" />
     </ItemGroup>
     <ItemGroup>
-        <Reference Include="Newtonsoft.Json" >
-            <HintPath>..\Includes\Newtonsoft.Json.dll</HintPath>
-        </Reference>
-    </ItemGroup>
-    <ItemGroup>
       <ProjectReference Include="..\LDtkMonogame\LDtk\LDtk.csproj" />
-    </ItemGroup>
-    <ItemGroup>
-      <Folder Include="AI\FSM\Conditions\" />
-      <Folder Include="Scripting\Scripts\Camera\" />
-    </ItemGroup>
-    <ItemGroup>
-      <ClCompile Include="Content\Effects\DefferedRenderCombine.fx" />
-      <ClCompile Include="Content\Effects\PointLight2D.fx" />
     </ItemGroup>
     <PropertyGroup>
         <MonoGameExtendedPipelineReferencePath>$(MSBuildThisFileDirectory)../Includes</MonoGameExtendedPipelineReferencePath>

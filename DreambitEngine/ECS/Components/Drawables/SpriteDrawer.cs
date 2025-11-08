@@ -8,12 +8,12 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
     private SpriteSheet _spriteSheet;
 
     private string _spriteSheetPath = string.Empty;
-    public Color Tint { get; private set; } = Color.White;
-    public float Opacity { get; private set; } = 1.0f;
-    public Vector2 Pivot { get; private set; } = Vector2.Zero;
-    public PivotType PivotType { get; private set; } = PivotType.Center;
-    public int CurrentFrameIndex { get; private set; }
-    public Rectangle? FrameRect { get; private set; } = null;
+    public Color Tint { get; internal set; } = Color.White;
+    public float Opacity { get; internal set; } = 1.0f;
+    public Vector2 Pivot { get; internal set; } = Vector2.Zero;
+    public PivotType PivotType { get; internal set; } = PivotType.Center;
+    public int CurrentFrameIndex { get; internal set; }
+    public Rectangle? FrameRect { get; internal set; } = null;
 
     public bool FlipX { get; set; } = false;
     

@@ -21,7 +21,7 @@ public class PongPaddle : Component<PongPaddle>
         _drawer.PivotType = PivotType.Center;
         
         _collider = Entity.GetComponent<BoxCollider>();
-        _collider.SetShape(Box.CreateRectangle(Vector2.Zero, 12f, 64f));
+        _collider.SetShape(Box2D.CreateRectangle(Vector2.Zero, 12f, 64f));
     }
 }
 

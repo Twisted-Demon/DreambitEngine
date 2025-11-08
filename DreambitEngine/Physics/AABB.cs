@@ -15,7 +15,7 @@ public struct AABB
 
 public static class PolygonExt
 {
-    public static AABB ComputeAABB(this Polygon p)
+    public static AABB ComputeAABB(this Polygon2D p)
     {
         var minX = float.PositiveInfinity; var minY = float.PositiveInfinity;
         var maxX = float.NegativeInfinity; var maxY = float.NegativeInfinity;

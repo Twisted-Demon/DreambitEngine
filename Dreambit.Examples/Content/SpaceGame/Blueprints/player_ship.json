@@ -1,0 +1,30 @@
+﻿{
+  "name": "player_ship",
+  "tags": ["player"],
+  "components": [
+    {
+      "type": "Dreambit.Examples.SpaceGame.SpaceGamePlayer, Dreambit.Examples",
+      "properties": {
+        "velocity": 120.0
+      }
+    },
+    {
+      "type": "Dreambit.ECS.BoxCollider, Dreambit",
+      "properties": {
+        "Bounds": [
+          [-4,-4],
+          [4,-4],
+          [4, 4],
+          [-4,4]
+        ]
+      }
+    },
+    {
+      "type": "Dreambit.ECS.SpriteDrawer, Dreambit",
+      "properties": {
+        "SpriteSheetPath": "SpaceGame/SpriteSheets/player_ship_sheet",
+        "CurrentFrameIndex": 1
+      }
+    }
+  ]
+}

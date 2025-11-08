@@ -119,6 +119,9 @@ public class ComponentRepository
     public Component GetComponent(Type type)
     {
         if (type == null) return null;
+        
+        if (!type.IsSubclassOf(typeof(Component)))
+            return null;
 
         foreach (var c in _attachedComponents)
             if (c.GetType() == type)
@@ -159,6 +162,14 @@ public class ComponentRepository
         foreach (var c in _attachedComponents)
             if (seen.Add(c))
                 list.Add(c);
+
+        return list;
+    }
+
+    public IReadOnlyCollection<Component> GetAllComponentsToAttach()
+    {
+        var list = new List<Component>(_componentsToAttach.Count);
+        list.AddRange(_componentsToAttach);
 
         return list;
     }

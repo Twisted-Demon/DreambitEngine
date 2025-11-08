@@ -23,7 +23,7 @@ public class GalagaEnemy : Component
         _fsm.GetBlackBoard<EnemyBlackboard>().GalagaPlayer =
             ECS.Entity.FindByName("player").GetComponent<GalagaPlayer>();
         _collider = Entity.GetComponent<BoxCollider>();
-        _collider.SetShape(Box.CreateSquare(Vector2.Zero, 7));
+        _collider.SetShape(Box2D.CreateSquare(Vector2.Zero, 7));
         _collider.IsTrigger = true;
         _collider.IsSilent = true;
     }

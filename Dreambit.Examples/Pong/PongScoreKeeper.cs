@@ -5,7 +5,7 @@ namespace Dreambit.Examples.Pong;
 
 public class PongScoreKeeper : Component
 {
-    private float _margin = 1.0f;
+    private readonly float _margin = 1.0f;
 
 
     public Canvas Canvas;

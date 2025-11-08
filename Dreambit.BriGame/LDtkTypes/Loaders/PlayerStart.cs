@@ -29,7 +29,7 @@ public partial class PlayerStart : LDtkEntity<PlayerStart>
         var collider = Entity.CreateChildOf(entity, "Player Collider", ["player"])
             .AttachComponent<BoxCollider>();
         
-        collider.SetShape(Box.CreateRectangle(new Vector2(0, -5), 5, 10));
+        collider.SetShape(Box2D.CreateRectangle(new Vector2(0, -5), 5, 10));
         collider.IsTrigger = true;
         collider.IsSilent = false;
         collider.IsQueryable = false;

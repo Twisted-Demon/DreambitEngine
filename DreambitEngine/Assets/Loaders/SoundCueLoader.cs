@@ -10,6 +10,7 @@ public class SoundCueLoader : AssetLoaderBase
         
         var cue = JsnbLoader.Deserialize<SoundCue>(s);
         cue.LoadInternal();
+        cue.AssetName = assetName;
         
         return cue;
     }

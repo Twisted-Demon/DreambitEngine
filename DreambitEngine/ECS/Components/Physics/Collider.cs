@@ -43,10 +43,10 @@ public class Collider : Component
     #region Bounds & Shape
 
     /// <summary>Local-space shape used for collision/trigger checks.</summary>
-    public Shape Bounds { get; set; } = null;
+    public Shape2D Bounds { get; set; } = null;
 
     /// <summary>World-space polygon computed from <see cref="Bounds" /> and current transform.</summary>
-    public Polygon WorldPolygon => GetTransformedPolygon();
+    public Polygon2D WorldPolygon2D => GetTransformedPolygon();
 
     #endregion
     
@@ -55,7 +55,7 @@ public class Collider : Component
     /// <summary>Renders polygon outline for debugging purposes.</summary>
     public override void OnDebugDraw()
     {
-        Core.SpriteBatch.DrawPolygon(WorldPolygon.Vertices, Color.White);
+        Core.SpriteBatch.DrawPolygon(WorldPolygon2D.Vertices, Color.White);
     }
 
     #endregion
@@ -185,7 +185,7 @@ public class Collider : Component
     #region Helpers
 
     /// <summary>Returns world-space polygon transformed from current <see cref="Bounds" />.</summary>
-    public Polygon GetTransformedPolygon()
+    public Polygon2D GetTransformedPolygon()
     {
         return Bounds.TransformPolygon(Transform);
     }
@@ -193,7 +193,7 @@ public class Collider : Component
     /// <summary>
     ///     Returns world-space polygon transformed as if the collider were at <paramref name="desiredPos" />.
     /// </summary>
-    public Polygon GetTransformedPolyWithDesiredPos(Vector3 desiredPos)
+    public Polygon2D GetTransformedPolyWithDesiredPos(Vector3 desiredPos)
     {
         return Bounds.TransformWithDesiredPos(Transform, desiredPos);
     }

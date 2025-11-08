@@ -43,7 +43,6 @@ public class Resources : Singleton<Resources>
             var fieldInfo = ReflectionUtils.GetFieldInfo(typeof(ContentManager), "loadedAssets");
             _loadedAssets = fieldInfo.GetValue(Core.Instance.Content) as Dictionary<string, object>;
             return _loadedAssets;
-            
         }
     }
 
@@ -57,7 +56,8 @@ public class Resources : Singleton<Resources>
         { typeof(LDtkFile), new LDtkFileLoader() },
         { typeof(LDtkLevel), new LDtkLevelLoader() },
         { typeof(SoundCue), new SoundCueLoader() },
-        { typeof(SpriteFontBaseLoader), new SpriteFontBaseLoader()}
+        { typeof(SpriteFontBaseLoader), new SpriteFontBaseLoader()},
+        { typeof(EntityBlueprint), new EntityBlueprintLoader()}
     };
 
     /// <summary>

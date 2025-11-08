@@ -7,10 +7,10 @@ public class BoxCollider : Collider
     public override void OnCreated()
     {
         base.OnCreated();
-        Bounds = Box.CreateSquare(Vector2.Zero, 5f);
+        Bounds ??= Box2D.CreateSquare(Vector2.Zero, 5.0f);
     }
 
-    public void SetShape(Box shape)
+    public void SetShape(Box2D shape)
     {
         Bounds = shape;
     }

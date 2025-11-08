@@ -40,7 +40,7 @@ public class LDtkEntity<T> : LDtkEntity where T : new()
         var verts = points.Select(p => new Vector2(p.X, p.Y) - entityPosition).ToArray();
 
         var bounds = entity.AttachComponent<PolyShapeCollider>();
-        var shape = PolyShape.Create(verts);
+        var shape = PolyShape2D.Create(verts);
         bounds.SetShape(shape);
         return bounds;
     }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices.JavaScript;
 using Microsoft.Xna.Framework;
 
 namespace Dreambit.ECS;
@@ -15,6 +16,8 @@ public class Entity : IDisposable
     private bool _isDisposed;
     private Entity _parent;
     public string Name;
+    
+    private readonly ILogger _logger = new Logger<Entity>();
 
     internal Entity(Guid id, string name, HashSet<string> tags, bool enabled, Scene scene)
     {
@@ -102,17 +105,39 @@ public class Entity : IDisposable
         Dispose(false);
     }
 
-    public static Entity Create(string name = "entity", HashSet<string> tags = null
-        , bool enabled = true, Vector3? createAt = null, Guid? guidOverride = null)
+    public static Entity Create(
+        string name = "entity", 
+        HashSet<string> tags = null, 
+        bool enabled = true, 
+        Vector3? createAt = null, 
+        Vector3? rotation = null, 
+        Vector3? scale = null, 
+        Guid? guidOverride = null)
     {
-        var entity = Core.Instance.CurrentScene.CreateEntity(name, tags, enabled, createAt, guidOverride);
+        var entity = Core.Instance.CurrentScene.CreateEntity(name, tags, enabled, createAt, rotation, scale, guidOverride);
 
         entity.Transform.LastWorldPosition = entity.Transform.WorldPosition;
         return entity;
     }
-    
 
-    public static Entity CreateChildOf(Entity parent, string name = "entity", HashSet<string> tags = null,
+    public static Entity Create(
+        EntityBlueprint blueprint, 
+        bool enabled = true,
+        Vector3? createAt = null, 
+        Vector3? rotation = null,
+        Vector3? scale = null)
+    {
+        var entity = Core.Instance.CurrentScene.CreateEntity(blueprint, enabled, createAt, rotation, scale);
+        
+        entity.Transform.LastWorldPosition = entity.Transform.WorldPosition;
+        
+        return entity;
+    }
+    
+    public static Entity CreateChildOf(
+        Entity parent, 
+        string name = "entity", 
+        HashSet<string> tags = null,
         bool enabled = true)
     {
         var entity = Core.Instance.CurrentScene.CreateEntity(name, tags, enabled);
@@ -193,7 +218,7 @@ public class Entity : IDisposable
         var component = ComponentRepository.GetComponent<T>();
         if (component != null) return component;
 
-        component = (T)Activator.CreateInstance<T>().SetUp(this, true);
+        component = (T)Activator.CreateInstance<T>().SetUpAndCreateChildren(this, true);
 
         if (component == null)
             return null;
@@ -215,14 +240,101 @@ public class Entity : IDisposable
         var component = ComponentRepository.GetComponent(type);
         if (component != null) return component;
 
-        component = Activator.CreateInstance(type) as Component;
+        if (type is null || !type.IsSubclassOf(typeof(Component)))
+            return null;
+        
+        component = (Component)Activator.CreateInstance(type);
         if (component == null) return null;
-        component.SetUp(this, true);
+        component.SetUpAndCreateChildren(this, true);
 
         component.Create();
         ComponentRepository.AttachComponent(component);
 
         return component;
+    }
+
+    internal void BuildComponentsFromBlueprint(EntityBlueprint entityBlueprint)
+    {
+        // all components we will end up creating (one per Type)
+        var constructed = new Dictionary<Type, Component>();
+        
+        //Seed all component types explicitly declared in the blueprint
+        var pending = new Stack<Type>();
+        foreach (var cbp in entityBlueprint.Components)
+        {
+            var type = BlueprintResolver.ResolveComponentType(cbp.Type);
+            if (type == null)
+            {
+                _logger.Warn("{0} is not a valid component type", cbp.Type);
+                continue;
+            }
+
+            pending.Push(type);
+        }
+        
+        // Expand transitive requirements
+        while (pending.Count > 0)
+        {
+            var type = pending.Pop();
+            if (constructed.ContainsKey(type))
+                continue; // already constructed skip
+
+            var component = Component.BpFromType(type, this);
+            if (component == null)
+            {
+                _logger.Warn("Could not construct component of type {0} for entity {1}", type.FullName, Name);
+                continue;
+            }
+            
+            constructed[type] = component;
+            
+            // Enqueue all direct requirements to be created
+            foreach (var requiredType in component.RequiredComponentTypes)
+            {
+                if (requiredType is null) continue;
+                if(!constructed.ContainsKey(requiredType))
+                    pending.Push(requiredType);
+            }
+        }
+        
+        foreach(var component in constructed.Values)
+            ComponentRepository.AttachComponent(component);
+    }
+
+    internal void DeserializeComponentsFromBlueprints(EntityBlueprint ebp)
+    {
+        var components = new Dictionary<Type, Component>();
+
+        foreach (var component in ComponentRepository.GetAllComponentsToAttach())
+        {
+            components[component.GetType()] = component;
+            component.MapRequiredFieldComponents();
+        }
+
+        foreach (var componentBlueprint in ebp.Components)
+        {
+            var type = BlueprintResolver.ResolveComponentType(componentBlueprint.Type);
+            if (type == null) continue;
+            if(!components.TryGetValue(type, out var component) || component == null) continue;
+            
+            component.BeforeDeserialize();
+            try
+            {
+                BlueprintResolver.ResolveComponent(componentBlueprint, component);
+            }
+            catch (Exception e)
+            {
+                _logger.Error($"{e.Message}");
+            }
+            component.AfterDeserialize();
+        }
+    }
+
+    internal void CallComponentOnCreateAfterDeserialized()
+    {
+        var components = ComponentRepository.GetAllComponentsToAttach();
+        foreach(var component  in components)
+            component.Create();
     }
 
     /// <summary>
@@ -258,6 +370,14 @@ public class Entity : IDisposable
     public T GetComponent<T>() where T : Component
     {
         return ComponentRepository.GetComponent<T>();
+    }
+
+    public Component GetComponent(Type type)
+    {
+        if (type is null || !type.IsSubclassOf(typeof(Component)))
+            return null;
+        
+        return ComponentRepository.GetComponent(type);
     }
 
     public T GetComponentInChildren<T>() where T : Component

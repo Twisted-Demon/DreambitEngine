@@ -37,15 +37,15 @@ public class Camera2D : Component
             var pos = Transform.WorldPosToVec2;
 
             // Calculate the width and height of the camera view based on the current zoom
-            var width = Window.Width;
-            var height = Window.Height;
+            var width  = Window.Width  / PixelsPerUnit;  
+            var height = Window.Height / PixelsPerUnit;
 
             // Return the bounds of the camera view
             return new Rectangle(
                 (int)(pos.X - width * 0.5f), // Center the X position based on the zoomed width
                 (int)(pos.Y - height * 0.5f), // Center the Y position based on the zoomed height
-                width,
-                height
+                (int)width,
+                (int)height
             );
         }
     }
@@ -100,10 +100,10 @@ public class Camera2D : Component
 
     public override void OnUpdate()
     {
+        UpdatePosition();
         TransformMatrix = CalculateTransformMatrix(ScreenPixelsPerWorldUnit);
         UnscaledTransformMatrix = CalculateTransformMatrix(PixelsPerUnit);
         TopLeftTransformMatrix = CalculateTopLeftMatrix(ScreenPixelsPerWorldUnit);
-        UpdatePosition();
     }
 
     public override void OnDestroyed()
@@ -115,16 +115,16 @@ public class Camera2D : Component
     private Matrix CalculateTransformMatrix(float scalePixelsPerUnit  = 1.0f)
     {
         return Matrix.CreateTranslation(-Transform.WorldPosition) *
+               Matrix.CreateRotationZ(-Transform.WorldZRotation) *
                Matrix.CreateScale(new Vector3(scalePixelsPerUnit, scalePixelsPerUnit, 1)) *
-               Matrix.CreateRotationZ(Transform.WorldZRotation) *
                Matrix.CreateTranslation(new Vector3(0.5f * Window.ScreenSize.X, 0.5f * Window.ScreenSize.Y, 0f));
     }
 
     private Matrix CalculateTopLeftMatrix(float scalePixelsPerUnit = 1.0f)
     {
         return Matrix.CreateTranslation(-Transform.WorldPosition) *
+               Matrix.CreateRotationZ(-Transform.WorldZRotation) *
                Matrix.CreateScale(new Vector3(scalePixelsPerUnit, scalePixelsPerUnit, 1)) *
-               Matrix.CreateRotationZ(Transform.WorldZRotation) *
                Matrix.CreateTranslation(new Vector3(0.5f * Window.ScreenSize.X, 0.5f * Window.ScreenSize.Y, 0f));
     }
 
@@ -136,20 +136,13 @@ public class Camera2D : Component
 
     private void SetResolutionZoom()
     {
-        ResolutionZoom = Window.Height / (float)TargetVerticalResolution;
+        var target = Math.Max(1, TargetVerticalResolution);
+        ResolutionZoom = Window.Height / (float)target;
     }
 
     public void SetViewPort()
     {
-        var topLeft = new Vector2(Transform.WorldPosition.X - Window.ScreenSize.X / 2f * WorldUnitsPerScreenPixel,   
-            Transform.WorldPosition.Y - Window.ScreenSize.Y / 2f * WorldUnitsPerScreenPixel);  
-
-        Core.Instance.GraphicsDevice.Viewport = new Viewport(
-            (int)(topLeft.X * PixelsPerUnit),  // ★ Viewport expects pixels; convert world->pixels (ignore camera zoom here)
-            (int)(topLeft.Y * PixelsPerUnit),
-            Window.Width,
-            Window.Height
-        );
+        Core.Instance.GraphicsDevice.Viewport = new Viewport(0, 0, Window.Width, Window.Height);
     }
 
     public void SetTargetVerticalResolution(int targetVerticalResolution)

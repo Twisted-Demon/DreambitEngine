@@ -9,6 +9,8 @@ public class PongScene : Scene
     
     protected override void OnInitialize()
     {
+        Window.SetSize(PongSettings.GameWidth,  PongSettings.GameHeight);
+        
         MainCamera.ForcePosition(new Vector3(PongSettings.GameWidth * 0.5f, PongSettings.GameHeight * 0.5f, 0));
         
         AmbientLight.Color = Color.White;

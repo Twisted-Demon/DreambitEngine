@@ -85,6 +85,8 @@ public static class Window
         gdm.ApplyChanges();
 
         RememberWindowedStateIfBordered();
+
+        WindowResized?.Invoke(null,  new WindowResizedEventArgs { Width = width, Height = height });
     }
 
     public static void SetPosition(int x, int y)

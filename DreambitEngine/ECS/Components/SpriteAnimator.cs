@@ -4,28 +4,41 @@ using System.Collections.Generic;
 namespace Dreambit.ECS;
 
 [Require(typeof(SpriteDrawer))]
-public class SpriteAnimator : Component
+public class SpriteAnimator : Component<SpriteAnimator>
 {
-    private readonly Logger<SpriteAnimator> _logger = new();
     private Queue<SpriteSheetAnimation> _animationQueue = [];
     private int _currentAnimationFrame;
     private float _elapsedFrameTime;
     private readonly Dictionary<string, Action> _eventActions = [];
 
     //internals
-    private SpriteDrawer _spriteDrawer;
+    [FromRequired] private SpriteDrawer _spriteDrawer;
     private float _timeToNextFrame;
+    
     public Action OnAnimationEnded;
     public bool IsPlaying { get; private set; }
 
+    public bool PlayOnStart { get; set; } = false;
+
+    public float PlaySpeed { get; set; } = 1.0f;
+
     public SpriteSheetAnimation Animation { get; private set; }
 
-    private string AnimationPath { get; set; }
+    private string _animationPath;
+
+    public string AnimationPath
+    {
+        get =>  _animationPath;
+        set => SetAnimation(value);
+    }
+
     
     public override void OnCreated()
     {
-        _spriteDrawer = Entity.GetComponent<SpriteDrawer>();
         _spriteDrawer.WithPivot(PivotType.Custom);
+        
+        if(PlayOnStart)
+            Play();
     }
 
     public override void OnUpdate()
@@ -41,7 +54,7 @@ public class SpriteAnimator : Component
 
     private void Run()
     {
-        _elapsedFrameTime += Time.DeltaTime;
+        _elapsedFrameTime += Time.DeltaTime * PlaySpeed;
 
         if (!(_elapsedFrameTime >= _timeToNextFrame)) return;
 
@@ -119,10 +132,10 @@ public class SpriteAnimator : Component
 
     public void SetAnimation(string animationPath)
     {
-        if (AnimationPath == animationPath)
+        if (_animationPath == animationPath)
             return;
         
-        AnimationPath = animationPath;
+        _animationPath = animationPath;
         UpdateAnimation(animationPath);
     }
     
