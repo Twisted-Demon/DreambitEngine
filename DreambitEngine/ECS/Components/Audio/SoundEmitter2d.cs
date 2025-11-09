@@ -1,10 +1,12 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Audio;
 
 namespace Dreambit.ECS.Audio;
 
+[Obsolete]
 public class SoundEmitter2d : Component
 {
     private readonly Logger<SoundEmitter2d> _logger = new();

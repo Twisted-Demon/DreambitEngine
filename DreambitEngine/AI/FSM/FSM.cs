@@ -38,10 +38,7 @@ public class FSM : Component
 
     /// <summary>Simple key/value store available to states/guards.</summary>
     public Blackboard Blackboard { get; private set; } = new();
-
-    /// <summary>Clock source for delta time accumulation. Defaults to 60 FPS if none supplied.</summary>
-    public IFsmClock Clock { get; set; } = new DefaultFsmClock();
-
+    
     // ----- Events -----
     public event Action<Type, Type, string> OnTransition;
     public event Action<Type> OnStateEntered;
@@ -336,12 +333,5 @@ public class FSM : Component
             _logger.Error("FSM guard threw: {0}", ex);
             return false;
         }
-    }
-
-    // Optional: call from your engine with delta time if available
-    public void Accumulate(TimeSpan dt)
-    {
-        TimeInState += dt;
-        FramesInState++;
     }
 }

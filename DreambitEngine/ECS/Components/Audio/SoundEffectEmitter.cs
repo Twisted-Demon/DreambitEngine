@@ -2,7 +2,7 @@
 
 namespace Dreambit.ECS.Audio;
 
-public class SoundEffectEmitter : Component
+public class SoundEffectEmitter : Component<SoundEffectEmitter>
 {
     private SoundCue _soundCue;
 

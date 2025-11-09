@@ -51,6 +51,6 @@ public abstract class State
 
 public abstract class State<T> : State where T : class
 {
-    protected readonly Logger<T> Logger = new();
+    protected readonly ILogger Logger = new Logger<T>();
     public new string Identifier = typeof(T).FullName;
 }

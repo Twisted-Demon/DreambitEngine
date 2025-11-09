@@ -80,12 +80,13 @@ public static class Window
         if (width <= 0 || height <= 0) return;
 
         var gdm = Core.GraphicsDeviceManager;
+        
         gdm.PreferredBackBufferWidth = width;
         gdm.PreferredBackBufferHeight = height;
         gdm.ApplyChanges();
 
         RememberWindowedStateIfBordered();
-
+        
         WindowResized?.Invoke(null,  new WindowResizedEventArgs { Width = width, Height = height });
     }
 
@@ -99,6 +100,18 @@ public static class Window
     public static Point GetPosition()
     {
         return Core.Instance.Window.Position;
+    }
+
+    public static Point GetCenter()
+    {
+        var pos = GetPosition();
+
+        var center = new Point(
+            pos.X + (Width / 2),
+            pos.Y + (Height / 2)
+        );
+
+        return center;
     }
 
     public static void CenterOnPrimaryDisplay()

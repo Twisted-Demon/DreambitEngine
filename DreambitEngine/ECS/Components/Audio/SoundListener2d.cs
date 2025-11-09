@@ -1,8 +1,10 @@
-﻿using Microsoft.Xna.Framework;
+﻿using System;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Audio;
 
 namespace Dreambit.ECS.Audio;
 
+[Obsolete]
 public class SoundListener2d : Component
 {
     private readonly Logger<SoundListener2d> _logger = new();

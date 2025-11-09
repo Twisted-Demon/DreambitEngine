@@ -6,7 +6,7 @@ namespace Dreambit.ECS;
 
 public abstract class Component<T> : Component where T : Component
 {
-    protected static readonly ILogger Logger = new Logger<T>();
+    protected new static readonly ILogger Logger = new Logger<T>();
 }
 
 public abstract class Component : IDisposable
@@ -16,7 +16,7 @@ public abstract class Component : IDisposable
     private bool _guarded = true;
     internal bool IsDestroyed;
     internal IReadOnlyList<Type> RequiredComponentTypes = [];
-    private static readonly ILogger Logger = new Logger<Component>();
+    protected static readonly ILogger Logger = new Logger<Component>();
 
     public Transform Transform => Entity?.Transform;
 
