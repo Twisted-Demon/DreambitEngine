@@ -1,14 +1,13 @@
-﻿using System;
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
 namespace Dreambit.ECS;
 
 public class ParticleSystemDrawer : DrawableComponent<ParticleSystemDrawer>
 {
-    private Texture2D Texture { get; set; }
-    
     private string _texturePath;
+    private Texture2D Texture { get; set; }
+
     public string TexturePath
     {
         get => _texturePath;
@@ -16,7 +15,7 @@ public class ParticleSystemDrawer : DrawableComponent<ParticleSystemDrawer>
         {
             if (_texturePath == value)
                 return;
-            
+
             _texturePath = value;
             Texture = Resources.LoadAsset<Texture2D>(value);
         }
@@ -30,12 +29,13 @@ public class ParticleSystemDrawer : DrawableComponent<ParticleSystemDrawer>
             return new Vector2(Texture.Width * 0.5f, Texture.Height * 0.5f);
         }
     }
+
     public ParticleSimulation2D Simulation { get; private set; }
     public override Rectangle Bounds => Simulation.Bounds;
-    
+
     public override void OnCreated()
     {
-        Simulation =  new ParticleSimulation2D(Transform);
+        Simulation = new ParticleSimulation2D(Transform);
         Simulation.UseLocalSpace = false;
     }
 
@@ -53,40 +53,41 @@ public class ParticleSystemDrawer : DrawableComponent<ParticleSystemDrawer>
         if (Simulation.UseLocalSpace)
         {
             var wp = Transform.WorldPosToVec2;
-            ox = wp.X; oy = wp.Y;
+            ox = wp.X;
+            oy = wp.Y;
         }
 
-        for (int i = 0; i < parts.Alive; i++)
+        for (var i = 0; i < parts.Alive; i++)
         {
-            int phys = parts.INDICES[i];
-            
+            var phys = parts.INDICES[i];
+
             //position
-            float px = parts.PX[phys] + ox;
-            float py = parts.PY[phys] + oy;
-            
+            var px = parts.PX[phys] + ox;
+            var py = parts.PY[phys] + oy;
+
             // size
-            float sx = Mathf.Max(0.0001f, parts.SX[phys]);
-            float sy = Mathf.Max(0.0001f, parts.SY[phys]);
-            
+            var sx = Mathf.Max(0.0001f, parts.SX[phys]);
+            var sy = Mathf.Max(0.0001f, parts.SY[phys]);
+
             // rotation
-            float rot = parts.ROT[phys];
+            var rot = parts.ROT[phys];
 
             var color = parts.COLOR[phys];
-            
+
             Core.SpriteBatch.Draw(
-                    texture: Texture,
-                    position: new Vector2(px, py),
-                    sourceRectangle: null,
-                    color: color,
-                    rotation: rot,
-                    origin: Origin,
-                    scale: new Vector2(sx, sy),
-                    effects: SpriteEffects.None,
-                    layerDepth: 0f
-                );
+                Texture,
+                new Vector2(px, py),
+                null,
+                color,
+                rot,
+                Origin,
+                new Vector2(sx, sy),
+                SpriteEffects.None,
+                0f
+            );
         }
     }
-    
+
     public void Play()
     {
         EnsureSimulation();
@@ -100,11 +101,11 @@ public class ParticleSystemDrawer : DrawableComponent<ParticleSystemDrawer>
 
     private void EnsureSimulation()
     {
-        if (Simulation == null)
-        {
-            Simulation = new ParticleSimulation2D(Transform) { UseLocalSpace = true };
-        }
+        if (Simulation == null) Simulation = new ParticleSimulation2D(Transform) { UseLocalSpace = true };
     }
 
-    public override bool IsVisibleFromCamera(Rectangle cameraBounds) => true;
+    public override bool IsVisibleFromCamera(Rectangle cameraBounds)
+    {
+        return true;
+    }
 }

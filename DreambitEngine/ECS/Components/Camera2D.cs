@@ -9,18 +9,18 @@ public class Camera2D : Component
     public CameraFollowBehavior CameraFollowBehavior = CameraFollowBehavior.Lerp;
     public bool IsFollowing = true;
     public Transform TransformToFollow;
-    
+
     private float ResolutionZoom { get; set; } = 1f;
     public float LerpSpeed { get; set; } = 5f;
     public float Zoom { get; set; } = 1f;
 
     public float PixelsPerUnit { get; set; } = 1f;
-    
+
     public float TotalZoom => Zoom * ResolutionZoom;
     public float Scale => PixelsPerUnit * Zoom * ResolutionZoom;
-    
+
     // Convenience: full pixels-per-world-unit including camera zoom
-    private float ScreenPixelsPerWorldUnit => TotalZoom * PixelsPerUnit;                  
+    private float ScreenPixelsPerWorldUnit => TotalZoom * PixelsPerUnit;
     private float WorldUnitsPerScreenPixel => 1f / ScreenPixelsPerWorldUnit;
 
     public int TargetVerticalResolution { get; private set; } = Window.Height;
@@ -37,7 +37,7 @@ public class Camera2D : Component
             var pos = Transform.WorldPosToVec2;
 
             // Calculate the width and height of the camera view based on the current zoom
-            var width  = Window.Width  / PixelsPerUnit;  
+            var width = Window.Width / PixelsPerUnit;
             var height = Window.Height / PixelsPerUnit;
 
             // Return the bounds of the camera view
@@ -112,7 +112,7 @@ public class Camera2D : Component
         TransformToFollow = null;
     }
 
-    private Matrix CalculateTransformMatrix(float scalePixelsPerUnit  = 1.0f)
+    private Matrix CalculateTransformMatrix(float scalePixelsPerUnit = 1.0f)
     {
         return Matrix.CreateTranslation(-Transform.WorldPosition) *
                Matrix.CreateRotationZ(-Transform.WorldZRotation) *
@@ -183,12 +183,12 @@ public class Camera2D : Component
         Transform.Position = Vector3.Lerp(Transform.WorldPosition, TransformToFollow.WorldPosition,
             LerpSpeed * Time.DeltaTime);
     }
-    
+
     public Vector2 WorldToScreen(Vector2 worldPos)
     {
         return Vector2.Transform(worldPos, TransformMatrix);
     }
-    
+
     public Vector2 ScreenToWorld(Vector2 screenPos)
     {
         var inverse = Matrix.Invert(TransformMatrix);

@@ -11,12 +11,12 @@ public abstract class Component<T> : Component where T : Component
 
 public abstract class Component : IDisposable
 {
+    protected static readonly ILogger Logger = new Logger<Component>();
     private bool _enabled = true;
-    private bool _isDisposed;
     private bool _guarded = true;
+    private bool _isDisposed;
     internal bool IsDestroyed;
     internal IReadOnlyList<Type> RequiredComponentTypes = [];
-    protected static readonly ILogger Logger = new Logger<Component>();
 
     public Transform Transform => Entity?.Transform;
 
@@ -57,14 +57,11 @@ public abstract class Component : IDisposable
 
         RequiredComponentTypes = GetRequiredComponents();
 
-        foreach (var cType in RequiredComponentTypes)
-        {
-            Entity.AttachComponent(cType);
-        }
+        foreach (var cType in RequiredComponentTypes) Entity.AttachComponent(cType);
         MapRequiredFieldComponents();
         return this;
     }
-    
+
     internal static Component BpFromType(Type type, Entity entity, bool enabled = true)
     {
         if (!type.IsSubclassOf(typeof(Component)))
@@ -72,28 +69,27 @@ public abstract class Component : IDisposable
             Logger.Warn("{0} is not a valid component type on deserialization", type.FullName);
             return null;
         }
-        
+
         // check if already created, if not create a new one
-        var component = 
-            entity.GetComponent(type) ?? 
+        var component =
+            entity.GetComponent(type) ??
             (Component)Activator.CreateInstance(type);
 
         if (component is null)
             return null;
-        
+
         component.Entity = entity;
         component._enabled = enabled;
         component.RequiredComponentTypes = component.GetRequiredComponents();
-        
+
 
         return component;
     }
 
     private IReadOnlyList<Type> GetRequiredComponents()
     {
-        
         var list = new List<Type>();
-        
+
         var attributes = Attribute.GetCustomAttributes(GetType());
         foreach (var attribute in attributes)
         {
@@ -115,7 +111,7 @@ public abstract class Component : IDisposable
     {
         const BindingFlags flags =
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
-        
+
         var type = GetType();
 
         var fields = type.GetFields(flags);
@@ -123,13 +119,14 @@ public abstract class Component : IDisposable
         {
             var attribute = field.GetCustomAttribute<FromRequiredAttribute>();
             if (attribute == null) continue;
-            
+
             var requiredType = field.FieldType;
             var requiredComponent = Entity.GetComponent(requiredType);
-            
-            if(requiredComponent is null)
-                Logger.Warn("{0} unable to reference component. Ensure use of Require component attribute", requiredType.FullName);
-            
+
+            if (requiredComponent is null)
+                Logger.Warn("{0} unable to reference component. Ensure use of Require component attribute",
+                    requiredType.FullName);
+
             field.SetValue(this, requiredComponent);
         }
 
@@ -141,20 +138,20 @@ public abstract class Component : IDisposable
 
             var requiredType = prop.PropertyType;
             var requiredComponent = Entity.GetComponent(requiredType);
-            
-            if(requiredComponent is null)
-                Logger.Warn("{0} unable to reference component. Ensure use of Require component attribute", requiredType.FullName);
-            
+
+            if (requiredComponent is null)
+                Logger.Warn("{0} unable to reference component. Ensure use of Require component attribute",
+                    requiredType.FullName);
+
             prop.SetValue(this, requiredComponent);
         }
     }
-    
+
     /// <summary>
     ///     Gets called immediately before the component is de-serialized
     /// </summary>
     public virtual void OnBeforeDeserialize()
     {
-        
     }
 
     /// <summary>
@@ -162,9 +159,8 @@ public abstract class Component : IDisposable
     /// </summary>
     public virtual void OnAfterDeserialize()
     {
-        
     }
-    
+
     /// <summary>
     ///     Gets called immediately when the component is instantiated and serialized.
     /// </summary>
@@ -217,12 +213,13 @@ public abstract class Component : IDisposable
     public virtual void OnUpdate()
     {
     }
-    
+
     /// <summary>
-    /// Called every physics update during the loop of the game
+    ///     Called every physics update during the loop of the game
     /// </summary>
     public virtual void OnPhysicsUpdate()
-    {}
+    {
+    }
 
     /// <summary>
     ///     Called if debug mode is activated. Used to render debug data.
@@ -242,7 +239,7 @@ public abstract class Component : IDisposable
         if (!_guarded) return;
         _guarded = Guard.SafeCall(OnAfterDeserialize, "OnAfterDeserialize");
     }
-    
+
     internal void Create()
     {
         if (!_guarded) return;
@@ -254,13 +251,13 @@ public abstract class Component : IDisposable
         if (!_guarded) return;
         _guarded = Guard.SafeCall(OnAddedToEntity, "OnAddedToEntity");
     }
-    
+
     internal void Update()
     {
         if (!_guarded) return;
         _guarded = Guard.SafeCall(OnUpdate, "OnUpdate");
     }
-    
+
     internal void PhysicsUpdate()
     {
         if (!_guarded) return;
