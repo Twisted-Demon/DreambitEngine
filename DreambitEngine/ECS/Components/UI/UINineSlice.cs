@@ -78,40 +78,40 @@ public class UINineSlice : UIElement
         if (!_spriteSheet.TryGetFrame(7, out var bottomMiddleSource)) return;
         if (!_spriteSheet.TryGetFrame(8, out var bottomRightSource)) return;
 
-        var middleWidth = (int)(size.X - (topLeftSource.Source.Width + topRightSource.Source.Width));
-        var middleHeight = (int)(size.Y - (topMiddleSource.Source.Height + topMiddleSource.Source.Height));
+        var middleWidth = (int)(size.X - (topLeftSource.SourceRect.Width + topRightSource.SourceRect.Width));
+        var middleHeight = (int)(size.Y - (topMiddleSource.SourceRect.Height + topMiddleSource.SourceRect.Height));
 
         //Define the destination rectangles
-        var topLeftDest = new Rectangle(dr.Left, dr.Top, topLeftSource.Source.Width, topLeftSource.Source.Height);
-        var topMiddleDest = new Rectangle(dr.Left + topLeftSource.Source.Width, dr.Top, middleWidth, topMiddleSource.Source.Height);
-        var topRightDest = new Rectangle(dr.Right - topRightSource.Source.Width, dr.Top, topRightSource.Source.Width,
-            topRightSource.Source.Height);
+        var topLeftDest = new Rectangle(dr.Left, dr.Top, topLeftSource.SourceRect.Width, topLeftSource.SourceRect.Height);
+        var topMiddleDest = new Rectangle(dr.Left + topLeftSource.SourceRect.Width, dr.Top, middleWidth, topMiddleSource.SourceRect.Height);
+        var topRightDest = new Rectangle(dr.Right - topRightSource.SourceRect.Width, dr.Top, topRightSource.SourceRect.Width,
+            topRightSource.SourceRect.Height);
 
-        var middleLeftDest = new Rectangle(dr.Left, dr.Top + topLeftSource.Source.Height, topLeftSource.Source.Width, middleHeight);
-        var middleDest = new Rectangle(dr.Left + topLeftSource.Source.Width, dr.Top + topLeftSource.Source.Height, middleWidth,
+        var middleLeftDest = new Rectangle(dr.Left, dr.Top + topLeftSource.SourceRect.Height, topLeftSource.SourceRect.Width, middleHeight);
+        var middleDest = new Rectangle(dr.Left + topLeftSource.SourceRect.Width, dr.Top + topLeftSource.SourceRect.Height, middleWidth,
             middleHeight);
-        var middleRightDest = new Rectangle(dr.Right - topRightSource.Source.Width, dr.Top + topLeftSource.Source.Height,
-            topRightSource.Source.Width, middleHeight);
+        var middleRightDest = new Rectangle(dr.Right - topRightSource.SourceRect.Width, dr.Top + topLeftSource.SourceRect.Height,
+            topRightSource.SourceRect.Width, middleHeight);
 
-        var bottomLeftDest = new Rectangle(dr.Left, dr.Bottom - bottomLeftSource.Source.Height, bottomLeftSource.Source.Width,
-            bottomLeftSource.Source.Height);
-        var bottomMiddleDest = new Rectangle(dr.Left + bottomRightSource.Source.Width, dr.Bottom - bottomMiddleSource.Source.Height,
-            middleWidth, bottomMiddleSource.Source.Height);
-        var bottomRightDest = new Rectangle(dr.Right - bottomRightSource.Source.Width, dr.Bottom - bottomMiddleSource.Source.Height,
-            bottomRightSource.Source.Width, bottomMiddleSource.Source.Height);
+        var bottomLeftDest = new Rectangle(dr.Left, dr.Bottom - bottomLeftSource.SourceRect.Height, bottomLeftSource.SourceRect.Width,
+            bottomLeftSource.SourceRect.Height);
+        var bottomMiddleDest = new Rectangle(dr.Left + bottomRightSource.SourceRect.Width, dr.Bottom - bottomMiddleSource.SourceRect.Height,
+            middleWidth, bottomMiddleSource.SourceRect.Height);
+        var bottomRightDest = new Rectangle(dr.Right - bottomRightSource.SourceRect.Width, dr.Bottom - bottomMiddleSource.SourceRect.Height,
+            bottomRightSource.SourceRect.Width, bottomMiddleSource.SourceRect.Height);
 
 
         //draw the slices
-        Core.SpriteBatch.Draw(_spriteSheet.Texture, topLeftDest, topLeftSource.Source, Color * Alpha);
-        Core.SpriteBatch.Draw(_spriteSheet.Texture, topMiddleDest, topMiddleSource.Source, Color * Alpha);
-        Core.SpriteBatch.Draw(_spriteSheet.Texture, topRightDest, topRightSource.Source, Color * Alpha);
+        Core.SpriteBatch.Draw(_spriteSheet.Texture, topLeftDest, topLeftSource.SourceRect, Color * Alpha);
+        Core.SpriteBatch.Draw(_spriteSheet.Texture, topMiddleDest, topMiddleSource.SourceRect, Color * Alpha);
+        Core.SpriteBatch.Draw(_spriteSheet.Texture, topRightDest, topRightSource.SourceRect, Color * Alpha);
 
-        Core.SpriteBatch.Draw(_spriteSheet.Texture, middleLeftDest, middleLeftSource.Source, Color * Alpha);
-        Core.SpriteBatch.Draw(_spriteSheet.Texture, middleDest, middleSource.Source, Color * Alpha);
-        Core.SpriteBatch.Draw(_spriteSheet.Texture, middleRightDest, middleRightSource.Source, Color * Alpha);
+        Core.SpriteBatch.Draw(_spriteSheet.Texture, middleLeftDest, middleLeftSource.SourceRect, Color * Alpha);
+        Core.SpriteBatch.Draw(_spriteSheet.Texture, middleDest, middleSource.SourceRect, Color * Alpha);
+        Core.SpriteBatch.Draw(_spriteSheet.Texture, middleRightDest, middleRightSource.SourceRect, Color * Alpha);
 
-        Core.SpriteBatch.Draw(_spriteSheet.Texture, bottomLeftDest, bottomLeftSource.Source, Color * Alpha);
-        Core.SpriteBatch.Draw(_spriteSheet.Texture, bottomMiddleDest, bottomMiddleSource.Source, Color * Alpha);
-        Core.SpriteBatch.Draw(_spriteSheet.Texture, bottomRightDest, bottomRightSource.Source, Color * Alpha);
+        Core.SpriteBatch.Draw(_spriteSheet.Texture, bottomLeftDest, bottomLeftSource.SourceRect, Color * Alpha);
+        Core.SpriteBatch.Draw(_spriteSheet.Texture, bottomMiddleDest, bottomMiddleSource.SourceRect, Color * Alpha);
+        Core.SpriteBatch.Draw(_spriteSheet.Texture, bottomRightDest, bottomRightSource.SourceRect, Color * Alpha);
     }
 }

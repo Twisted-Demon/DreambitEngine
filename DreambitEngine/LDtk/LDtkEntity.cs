@@ -34,7 +34,7 @@ public class LDtkEntity<T> : LDtkEntity where T : new()
         var sprite = new Sprite
         {
             Texture = LDtkManager.Instance.SpriteSheets[tilesetRect.TilesetUid].Texture,
-            Source = tilesetRect
+            SourceRect = tilesetRect
         };
         drawer.SetSprite(sprite);
     }

@@ -15,7 +15,9 @@ public static class Mathf
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)] public static float Abs(float value) => value >= 0f ? value : -value;
     [MethodImpl(MethodImplOptions.AggressiveInlining)] public static float Min(float min, float max) => min < max ? min : max;
+    [MethodImpl(MethodImplOptions.AggressiveInlining)] public static float MinInt(int min, int max) => min < max ? min : max;
     [MethodImpl(MethodImplOptions.AggressiveInlining)] public static float Max(float min, float max) => min > max ? min : max;
+    [MethodImpl(MethodImplOptions.AggressiveInlining)] public static int MaxInt(int min, int max) => min > max ? min : max;
     [MethodImpl(MethodImplOptions.AggressiveInlining)] public static float Saturate(float value) => Max(0f, Min(1f, value));
     [MethodImpl(MethodImplOptions.AggressiveInlining)] public static float Clamp(float value, float min, float max) => Max(min, Min(max, value));
     

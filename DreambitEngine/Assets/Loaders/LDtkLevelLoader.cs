@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.Text.Json;
 using LDtk;
 
@@ -8,6 +9,8 @@ public class LDtkLevelLoader : AssetLoaderBase
 {
     public override string Extension { get; } = ".jsonb";
     public override bool AddToDisposableList { get; } = true;
+    public override Type TargetType { get; } = typeof(LDtkLevel);
+
     public override object Load(string assetName, string pakName, bool usePak, string contentDirectory)
     {
         

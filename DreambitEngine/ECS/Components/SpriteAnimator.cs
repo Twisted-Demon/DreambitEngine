@@ -165,7 +165,7 @@ public class SpriteAnimator : Component<SpriteAnimator>
         if (Animation.TryGetFrame(frameNumber, out var nextFrame))
         {
             _currentAnimationFrame = frameNumber;
-            var sprite = CurrentSpriteSheet.Frames[nextFrame.FrameIndex];
+            var sprite = CurrentSpriteSheet[nextFrame.FrameIndex];
             _spriteDrawer.SetSprite(sprite);
             _spriteDrawer.WithPivot(nextFrame.Pivot);
 

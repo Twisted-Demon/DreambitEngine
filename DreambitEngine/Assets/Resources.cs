@@ -46,19 +46,22 @@ public class Resources : Singleton<Resources>
         }
     }
 
-    private static readonly Dictionary<Type, IAssetLoader> Loaders = new()
+    private static readonly Dictionary<Type, IAssetLoader> Loaders = [];
+
+    public void Init()
     {
-        { typeof(Texture2D), new Texture2dLoader() },
-        { typeof(SoundEffect), new SoundEffectLoader() },
-        { typeof(Song), new SongLoader() },
-        { typeof(SpriteSheet), new SpriteSheetLoader() },
-        { typeof(SpriteSheetAnimation), new SpriteSheetAnimationLoader() },
-        { typeof(LDtkFile), new LDtkFileLoader() },
-        { typeof(LDtkLevel), new LDtkLevelLoader() },
-        { typeof(SoundCue), new SoundCueLoader() },
-        { typeof(SpriteFontBaseLoader), new SpriteFontBaseLoader()},
-        { typeof(EntityBlueprint), new EntityBlueprintLoader()}
-    };
+        var loaderTypes = ReflectionUtils.GetAllTypesAssignableFrom(
+            typeof(IAssetLoader),
+            onlyIncludeParameterlessConstructors: true);
+
+        foreach (var type in loaderTypes)
+        {
+            var instance = (IAssetLoader)Activator.CreateInstance(type);
+            if (instance is null) continue;
+            
+            Loaders[instance.TargetType] = instance;
+        }
+    }
 
     /// <summary>
     ///     Tries to Load an asset and returns default if not found

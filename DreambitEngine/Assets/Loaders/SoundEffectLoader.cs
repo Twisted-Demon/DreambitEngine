@@ -8,7 +8,8 @@ public class SoundEffectLoader : AssetLoaderBase
 {
     public override string Extension { get; } = ".audb";
     public override bool AddToDisposableList { get; } = true;
-    
+    public override Type TargetType { get; } = typeof(SoundEffect);
+
     public override object Load(string assetName, string pakName, bool usePak, string contentDirectory)
     {
         using var s = GetStream(GetPath(assetName), pakName, usePak, contentDirectory);

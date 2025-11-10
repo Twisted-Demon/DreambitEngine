@@ -13,6 +13,16 @@ public class SpriteSheet : DreambitAsset
     [JsonProperty("rows")] public readonly int Rows = 1;
 
     [JsonProperty("texture_path")] private string _texturePath;
+    
+    [JsonIgnore] public Texture2D Texture { get; private set; }
+
+    [JsonIgnore] public string TexturePath => _texturePath;
+
+    [JsonIgnore] public Sprite[] Frames { get; private set; } = [];
+
+    [JsonIgnore] public int FrameCount => Frames.Length;
+
+    public Sprite this[int index] => Frames[index];
 
     private SpriteSheet(int columns, int rows, string texturePath, Texture2D texture)
     {
@@ -33,20 +43,11 @@ public class SpriteSheet : DreambitAsset
 
         SplitSprite();
     }
-
-
+    
     public SpriteSheet()
     {
     }
-
-    [JsonIgnore] public Texture2D Texture { get; private set; }
-
-    [JsonIgnore] public string TexturePath => _texturePath;
-
-    [JsonIgnore] public Sprite[] Frames { get; private set; } = [];
-
-    [JsonIgnore] public int FrameCount => Frames.Length;
-
+    
     public static SpriteSheet Create(int columns, int rows, string texturePath)
     {
         var texture = Resources.LoadAsset<Texture2D>(texturePath);
@@ -73,7 +74,7 @@ public class SpriteSheet : DreambitAsset
         if (Columns < 1 || Rows < 1) return;
         if (Texture == null) return;
 
-        var totalFrames = (int)Mathf.Max(1, Columns * Rows);
+        var totalFrames = Mathf.MaxInt(1, Columns * Rows);
 
         Frames = new Sprite[totalFrames];
 
@@ -92,7 +93,7 @@ public class SpriteSheet : DreambitAsset
                     Frames[i] = new Sprite
                     {
                         Texture = Texture,
-                        Source = new Rectangle(x * frameWidth, y * frameHeight, frameWidth, frameHeight)
+                        SourceRect = new Rectangle(x * frameWidth, y * frameHeight, frameWidth, frameHeight)
                     };  
                 }
                 break;
@@ -101,7 +102,7 @@ public class SpriteSheet : DreambitAsset
                 Frames[0] = new Sprite
                 {
                     Texture = Texture,
-                    Source = new Rectangle(0, 0, Texture.Width, Texture.Height)
+                    SourceRect = new Rectangle(0, 0, Texture.Width, Texture.Height)
                 };
                 break;
         }
@@ -120,7 +121,7 @@ public class SpriteSheet : DreambitAsset
             sprite = new Sprite
             {
                 Texture = Texture,
-                Source = new Rectangle(0, 0, Texture.Width, Texture.Height)
+                SourceRect = new Rectangle(0, 0, Texture.Width, Texture.Height)
             };
             return false;
         }

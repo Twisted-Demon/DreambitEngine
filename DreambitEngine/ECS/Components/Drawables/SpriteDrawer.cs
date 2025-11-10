@@ -38,21 +38,19 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
     {
         get
         {
-            var soureRect = Sprite.Source;
-
             var originToUse = Pivot;
 
             if (PivotType != PivotType.Custom)
             {
                 var relative = PivotHelper.GetRelativePivot(PivotType);
-                originToUse = new Vector2(relative.X * Sprite.Source.Width, relative.Y * Sprite.Source.Height);
+                originToUse = new Vector2(relative.X * Sprite.SourceRect.Width, relative.Y * Sprite.SourceRect.Height);
             }
 
             var rect = new Rectangle(
                 (int)(Transform.WorldPosition.X - originToUse.X),
                 (int)(Transform.WorldPosition.Y - originToUse.Y),
-                Sprite.Source.Width,
-                Sprite.Source.Height
+                Sprite.SourceRect.Width,
+                Sprite.SourceRect.Height
             );
 
             return rect;
@@ -67,15 +65,13 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
             Logger.Warn("Entity {0} is missing a texture", Entity.Name);
             return;
         }
-
-        var soureRect = Sprite.Source;
-
+        
         var originToUse = Pivot;
 
         if (PivotType != PivotType.Custom)
         {
             var relative = PivotHelper.GetRelativePivot(PivotType);
-            originToUse = new Vector2(relative.X * Sprite.Source.Width, relative.Y * Sprite.Source.Height);
+            originToUse = new Vector2(relative.X * Sprite.SourceRect.Width, relative.Y * Sprite.SourceRect.Height);
         }
 
         //var depth = Transform.WorldPosition.Y / float.MaxValue;
@@ -85,13 +81,13 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
         if (FlipX)
         {
             spriteEffect |= SpriteEffects.FlipHorizontally;
-            originToUse.X = Sprite.Source.Width - originToUse.X;
+            originToUse.X = Sprite.SourceRect.Width - originToUse.X;
         }
 
         Core.SpriteBatch.Draw(
             Sprite.Texture,
             Transform.WorldPosToVec2,
-            Sprite.Source,
+            Sprite.SourceRect,
             Tint * Opacity,
             Transform.WorldZRotation,
             originToUse,

@@ -31,12 +31,12 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
             if (instance is null) continue;
 
             // get the target type and store it
-            var target = GetPropertyConverterT(type);
+            var target = GetPropertyConverter(type);
             Converters[target] = instance;
         }
     }
     
-    private static Type GetPropertyConverterT(Type converterType)
+    private static Type GetPropertyConverter(Type converterType)
     {
         for (var bt = converterType; bt != null && bt != typeof(object); bt = bt.BaseType)
             if (bt.IsGenericType && bt.GetGenericTypeDefinition() == typeof(PropertyConverter<>))
@@ -50,35 +50,81 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
     {
         var type = component.GetType();
 
+        ResolveProperties(type, bp, component);
+        ResolveFields(type, bp, component);
+    }
+
+    private static void ResolveProperties(Type type, ComponentBlueprint bp, Component component)
+    {
         foreach (var (propName, token) in bp.Properties)
         {
             var prop = type.GetProperty(propName,
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase);
 
             if (prop is null || !prop.CanWrite) continue;
-
+            var propType = prop.PropertyType;
+            
             object value = null;
 
-            if (prop.PropertyType.IsSubclassOf(typeof(DreambitAsset)))
+            if (IsDreambitAsset(propType))
             {
                 var assetName = token.Value<string>();
                 if (string.IsNullOrWhiteSpace(assetName))
                     return;
                 
-                value = GetAssetReference(assetName, prop.PropertyType);
+                value = GetAssetReference(assetName, propType);
             }
             else
             {
-                value = ConvertJToken(token, prop.PropertyType);
+                value = ConvertJToken(token, propType);
             }
             
             prop.SetValue(component, value);
         }
     }
 
+    private static void ResolveFields(Type type, ComponentBlueprint bp, Component component)
+    {
+        foreach (var (propName, token) in bp.Properties)
+        {
+            var field = type.GetField(propName,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase);
+
+            if (field is null) continue;
+            var fieldType = field.FieldType;
+            
+            object value = null;
+
+            if (IsDreambitAsset(fieldType))
+            {
+                var assetName = token.Value<string>();
+                if (string.IsNullOrWhiteSpace(assetName))
+                    return;
+                
+                value = GetAssetReference(assetName, fieldType);
+            }
+            else
+            {
+                value = ConvertJToken(token, fieldType);
+            }
+            
+            field.SetValue(component, value);
+        }
+    }
+
+    private static bool IsDreambitAsset(Type type)
+    {
+        return type.IsSubclassOf(typeof(DreambitAsset));
+    }
+
     public static object GetAssetReference(string assetName, Type assetType)
     {
-        return Resources.LoadDreambitAsset(assetName, assetType);
+        var reference = Resources.LoadDreambitAsset(assetName, assetType);
+        
+        if(reference is null)
+            Instance.Logger.Warn("Unable to serialize {0} reference {1}", assetType.Name,  assetName);
+
+        return reference;
     }
 
     public static Type ResolveComponentType(string typeName)

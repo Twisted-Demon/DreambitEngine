@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using FontStashSharp;
 
@@ -10,6 +11,7 @@ public class SpriteFontBaseLoader : AssetLoaderBase<SpriteFontBaseLoader>
 {
     public override string Extension { get; } = ".ttf";
     public override bool AddToDisposableList { get; } = true;
+    public override Type TargetType { get; } = typeof(SpriteFontBase);
 
     private readonly List<FontSystem> _fontSystems = new(32);
     private readonly Dictionary<string, FontSystem> _byName = new(32);
