@@ -5,7 +5,8 @@
     {
       "type": "Dreambit.Examples.SpaceGame.SpaceGamePlayer, Dreambit.Examples",
       "properties": {
-        "velocity": 120.0
+        "velocity": 120.0,
+        "SpriteSheet": "SpaceGame/SpriteSheets/player_ship_sheet"
       }
     },
     {
@@ -22,8 +23,6 @@
     {
       "type": "Dreambit.ECS.SpriteDrawer, Dreambit",
       "properties": {
-        "SpriteSheetPath": "SpaceGame/SpriteSheets/player_ship_sheet",
-        "CurrentFrameIndex": 1
       }
     }
   ]

@@ -64,7 +64,7 @@ public class SpaceGameProjectile : Component<SpaceGameProjectile>
             .AttachComponent<SpaceGameProjectile>();
 
         var drawer = projectile.Entity.AttachComponent<SpriteDrawer>();
-        drawer.SpriteSheet = SpriteSheet.Create(1, 1, "SpaceGame/Textures/Projectiles/player_beam");
+        drawer.SetSprite(SpriteSheet.Create(1, 1, "SpaceGame/Textures/Projectiles/player_beam").Frames[0]);
         drawer.DrawLayer = -1;
 
         projectile.Velocity = 200.0f;

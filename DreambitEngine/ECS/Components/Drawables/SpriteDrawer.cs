@@ -1,103 +1,81 @@
-﻿using Microsoft.Xna.Framework;
+﻿using System;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
 namespace Dreambit.ECS;
 
 public class SpriteDrawer : DrawableComponent<SpriteDrawer>
 {
-    private SpriteSheet _spriteSheet;
-
-    private string _spriteSheetPath = string.Empty;
     public Color Tint { get; internal set; } = Color.White;
     public float Opacity { get; internal set; } = 1.0f;
     public Vector2 Pivot { get; internal set; } = Vector2.Zero;
     public PivotType PivotType { get; internal set; } = PivotType.Center;
-    public int CurrentFrameIndex { get; internal set; }
-    public Rectangle? FrameRect { get; internal set; } = null;
+    public Sprite Sprite { get;  set; } = null;
+
+    private string _spritePath;
+    public string SpritePath
+    {
+        get => _spritePath;
+        set
+        {
+            if (_spritePath == value) return;
+            
+            _spritePath = value;
+            Sprite = Resources.LoadAsset<Sprite>(_spritePath);
+        }
+    }
 
     public bool FlipX { get; set; } = false;
     
-    public SpriteDrawer WithSprite(string assetPath, int frame = 0) { SpriteSheetPath = assetPath; SetFrame(frame); return this; }
+    public SpriteDrawer WithSprite(string assetPath) { SpritePath = assetPath; return this; }
     public SpriteDrawer WithTint(Color tint) { Tint = tint; return this; }
     public SpriteDrawer WithOpacity(float a) { Opacity = MathHelper.Clamp(a, 0f, 1f); return this; }
     public SpriteDrawer WithPivot(PivotType type) { PivotType = type; return this; }
     public SpriteDrawer WithPivot(Vector2 pivot) { PivotType = PivotType.Custom; Pivot = pivot; return this; }
-    public SpriteDrawer SetFrame(int index) { CurrentFrameIndex = index; return this; }
-    public SpriteDrawer SetFrameRect(Rectangle rect) { FrameRect = rect; return this; }
+    public SpriteDrawer SetSprite(Sprite sprite) { Sprite = sprite; return this; }
     
-
     public override Rectangle Bounds
     {
         get
         {
-            var spriteFrame = GetDrawRect();
+            var soureRect = Sprite.Source;
 
             var originToUse = Pivot;
 
             if (PivotType != PivotType.Custom)
             {
                 var relative = PivotHelper.GetRelativePivot(PivotType);
-                originToUse = new Vector2(relative.X * spriteFrame.Width, relative.Y * spriteFrame.Height);
+                originToUse = new Vector2(relative.X * Sprite.Source.Width, relative.Y * Sprite.Source.Height);
             }
 
             var rect = new Rectangle(
                 (int)(Transform.WorldPosition.X - originToUse.X),
                 (int)(Transform.WorldPosition.Y - originToUse.Y),
-                spriteFrame.Width,
-                spriteFrame.Height
+                Sprite.Source.Width,
+                Sprite.Source.Height
             );
 
             return rect;
         }
     }
-
-    public string SpriteSheetPath
-    {
-        get => _spriteSheetPath;
-        set
-        {
-            if (_spriteSheetPath == value) return;
-            OnSpriteSheetPathChanged(value);
-        }
-    }
-
-    public SpriteSheet SpriteSheet
-    {
-        get => _spriteSheet;
-        set
-        {
-            if (_spriteSheet == value) return;
-            _spriteSheet = value;
-            _spriteSheetPath = _spriteSheet.AssetName;
-        }
-    }
-
-    private void OnSpriteSheetPathChanged(string newPath)
-    {
-        _spriteSheetPath = newPath;
-        _spriteSheet = Resources.LoadAsset<SpriteSheet>(_spriteSheetPath);
-    }
-
-
+    
     public override void OnDraw()
     {
-        if (_spriteSheet is null)
-            return; 
         
-        if (_spriteSheet?.Texture == null)
+        if (Sprite?.Texture == null)
         {
             Logger.Warn("Entity {0} is missing a texture", Entity.Name);
             return;
         }
 
-        var spriteFrame = GetDrawRect();
+        var soureRect = Sprite.Source;
 
         var originToUse = Pivot;
 
         if (PivotType != PivotType.Custom)
         {
             var relative = PivotHelper.GetRelativePivot(PivotType);
-            originToUse = new Vector2(relative.X * spriteFrame.Width, relative.Y * spriteFrame.Height);
+            originToUse = new Vector2(relative.X * Sprite.Source.Width, relative.Y * Sprite.Source.Height);
         }
 
         //var depth = Transform.WorldPosition.Y / float.MaxValue;
@@ -107,13 +85,13 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
         if (FlipX)
         {
             spriteEffect |= SpriteEffects.FlipHorizontally;
-            originToUse.X = spriteFrame.Width - originToUse.X;
+            originToUse.X = Sprite.Source.Width - originToUse.X;
         }
 
         Core.SpriteBatch.Draw(
-            _spriteSheet.Texture,
+            Sprite.Texture,
             Transform.WorldPosToVec2,
-            spriteFrame,
+            Sprite.Source,
             Tint * Opacity,
             Transform.WorldZRotation,
             originToUse,
@@ -122,20 +100,7 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
             0f
         );
     }
-
-    private Rectangle GetDrawRect()
-    {
-        if (FrameRect != null)
-            return FrameRect.Value!;
-
-        if (_spriteSheet is null)
-            return new Rectangle(0, 0, 0, 0);
-
-        _spriteSheet.TryGetFrame(CurrentFrameIndex, out var spriteFrame);
-
-        return spriteFrame;
-    }
-
+    
     public override void OnDebugDraw()
     {
         var vec2 = Transform.WorldPosToVec2;
@@ -145,7 +110,6 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
 
     public override void OnDestroyed()
     {
-        FrameRect = null;
-        _spriteSheet = null;
+        Sprite = null;
     }
 }

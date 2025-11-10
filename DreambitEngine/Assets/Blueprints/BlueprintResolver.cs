@@ -57,9 +57,28 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
 
             if (prop is null || !prop.CanWrite) continue;
 
-            var value = ConvertJToken(token, prop.PropertyType);
+            object value = null;
+
+            if (prop.PropertyType.IsSubclassOf(typeof(DreambitAsset)))
+            {
+                var assetName = token.Value<string>();
+                if (string.IsNullOrWhiteSpace(assetName))
+                    return;
+                
+                value = GetAssetReference(assetName, prop.PropertyType);
+            }
+            else
+            {
+                value = ConvertJToken(token, prop.PropertyType);
+            }
+            
             prop.SetValue(component, value);
         }
+    }
+
+    public static object GetAssetReference(string assetName, Type assetType)
+    {
+        return Resources.LoadDreambitAsset(assetName, assetType);
     }
 
     public static Type ResolveComponentType(string typeName)

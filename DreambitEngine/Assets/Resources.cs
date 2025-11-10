@@ -102,6 +102,41 @@ public class Resources : Singleton<Resources>
             return null;
         }
     }
+    
+    public static object LoadDreambitAsset(string assetName, Type type)
+    {
+        if (!type.IsSubclassOf(typeof(DreambitAsset)))
+            return null;
+        
+        //if we already have the asset we will return it
+        if (Instance.LoadedAssets.TryGetValue(assetName, out var rawAsset))
+            return rawAsset;
+        
+        try
+        {
+            Instance.Logger.Trace("Loading {0} - {1}", type.Name, assetName);
+
+            object asset = null;
+            if (Loaders.TryGetValue(type, out var loader))
+            {
+                asset = loader.Load(assetName, PakName, UsePak, ContentDirectory);
+            }
+
+            Instance.LoadedAssets[assetName] = asset;
+            
+            if (asset is IDisposable disposable)
+                Instance.DisposableAssets.Add(disposable);
+
+            return asset;
+        }
+        catch (Exception e)
+        {
+            Instance.Logger.Warn("Could not load {0} | {1}", type.Name, assetName);
+            Instance.Logger.Error(e.Message);
+
+            return null;
+        }
+    }
 
     public static void UnloadAsset(string assetName)
     {

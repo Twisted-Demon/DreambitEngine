@@ -154,6 +154,11 @@ public class Scene : IDisposable
     {
     }
 
+    protected virtual void OnPhysicsUpdate()
+    {
+        
+    }
+
     /// <summary>
     ///     Called when the scene is ending. Clean up scene-specific content here.
     /// </summary>
@@ -279,7 +284,10 @@ public class Scene : IDisposable
     public virtual void PhysicsTick()
     {
         if (State == SceneState.Running)
+        {
+            Guard.SafeCall(OnPhysicsUpdate, "OnPhysicsUpdate");
             Guard.SafeCall(Entities.OnPhysicsTick, "Entities.OnPhysicsTick");
+        }
     }
 
     /// <summary>

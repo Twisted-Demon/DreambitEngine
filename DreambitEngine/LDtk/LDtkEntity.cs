@@ -25,14 +25,18 @@ public class LDtkEntity<T> : LDtkEntity where T : new()
     {
         if (tilesetRect == null) return;
 
-        var sprite = entity.AttachComponent<SpriteDrawer>();
+        var drawer = entity.AttachComponent<SpriteDrawer>();
 
-        sprite.WithPivot(new Vector2(data.Pivot.X * tilesetRect.W, data.Pivot.Y * tilesetRect.H));
-        sprite.WithPivot(PivotType.Custom);
-        sprite.WithTint(color ?? data.SmartColor);
+        drawer.WithPivot(new Vector2(data.Pivot.X * tilesetRect.W, data.Pivot.Y * tilesetRect.H));
+        drawer.WithPivot(PivotType.Custom);
+        drawer.WithTint(color ?? data.SmartColor);
 
-        sprite.SpriteSheet = LDtkManager.Instance.SpriteSheets[tilesetRect.TilesetUid];
-        sprite.SetFrameRect(tilesetRect);
+        var sprite = new Sprite
+        {
+            Texture = LDtkManager.Instance.SpriteSheets[tilesetRect.TilesetUid].Texture,
+            Source = tilesetRect
+        };
+        drawer.SetSprite(sprite);
     }
 
     protected PolyShapeCollider CreatePolyCollider(Entity entity, Point[] points, Vector2 entityPosition)

@@ -23,6 +23,7 @@ public class SpriteAnimator : Component<SpriteAnimator>
     public float PlaySpeed { get; set; } = 1.0f;
 
     public SpriteSheetAnimation Animation { get; private set; }
+    public SpriteSheet CurrentSpriteSheet { get; private set; }
 
     private string _animationPath;
 
@@ -164,7 +165,8 @@ public class SpriteAnimator : Component<SpriteAnimator>
         if (Animation.TryGetFrame(frameNumber, out var nextFrame))
         {
             _currentAnimationFrame = frameNumber;
-            _spriteDrawer.SetFrame(nextFrame.FrameIndex);
+            var sprite = CurrentSpriteSheet.Frames[nextFrame.FrameIndex];
+            _spriteDrawer.SetSprite(sprite);
             _spriteDrawer.WithPivot(nextFrame.Pivot);
 
             if (nextFrame.AnimationEvent == null) return;
@@ -177,15 +179,17 @@ public class SpriteAnimator : Component<SpriteAnimator>
     private void UpdateAnimation(string animPath)
     {
         var newAnimation = Resources.LoadAsset<SpriteSheetAnimation>(animPath);
+        CurrentSpriteSheet = Resources.LoadAsset<SpriteSheet>(newAnimation.SpriteSheetPath);
         
         Animation = newAnimation;
 
-        if (newAnimation == null)
+        if (Animation is null)
             return;
 
-        _spriteDrawer.SpriteSheetPath = newAnimation.SpriteSheetPath;
-
-        SetFrameRate(newAnimation.FrameRate);
+        if (CurrentSpriteSheet is null)
+            return;
+        
+        SetFrameRate(Animation.FrameRate);
         ResetInternals();
         SetAnimationFrame(0);
     }

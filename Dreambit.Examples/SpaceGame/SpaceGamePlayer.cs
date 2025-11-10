@@ -26,13 +26,13 @@ public class SpaceGamePlayer : Component<SpaceGamePlayer>
     
     private Vector2 _inputDirection = Vector2.Zero;
     
+    public SpriteSheet SpriteSheet { get; set; }
+    
     
     public override void OnCreated()
     {
         _projectileListener = Entity.GetComponent<SpaceGameProjectileListener>();
         _projectileListener.OnProjectileHit += HitByProjectile;
-
-        var converters = BlueprintResolver.Instance.Converters;
     }
 
     public override void OnUpdate()
@@ -78,13 +78,13 @@ public class SpaceGamePlayer : Component<SpaceGamePlayer>
         switch (_inputDirection.X)
         {
             case < 0:
-                _drawer.SetFrame(0); // left
+                _drawer.SetSprite(SpriteSheet.Frames[0]); // left
                 break;
             case > 0:
-                _drawer.SetFrame(2); // right
+                _drawer.SetSprite(SpriteSheet.Frames[2]);  // right
                 break;
             default:
-                _drawer.SetFrame(1); // middle
+                _drawer.SetSprite(SpriteSheet.Frames[1]);  // middle
                 break;
         }
     }
