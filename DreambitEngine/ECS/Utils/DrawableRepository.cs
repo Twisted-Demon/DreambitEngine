@@ -2,25 +2,24 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
 
 namespace Dreambit.ECS;
 
 public sealed class DrawableRepository
 {
     private const int MaxComponents = 4096;
-    
+
     // ---------- Backing storage ----------
     private readonly List<DrawableComponent> _all = new(MaxComponents);
     private readonly Dictionary<DrawableComponent, int> _allIdx = new(MaxComponents);
-    
+
     // Per-layer buckets 
     private readonly Dictionary<int, List<DrawableComponent>> _byLayer = new(MaxComponents);
     private readonly Dictionary<int, Dictionary<DrawableComponent, int>> _byLayerIdx = new(MaxComponents);
-    
+
     // per-type buckets
     private readonly Dictionary<Type, IList> _byType = new(MaxComponents);
-    
+
     // ---------- Public surface (same as your original + fast paths) ----------
     internal int Count => _all.Count;
     internal DrawableComponent this[int index] => _all[index];
@@ -38,10 +37,10 @@ public sealed class DrawableRepository
         AddToLayer(drawable, drawable.DrawLayer);
 
         var t = drawable.GetType();
-        
+
         if (!_byType.TryGetValue(t, out var typeList))
             _byType[t] = typeList = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(t))!;
-        
+
         typeList.Add(drawable);
     }
 
@@ -54,7 +53,7 @@ public sealed class DrawableRepository
 
         // Remove from layer buckets
         RemoveFromLayer(drawable, drawable.DrawLayer);
-        
+
         var t = drawable.GetType();
 
         if (!_byType.TryGetValue(t, out var typeList))
@@ -62,15 +61,17 @@ public sealed class DrawableRepository
 
         typeList.Remove(drawable);
     }
-    
+
     internal void ClearLists()
     {
-        _all.Clear(); _allIdx.Clear();
+        _all.Clear();
+        _allIdx.Clear();
 
         foreach (var kv in _byLayer) kv.Value.Clear();
         foreach (var kv in _byLayerIdx) kv.Value.Clear();
 
-        _byLayer.Clear(); _byLayerIdx.Clear();
+        _byLayer.Clear();
+        _byLayerIdx.Clear();
     }
 
     internal void UpdateDrawableDrawLayer(DrawableComponent drawable, int oldLayer, int newLayer)
@@ -81,7 +82,6 @@ public sealed class DrawableRepository
         // Move in "all" layer buckets
         RemoveFromLayer(drawable, oldLayer);
         AddToLayer(drawable, newLayer);
-        
     }
 
     private void AddToLayer(DrawableComponent d, int layer)
@@ -92,6 +92,7 @@ public sealed class DrawableRepository
             _byLayer[layer] = list;
             _byLayerIdx[layer] = new Dictionary<DrawableComponent, int>(128);
         }
+
         _byLayerIdx[layer][d] = list.Count;
         list.Add(d);
     }
@@ -101,10 +102,14 @@ public sealed class DrawableRepository
         if (_byLayer.TryGetValue(layer, out var list) && _byLayerIdx.TryGetValue(layer, out var idxMap))
         {
             SwapRemove(list, idxMap, d);
-            if (list.Count == 0) { _byLayer.Remove(layer); _byLayerIdx.Remove(layer); }
+            if (list.Count == 0)
+            {
+                _byLayer.Remove(layer);
+                _byLayerIdx.Remove(layer);
+            }
         }
     }
-    
+
 
     // ---------- Original API helpers (kept) ----------
     public IReadOnlyList<DrawableComponent> GetDrawablesByDrawLayer(int drawLayer)
@@ -115,12 +120,19 @@ public sealed class DrawableRepository
             _byLayer[drawLayer] = list;
             _byLayerIdx[drawLayer] = new Dictionary<DrawableComponent, int>(0);
         }
+
         return list;
     }
 
-    public Dictionary<int, List<DrawableComponent>> GetDrawLayers() => _byLayer;
+    public Dictionary<int, List<DrawableComponent>> GetDrawLayers()
+    {
+        return _byLayer;
+    }
 
-    public IReadOnlyList<DrawableComponent> GetAllDrawables() => _all;
+    public IReadOnlyList<DrawableComponent> GetAllDrawables()
+    {
+        return _all;
+    }
 
     public IReadOnlyList<DrawableComponent> GetAllEnabledDrawables()
     {
@@ -136,16 +148,19 @@ public sealed class DrawableRepository
     }
 
     // ---------- Internals ----------
-    private static bool IsEnabled(DrawableComponent d) => d.Enabled && d.Entity.Enabled;
+    private static bool IsEnabled(DrawableComponent d)
+    {
+        return d.Enabled && d.Entity.Enabled;
+    }
 
     private static void SwapRemove<T>(List<T> list, Dictionary<T, int> indexMap, T item)
     {
-        if (!indexMap.TryGetValue(item, out int idx)) return;
-        int last = list.Count - 1;
+        if (!indexMap.TryGetValue(item, out var idx)) return;
+        var last = list.Count - 1;
 
         if (idx != last)
         {
-            T lastItem = list[last];
+            var lastItem = list[last];
             list[idx] = lastItem;
             indexMap[lastItem] = idx;
         }

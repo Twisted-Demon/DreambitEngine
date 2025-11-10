@@ -6,15 +6,13 @@ namespace Dreambit.ECS;
 
 public static class ComponentRequirementResolver
 {
-    private enum Mark : byte { None, Visiting, Done }
-
     public static IReadOnlyList<Type> ResolveOrder(
         Type root,
         Func<Type, bool> hasAlready // e.g., entity.HasComponentOfType
     )
     {
         var order = new List<Type>(8);
-        var mark  = new Dictionary<Type, Mark>(16);
+        var mark = new Dictionary<Type, Mark>(16);
         var stack = new Stack<Type>(); // for pretty cycle messages
 
         void Visit(Type t)
@@ -27,6 +25,7 @@ public static class ComponentRequirementResolver
                     var cycle = string.Join(" -> ", stack.Reverse().Append(t).Select(x => x.FullName));
                     throw new InvalidOperationException($"Cycle detected in [Require]: {cycle}");
                 }
+
                 // m == Done → nothing to do
                 return;
             }
@@ -62,13 +61,16 @@ public static class ComponentRequirementResolver
     private static IEnumerable<Type> GetRequireTypes(Type t)
     {
         // Gather all [Require] from the type (and optionally base classes if you want)
-        foreach (var attr in t.GetCustomAttributes(inherit: true))
-        {
+        foreach (var attr in t.GetCustomAttributes(true))
             if (attr is RequireAttribute r)
-            {
                 foreach (var rt in r.RequiredTypes)
                     yield return rt;
-            }
-        }
+    }
+
+    private enum Mark : byte
+    {
+        None,
+        Visiting,
+        Done
     }
 }

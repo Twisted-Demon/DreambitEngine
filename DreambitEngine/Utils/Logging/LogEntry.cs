@@ -6,4 +6,4 @@ public readonly record struct LogEntry(
     string Prefix,
     string Message,
     object[]? Args
-    );
+);

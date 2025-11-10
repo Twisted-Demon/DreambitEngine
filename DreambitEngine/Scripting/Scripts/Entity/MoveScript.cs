@@ -5,12 +5,12 @@ namespace Dreambit.Scripting;
 
 public class MoveScript : ScriptAction
 {
-    private string _entityName;
-    private float _speed;
-    private Vector2 _moveTo;
+    private readonly string _entityName;
+    private readonly Vector2 _moveTo;
+    private readonly float _speed;
     private Entity _entity;
     private Mover _mover;
-    
+
     public MoveScript(string entity, float speed, Vector2 moveTo)
     {
         _entityName = entity;
@@ -27,10 +27,7 @@ public class MoveScript : ScriptAction
 
     public override void OnUpdate()
     {
-        if (_mover.MoveTo(_moveTo.ToVector3(), _speed))
-        {
-            IsComplete = true;
-        }
+        if (_mover.MoveTo(_moveTo.ToVector3(), _speed)) IsComplete = true;
     }
 
     public override void OnCompleted()

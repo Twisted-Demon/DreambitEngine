@@ -1,20 +1,19 @@
-﻿using System;
-using FontStashSharp;
+﻿using FontStashSharp;
 using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 
 namespace Dreambit.ECS;
 
 public class UIText : UIElement
 {
-    private Logger<UIText> _logger = new();
-    
     private string _fontPath;
-    
+
+    private float _fontSize = 12f;
+    private Logger<UIText> _logger = new();
+
 
     private SpriteFontBase _spriteFont;
     public SpriteFontBase SpriteFont;
-    
+
     public string Text { get; set; } = string.Empty;
     public float MaxWidth { get; set; } = float.MaxValue;
     public HorizontalAlignment HAlignment { get; set; } = HorizontalAlignment.Left;
@@ -27,13 +26,11 @@ public class UIText : UIElement
         {
             if (_fontPath == value)
                 return;
-            
+
             _fontPath = value;
             _spriteFont = Resources.LoadSpriteFont(_fontPath, _fontSize);
         }
     }
-
-    private float _fontSize = 12f;
 
     public float FontSize
     {
@@ -47,10 +44,7 @@ public class UIText : UIElement
 
     public override void OnDrawUI()
     {
-        if (_spriteFont == null)
-        {
-            return;
-        }
+        if (_spriteFont == null) return;
 
         var position = GetScreenPos();
         var size = Canvas.ConvertToScreenSize(new Vector2(MaxWidth, 0));

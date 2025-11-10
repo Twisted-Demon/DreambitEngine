@@ -4,11 +4,11 @@ namespace Dreambit.Scripting;
 
 public class SetAnimationScript : ScriptAction
 {
+    private readonly string _animationName;
+    private readonly string _entityName;
     private readonly Logger<SetAnimationScript> _logger = new();
-    
+
     private SpriteAnimator _animator;
-    private string _entityName;
-    private string _animationName;
 
     public SetAnimationScript(string entity, string animation)
     {
@@ -33,10 +33,8 @@ public class SetAnimationScript : ScriptAction
 
         _animator.SetAnimation(_animationName);
         IsComplete = true;
-        
+
         if (_animator.Animation is null)
             _logger.Warn("Animation {0} Found", _animationName);
     }
-    
-    
 }

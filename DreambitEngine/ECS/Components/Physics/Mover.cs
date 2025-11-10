@@ -1,5 +1,4 @@
-﻿using System.Globalization;
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 
 namespace Dreambit.ECS;
 
@@ -14,8 +13,8 @@ public class Mover : Component
     }
 
     /// <summary>
-    /// Moves the entity towards the target position
-    /// returns true if it has arrived.
+    ///     Moves the entity towards the target position
+    ///     returns true if it has arrived.
     /// </summary>
     /// <param name="targetPosition"></param>
     /// <param name="velocity"></param>
@@ -25,12 +24,12 @@ public class Mover : Component
         var position = Transform.WorldPosition;
         var direction = targetPosition - position;
         var distance = direction.Length();
-        
-        if(direction.Length() != 0)
+
+        if (direction.Length() != 0)
             direction.Normalize();
-        
+
         var adjustedSpeed = velocity * Time.DeltaTime;
-        
+
         if (adjustedSpeed >= distance)
         {
             Transform.Position = targetPosition;

@@ -16,7 +16,7 @@ public class LDtkScene : Scene<LDtkScene>
     internal override void InitializeInternals()
     {
         base.InitializeInternals();
-        
+
         if (LDtkManager.Instance.CurrentWorld == null)
         {
             Logger.Error("LDtk World Not Initialized, please call LDtkScene.SetUpWorld() First");
@@ -44,8 +44,8 @@ public class LDtkScene : Scene<LDtkScene>
 
         //set up all the entities
         LDtkManager.SetUpEntities(Level);
-        
-        BackgroundColor = Level._BgColor; 
+
+        BackgroundColor = Level._BgColor;
     }
 
     protected override void OnEnd()

@@ -1,14 +1,12 @@
 ﻿using System.Collections.Generic;
-using System.Reflection;
 using Microsoft.Xna.Framework;
 
 namespace Dreambit.ECS;
 
 public class Canvas : UIComponent
 {
-
     private List<UIElement> _uiComponents = [];
-    
+
 
     public override void OnDrawUI()
     {
@@ -18,7 +16,7 @@ public class Canvas : UIComponent
     internal Vector2 ConvertToScreenCoord(Vector2 position)
     {
         var camera = Scene.UICamera;
-        
+
         var xScale = camera.Bounds.Width / (float)100;
         var yScale = camera.Bounds.Height / (float)100;
 
@@ -28,7 +26,7 @@ public class Canvas : UIComponent
     internal Vector2 ConvertToScreenSize(Vector2 size)
     {
         var camera = Scene.UICamera;
-        
+
         var xScale = camera.Bounds.Width / 100;
         var yScale = camera.Bounds.Height / 100;
 
@@ -41,16 +39,14 @@ public class Canvas : UIComponent
 
         var entity = Entity.CreateChildOf(Entity, name);
         var uiElement = entity.AttachComponent<T>();
-        
+
         foreach (var component in entity.GetAllComponents())
-        {
             if (component is UIElement element)
             {
                 element.Canvas = this;
                 _uiComponents.Add(element);
             }
-        }
-        
+
         return uiElement;
     }
 

@@ -32,9 +32,7 @@ public static class ReflectionUtils
             {
                 if (onlyIncludeParameterlessConstructors)
                     if (type.GetConstructor(Type.EmptyTypes) == null)
-                    {
                         continue;
-                    }
 
                 typeList.Add(type);
             }

@@ -119,7 +119,7 @@ public class ComponentRepository
     public Component GetComponent(Type type)
     {
         if (type == null) return null;
-        
+
         if (!type.IsSubclassOf(typeof(Component)))
             return null;
 
@@ -191,8 +191,8 @@ public class ComponentRepository
 
     public void PhysicsUpdateComponents()
     {
-        foreach(var c in _attachedComponents)
-            if(c.Enabled)
+        foreach (var c in _attachedComponents)
+            if (c.Enabled)
                 c.PhysicsUpdate();
     }
 

@@ -82,22 +82,31 @@ public class UINineSlice : UIElement
         var middleHeight = (int)(size.Y - (topMiddleSource.SourceRect.Height + topMiddleSource.SourceRect.Height));
 
         //Define the destination rectangles
-        var topLeftDest = new Rectangle(dr.Left, dr.Top, topLeftSource.SourceRect.Width, topLeftSource.SourceRect.Height);
-        var topMiddleDest = new Rectangle(dr.Left + topLeftSource.SourceRect.Width, dr.Top, middleWidth, topMiddleSource.SourceRect.Height);
-        var topRightDest = new Rectangle(dr.Right - topRightSource.SourceRect.Width, dr.Top, topRightSource.SourceRect.Width,
+        var topLeftDest =
+            new Rectangle(dr.Left, dr.Top, topLeftSource.SourceRect.Width, topLeftSource.SourceRect.Height);
+        var topMiddleDest = new Rectangle(dr.Left + topLeftSource.SourceRect.Width, dr.Top, middleWidth,
+            topMiddleSource.SourceRect.Height);
+        var topRightDest = new Rectangle(dr.Right - topRightSource.SourceRect.Width, dr.Top,
+            topRightSource.SourceRect.Width,
             topRightSource.SourceRect.Height);
 
-        var middleLeftDest = new Rectangle(dr.Left, dr.Top + topLeftSource.SourceRect.Height, topLeftSource.SourceRect.Width, middleHeight);
-        var middleDest = new Rectangle(dr.Left + topLeftSource.SourceRect.Width, dr.Top + topLeftSource.SourceRect.Height, middleWidth,
+        var middleLeftDest = new Rectangle(dr.Left, dr.Top + topLeftSource.SourceRect.Height,
+            topLeftSource.SourceRect.Width, middleHeight);
+        var middleDest = new Rectangle(dr.Left + topLeftSource.SourceRect.Width,
+            dr.Top + topLeftSource.SourceRect.Height, middleWidth,
             middleHeight);
-        var middleRightDest = new Rectangle(dr.Right - topRightSource.SourceRect.Width, dr.Top + topLeftSource.SourceRect.Height,
+        var middleRightDest = new Rectangle(dr.Right - topRightSource.SourceRect.Width,
+            dr.Top + topLeftSource.SourceRect.Height,
             topRightSource.SourceRect.Width, middleHeight);
 
-        var bottomLeftDest = new Rectangle(dr.Left, dr.Bottom - bottomLeftSource.SourceRect.Height, bottomLeftSource.SourceRect.Width,
+        var bottomLeftDest = new Rectangle(dr.Left, dr.Bottom - bottomLeftSource.SourceRect.Height,
+            bottomLeftSource.SourceRect.Width,
             bottomLeftSource.SourceRect.Height);
-        var bottomMiddleDest = new Rectangle(dr.Left + bottomRightSource.SourceRect.Width, dr.Bottom - bottomMiddleSource.SourceRect.Height,
+        var bottomMiddleDest = new Rectangle(dr.Left + bottomRightSource.SourceRect.Width,
+            dr.Bottom - bottomMiddleSource.SourceRect.Height,
             middleWidth, bottomMiddleSource.SourceRect.Height);
-        var bottomRightDest = new Rectangle(dr.Right - bottomRightSource.SourceRect.Width, dr.Bottom - bottomMiddleSource.SourceRect.Height,
+        var bottomRightDest = new Rectangle(dr.Right - bottomRightSource.SourceRect.Width,
+            dr.Bottom - bottomMiddleSource.SourceRect.Height,
             bottomRightSource.SourceRect.Width, bottomMiddleSource.SourceRect.Height);
 
 

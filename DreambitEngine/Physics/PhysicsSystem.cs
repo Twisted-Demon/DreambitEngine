@@ -6,13 +6,13 @@ namespace Dreambit;
 
 public class PhysicsSystem : Singleton<PhysicsSystem>
 {
-    private readonly List<Collider> _colliders = [];
     private readonly Dictionary<string, List<Collider>> _byTag = [];
-    private readonly SpatialHash _grid = new(cellSize: 16f);
-    
+    private readonly List<Collider> _candidateList = new(256);
+
     //scratch buffers to avoid allocs per frame
     private readonly HashSet<Collider> _candidateSet = new(256);
-    private readonly List<Collider> _candidateList = new(256);
+    private readonly List<Collider> _colliders = [];
+    private readonly SpatialHash _grid = new(16f);
 
     public void RegisterCollider(Collider c)
     {
@@ -39,7 +39,7 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
     }
 
     /// <summary>
-    /// This should be called when a collider's transform/shape changes
+    ///     This should be called when a collider's transform/shape changes
     /// </summary>
     /// <param name="c"></param>
     public void Touch(Collider c)
@@ -54,24 +54,24 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         _byTag.Clear();
         _grid.Clear();
     }
-    
+
     public bool ColliderCast(Collider @this, out CollisionResult result)
     {
         result = new CollisionResult();
-        if(@this == null) return false;
+        if (@this == null) return false;
 
-        
+
         _candidateSet.Clear();
         var ap = @this.GetTransformedPolygon();
         var aabb = ap.ComputeAABB();
-        
+
         _candidateSet.Add(@this);
         _grid.QueryAABB(aabb, _candidateSet);
-        
+
         foreach (var other in _candidateSet)
         {
             if (other == null || other == @this) continue;
-            if(!other.Enabled || !other.Entity.Enabled) continue;
+            if (!other.Enabled || !other.Entity.Enabled) continue;
 
             var bp = other.GetTransformedPolygon();
             if (!ap.Intersects(bp)) continue;
@@ -80,17 +80,17 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
 
         return result.Collisions.Count > 0;
     }
-    
-    
+
+
     public bool ColliderCastByTag(Collider @this, out CollisionResult result, params string[] tags)
     {
         result = new CollisionResult();
-        if(@this == null) return false;
+        if (@this == null) return false;
 
         _candidateSet.Clear();
         var ap = @this.GetTransformedPolygon();
         var aabb = ap.ComputeAABB();
-        
+
         _candidateSet.Add(@this);
         _grid.QueryAABB(aabb, _candidateSet);
 
@@ -99,64 +99,64 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
             if (!_byTag.TryGetValue(tag, out var tagged)) continue;
             foreach (var other in tagged)
             {
-                if(!_candidateSet.Contains(other)) continue;
+                if (!_candidateSet.Contains(other)) continue;
                 if (other == null || other == @this) continue;
                 if (!other.Enabled || !other.Entity.Enabled) continue;
-                
-                var op =  other.GetTransformedPolygon();
-                if(!ap.Intersects(op)) continue;
+
+                var op = other.GetTransformedPolygon();
+                if (!ap.Intersects(op)) continue;
                 result.Collisions.Add(other);
             }
         }
-        
+
         return result.Collisions.Count > 0;
     }
-    
+
     public bool PointCast(Vector2 p, out CollisionResult result)
     {
         result = new CollisionResult();
-        
+
         _candidateList.Clear();
         _grid.QueryPoint(p, _candidateList);
-        
+
         _candidateSet.Clear();
-        for (int i = 0; i < _candidateList.Count; i++) _candidateSet.Add(_candidateList[i]);
+        for (var i = 0; i < _candidateList.Count; i++) _candidateSet.Add(_candidateList[i]);
 
         foreach (var other in _candidateSet)
         {
             if (other == null) continue;
-            if(!other.Enabled || !other.Entity.Enabled) continue;
+            if (!other.Enabled || !other.Entity.Enabled) continue;
 
             var poly = other.GetTransformedPolygon();
-            if(!poly.ContainsPoint(p)) continue;
+            if (!poly.ContainsPoint(p)) continue;
             result.Collisions.Add(other);
         }
-        
+
         return result.Collisions.Count > 0;
     }
 
     public bool PointCastByTag(Vector2 p, out CollisionResult result, params string[] tags)
     {
         result = new CollisionResult();
-        
+
         _candidateList.Clear();
         _grid.QueryPoint(p, _candidateList);
-        
+
         _candidateSet.Clear();
-        for (int i = 0; i < _candidateList.Count; i++) _candidateSet.Add(_candidateList[i]);
+        for (var i = 0; i < _candidateList.Count; i++) _candidateSet.Add(_candidateList[i]);
 
         foreach (var tag in tags)
         {
             if (!_byTag.TryGetValue(tag, out var tagged)) continue;
             foreach (var other in tagged)
             {
-                if(!_candidateSet.Contains(other)) continue;
+                if (!_candidateSet.Contains(other)) continue;
                 if (!other.Enabled || !other.Entity.Enabled) continue;
                 var poly = other.GetTransformedPolygon();
                 if (poly.ContainsPoint(p)) result.Collisions.Add(other);
             }
         }
-        
+
         return result.Collisions.Count > 0;
     }
 
@@ -168,7 +168,7 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         _grid.QueryRay(ray.Start, ray.End, _candidateList);
 
         _candidateSet.Clear();
-        for (int i = 0; i < _candidateList.Count; i++) _candidateSet.Add(_candidateList[i]);
+        for (var i = 0; i < _candidateList.Count; i++) _candidateSet.Add(_candidateList[i]);
 
         foreach (var other in _candidateSet)
         {
@@ -178,6 +178,7 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
             if (!poly.RayIntersects(ray.Start, ray.End, out _)) continue;
             result.Collisions.Add(other);
         }
+
         return result.Collisions.Count > 0;
     }
 
@@ -188,7 +189,7 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         _grid.QueryRay(ray.Start, ray.End, _candidateList);
 
         _candidateSet.Clear();
-        for (int i = 0; i < _candidateList.Count; i++) _candidateSet.Add(_candidateList[i]);
+        for (var i = 0; i < _candidateList.Count; i++) _candidateSet.Add(_candidateList[i]);
 
         foreach (var tag in tags)
         {
@@ -201,6 +202,7 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
                 if (poly.RayIntersects(ray.Start, ray.End, out _)) result.Collisions.Add(other);
             }
         }
+
         return result.Collisions.Count > 0;
     }
 }

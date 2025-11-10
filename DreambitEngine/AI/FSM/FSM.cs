@@ -12,13 +12,13 @@ public class FSM : Component
     private readonly Queue<string> _eventQueue = new(8);
     private readonly Stack<Type> _history = new(8);
 
+    // ----- Internals -----
+    private readonly Logger<FSM> _logger = new();
+
     private readonly Dictionary<Type, State> _states = new(32);
 
     private Type _defaultStateType;
     private int _historyCapacity = 16;
-
-    // ----- Internals -----
-    private readonly Logger<FSM> _logger = new();
 
     // ----- Public surface -----
     public State CurrentState { get; private set; }
@@ -38,7 +38,7 @@ public class FSM : Component
 
     /// <summary>Simple key/value store available to states/guards.</summary>
     public Blackboard Blackboard { get; private set; } = new();
-    
+
     // ----- Events -----
     public event Action<Type, Type, string> OnTransition;
     public event Action<Type> OnStateEntered;
@@ -294,8 +294,7 @@ public class FSM : Component
 
         // 1) Specific transitions from this state
         if (_edges.TryGetValue(from, out var list))
-        {
-            for (int i = 0; i < list.Count; i++)
+            for (var i = 0; i < list.Count; i++)
             {
                 var edge = list[i]; // copy
                 if (edge.Guard == null || SafeGuard(edge.Guard))
@@ -305,10 +304,9 @@ public class FSM : Component
                     return true;
                 }
             }
-        }
 
         // 2) Wildcard transitions
-        for (int i = 0; i < _anyEdges.Count; i++)
+        for (var i = 0; i < _anyEdges.Count; i++)
         {
             var edge = _anyEdges[i]; // copy
             if (edge.Guard == null || SafeGuard(edge.Guard))

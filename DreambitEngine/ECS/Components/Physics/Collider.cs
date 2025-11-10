@@ -10,7 +10,78 @@ namespace Dreambit.ECS;
 /// </summary>
 public class Collider : Component
 {
-    
+    #region Debug
+
+    /// <summary>Renders polygon outline for debugging purposes.</summary>
+    public override void OnDebugDraw()
+    {
+        Core.SpriteBatch.DrawPolygon(WorldPolygon2D.Vertices, Color.White);
+    }
+
+    #endregion
+
+    #region Trigger Collision Checks
+
+    /// <summary>
+    ///     Performs trigger overlap checks and dispatches Enter/Exit/Stay events.
+    ///     Uses tag filtering if <see cref="InterestedIn" /> is populated.
+    /// </summary>
+    private void CheckForTriggerCollisions()
+    {
+        CollisionResult hits;
+
+        if (InterestedIn.Count == 0)
+            PhysicsSystem.Instance.ColliderCast(this, out hits);
+        else
+            PhysicsSystem.Instance.ColliderCastByTag(this, out hits, InterestedIn.ToArray());
+
+        // Build current-frame overlap set
+        _overlapsCurr.Clear();
+        for (var i = 0; i < hits.Collisions.Count; i++)
+            _overlapsCurr.Add(hits.Collisions[i]);
+
+        // Enter = curr \ prev
+        foreach (var c in _overlapsCurr)
+            if (!_overlapsPrev.Contains(c))
+                OnCollisionEnter?.Invoke(c);
+
+        // Exit = prev \ curr
+        foreach (var c in _overlapsPrev)
+            if (!_overlapsCurr.Contains(c))
+                OnCollisionExit?.Invoke(c);
+
+        // Stay = curr ∩ prev  (here: fire for all curr each pass)
+        foreach (var c in _overlapsCurr)
+            OnCollisionStay?.Invoke(c);
+
+        // Prepare for next frame
+        _overlapsPrev.Clear();
+        foreach (var c in _overlapsCurr)
+            _overlapsPrev.Add(c);
+    }
+
+    #endregion
+
+    #region Broadphase / Spatial Hash Participation
+
+    /// <summary>
+    ///     Notifies the physics system when the collider's position changes,
+    ///     allowing broadphase structures (e.g., spatial hash) to stay current.
+    /// </summary>
+    private void UpdateInSpatialHash()
+    {
+        if (!IsQueryable) return;
+
+        _currentPosition = Transform.Position;
+
+        if (_lastPosition != _currentPosition)
+            PhysicsSystem.Instance.Touch(this);
+
+        _lastPosition = _currentPosition;
+    }
+
+    #endregion
+
     #region Flags & Configuration
 
     /// <summary>When true, collider acts as a trigger (no physical response, events only).</summary>
@@ -47,16 +118,6 @@ public class Collider : Component
 
     /// <summary>World-space polygon computed from <see cref="Bounds" /> and current transform.</summary>
     public Polygon2D WorldPolygon2D => GetTransformedPolygon();
-
-    #endregion
-    
-    #region Debug
-
-    /// <summary>Renders polygon outline for debugging purposes.</summary>
-    public override void OnDebugDraw()
-    {
-        Core.SpriteBatch.DrawPolygon(WorldPolygon2D.Vertices, Color.White);
-    }
 
     #endregion
 
@@ -116,68 +177,6 @@ public class Collider : Component
     public override void OnPhysicsUpdate()
     {
         UpdateInSpatialHash();
-    }
-
-    #endregion
-    
-    #region Trigger Collision Checks
-
-    /// <summary>
-    ///     Performs trigger overlap checks and dispatches Enter/Exit/Stay events.
-    ///     Uses tag filtering if <see cref="InterestedIn" /> is populated.
-    /// </summary>
-    private void CheckForTriggerCollisions()
-    {
-        CollisionResult hits;
-
-        if (InterestedIn.Count == 0)
-            PhysicsSystem.Instance.ColliderCast(this, out hits);
-        else
-            PhysicsSystem.Instance.ColliderCastByTag(this, out hits, InterestedIn.ToArray());
-
-        // Build current-frame overlap set
-        _overlapsCurr.Clear();
-        for (var i = 0; i < hits.Collisions.Count; i++)
-            _overlapsCurr.Add(hits.Collisions[i]);
-
-        // Enter = curr \ prev
-        foreach (var c in _overlapsCurr)
-            if (!_overlapsPrev.Contains(c))
-                OnCollisionEnter?.Invoke(c);
-
-        // Exit = prev \ curr
-        foreach (var c in _overlapsPrev)
-            if (!_overlapsCurr.Contains(c))
-                OnCollisionExit?.Invoke(c);
-
-        // Stay = curr ∩ prev  (here: fire for all curr each pass)
-        foreach (var c in _overlapsCurr)
-            OnCollisionStay?.Invoke(c);
-
-        // Prepare for next frame
-        _overlapsPrev.Clear();
-        foreach (var c in _overlapsCurr)
-            _overlapsPrev.Add(c);
-    }
-
-    #endregion
-    
-    #region Broadphase / Spatial Hash Participation
-
-    /// <summary>
-    ///     Notifies the physics system when the collider's position changes,
-    ///     allowing broadphase structures (e.g., spatial hash) to stay current.
-    /// </summary>
-    private void UpdateInSpatialHash()
-    {
-        if (!IsQueryable) return;
-
-        _currentPosition = Transform.Position;
-
-        if (_lastPosition != _currentPosition)
-            PhysicsSystem.Instance.Touch(this);
-
-        _lastPosition = _currentPosition;
     }
 
     #endregion

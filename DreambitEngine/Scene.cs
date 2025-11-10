@@ -47,6 +47,18 @@ public class Scene : IDisposable
 
     #endregion
 
+    #region Cutscene Helpers
+
+    /// <summary>
+    ///     Helper to start a cutscene by name using the scene's ScriptingManager.
+    /// </summary>
+    public static void StartCutscene(string cutsceneName, string fileExtension = ".yaml")
+    {
+        Core.Instance.CurrentScene.ScriptingManager.StartCutscene(cutsceneName, fileExtension);
+    }
+
+    #endregion
+
     #region Scene Switching (Core integration)
 
     /// <summary>Schedules a new scene to be swapped in by the Core.</summary>
@@ -60,18 +72,6 @@ public class Scene : IDisposable
     {
         var scene = new T();
         Core.Instance.SetNextScene(scene);
-    }
-
-    #endregion
-
-    #region Cutscene Helpers
-
-    /// <summary>
-    ///     Helper to start a cutscene by name using the scene's ScriptingManager.
-    /// </summary>
-    public static void StartCutscene(string cutsceneName, string fileExtension = ".yaml")
-    {
-        Core.Instance.CurrentScene.ScriptingManager.StartCutscene(cutsceneName, fileExtension);
     }
 
     #endregion
@@ -114,7 +114,7 @@ public class Scene : IDisposable
 
     /// <summary>Post-process configuration shared with passes.</summary>
     public readonly PostProcessSettings PostProcessSettings;
-    
+
     public readonly RenderingOptions RenderingOptions;
 
     /// <summary>Primary world camera.</summary>
@@ -122,7 +122,7 @@ public class Scene : IDisposable
 
     /// <summary>UI camera for screen-space/UI rendering.</summary>
     public Camera2D UICamera { get; private set; }
-    
+
     /// <summary>Ambient light for the scene/// </summary>
     public AmbientLight2D AmbientLight { get; private set; }
 
@@ -156,7 +156,6 @@ public class Scene : IDisposable
 
     protected virtual void OnPhysicsUpdate()
     {
-        
     }
 
     /// <summary>
@@ -356,7 +355,7 @@ public class Scene : IDisposable
     }
 
     /// <summary>
-    ///  Creates an entity based on a blueprint, forwarded to the repository
+    ///     Creates an entity based on a blueprint, forwarded to the repository
     /// </summary>
     /// <param name="blueprint"></param>
     /// <param name="enabled"></param>
@@ -365,9 +364,9 @@ public class Scene : IDisposable
     /// <param name="scale"></param>
     /// <returns></returns>
     public Entity CreateEntity(
-        EntityBlueprint blueprint, 
+        EntityBlueprint blueprint,
         bool enabled = true,
-        Vector3? createAt = null, 
+        Vector3? createAt = null,
         Vector3? rotation = null,
         Vector3? scale = null)
     {
@@ -382,7 +381,7 @@ public class Scene : IDisposable
             rot = rotation.Value;
         if (scale.HasValue)
             scl = scale.Value;
-        
+
         var entity = Entities.CreateEntity(blueprint.Name, blueprint.Tags, enabled, pos, rot, scl);
 
         entity.BuildComponentsFromBlueprint(blueprint);
@@ -391,7 +390,7 @@ public class Scene : IDisposable
 
         return entity;
     }
-    
+
 
     /// <summary>Sets AlwaysUpdate on a specific entity.</summary>
     public void SetEntityAlwaysUpdate(Entity entity, bool value)
@@ -424,10 +423,16 @@ public class Scene : IDisposable
     }
 
     /// <summary>Returns all entities with a given tag.</summary>
-    public IReadOnlyList<Entity> GetEntitiesByTag(string tag) => Entities.GetEntitiesByTag(tag);
-    
+    public IReadOnlyList<Entity> GetEntitiesByTag(string tag)
+    {
+        return Entities.GetEntitiesByTag(tag);
+    }
+
     /// <summary>Returns all active entities with a given tag.</summary>
-    public IReadOnlyList<Entity> GetActiveEntitiesByTag(string tag) => Entities.GetActiveEntitiesByTag(tag);
+    public IReadOnlyList<Entity> GetActiveEntitiesByTag(string tag)
+    {
+        return Entities.GetActiveEntitiesByTag(tag);
+    }
 
     #endregion
 

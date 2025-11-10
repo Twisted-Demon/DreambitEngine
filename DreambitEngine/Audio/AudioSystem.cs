@@ -8,13 +8,13 @@ public class AudioSystem : Singleton<AudioSystem>
     private readonly List<AudioEmitter> _emitters = [];
 
     private readonly List<AudioListener> _listeners = [];
-    
+
     public IReadOnlyList<AudioListener> Listeners => _listeners;
     public IReadOnlyList<AudioEmitter> Emitters => _emitters;
 
     public void RegisterEmitter(AudioEmitter emitter)
     {
-        if(!_emitters.Contains(emitter))
+        if (!_emitters.Contains(emitter))
             _emitters.Add(emitter);
     }
 
@@ -25,7 +25,7 @@ public class AudioSystem : Singleton<AudioSystem>
 
     public void RegisterListener(AudioListener listener)
     {
-        if(!_listeners.Contains(listener))
+        if (!_listeners.Contains(listener))
             _listeners.Add(listener);
     }
 

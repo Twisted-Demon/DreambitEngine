@@ -23,10 +23,8 @@ public static class SpriteBatchExtensions
     {
         float h = font.LineHeight;
         if (h <= 0f)
-        {
             // "Ay" or "Mg" tends to give a decent vertical extent if you need a fallback
             h = font.MeasureString("Ay").Y;
-        }
         return h * lineSpacingMultiplier;
     }
 
@@ -61,21 +59,21 @@ public static class SpriteBatchExtensions
     }
 
     //draw multi lined text
-    public static void DrawMultiLineText(this SpriteBatch spriteBatch, 
-        SpriteFontBase font, 
-        string text, 
-        Vector2 position, 
-        HorizontalAlignment horizontalAlignment, 
-        VerticalAlignment verticalAlignment, 
-        Color color, 
-        float maxWidth, 
+    public static void DrawMultiLineText(this SpriteBatch spriteBatch,
+        SpriteFontBase font,
+        string text,
+        Vector2 position,
+        HorizontalAlignment horizontalAlignment,
+        VerticalAlignment verticalAlignment,
+        Color color,
+        float maxWidth,
         float lineSpacingMultiplier = 1f)
     {
         var lines = SplitTextIntoLines(font, text, maxWidth);
 
         //calculate the total height
-        float lineHeight = GetLineHeight(font, lineSpacingMultiplier);
-        float totalHeight = lines.Count * lineHeight;
+        var lineHeight = GetLineHeight(font, lineSpacingMultiplier);
+        var totalHeight = lines.Count * lineHeight;
 
         switch (verticalAlignment)
         {
@@ -94,7 +92,7 @@ public static class SpriteBatchExtensions
             spriteBatch.DrawString(font, lines[i], linePos, color);
         }
     }
-    
+
     public static void DrawTextAligned(this SpriteBatch spriteBatch,
         SpriteFontBase font,
         string text,
@@ -108,7 +106,7 @@ public static class SpriteBatchExtensions
         // Vertical
         position.Y -= verticalAlignment switch
         {
-            VerticalAlignment.Top    => 0f,
+            VerticalAlignment.Top => 0f,
             VerticalAlignment.Center => size.Y * 0.5f,
             VerticalAlignment.Bottom => size.Y,
             _ => 0f
@@ -117,9 +115,9 @@ public static class SpriteBatchExtensions
         // Horizontal
         var xOffset = horizontalAlignment switch
         {
-            HorizontalAlignment.Left   => 0f,
+            HorizontalAlignment.Left => 0f,
             HorizontalAlignment.Center => size.X * 0.5f,
-            HorizontalAlignment.Right  => size.X,
+            HorizontalAlignment.Right => size.X,
             _ => 0f
         };
 

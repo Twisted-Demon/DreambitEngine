@@ -1,5 +1,6 @@
 ﻿using System.Threading.Channels;
 using System.Threading.Tasks;
+using Spectre.Console;
 
 namespace Dreambit;
 
@@ -17,20 +18,19 @@ public static class LogSink
         {
             var reader = Channel.Reader;
             while (await reader.WaitToReadAsync().ConfigureAwait(false))
-            {
-                while (reader.TryRead(out var entry))
-                {
-                    if (entry.Args is { Length: > 0 })
-                        SpectreWrite(entry.Level, entry.Prefix, entry.Message, entry.Args);
-                    else
-                        SpectreWrite(entry.Level, entry.Prefix, entry.Message, null);
-                }
-            }
+            while (reader.TryRead(out var entry))
+                if (entry.Args is { Length: > 0 })
+                    SpectreWrite(entry.Level, entry.Prefix, entry.Message, entry.Args);
+                else
+                    SpectreWrite(entry.Level, entry.Prefix, entry.Message, null);
         });
     }
-    
-    public static void Enqueue(in LogEntry entry) => Channel.Writer.TryWrite(entry);
-    
+
+    public static void Enqueue(in LogEntry entry)
+    {
+        Channel.Writer.TryWrite(entry);
+    }
+
     private static void SpectreWrite(LogLevel level, string prefix, string msg, object[]? args)
     {
         // choose color by level; cheap switch
@@ -38,13 +38,13 @@ public static class LogSink
         {
             LogLevel.Trace => ("[white]", "[grey69]"),
             LogLevel.Debug => ("[white]", "[cyan]"),
-            LogLevel.Info  => ("[white]", "[deepskyblue1]"),
-            LogLevel.Warn  => ("[white]", "[orange1]"),
+            LogLevel.Info => ("[white]", "[deepskyblue1]"),
+            LogLevel.Warn => ("[white]", "[orange1]"),
             LogLevel.Error => ("[white]", "[red1]"),
             _ => ("[white]", "[grey70]")
         };
         var line = $"{hdr}{prefix}: [/]{body}{msg}[/]";
-        if (args is null) Spectre.Console.AnsiConsole.MarkupLine(line);
-        else Spectre.Console.AnsiConsole.MarkupLine(line, args);
+        if (args is null) AnsiConsole.MarkupLine(line);
+        else AnsiConsole.MarkupLine(line, args);
     }
 }

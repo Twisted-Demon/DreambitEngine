@@ -9,18 +9,19 @@ namespace Dreambit.Scripting;
 
 public class ScriptingManager
 {
-    private Queue<ScriptActionGroup> _groupQueue = [];
-    private readonly Logger<ScriptingManager> _logger = new();
     private static readonly Dictionary<string, ScriptSequence> PreloadedGroups = [];
-    public static ScriptingManager Instance => Scene.Instance.ScriptingManager;
-    public Action OnScriptingStart;
+    private readonly Logger<ScriptingManager> _logger = new();
+    private Queue<ScriptActionGroup> _groupQueue = [];
     public Action OnScriptingEnd;
-    public static bool IsCutsceneActive { get; internal set; }
+    public Action OnScriptingStart;
 
     public ScriptingManager()
     {
         IsCutsceneActive = false;
     }
+
+    public static ScriptingManager Instance => Scene.Instance.ScriptingManager;
+    public static bool IsCutsceneActive { get; internal set; }
 
     public void StartCutscene(string cutsceneName, string fileExtension = ".yaml")
     {
@@ -43,10 +44,9 @@ public class ScriptingManager
                 var sequence = LoadSequenceFromFile(cutsceneName, fileExtension);
                 _groupQueue = sequence.GetScriptGroupQueue();
             }
-            
+
             IsCutsceneActive = true;
             OnScriptingStart?.Invoke();
-            
         }
         catch (Exception e)
         {
@@ -61,9 +61,9 @@ public class ScriptingManager
         var deserializer = new DeserializerBuilder()
             .WithNamingConvention(CamelCaseNamingConvention.Instance)
             .Build();
-                
+
         var yamlData = deserializer.Deserialize<List<dynamic>>(yamlText);
-    
+
         var sequence = new ScriptSequence();
         var groups = new List<ScriptActionGroup>();
 
@@ -89,12 +89,10 @@ public class ScriptingManager
         }
 
         sequence.RegisterGroups(groups);
-        
+
         //register the sequence
         if (!PreloadedGroups.ContainsKey(cutsceneName + fileExtension))
-        {
             PreloadedGroups.Add(cutsceneName + fileExtension, sequence);
-        }
 
         return sequence;
     }
@@ -113,10 +111,7 @@ public class ScriptingManager
         if (currentGroup.Completed())
         {
             _logger.Debug("Script Group Completed");
-            foreach (var script in currentGroup.Scripts)
-            {
-                script.OnGroupEnd();
-            }
+            foreach (var script in currentGroup.Scripts) script.OnGroupEnd();
             _groupQueue.Dequeue();
         }
 

@@ -1,10 +1,8 @@
-﻿using Dreambit.ECS;
-
-namespace Dreambit.Scripting;
+﻿namespace Dreambit.Scripting;
 
 public class CameraFollowScript : ScriptAction
 {
-    private string _entityName;
+    private readonly string _entityName;
 
     public CameraFollowScript(string entity)
     {

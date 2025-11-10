@@ -6,10 +6,9 @@ namespace Dreambit.ECS;
 public class RequireAttribute(params Type[] type) : Attribute
 {
     public readonly Type[] RequiredTypes = type;
-    
 }
 
-[AttributeUsage(AttributeTargets.Field |  AttributeTargets.Property)]
+[AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
 public class FromRequiredAttribute : Attribute
 {
 }

@@ -1,39 +1,31 @@
-﻿using System;
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
 namespace Dreambit.ECS;
 
 public class SpriteDrawer : DrawableComponent<SpriteDrawer>
 {
+    private string _spritePath;
     public Color Tint { get; internal set; } = Color.White;
     public float Opacity { get; internal set; } = 1.0f;
     public Vector2 Pivot { get; internal set; } = Vector2.Zero;
     public PivotType PivotType { get; internal set; } = PivotType.Center;
-    public Sprite Sprite { get;  set; } = null;
+    public Sprite Sprite { get; set; }
 
-    private string _spritePath;
     public string SpritePath
     {
         get => _spritePath;
         set
         {
             if (_spritePath == value) return;
-            
+
             _spritePath = value;
             Sprite = Resources.LoadAsset<Sprite>(_spritePath);
         }
     }
 
     public bool FlipX { get; set; } = false;
-    
-    public SpriteDrawer WithSprite(string assetPath) { SpritePath = assetPath; return this; }
-    public SpriteDrawer WithTint(Color tint) { Tint = tint; return this; }
-    public SpriteDrawer WithOpacity(float a) { Opacity = MathHelper.Clamp(a, 0f, 1f); return this; }
-    public SpriteDrawer WithPivot(PivotType type) { PivotType = type; return this; }
-    public SpriteDrawer WithPivot(Vector2 pivot) { PivotType = PivotType.Custom; Pivot = pivot; return this; }
-    public SpriteDrawer SetSprite(Sprite sprite) { Sprite = sprite; return this; }
-    
+
     public override Rectangle Bounds
     {
         get
@@ -56,16 +48,52 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
             return rect;
         }
     }
-    
+
+    public SpriteDrawer WithSprite(string assetPath)
+    {
+        SpritePath = assetPath;
+        return this;
+    }
+
+    public SpriteDrawer WithTint(Color tint)
+    {
+        Tint = tint;
+        return this;
+    }
+
+    public SpriteDrawer WithOpacity(float a)
+    {
+        Opacity = MathHelper.Clamp(a, 0f, 1f);
+        return this;
+    }
+
+    public SpriteDrawer WithPivot(PivotType type)
+    {
+        PivotType = type;
+        return this;
+    }
+
+    public SpriteDrawer WithPivot(Vector2 pivot)
+    {
+        PivotType = PivotType.Custom;
+        Pivot = pivot;
+        return this;
+    }
+
+    public SpriteDrawer SetSprite(Sprite sprite)
+    {
+        Sprite = sprite;
+        return this;
+    }
+
     public override void OnDraw()
     {
-        
         if (Sprite?.Texture == null)
         {
             Logger.Warn("Entity {0} is missing a texture", Entity.Name);
             return;
         }
-        
+
         var originToUse = Pivot;
 
         if (PivotType != PivotType.Custom)
@@ -96,7 +124,7 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
             0f
         );
     }
-    
+
     public override void OnDebugDraw()
     {
         var vec2 = Transform.WorldPosToVec2;

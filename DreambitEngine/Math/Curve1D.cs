@@ -5,19 +5,7 @@ namespace Dreambit;
 
 public class Curve1D
 {
-    public readonly struct Key
-    {
-        public readonly float Time;
-        public readonly float Value;
-        public Key(float time, float value)
-        {
-            Time = time;
-            Value = value;
-        }
-    }
-
     private readonly Key[] _keys;
-    public ReadOnlySpan<Key> Keys => _keys;
 
     public Curve1D(params Key[] keys)
     {
@@ -25,11 +13,13 @@ public class Curve1D
             keys = new[]
             {
                 new Key(0, 1),
-                new Key(1, 0),
+                new Key(1, 0)
             };
         Array.Sort(keys, (a, b) => a.Time.CompareTo(b.Time));
         _keys = keys;
     }
+
+    public ReadOnlySpan<Key> Keys => _keys;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float Evaluate(float time)
@@ -42,20 +32,52 @@ public class Curve1D
         int lo = 0, hi = _keys.Length - 1;
         while (hi - lo > 1)
         {
-            int mid = (lo + hi) >> 1;
-            if (time < _keys[mid].Time) hi = mid; else lo = mid;
+            var mid = (lo + hi) >> 1;
+            if (time < _keys[mid].Time) hi = mid;
+            else lo = mid;
         }
 
         var a = _keys[lo];
         var b = _keys[hi];
-        float u = (time - a.Time) / (b.Time - a.Time);
+        var u = (time - a.Time) / (b.Time - a.Time);
         return a.Value + (b.Value - a.Value) * u;
     }
-    
+
     // Handy presets (all clamped 0..1 on t)
-    public static Curve1D FadeOut()     => new(new Key(0f, 1f), new Key(1f, 0f));
-    public static Curve1D FadeIn()      => new(new Key(0f, 0f), new Key(1f, 1f));
-    public static Curve1D EaseInOut()   => new(new Key(0f, 0f), new Key(0.5f, 1f), new Key(1f, 0f));
-    public static Curve1D Bell()        => new(new Key(0f, 0f), new Key(0.5f, 1f), new Key(1f, 0f));
-    public static Curve1D Flat(float v) => new(new Key(0f, v), new Key(1f, v));
+    public static Curve1D FadeOut()
+    {
+        return new Curve1D(new Key(0f, 1f), new Key(1f, 0f));
+    }
+
+    public static Curve1D FadeIn()
+    {
+        return new Curve1D(new Key(0f, 0f), new Key(1f, 1f));
+    }
+
+    public static Curve1D EaseInOut()
+    {
+        return new Curve1D(new Key(0f, 0f), new Key(0.5f, 1f), new Key(1f, 0f));
+    }
+
+    public static Curve1D Bell()
+    {
+        return new Curve1D(new Key(0f, 0f), new Key(0.5f, 1f), new Key(1f, 0f));
+    }
+
+    public static Curve1D Flat(float v)
+    {
+        return new Curve1D(new Key(0f, v), new Key(1f, v));
+    }
+
+    public readonly struct Key
+    {
+        public readonly float Time;
+        public readonly float Value;
+
+        public Key(float time, float value)
+        {
+            Time = time;
+            Value = value;
+        }
+    }
 }

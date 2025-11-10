@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices.JavaScript;
 using Microsoft.Xna.Framework;
 
 namespace Dreambit.ECS;
@@ -9,31 +8,16 @@ public class Entity : IDisposable
 {
     private readonly List<Entity> _children = [];
 
-    public readonly Guid Id;
-    public string Name;
-    
-    private ComponentRepository ComponentRepository { get; }
-    public Transform Transform { get; }
-    public HashSet<string> Tags { get; } = [];
-    internal Scene Scene { get; private set; }
+    private readonly ILogger _logger = new Logger<Entity>();
 
-    public Entity Parent
-    {
-        get => _parent;
-        set
-        {
-            if (_parent == value) return;
-            SetParent(value);
-        }
-    }
-    
+    public readonly Guid Id;
+
     private bool _alwaysUpdate;
     private bool _enabled;
     private bool _isDestroyed;
     private bool _isDisposed;
     private Entity _parent;
-    
-    private readonly ILogger _logger = new Logger<Entity>();
+    public string Name;
 
     internal Entity(Guid id, string name, HashSet<string> tags, bool enabled, Scene scene)
     {
@@ -58,7 +42,22 @@ public class Entity : IDisposable
     private Entity()
     {
     }
-    
+
+    private ComponentRepository ComponentRepository { get; }
+    public Transform Transform { get; }
+    public HashSet<string> Tags { get; } = [];
+    internal Scene Scene { get; private set; }
+
+    public Entity Parent
+    {
+        get => _parent;
+        set
+        {
+            if (_parent == value) return;
+            SetParent(value);
+        }
+    }
+
     public bool AlwaysUpdate
     {
         get => _alwaysUpdate;
@@ -78,16 +77,16 @@ public class Entity : IDisposable
     {
         get
         {
-            if(Parent == null)
+            if (Parent == null)
                 return _enabled;
-            
+
             return Parent.Enabled && _enabled;
         }
         set
         {
             if (_enabled == value) return;
             _enabled = value;
-            
+
             if (_enabled)
                 OnEnabled();
             else
@@ -107,37 +106,38 @@ public class Entity : IDisposable
     }
 
     public static Entity Create(
-        string name = "entity", 
-        HashSet<string> tags = null, 
-        bool enabled = true, 
-        Vector3? createAt = null, 
-        Vector3? rotation = null, 
-        Vector3? scale = null, 
+        string name = "entity",
+        HashSet<string> tags = null,
+        bool enabled = true,
+        Vector3? createAt = null,
+        Vector3? rotation = null,
+        Vector3? scale = null,
         Guid? guidOverride = null)
     {
-        var entity = Core.Instance.CurrentScene.CreateEntity(name, tags, enabled, createAt, rotation, scale, guidOverride);
+        var entity =
+            Core.Instance.CurrentScene.CreateEntity(name, tags, enabled, createAt, rotation, scale, guidOverride);
 
         entity.Transform.LastWorldPosition = entity.Transform.WorldPosition;
         return entity;
     }
 
     public static Entity Create(
-        EntityBlueprint blueprint, 
+        EntityBlueprint blueprint,
         bool enabled = true,
-        Vector3? createAt = null, 
+        Vector3? createAt = null,
         Vector3? rotation = null,
         Vector3? scale = null)
     {
         var entity = Core.Instance.CurrentScene.CreateEntity(blueprint, enabled, createAt, rotation, scale);
-        
+
         entity.Transform.LastWorldPosition = entity.Transform.WorldPosition;
-        
+
         return entity;
     }
-    
+
     public static Entity CreateChildOf(
-        Entity parent, 
-        string name = "entity", 
+        Entity parent,
+        string name = "entity",
         HashSet<string> tags = null,
         bool enabled = true)
     {
@@ -173,7 +173,7 @@ public class Entity : IDisposable
     public static void Destroy(Entity entity)
     {
         if (entity == null || entity._isDestroyed) return;
-        
+
         Core.Instance.CurrentScene.DestroyEntity(entity);
 
         if (entity._children.Count <= 0) return;
@@ -219,7 +219,7 @@ public class Entity : IDisposable
         var component = ComponentRepository.GetComponent<T>();
         if (component != null) return component;
 
-        component = (T)Activator.CreateInstance<T>().SetUpAndCreateChildren(this, true);
+        component = (T)Activator.CreateInstance<T>().SetUpAndCreateChildren(this);
 
         if (component == null)
             return null;
@@ -243,10 +243,10 @@ public class Entity : IDisposable
 
         if (type is null || !type.IsSubclassOf(typeof(Component)))
             return null;
-        
+
         component = (Component)Activator.CreateInstance(type);
         if (component == null) return null;
-        component.SetUpAndCreateChildren(this, true);
+        component.SetUpAndCreateChildren(this);
 
         component.Create();
         ComponentRepository.AttachComponent(component);
@@ -258,7 +258,7 @@ public class Entity : IDisposable
     {
         // all components we will end up creating (one per Type)
         var constructed = new Dictionary<Type, Component>();
-        
+
         //Seed all component types explicitly declared in the blueprint
         var pending = new Stack<Type>();
         foreach (var cbp in entityBlueprint.Components)
@@ -272,7 +272,7 @@ public class Entity : IDisposable
 
             pending.Push(type);
         }
-        
+
         // Expand transitive requirements
         while (pending.Count > 0)
         {
@@ -286,19 +286,19 @@ public class Entity : IDisposable
                 _logger.Warn("Could not construct component of type {0} for entity {1}", type.FullName, Name);
                 continue;
             }
-            
+
             constructed[type] = component;
-            
+
             // Enqueue all direct requirements to be created
             foreach (var requiredType in component.RequiredComponentTypes)
             {
                 if (requiredType is null) continue;
-                if(!constructed.ContainsKey(requiredType))
+                if (!constructed.ContainsKey(requiredType))
                     pending.Push(requiredType);
             }
         }
-        
-        foreach(var component in constructed.Values)
+
+        foreach (var component in constructed.Values)
             ComponentRepository.AttachComponent(component);
     }
 
@@ -316,8 +316,8 @@ public class Entity : IDisposable
         {
             var type = BlueprintResolver.ResolveComponentType(componentBlueprint.Type);
             if (type == null) continue;
-            if(!components.TryGetValue(type, out var component) || component == null) continue;
-            
+            if (!components.TryGetValue(type, out var component) || component == null) continue;
+
             component.BeforeDeserialize();
             try
             {
@@ -327,6 +327,7 @@ public class Entity : IDisposable
             {
                 _logger.Error($"{e.Message}");
             }
+
             component.AfterDeserialize();
         }
     }
@@ -334,7 +335,7 @@ public class Entity : IDisposable
     internal void CallComponentOnCreateAfterDeserialized()
     {
         var components = ComponentRepository.GetAllComponentsToAttach();
-        foreach(var component  in components)
+        foreach (var component in components)
             component.Create();
     }
 
@@ -377,7 +378,7 @@ public class Entity : IDisposable
     {
         if (type is null || !type.IsSubclassOf(typeof(Component)))
             return null;
-        
+
         return ComponentRepository.GetComponent(type);
     }
 

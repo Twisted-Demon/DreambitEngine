@@ -1,5 +1,4 @@
 ﻿using System;
-using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Audio;
 
 namespace Dreambit.ECS.Audio;
@@ -7,10 +6,10 @@ namespace Dreambit.ECS.Audio;
 [Obsolete]
 public class SoundListener2d : Component
 {
+    private readonly AudioListener _listener = new();
     private readonly Logger<SoundListener2d> _logger = new();
 
     private Mover _mover;
-    private readonly AudioListener _listener = new();
 
     public override void OnAddedToEntity()
     {
@@ -41,9 +40,8 @@ public class SoundListener2d : Component
     public override void OnUpdate()
     {
         _listener.Position = Transform.WorldPosition;
-        
-        if(_mover is not null)
+
+        if (_mover is not null)
             _listener.Velocity = _mover.Velocity;
-        
     }
 }

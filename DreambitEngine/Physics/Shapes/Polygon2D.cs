@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Net.Mime;
 using Dreambit.ECS;
 using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 
 namespace Dreambit;
 
@@ -18,13 +16,14 @@ public struct Polygon2D
     public void NormalizeWindingCCW()
     {
         if (Vertices == null || Vertices.Length < 3) return;
-        float area = 0f;
-        for (int i = 0; i < Vertices.Length; i++)
+        var area = 0f;
+        for (var i = 0; i < Vertices.Length; i++)
         {
             var a = Vertices[i];
             var b = Vertices[(i + 1) % Vertices.Length];
-            area += (a.X * b.Y - b.X * a.Y);
+            area += a.X * b.Y - b.X * a.Y;
         }
+
         if (area < 0f) Array.Reverse(Vertices);
     }
 
@@ -37,26 +36,29 @@ public struct Polygon2D
         Vector2? prev = null;
         foreach (var v in Vertices)
         {
-            if (prev.HasValue && Vector2.DistanceSquared(prev.Value, v) < EPS*EPS) continue;
+            if (prev.HasValue && Vector2.DistanceSquared(prev.Value, v) < EPS * EPS) continue;
             list.Add(v);
             prev = v;
         }
-        if (list.Count >= 2 && Vector2.DistanceSquared(list[0], list[^1]) < EPS*EPS)
+
+        if (list.Count >= 2 && Vector2.DistanceSquared(list[0], list[^1]) < EPS * EPS)
             list.RemoveAt(list.Count - 1);
         // Remove collinear
         if (list.Count >= 3)
         {
             var cleaned = new List<Vector2>(list.Count);
-            for (int i = 0; i < list.Count; i++)
+            for (var i = 0; i < list.Count; i++)
             {
                 var a = list[(i - 1 + list.Count) % list.Count];
                 var b = list[i];
                 var c = list[(i + 1) % list.Count];
-                float cross = (b.X - a.X) * (c.Y - a.Y) - (b.Y - a.Y) * (c.X - a.X);
+                var cross = (b.X - a.X) * (c.Y - a.Y) - (b.Y - a.Y) * (c.X - a.X);
                 if (MathF.Abs(cross) > EPS) cleaned.Add(b);
             }
+
             if (cleaned.Count >= 3) list = cleaned;
         }
+
         Vertices = list.ToArray();
         NormalizeWindingCCW();
     }
@@ -83,13 +85,14 @@ public struct Polygon2D
                 return false; // separating axis found
 
             // overlap on this axis
-            float overlap = MathF.Min(maxA, maxB) - MathF.Max(minA, minB);
+            var overlap = MathF.Min(maxA, maxB) - MathF.Max(minA, minB);
             if (overlap < mtvDepth)
             {
                 mtvDepth = overlap;
                 mtvAxis = axis;
             }
         }
+
         // Point mtvAxis from A -> B (roughly)
         var centerA = GetCentroid();
         var centerB = other.GetCentroid();
@@ -102,7 +105,8 @@ public struct Polygon2D
     /// <summary>General intersection supporting concave by triangulation.</summary>
     public bool IntersectsGeneral(Polygon2D other, out Vector2 mtvAxis, out float mtvDepth)
     {
-        mtvAxis = Vector2.Zero; mtvDepth = float.MaxValue;
+        mtvAxis = Vector2.Zero;
+        mtvDepth = float.MaxValue;
         // Clean and normalize once
         CleanAndNormalize();
         other.CleanAndNormalize();
@@ -110,10 +114,7 @@ public struct Polygon2D
         var thisConcave = IsConcave();
         var otherConcave = other.IsConcave();
 
-        if (!thisConcave && !otherConcave)
-        {
-            return IntersectsSAT(other, ref mtvAxis, ref mtvDepth);
-        }
+        if (!thisConcave && !otherConcave) return IntersectsSAT(other, ref mtvAxis, ref mtvDepth);
 
         var partsA = thisConcave ? SplitPolygon(this) : [this];
         var partsB = otherConcave ? other.SplitPolygon(other) : [other];
@@ -121,18 +122,26 @@ public struct Polygon2D
         var hit = false;
         foreach (var a in partsA)
         {
-            var aClean = a; aClean.CleanAndNormalize();
+            var aClean = a;
+            aClean.CleanAndNormalize();
             foreach (var b in partsB)
             {
-                var bClean = b; bClean.CleanAndNormalize();
-                var axis = Vector2.Zero; float depth = float.MaxValue;
+                var bClean = b;
+                bClean.CleanAndNormalize();
+                var axis = Vector2.Zero;
+                var depth = float.MaxValue;
                 if (aClean.IntersectsSAT(bClean, ref axis, ref depth))
                 {
                     hit = true;
-                    if (depth < mtvDepth) { mtvDepth = depth; mtvAxis = axis; }
+                    if (depth < mtvDepth)
+                    {
+                        mtvDepth = depth;
+                        mtvAxis = axis;
+                    }
                 }
             }
         }
+
         return hit;
     }
 
@@ -145,13 +154,14 @@ public struct Polygon2D
         {
             var a = Vertices[i];
             var b = Vertices[(i + 1) % Vertices.Length];
-            float cross = a.X * b.Y - b.X * a.Y;
+            var cross = a.X * b.Y - b.X * a.Y;
             areaSum += cross;
             cx += (a.X + b.X) * cross;
             cy += (a.Y + b.Y) * cross;
         }
+
         if (MathF.Abs(areaSum) < EPS) return Vertices[0];
-        float inv = 1f / (3f * areaSum);
+        var inv = 1f / (3f * areaSum);
         return new Vector2(cx * inv, cy * inv);
     }
 
@@ -286,42 +296,40 @@ public struct Polygon2D
         if (Vertices == null || Length < 3) return false;
 
         for (int i = 0, j = Length - 1; i < Length; j = i++)
-        {
-            if(PointOnSegment(Vertices[j], Vertices[i], p))
+            if (PointOnSegment(Vertices[j], Vertices[i], p))
                 return includeBoundary;
-        }
 
-        bool inside = false;
+        var inside = false;
         for (int i = 0, j = Length - 1; i < Length; j = i++)
         {
             var a = Vertices[j];
             var b = Vertices[i];
 
-            bool cond = ((a.Y > p.Y) != (b.Y > p.Y));
+            var cond = a.Y > p.Y != b.Y > p.Y;
             if (!cond) continue;
 
-            float t = (p.Y - a.Y) / (b.Y - a.Y);
-            float xAtY = a.X + t * (b.X - a.X);
+            var t = (p.Y - a.Y) / (b.Y - a.Y);
+            var xAtY = a.X + t * (b.X - a.X);
 
             if (xAtY > p.X) inside = !inside;
         }
 
         return inside;
     }
-    
+
     private bool PointOnSegment(Vector2 a, Vector2 b, Vector2 p)
     {
         // Collinearity via cross product
         var ab = b - a;
         var ap = p - a;
-        float cross = ab.X * ap.Y - ab.Y * ap.X;
+        var cross = ab.X * ap.Y - ab.Y * ap.X;
         if (MathF.Abs(cross) > EPS) return false;
 
         // Within segment bounds via dot products
-        float dot = Vector2.Dot(ap, ab);
+        var dot = Vector2.Dot(ap, ab);
         if (dot < -EPS) return false;
 
-        float abLenSq = Vector2.Dot(ab, ab);
+        var abLenSq = Vector2.Dot(ab, ab);
         if (dot > abLenSq + EPS) return false;
 
         return true;
@@ -442,7 +450,7 @@ public struct Polygon2D
                         return false;
             return true;
         }
-        
+
         return false;
     }
 

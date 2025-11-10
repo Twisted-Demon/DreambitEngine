@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
-using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Audio;
 
 namespace Dreambit.ECS.Audio;
@@ -9,11 +7,22 @@ namespace Dreambit.ECS.Audio;
 [Obsolete]
 public class SoundEmitter2d : Component
 {
+    private readonly AudioEmitter _emitter = new();
     private readonly Logger<SoundEmitter2d> _logger = new();
 
     private Mover _mover;
-    
+
+    private SoundEffect _soundEffect;
+
     private string _soundEffectPath = string.Empty;
+    public float DopplerScale = 1.0f;
+    public float Pan = 1.0f;
+    public float Pitch = 0.0f;
+
+    public bool UseDoppler = true;
+
+    public float Volume = 1.0f;
+
     public string SoundEffectPath
     {
         get => _soundEffectPath;
@@ -27,16 +36,6 @@ public class SoundEmitter2d : Component
             _soundEffectPath = value;
         }
     }
-
-    private SoundEffect _soundEffect;
-    private readonly AudioEmitter _emitter = new();
-
-    public float Volume = 1.0f;
-    public float Pitch = 0.0f;
-    public float Pan = 1.0f;
-    public float DopplerScale = 1.0f;
-
-    public bool UseDoppler = true;
 
     public override void OnAddedToEntity()
     {
@@ -67,10 +66,10 @@ public class SoundEmitter2d : Component
     public override void OnUpdate()
     {
         _emitter.Position = Transform.WorldPosition;
-        
-        if(_mover is not null)
+
+        if (_mover is not null)
             _emitter.Velocity = _mover.Velocity;
-        
+
         if (!UseDoppler)
             _emitter.DopplerScale = 0.0f;
         else
@@ -80,13 +79,13 @@ public class SoundEmitter2d : Component
     public SoundEffectInstance Play()
     {
         var instance = _soundEffect.CreateInstance();
-        
+
         instance.Volume = Volume;
         instance.Pitch = Pitch;
         instance.Pan = Pan;
-        
+
         instance.Play();
-        
+
         return instance;
     }
 
@@ -96,11 +95,11 @@ public class SoundEmitter2d : Component
         instance.Volume = Volume;
         instance.Pitch = Pitch;
         instance.Pan = Pan;
-        
+
         instance.Play();
-        
+
         var listeners = AudioSystem.Instance.Listeners;
-        instance.Apply3D(listeners.ToArray().First(),  _emitter);
+        instance.Apply3D(listeners.ToArray().First(), _emitter);
         return instance;
     }
 }

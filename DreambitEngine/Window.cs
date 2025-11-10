@@ -16,14 +16,14 @@ public static class Window
     private static TimeSpan _lastResizeAt = TimeSpan.Zero;
     private static bool _pendingResize;
     private static int _pendingW, _pendingH;
-    
+
     public static int MonitorCount => GraphicsAdapter.Adapters.Count;
 
     public static int Width => Core.Instance.GraphicsDevice.PresentationParameters.BackBufferWidth;
     public static int Height => Core.Instance.GraphicsDevice.PresentationParameters.BackBufferHeight;
 
     public static Point ScreenSize => new(Width, Height);
-    
+
     public static GraphicsAdapter Adapter => Core.Instance.GraphicsDevice.Adapter;
 
     public static float AspectRatio
@@ -80,14 +80,14 @@ public static class Window
         if (width <= 0 || height <= 0) return;
 
         var gdm = Core.GraphicsDeviceManager;
-        
+
         gdm.PreferredBackBufferWidth = width;
         gdm.PreferredBackBufferHeight = height;
         gdm.ApplyChanges();
 
         RememberWindowedStateIfBordered();
-        
-        WindowResized?.Invoke(null,  new WindowResizedEventArgs { Width = width, Height = height });
+
+        WindowResized?.Invoke(null, new WindowResizedEventArgs { Width = width, Height = height });
     }
 
     public static void SetPosition(int x, int y)
@@ -107,8 +107,8 @@ public static class Window
         var pos = GetPosition();
 
         var center = new Point(
-            pos.X + (Width / 2),
-            pos.Y + (Height / 2)
+            pos.X + Width / 2,
+            pos.Y + Height / 2
         );
 
         return center;
@@ -123,7 +123,7 @@ public static class Window
         Core.Instance.Window.Position = pos;
         RememberWindowedStateIfBordered();
     }
-    
+
     // ---- Window chrome & behavior -----------------------------------------
 
     public static void SetAllowUserResizing(bool value)

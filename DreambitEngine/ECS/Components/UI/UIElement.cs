@@ -14,7 +14,7 @@ public abstract class UIElement : UIComponent
     public PivotType PivotType { get; set; } = PivotType.Center;
 
     public Vector2 Pivot { get; set; }
-    
+
 
     public Vector2 GetScreenPos()
     {

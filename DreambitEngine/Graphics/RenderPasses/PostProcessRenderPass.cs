@@ -1,5 +1,4 @@
-﻿
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
 namespace Dreambit;
@@ -7,22 +6,22 @@ namespace Dreambit;
 public class PostProcessRenderPass : RenderPass
 {
     private Effect _colorCorrectionEffect;
-    private Effect _tintEffect;
 
     private RenderTarget2D _colorCorrectionPass;
-    private RenderTarget2D _tintPass;
-    
+
     private PostProcessSettings _postProcessSettings;
-    
+    private Effect _tintEffect;
+    private RenderTarget2D _tintPass;
+
 
     public override void Initialize()
     {
         _colorCorrectionEffect = Resources.LoadAsset<Effect>("Effects/ColorCorrection");
         _colorCorrectionPass = RenderPipeline.CreateRenderTarget();
-        
+
         _tintEffect = Resources.LoadAsset<Effect>("Effects/Tint");
         _tintPass = RenderPipeline.CreateRenderTarget();
-        
+
         _postProcessSettings = Scene.PostProcessSettings;
     }
 
@@ -48,32 +47,32 @@ public class PostProcessRenderPass : RenderPass
     {
         _tintEffect.Parameters["tintColor"].SetValue(_postProcessSettings.TintColor.ToVector4());
     }
-    
+
     private void Draw()
     {
         //Color correction pass
         {
             Device.SetRenderTarget(_colorCorrectionPass);
             Device.Clear(Color.Transparent);
-        
-            Core.SpriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, 
-                samplerState: SamplerState.PointClamp, effect: _colorCorrectionEffect);
-        
+
+            Core.SpriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend,
+                SamplerState.PointClamp, effect: _colorCorrectionEffect);
+
             Core.SpriteBatch.Draw(RenderPipeline.SceneRenderTarget, Vector2.Zero, Color.White);
-        
+
             Core.SpriteBatch.End();
         }
-        
+
         //Tint pass
         {
             Device.SetRenderTarget(_tintPass);
             Device.Clear(Color.Transparent);
-            
-            Core.SpriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, 
-                samplerState: SamplerState.PointClamp, effect: _tintEffect);
-        
+
+            Core.SpriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend,
+                SamplerState.PointClamp, effect: _tintEffect);
+
             Core.SpriteBatch.Draw(_colorCorrectionPass, Vector2.Zero, Color.White);
-        
+
             Core.SpriteBatch.End();
         }
 
@@ -81,12 +80,12 @@ public class PostProcessRenderPass : RenderPass
         {
             Device.SetRenderTarget(RenderPipeline.SceneRenderTarget); // render to the final render target
             Device.Clear(Color.Transparent);
-            
-            Core.SpriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, 
-                samplerState: SamplerState.PointClamp);
-        
+
+            Core.SpriteBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend,
+                SamplerState.PointClamp);
+
             Core.SpriteBatch.Draw(_tintPass, Vector2.Zero, Color.White); // color correction
-        
+
             Core.SpriteBatch.End();
         }
     }
@@ -96,7 +95,7 @@ public class PostProcessRenderPass : RenderPass
         base.OnWindowResized(sender, args);
         _colorCorrectionPass?.Dispose();
         _colorCorrectionPass = RenderPipeline.CreateRenderTarget();
-        
+
         _tintPass?.Dispose();
         _tintPass = RenderPipeline.CreateRenderTarget();
     }
@@ -105,7 +104,7 @@ public class PostProcessRenderPass : RenderPass
     {
         _colorCorrectionPass?.Dispose();
         _colorCorrectionPass = null;
-        
+
         _tintPass?.Dispose();
         _tintPass = null;
 

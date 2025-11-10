@@ -6,30 +6,29 @@ public abstract class ScriptAction
     public bool IsComplete { get; set; } = false;
 
     /// <summary>
-    /// Called every frame
+    ///     Called every frame
     /// </summary>
     public abstract void OnUpdate();
-    
+
     /// <summary>
-    /// Called once when this script has started, before the first update
+    ///     Called once when this script has started, before the first update
     /// </summary>
     public virtual void OnStart()
     {
     }
 
     /// <summary>
-    /// Called once when the script is completed, before the script group has ended
+    ///     Called once when the script is completed, before the script group has ended
     /// </summary>
     public virtual void OnCompleted()
     {
     }
 
     /// <summary>
-    /// Called once after all scripts in the current group have ended
+    ///     Called once after all scripts in the current group have ended
     /// </summary>
     public virtual void OnGroupEnd()
     {
-        
     }
 
     internal void Update()
@@ -42,7 +41,7 @@ public abstract class ScriptAction
 
         OnUpdate();
 
-        if (IsComplete) 
+        if (IsComplete)
             OnCompleted();
     }
 }

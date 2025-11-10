@@ -14,10 +14,10 @@ public class LDtkManager : Singleton<LDtkManager>
     public readonly Dictionary<Guid, LDtkLevel> LoadedLevels = new();
     public readonly Dictionary<int, SpriteSheet> SpriteSheets = new();
     public LDtkLevel CurrentLevel;
+    public LDtkWorld CurrentWorld;
     public LDtkFile LDtkFile;
     public ExampleRenderer LDtkRenderer;
-    public LDtkWorld CurrentWorld;
-    
+
     public void SetUp(string ldtkFilePath)
     {
         LoadFile(ldtkFilePath);
@@ -77,7 +77,7 @@ public class LDtkManager : Singleton<LDtkManager>
         foreach (var tileSet in defs.Tilesets)
         {
             if (string.IsNullOrEmpty(tileSet.RelPath)) continue;
-            
+
             tileSet.RelPath = tileSet.RelPath.Replace(".png", "");
 
             var texturePath = tileSet.RelPath;

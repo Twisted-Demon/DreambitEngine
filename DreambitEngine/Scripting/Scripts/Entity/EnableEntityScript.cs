@@ -4,13 +4,13 @@ namespace Dreambit.Scripting;
 
 public class EnableEntityScript : ScriptAction
 {
-    private string _entityName;
-    
+    private readonly string _entityName;
+
     public EnableEntityScript(string entity)
     {
         _entityName = entity;
     }
-    
+
     public override void OnUpdate()
     {
         var e = Entity.FindByName(_entityName);

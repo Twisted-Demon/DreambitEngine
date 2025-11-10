@@ -1,6 +1,4 @@
-﻿using System.Linq;
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
+﻿using Microsoft.Xna.Framework.Graphics;
 
 namespace Dreambit.Graphics;
 
@@ -15,12 +13,9 @@ public class DebugRenderPass : RenderPass
     public override void OnDraw()
     {
         IsActive = Scene.DebugMode;
-        
-        if (!Scene.DebugMode)
-        {
-            return;
-        }
-        
+
+        if (!Scene.DebugMode) return;
+
         Device.SetRenderTarget(RenderPipeline.SceneRenderTarget);
 
         Core.SpriteBatch.Begin(
@@ -34,10 +29,7 @@ public class DebugRenderPass : RenderPass
         foreach (var entity in entities)
         {
             var comps = entity.GetAllActiveComponents();
-            foreach (var c in comps)
-            {
-                c.OnDebugDraw();
-            }
+            foreach (var c in comps) c.OnDebugDraw();
         }
 
         Core.SpriteBatch.End();

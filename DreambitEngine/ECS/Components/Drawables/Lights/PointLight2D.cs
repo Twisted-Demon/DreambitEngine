@@ -11,10 +11,10 @@ public class PointLight2D : Light2D
     {
         get
         {
-            float r = MathF.Max(0f, Radius); // safety
-            int left  = (int)MathF.Floor(Position.X - r);
-            int top   = (int)MathF.Floor(Position.Y - r);
-            int size  = (int)MathF.Ceiling(r * 2f);
+            var r = MathF.Max(0f, Radius); // safety
+            var left = (int)MathF.Floor(Position.X - r);
+            var top = (int)MathF.Floor(Position.Y - r);
+            var size = (int)MathF.Ceiling(r * 2f);
             return new Rectangle(left, top, size, size);
         }
     }

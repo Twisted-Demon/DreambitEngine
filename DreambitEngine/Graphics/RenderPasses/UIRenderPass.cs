@@ -1,7 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using Dreambit.ECS;
-using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
 namespace Dreambit;
@@ -9,7 +8,6 @@ namespace Dreambit;
 [SuppressMessage("ReSharper", "InconsistentNaming")]
 public class UIRenderPass : RenderPass
 {
-    
     public override void Initialize()
     {
         base.Initialize();
@@ -24,7 +22,7 @@ public class UIRenderPass : RenderPass
         var layerOrder = drawLayers.Keys.OrderBy(x => x).ToList();
 
         Device.SetRenderTarget(RenderPipeline.SceneRenderTarget);
-        
+
         for (var i = 0; i < layerOrder.Count; i++)
         {
             Core.SpriteBatch.Begin(transformMatrix: Scene.UICamera.TopLeftTransformMatrix,
@@ -50,5 +48,4 @@ public class UIRenderPass : RenderPass
     {
         DrawUIComponents();
     }
-    
 }

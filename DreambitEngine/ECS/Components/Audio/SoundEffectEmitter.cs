@@ -4,19 +4,23 @@ namespace Dreambit.ECS.Audio;
 
 public class SoundEffectEmitter : Component<SoundEffectEmitter>
 {
+    private SoundEffectInstance[] _pool = new SoundEffectInstance[5];
+    private int _poolIdx;
+
+    private SoundEffectInstance _primaryInstance;
     private SoundCue _soundCue;
+
+    private string _soundCuePath;
 
     public SoundCue SoundCue
     {
         get => _soundCue;
         set
         {
-            if(value is null) return;
+            if (value is null) return;
             UpdateSoundCue(value);
         }
     }
-    
-    private string _soundCuePath;
 
     public string SoundCuePath
     {
@@ -30,15 +34,11 @@ public class SoundEffectEmitter : Component<SoundEffectEmitter>
         }
     }
 
-    private SoundEffectInstance _primaryInstance;
-    private SoundEffectInstance[] _pool = new SoundEffectInstance[5];
-    private int _poolIdx = 0;
-
     public bool CullWhenOffscreen { get; set; } = false;
 
     public override void OnUpdate()
     {
-        for (int i = 0; i < _pool.Length; i++)
+        for (var i = 0; i < _pool.Length; i++)
         {
             var inst = _pool[i];
             if (inst != null && inst.State == SoundState.Stopped)
@@ -54,7 +54,7 @@ public class SoundEffectEmitter : Component<SoundEffectEmitter>
         _soundCuePath = soundCue.AssetName;
         _soundCue = soundCue;
 
-        for (int i = 0; i < _pool.Length; i++)
+        for (var i = 0; i < _pool.Length; i++)
         {
             var inst = _pool[i];
             if (inst != null)
@@ -72,7 +72,7 @@ public class SoundEffectEmitter : Component<SoundEffectEmitter>
         _primaryInstance?.Stop();
         _primaryInstance?.Dispose();
         _primaryInstance = null;
-        for (int i = 0; i < _pool.Length; i++)
+        for (var i = 0; i < _pool.Length; i++)
         {
             _pool[i]?.Stop();
             _pool[i]?.Dispose();
@@ -83,30 +83,24 @@ public class SoundEffectEmitter : Component<SoundEffectEmitter>
     public void PauseAll()
     {
         _primaryInstance?.Pause();
-        for (int i = 0; i < _pool.Length; i++)
-        {
-            _pool[i]?.Pause();
-        }
+        for (var i = 0; i < _pool.Length; i++) _pool[i]?.Pause();
     }
-    
+
     public void ResumeAll()
     {
         _primaryInstance?.Resume();
-        for (int i = 0; i < _pool.Length; i++)
-        {
-            _pool[i]?.Resume();
-        }
+        for (var i = 0; i < _pool.Length; i++) _pool[i]?.Resume();
     }
 
     public void Play(SoundCue cue)
     {
         if (cue.Takes.Length == 0) return;
 
-        int activeCount = CountActive();
+        var activeCount = CountActive();
         if (activeCount >= cue.MaxOverlaps && !cue.Loop) return;
 
         var sfxInstance = cue.GetSfxInstance();
-        
+
         sfxInstance.Volume = cue.Volume;
         sfxInstance.Pitch = cue.Pitch;
         sfxInstance.Pan = cue.Pan;
@@ -115,11 +109,10 @@ public class SoundEffectEmitter : Component<SoundEffectEmitter>
 
         if (cue.Loop)
         {
-            if(_primaryInstance == null || _primaryInstance.IsDisposed)
+            if (_primaryInstance == null || _primaryInstance.IsDisposed)
                 _primaryInstance = sfxInstance;
-            
-            var inst =  _primaryInstance;
-            
+
+            var inst = _primaryInstance;
         }
         else
         {
@@ -135,11 +128,12 @@ public class SoundEffectEmitter : Component<SoundEffectEmitter>
     private int CountActive()
     {
         var c = 0;
-        
+
         if (_primaryInstance != null && _primaryInstance.State == SoundState.Playing) c++;
-        
-        for(int i = 0; i < _pool.Length; i++)
-            if(_pool[i] != null && _pool[i].State == SoundState.Playing) c++;
+
+        for (var i = 0; i < _pool.Length; i++)
+            if (_pool[i] != null && _pool[i].State == SoundState.Playing)
+                c++;
 
         return c;
     }

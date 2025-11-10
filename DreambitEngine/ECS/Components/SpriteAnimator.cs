@@ -6,15 +6,17 @@ namespace Dreambit.ECS;
 [Require(typeof(SpriteDrawer))]
 public class SpriteAnimator : Component<SpriteAnimator>
 {
+    private readonly Dictionary<string, Action> _eventActions = [];
+
+    private string _animationPath;
     private Queue<SpriteSheetAnimation> _animationQueue = [];
     private int _currentAnimationFrame;
     private float _elapsedFrameTime;
-    private readonly Dictionary<string, Action> _eventActions = [];
 
     //internals
     [FromRequired] private SpriteDrawer _spriteDrawer;
     private float _timeToNextFrame;
-    
+
     public Action OnAnimationEnded;
     public bool IsPlaying { get; private set; }
 
@@ -25,20 +27,18 @@ public class SpriteAnimator : Component<SpriteAnimator>
     public SpriteSheetAnimation Animation { get; private set; }
     public SpriteSheet CurrentSpriteSheet { get; private set; }
 
-    private string _animationPath;
-
     public string AnimationPath
     {
-        get =>  _animationPath;
+        get => _animationPath;
         set => SetAnimation(value);
     }
 
-    
+
     public override void OnCreated()
     {
         _spriteDrawer.WithPivot(PivotType.Custom);
-        
-        if(PlayOnStart)
+
+        if (PlayOnStart)
             Play();
     }
 
@@ -135,23 +135,19 @@ public class SpriteAnimator : Component<SpriteAnimator>
     {
         if (_animationPath == animationPath)
             return;
-        
+
         _animationPath = animationPath;
         UpdateAnimation(animationPath);
     }
-    
+
     public void RegisterEvent(string eventName, Action eventAction)
     {
         if (!_eventActions.TryAdd(eventName, null))
-        {
             // Add the event action to the existing one (+= syntax allows you to chain multiple methods to the same event)
             _eventActions[eventName] += eventAction;
-        }
         else
-        {
             // If the event doesn't exist, create a new one
             _eventActions[eventName] += eventAction;
-        }
     }
 
     public void DeregisterEvent(string eventName)
@@ -180,7 +176,7 @@ public class SpriteAnimator : Component<SpriteAnimator>
     {
         var newAnimation = Resources.LoadAsset<SpriteSheetAnimation>(animPath);
         CurrentSpriteSheet = Resources.LoadAsset<SpriteSheet>(newAnimation.SpriteSheetPath);
-        
+
         Animation = newAnimation;
 
         if (Animation is null)
@@ -188,7 +184,7 @@ public class SpriteAnimator : Component<SpriteAnimator>
 
         if (CurrentSpriteSheet is null)
             return;
-        
+
         SetFrameRate(Animation.FrameRate);
         ResetInternals();
         SetAnimationFrame(0);

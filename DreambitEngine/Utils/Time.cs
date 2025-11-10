@@ -25,13 +25,13 @@ public static class Time
 
     public static float PhysicsDeltaTime { get; }
     public static float UnscaledPhysicsDeltaTime { get; }
-    
+
     public static GameTime GameTime { get; private set; }
 
     internal static void Update(GameTime gameTime)
     {
         GameTime = gameTime;
-        
+
         var dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
 
         if (dt > MaxDeltaTime)

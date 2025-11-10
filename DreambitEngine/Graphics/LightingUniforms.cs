@@ -26,7 +26,7 @@ public static class LightingUniforms
             var screen = Vector2.Transform(light.Position, camera.TransformMatrix);
 
             LightPos[count] = screen;
-            LightRadius[count] = MathF.Max(1f, light.Radius * camera.Scale);      
+            LightRadius[count] = MathF.Max(1f, light.Radius * camera.Scale);
             LightColor[count] = light.Color.ToVector3();
             LightIntensity[count] = light.Intensity;
             count++;
@@ -34,7 +34,7 @@ public static class LightingUniforms
 
         fx.Parameters["AmbientColor"]?.SetValue(ambient);
         fx.Parameters["LightCount"]?.SetValue(count);
-        
+
         fx.Parameters["LightsPos"]?.SetValue(LightPos);
         fx.Parameters["LightsRadius"]?.SetValue(LightRadius);
         fx.Parameters["LightsColor"]?.SetValue(LightColor);

@@ -17,7 +17,7 @@ public class Shape2D
     {
         return Polygon2D.Vertices;
     }
-    
+
     public bool Intersects(Shape2D other, out Vector2 mtvAxis, out float mtvDepth)
     {
         return Polygon2D.IntersectsGeneral(other.Polygon2D, out mtvAxis, out mtvDepth);
