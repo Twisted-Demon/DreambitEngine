@@ -21,8 +21,10 @@ public class Vector2Converter : PropertyConverter<Vector2>
         if (reader.TokenType != JsonToken.StartArray)
             throw new JsonSerializationException("Vector2 must be an array: [x,y].");
 
-        reader.Read(); var x = Convert.ToSingle(reader.Value, CultureInfo.InvariantCulture);
-        reader.Read(); var y = Convert.ToSingle(reader.Value, CultureInfo.InvariantCulture);
+        reader.Read();
+        var x = Convert.ToSingle(reader.Value, CultureInfo.InvariantCulture);
+        reader.Read();
+        var y = Convert.ToSingle(reader.Value, CultureInfo.InvariantCulture);
 
         if (!reader.Read() || reader.TokenType != JsonToken.EndArray)
             throw new JsonSerializationException("Vector2 must have exactly 2 elements.");

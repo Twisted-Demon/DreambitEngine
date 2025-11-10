@@ -13,16 +13,6 @@ public class SpriteSheet : DreambitAsset
     [JsonProperty("rows")] public readonly int Rows = 1;
 
     [JsonProperty("texture_path")] private string _texturePath;
-    
-    [JsonIgnore] public Texture2D Texture { get; private set; }
-
-    [JsonIgnore] public string TexturePath => _texturePath;
-
-    [JsonIgnore] public Sprite[] Frames { get; private set; } = [];
-
-    [JsonIgnore] public int FrameCount => Frames.Length;
-
-    public Sprite this[int index] => Frames[index];
 
     private SpriteSheet(int columns, int rows, string texturePath, Texture2D texture)
     {
@@ -43,11 +33,21 @@ public class SpriteSheet : DreambitAsset
 
         SplitSprite();
     }
-    
+
     public SpriteSheet()
     {
     }
-    
+
+    [JsonIgnore] public Texture2D Texture { get; private set; }
+
+    [JsonIgnore] public string TexturePath => _texturePath;
+
+    [JsonIgnore] public Sprite[] Frames { get; private set; } = [];
+
+    [JsonIgnore] public int FrameCount => Frames.Length;
+
+    public Sprite this[int index] => Frames[index];
+
     public static SpriteSheet Create(int columns, int rows, string texturePath)
     {
         var texture = Resources.LoadAsset<Texture2D>(texturePath);
@@ -68,7 +68,7 @@ public class SpriteSheet : DreambitAsset
         SplitSprite();
         AssetName = _texturePath;
     }
-    
+
     private void SplitSprite()
     {
         if (Columns < 1 || Rows < 1) return;
@@ -89,13 +89,14 @@ public class SpriteSheet : DreambitAsset
                 {
                     var x = i % Columns;
                     var y = i / Columns;
-                    
+
                     Frames[i] = new Sprite
                     {
                         Texture = Texture,
                         SourceRect = new Rectangle(x * frameWidth, y * frameHeight, frameWidth, frameHeight)
-                    };  
+                    };
                 }
+
                 break;
             }
             default:

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Dreambit.ECS;
-using Microsoft.Xna.Framework;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -11,19 +10,19 @@ namespace Dreambit;
 
 public class BlueprintResolver : Singleton<BlueprintResolver>
 {
-    public Dictionary<Type, JsonConverter> Converters { get; } = [];
-
     public BlueprintResolver()
     {
         BuildConvertersDictionary();
     }
 
+    public Dictionary<Type, JsonConverter> Converters { get; } = [];
+
     private void BuildConvertersDictionary()
     {
-        var converterTypes = 
+        var converterTypes =
             ReflectionUtils.GetAllTypesAssignableFrom(
-                typeof(IPropertyConverterMarker), 
-                onlyIncludeParameterlessConstructors: true);
+                typeof(IPropertyConverterMarker),
+                true);
 
         foreach (var type in converterTypes)
         {
@@ -35,7 +34,7 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
             Converters[target] = instance;
         }
     }
-    
+
     private static Type GetPropertyConverter(Type converterType)
     {
         for (var bt = converterType; bt != null && bt != typeof(object); bt = bt.BaseType)
@@ -44,7 +43,7 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
 
         throw new ArgumentException($"{converterType} does not inherit PropertyConverter<>");
     }
-    
+
 
     public static void ResolveComponent(ComponentBlueprint bp, Component component)
     {
@@ -63,7 +62,7 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
 
             if (prop is null || !prop.CanWrite) continue;
             var propType = prop.PropertyType;
-            
+
             object value = null;
 
             if (IsDreambitAsset(propType))
@@ -71,14 +70,14 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
                 var assetName = token.Value<string>();
                 if (string.IsNullOrWhiteSpace(assetName))
                     return;
-                
+
                 value = GetAssetReference(assetName, propType);
             }
             else
             {
                 value = ConvertJToken(token, propType);
             }
-            
+
             prop.SetValue(component, value);
         }
     }
@@ -92,7 +91,7 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
 
             if (field is null) continue;
             var fieldType = field.FieldType;
-            
+
             object value = null;
 
             if (IsDreambitAsset(fieldType))
@@ -100,14 +99,14 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
                 var assetName = token.Value<string>();
                 if (string.IsNullOrWhiteSpace(assetName))
                     return;
-                
+
                 value = GetAssetReference(assetName, fieldType);
             }
             else
             {
                 value = ConvertJToken(token, fieldType);
             }
-            
+
             field.SetValue(component, value);
         }
     }
@@ -120,9 +119,9 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
     public static object GetAssetReference(string assetName, Type assetType)
     {
         var reference = Resources.LoadDreambitAsset(assetName, assetType);
-        
-        if(reference is null)
-            Instance.Logger.Warn("Unable to serialize {0} reference {1}", assetType.Name,  assetName);
+
+        if (reference is null)
+            Instance.Logger.Warn("Unable to serialize {0} reference {1}", assetType.Name, assetName);
 
         return reference;
     }
@@ -132,7 +131,7 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
         var type = Type.GetType(typeName);
         if (type is null || !type.IsSubclassOf(typeof(Component)))
             return null;
-        
+
         return type;
     }
 
@@ -142,11 +141,11 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
         if (targetType.IsEnum)
         {
             if (token.Type == JTokenType.String)
-                return Enum.Parse(targetType, token.Value<string>()!, ignoreCase: true);
+                return Enum.Parse(targetType, token.Value<string>()!, true);
             if (token.Type == JTokenType.Integer)
                 return Enum.ToObject(targetType, token.Value<int>());
         }
-        
+
         // Nullable<T>
         var underlying = Nullable.GetUnderlyingType(targetType);
         if (underlying != null)
@@ -154,17 +153,17 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
             if (token.Type == JTokenType.Null) return null;
             return ConvertJToken(token, underlying);
         }
-        
+
         // Arrays & Lists
         if (targetType.IsArray)
         {
             var elemType = targetType.GetElementType()!;
             var arr = ((JArray)token).Select(j => ConvertJToken(j, elemType)).ToArray();
             var typedArr = Array.CreateInstance(elemType, arr.Length);
-            for (int i = 0; i < arr.Length; i++) typedArr.SetValue(arr[i], i);
+            for (var i = 0; i < arr.Length; i++) typedArr.SetValue(arr[i], i);
             return typedArr;
         }
-        
+
         if (IsGenericList(targetType, out var listElem))
         {
             var jArr = (JArray)token;
@@ -178,16 +177,16 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
         {
             var settings = new JsonSerializerSettings();
             settings.Converters.Add(converter);
-            
+
             var serializer = JsonSerializer.CreateDefault(settings);
-            
+
             return token.ToObject(targetType, serializer);
         }
-        
-        
+
+
         return token.ToObject(targetType);
     }
-    
+
     private static bool IsGenericList(Type t, out Type elem)
     {
         if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(List<>))
@@ -195,6 +194,7 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
             elem = t.GetGenericArguments()[0];
             return true;
         }
+
         elem = null!;
         return false;
     }

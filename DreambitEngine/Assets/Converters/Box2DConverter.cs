@@ -29,10 +29,10 @@ public class Box2DConverter : PropertyConverter<Box2D>
     public override Box2D ReadJson(JsonReader reader, Type objectType, Box2D existingValue, bool hasExistingValue,
         JsonSerializer serializer)
     {
-        if(reader.TokenType != JsonToken.StartArray)
+        if (reader.TokenType != JsonToken.StartArray)
             throw new JsonSerializationException("Expected Vector2[] as an array of [x,y] elements");
 
-        var list = new List<Vector2>(capacity: 4);
+        var list = new List<Vector2>(4);
 
         // Move into the outer array
         while (reader.Read() && reader.TokenType != JsonToken.EndArray)
@@ -45,17 +45,17 @@ public class Box2DConverter : PropertyConverter<Box2D>
 
             // Read [x, y]
             if (!reader.Read()) throw new JsonSerializationException("Unexpected end while reading Vector2.x.");
-            float x = Convert.ToSingle(reader.Value, CultureInfo.InvariantCulture);
+            var x = Convert.ToSingle(reader.Value, CultureInfo.InvariantCulture);
 
             if (!reader.Read()) throw new JsonSerializationException("Unexpected end while reading Vector2.y.");
-            float y = Convert.ToSingle(reader.Value, CultureInfo.InvariantCulture);
+            var y = Convert.ToSingle(reader.Value, CultureInfo.InvariantCulture);
 
             if (!reader.Read() || reader.TokenType != JsonToken.EndArray)
                 throw new JsonSerializationException("Vector2 must have exactly 2 elements.");
 
             list.Add(new Vector2(x, y));
         }
-        
+
         if (list.Count != 4)
             throw new JsonSerializationException($"Expected exactly 4 Vector2s, got {list.Count}.");
 

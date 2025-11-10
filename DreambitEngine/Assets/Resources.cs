@@ -1,20 +1,16 @@
 ﻿using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
-using System.Threading.Tasks;
 using FontStashSharp;
-using LDtk;
 using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Audio;
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
-using Microsoft.Xna.Framework.Media;
 
 namespace Dreambit;
 
 public class Resources : Singleton<Resources>
 {
+    private static readonly Dictionary<Type, IAssetLoader> Loaders = [];
     private List<IDisposable> _disposableAssets;
 
     private Dictionary<string, object> _loadedAssets;
@@ -46,19 +42,17 @@ public class Resources : Singleton<Resources>
         }
     }
 
-    private static readonly Dictionary<Type, IAssetLoader> Loaders = [];
-
     public void Init()
     {
         var loaderTypes = ReflectionUtils.GetAllTypesAssignableFrom(
             typeof(IAssetLoader),
-            onlyIncludeParameterlessConstructors: true);
+            true);
 
         foreach (var type in loaderTypes)
         {
             var instance = (IAssetLoader)Activator.CreateInstance(type);
             if (instance is null) continue;
-            
+
             Loaders[instance.TargetType] = instance;
         }
     }
@@ -75,23 +69,19 @@ public class Resources : Singleton<Resources>
         if (Instance.LoadedAssets.TryGetValue(assetName, out var rawAsset))
             if (rawAsset is T asset)
                 return asset;
-        
+
         try
         {
             Instance.Logger.Trace("Loading {0} - {1}", typeof(T).Name, assetName);
-            
+
             object asset;
             if (Loaders.TryGetValue(typeof(T), out var loader))
-            {
                 asset = loader.Load(assetName, PakName, UsePak, ContentDirectory);
-            }
             else
-            {
                 asset = Instance.Content.Load<T>(assetName);
-            }
 
             Instance.LoadedAssets[assetName] = (T)asset;
-            
+
             if (asset is IDisposable disposable)
                 Instance.DisposableAssets.Add(disposable);
 
@@ -105,28 +95,26 @@ public class Resources : Singleton<Resources>
             return null;
         }
     }
-    
+
     public static object LoadDreambitAsset(string assetName, Type type)
     {
         if (!type.IsSubclassOf(typeof(DreambitAsset)))
             return null;
-        
+
         //if we already have the asset we will return it
         if (Instance.LoadedAssets.TryGetValue(assetName, out var rawAsset))
             return rawAsset;
-        
+
         try
         {
             Instance.Logger.Trace("Loading {0} - {1}", type.Name, assetName);
 
             object asset = null;
             if (Loaders.TryGetValue(type, out var loader))
-            {
                 asset = loader.Load(assetName, PakName, UsePak, ContentDirectory);
-            }
 
             Instance.LoadedAssets[assetName] = asset;
-            
+
             if (asset is IDisposable disposable)
                 Instance.DisposableAssets.Add(disposable);
 
@@ -161,7 +149,7 @@ public class Resources : Singleton<Resources>
             if (Loaders.TryGetValue(typeof(SpriteFontBaseLoader), out var loader))
             {
                 var sfLoader = (SpriteFontBaseLoader)loader;
-                
+
                 font = sfLoader.LoadFont(assetName, ContentDirectory, fontSize);
             }
             else
@@ -169,7 +157,7 @@ public class Resources : Singleton<Resources>
                 Instance.Logger.Warn("Could not load {0} | {1}", nameof(SpriteFontBase), assetName + fontSize);
                 return null;
             }
-            
+
             Instance.LoadedAssets[assetName + fontSize] = font;
 
             var disposable = font as IDisposable;
@@ -184,8 +172,8 @@ public class Resources : Singleton<Resources>
             throw;
         }
     }
-    
-    
+
+
     private static Texture2D PremultiplyTexture(Texture2D texture)
     {
         var data = new Color[texture.Width * texture.Height];

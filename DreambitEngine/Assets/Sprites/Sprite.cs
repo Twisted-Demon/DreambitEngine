@@ -6,9 +6,8 @@ namespace Dreambit;
 
 public class Sprite : DreambitAsset
 {
-    [JsonProperty("texture")]
-    public Texture2D Texture { get; init; }
-    
+    [JsonProperty("texture")] public Texture2D Texture { get; init; }
+
     [JsonProperty("source")]
     [JsonConverter(typeof(RectangleConverter))]
     public Rectangle SourceRect { get; init; }
@@ -23,7 +22,7 @@ public class Sprite : DreambitAsset
         return new Sprite
         {
             Texture = texture,
-            SourceRect = new Rectangle(sourceX, sourceY, sourceWidth, sourceHeight),
+            SourceRect = new Rectangle(sourceX, sourceY, sourceWidth, sourceHeight)
         };
     }
 
@@ -32,7 +31,7 @@ public class Sprite : DreambitAsset
         return new Sprite
         {
             Texture = texture,
-            SourceRect = new Rectangle(sourceX, sourceY, sourceWidth, sourceHeight),
+            SourceRect = new Rectangle(sourceX, sourceY, sourceWidth, sourceHeight)
         };
     }
 
@@ -41,19 +40,19 @@ public class Sprite : DreambitAsset
         return new Sprite
         {
             Texture = texture,
-            SourceRect = sourceRect,
+            SourceRect = sourceRect
         };
     }
-    
+
     public static Sprite Create(string texturePath, Rectangle sourceRect)
     {
         var texture = Resources.LoadAsset<Texture2D>(texturePath);
         if (texture is null) return null;
-        
+
         return new Sprite
         {
             Texture = texture,
-            SourceRect = sourceRect,
+            SourceRect = sourceRect
         };
     }
 
@@ -62,7 +61,7 @@ public class Sprite : DreambitAsset
         return new Sprite
         {
             Texture = texture,
-            SourceRect = new Rectangle(0, 0, texture.Width, texture.Height),
+            SourceRect = new Rectangle(0, 0, texture.Width, texture.Height)
         };
     }
 
@@ -74,7 +73,7 @@ public class Sprite : DreambitAsset
         return new Sprite
         {
             Texture = texture,
-            SourceRect = new Rectangle(0, 0, texture.Width, texture.Height),
+            SourceRect = new Rectangle(0, 0, texture.Width, texture.Height)
         };
     }
 }

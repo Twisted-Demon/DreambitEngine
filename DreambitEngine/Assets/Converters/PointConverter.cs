@@ -18,15 +18,17 @@ public class PointConverter : PropertyConverter<Point>
     public override Point ReadJson(JsonReader reader, Type objectType, Point existingValue, bool hasExistingValue,
         JsonSerializer serializer)
     {
-        if(reader.TokenType != JsonToken.StartArray)
+        if (reader.TokenType != JsonToken.StartArray)
             throw new JsonSerializationException("Point must be an array: [x,y]");
 
-        reader.Read(); var x = Convert.ToInt32(reader.Value, CultureInfo.InvariantCulture);
-        reader.Read(); var y = Convert.ToInt32(reader.Value, CultureInfo.InvariantCulture);
-        
-        if(!reader.Read() || reader.TokenType != JsonToken.EndArray)
-            throw new  JsonSerializationException("Point must have exactly 2 elements");
-        
+        reader.Read();
+        var x = Convert.ToInt32(reader.Value, CultureInfo.InvariantCulture);
+        reader.Read();
+        var y = Convert.ToInt32(reader.Value, CultureInfo.InvariantCulture);
+
+        if (!reader.Read() || reader.TokenType != JsonToken.EndArray)
+            throw new JsonSerializationException("Point must have exactly 2 elements");
+
         return new Point(x, y);
     }
 }

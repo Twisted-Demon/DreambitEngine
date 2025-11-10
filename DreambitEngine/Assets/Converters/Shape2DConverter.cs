@@ -8,25 +8,21 @@ namespace Dreambit;
 
 public class Shape2DConverter : PropertyConverter<Shape2D>
 {
-    
     public override void WriteJson(JsonWriter writer, Shape2D value, JsonSerializer serializer)
     {
         writer.WriteStartArray();
-        foreach (var vert in value.GetVertices())
-        {
-            WriteVert(writer, vert);
-        }
+        foreach (var vert in value.GetVertices()) WriteVert(writer, vert);
         writer.WriteEndArray();
     }
 
     public override Shape2D ReadJson(JsonReader reader, Type objectType, Shape2D existingValue, bool hasExistingValue,
         JsonSerializer serializer)
     {
-        if(reader.TokenType != JsonToken.StartArray)
+        if (reader.TokenType != JsonToken.StartArray)
             throw new JsonSerializationException("Expected Vector2[] as an array of [x,y] elements");
 
         var list = new List<Vector2>();
-        
+
         // Move into the outer array
         while (reader.Read() && reader.TokenType != JsonToken.EndArray)
         {
@@ -35,10 +31,10 @@ public class Shape2DConverter : PropertyConverter<Shape2D>
 
             // Read [x, y]
             if (!reader.Read()) throw new JsonSerializationException("Unexpected end while reading Vector2.x.");
-            float x = Convert.ToSingle(reader.Value, CultureInfo.InvariantCulture);
+            var x = Convert.ToSingle(reader.Value, CultureInfo.InvariantCulture);
 
             if (!reader.Read()) throw new JsonSerializationException("Unexpected end while reading Vector2.y.");
-            float y = Convert.ToSingle(reader.Value, CultureInfo.InvariantCulture);
+            var y = Convert.ToSingle(reader.Value, CultureInfo.InvariantCulture);
 
             if (!reader.Read() || reader.TokenType != JsonToken.EndArray)
                 throw new JsonSerializationException("Vector2 must have exactly 2 elements.");
@@ -48,7 +44,7 @@ public class Shape2DConverter : PropertyConverter<Shape2D>
 
         return PolyShape2D.Create(list.ToArray());
     }
-    
+
     private static void WriteVert(JsonWriter writer, Vector2 vec)
     {
         writer.WriteStartArray();

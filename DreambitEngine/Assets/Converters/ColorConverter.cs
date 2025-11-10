@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Globalization;
 using Microsoft.Xna.Framework;
 using Newtonsoft.Json;
 
@@ -24,9 +23,12 @@ public class ColorConverter : PropertyConverter<Color>
             throw new JsonSerializationException("Color must be an array: [r,g,b] or [r,g,b,a].");
 
         // [r,g,b,(a)]
-        reader.Read(); var r = Convert.ToInt32(reader.Value);
-        reader.Read(); var g = Convert.ToInt32(reader.Value);
-        reader.Read(); var b = Convert.ToInt32(reader.Value);
+        reader.Read();
+        var r = Convert.ToInt32(reader.Value);
+        reader.Read();
+        var g = Convert.ToInt32(reader.Value);
+        reader.Read();
+        var b = Convert.ToInt32(reader.Value);
 
         byte a = 255;
         reader.Read();

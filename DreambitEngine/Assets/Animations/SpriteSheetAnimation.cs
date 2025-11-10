@@ -15,7 +15,7 @@ public class SpriteSheetAnimation : DreambitAsset
 
     [JsonProperty("one_shot", NullValueHandling = NullValueHandling.Ignore)]
     public bool OneShot { get; set; }
-    
+
     [JsonIgnore] public int FrameCount => _frames.Length;
 
     public AnimationFrame this[int key]
@@ -36,11 +36,10 @@ public class AnimationFrame
 {
     [JsonProperty("event", NullValueHandling = NullValueHandling.Ignore)]
     public AnimationEvent AnimationEvent;
-    
+
     [JsonProperty("frame_index")] public int FrameIndex { get; set; }
 
     [JsonProperty("pivot")] public Vector2 Pivot { get; set; }
-    
 }
 
 public class AnimationEvent
