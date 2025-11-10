@@ -13,9 +13,9 @@ public class SpriteSheetLoader : AssetLoaderBase
         using var s = GetStream(GetPath(assetName), pakName, usePak, contentDirectory);
         var sheet = JsnbLoader.Deserialize<SpriteSheet>(s);
         sheet.AssetName = assetName;
-        
+
         sheet.LoadSpriteSheet();
-        
+
         return sheet;
     }
 }

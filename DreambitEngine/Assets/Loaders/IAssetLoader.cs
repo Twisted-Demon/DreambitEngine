@@ -1,6 +1,5 @@
 ﻿using System;
 using System.IO;
-using System.Text;
 
 namespace Dreambit;
 
@@ -18,7 +17,7 @@ public abstract class AssetLoaderBase : IAssetLoader
     public abstract bool AddToDisposableList { get; }
     public abstract Type TargetType { get; }
     public abstract object Load(string assetName, string pakName, bool usePak, string contentDirectory);
-    
+
     protected static Stream GetStream(string assetName, string pakName, bool usePak, string contentDirectory)
     {
         if (usePak)
@@ -26,10 +25,8 @@ public abstract class AssetLoaderBase : IAssetLoader
             var pak = new PakReader(Path.Combine(contentDirectory, pakName));
             return pak.Open(assetName);
         }
-        else
-        {
-            return File.OpenRead(Path.Combine(contentDirectory, assetName));
-        }
+
+        return File.OpenRead(Path.Combine(contentDirectory, assetName));
     }
 
     protected string GetPath(string assetName)
@@ -38,7 +35,7 @@ public abstract class AssetLoaderBase : IAssetLoader
     }
 }
 
-public abstract class AssetLoaderBase<T> : AssetLoaderBase where T: class
+public abstract class AssetLoaderBase<T> : AssetLoaderBase where T : class
 {
-    protected Logger<T> Logger = new Logger<T>();
+    protected Logger<T> Logger = new();
 }

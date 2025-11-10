@@ -13,8 +13,6 @@ public class LDtkLevelLoader : AssetLoaderBase
 
     public override object Load(string assetName, string pakName, bool usePak, string contentDirectory)
     {
-        
-        
         using var s = GetStream(GetPath(assetName), pakName, usePak, contentDirectory);
         var json = JsnbLoader.GetJsonString(s);
 

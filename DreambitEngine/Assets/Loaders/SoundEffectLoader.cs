@@ -14,11 +14,11 @@ public class SoundEffectLoader : AssetLoaderBase
     {
         using var s = GetStream(GetPath(assetName), pakName, usePak, contentDirectory);
 
-        var (hdr, payload)  = AudbLoader.ReadAudb(s);
+        var (hdr, payload) = AudbLoader.ReadAudb(s);
         if (hdr.SubType != AudbLoader.AudioSubType.Wav)
             throw new NotSupportedException("Sound effect loader supports WAV only");
-        
-        using var ms = new MemoryStream(payload, writable: false);
+
+        using var ms = new MemoryStream(payload, false);
         var sfx = SoundEffect.FromStream(ms);
         sfx.Name = assetName;
         return sfx;

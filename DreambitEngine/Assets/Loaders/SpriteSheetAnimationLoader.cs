@@ -13,7 +13,7 @@ public class SpriteSheetAnimationLoader : AssetLoaderBase
         using var s = GetStream(GetPath(assetName), pakName, usePak, contentDirectory);
         var anim = JsnbLoader.Deserialize<SpriteSheetAnimation>(s);
         anim.AssetName = assetName;
-        
+
         return anim;
     }
 }
