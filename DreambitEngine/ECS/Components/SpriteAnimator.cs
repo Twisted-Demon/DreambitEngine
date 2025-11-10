@@ -4,40 +4,47 @@ using System.Collections.Generic;
 namespace Dreambit.ECS;
 
 [Require(typeof(SpriteDrawer))]
-public class SpriteAnimator : Component
+public class SpriteAnimator : Component<SpriteAnimator>
 {
-    private readonly Logger<SpriteAnimator> _logger = new();
-    private Queue<SpriteSheetAnimation> _animationQueue = [];
-    private SpriteSheetAnimation _currentAnimation;
-    private int _currentAnimationFrame;
-    private float _elapsedFrameTime;
     private readonly Dictionary<string, Action> _eventActions = [];
 
+    private string _animationPath;
+    private Queue<SpriteSheetAnimation> _animationQueue = [];
+    private int _currentAnimationFrame;
+    private float _elapsedFrameTime;
+
     //internals
-    private SpriteDrawer _spriteDrawer;
+    [FromRequired] private SpriteDrawer _spriteDrawer;
     private float _timeToNextFrame;
-    public Action OnAnimationEnd;
+
+    public Action OnAnimationEnded;
     public bool IsPlaying { get; private set; }
 
-    public SpriteSheetAnimation Animation
+    public bool PlayOnStart { get; set; } = false;
+
+    public float PlaySpeed { get; set; } = 1.0f;
+
+    public SpriteSheetAnimation Animation { get; private set; }
+    public SpriteSheet CurrentSpriteSheet { get; private set; }
+
+    public string AnimationPath
     {
-        get => _currentAnimation;
-        set
-        {
-            if (_currentAnimation == value) return;
-            UpdateAnimation(value);
-        }
+        get => _animationPath;
+        set => SetAnimation(value);
     }
+
 
     public override void OnCreated()
     {
-        _spriteDrawer = Entity.GetComponent<SpriteDrawer>();
-        _spriteDrawer.PivotType = PivotType.Custom;
+        _spriteDrawer.WithPivot(PivotType.Custom);
+
+        if (PlayOnStart)
+            Play();
     }
 
     public override void OnUpdate()
     {
-        if (_currentAnimation == null)
+        if (Animation == null)
             return;
 
         if (!IsPlaying)
@@ -48,7 +55,7 @@ public class SpriteAnimator : Component
 
     private void Run()
     {
-        _elapsedFrameTime += Time.DeltaTime;
+        _elapsedFrameTime += Time.DeltaTime * PlaySpeed;
 
         if (!(_elapsedFrameTime >= _timeToNextFrame)) return;
 
@@ -59,7 +66,7 @@ public class SpriteAnimator : Component
     private void ChangeAnimationFrame()
     {
         //if we have another frame in the animation, set the current frame to the next one
-        if (_currentAnimation.TryGetFrame(_currentAnimationFrame + 1, out var nextFrame))
+        if (Animation.TryGetFrame(_currentAnimationFrame + 1, out var nextFrame))
         {
             SetAnimationFrame(_currentAnimationFrame + 1);
             return;
@@ -71,9 +78,9 @@ public class SpriteAnimator : Component
     private void AnimationEnded()
     {
         //if we are a one shot
-        if (_currentAnimation.OneShot)
+        if (Animation.OneShot)
         {
-            OnAnimationEnd?.Invoke();
+            OnAnimationEnded?.Invoke();
 
             //load next animation if we have one queued
             if (_animationQueue.Count > 0)
@@ -86,7 +93,7 @@ public class SpriteAnimator : Component
                 Pause(); //or else just pause at the end of the oneshot.
             }
         }
-        else if (!_currentAnimation.OneShot)
+        else
         {
             SetAnimationFrame(0); //reset and loop.
         }
@@ -124,19 +131,23 @@ public class SpriteAnimator : Component
         Play();
     }
 
+    public void SetAnimation(string animationPath)
+    {
+        if (_animationPath == animationPath)
+            return;
+
+        _animationPath = animationPath;
+        UpdateAnimation(animationPath);
+    }
+
     public void RegisterEvent(string eventName, Action eventAction)
     {
-        if (_eventActions.ContainsKey(eventName))
-        {
+        if (!_eventActions.TryAdd(eventName, null))
             // Add the event action to the existing one (+= syntax allows you to chain multiple methods to the same event)
             _eventActions[eventName] += eventAction;
-        }
         else
-        {
             // If the event doesn't exist, create a new one
-            _eventActions[eventName] = null;
             _eventActions[eventName] += eventAction;
-        }
     }
 
     public void DeregisterEvent(string eventName)
@@ -147,11 +158,12 @@ public class SpriteAnimator : Component
 
     private void SetAnimationFrame(int frameNumber)
     {
-        if (_currentAnimation.TryGetFrame(frameNumber, out var nextFrame))
+        if (Animation.TryGetFrame(frameNumber, out var nextFrame))
         {
             _currentAnimationFrame = frameNumber;
-            _spriteDrawer.CurrentFrameIndex = nextFrame.FrameIndex;
-            _spriteDrawer.Pivot = nextFrame.Pivot;
+            var sprite = CurrentSpriteSheet[nextFrame.FrameIndex];
+            _spriteDrawer.SetSprite(sprite);
+            _spriteDrawer.WithPivot(nextFrame.Pivot);
 
             if (nextFrame.AnimationEvent == null) return;
 
@@ -160,16 +172,20 @@ public class SpriteAnimator : Component
         }
     }
 
-    private void UpdateAnimation(SpriteSheetAnimation newAnimation)
+    private void UpdateAnimation(string animPath)
     {
-        _currentAnimation = newAnimation;
+        var newAnimation = Resources.LoadAsset<SpriteSheetAnimation>(animPath);
+        CurrentSpriteSheet = Resources.LoadAsset<SpriteSheet>(newAnimation.SpriteSheetPath);
 
-        if (newAnimation == null)
+        Animation = newAnimation;
+
+        if (Animation is null)
             return;
 
-        _spriteDrawer.SpriteSheetPath = newAnimation.SpriteSheetPath;
+        if (CurrentSpriteSheet is null)
+            return;
 
-        SetFrameRate(newAnimation.FrameRate);
+        SetFrameRate(Animation.FrameRate);
         ResetInternals();
         SetAnimationFrame(0);
     }
@@ -187,7 +203,7 @@ public class SpriteAnimator : Component
     public override void OnDestroyed()
     {
         _spriteDrawer = null;
-        _currentAnimation = null;
+        Animation = null;
         _animationQueue.Clear();
         _animationQueue = null;
     }

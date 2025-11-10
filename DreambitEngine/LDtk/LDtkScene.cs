@@ -13,9 +13,11 @@ public class LDtkScene : Scene<LDtkScene>
 
     internal bool LoadByGuid { get; init; }
 
-    protected override void OnInitialize()
+    internal override void InitializeInternals()
     {
-        if (LDtkManager.Instance.LDtkWorld == null)
+        base.InitializeInternals();
+
+        if (LDtkManager.Instance.CurrentWorld == null)
         {
             Logger.Error("LDtk World Not Initialized, please call LDtkScene.SetUpWorld() First");
             return;
@@ -32,8 +34,6 @@ public class LDtkScene : Scene<LDtkScene>
             ? LDtkManager.Instance.LoadLDtkLevel((Guid)LevelIid!)
             : LDtkManager.Instance.LoadLDtkLevel(LevelIdentifier);
 
-        BackgroundColor = Level._BgColor;
-
         //create the LDtk Renderer
         var ldtkRenderer = CreateEntity("LDtkRenderer")
             .AttachComponent<LDtkRenderer>();
@@ -45,7 +45,7 @@ public class LDtkScene : Scene<LDtkScene>
         //set up all the entities
         LDtkManager.SetUpEntities(Level);
 
-        //BackgroundColor = Level._BgColor;
+        BackgroundColor = Level._BgColor;
     }
 
     protected override void OnEnd()

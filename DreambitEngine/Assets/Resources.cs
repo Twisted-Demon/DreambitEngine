@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
+using System.IO;
+using FontStashSharp;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
@@ -9,10 +10,14 @@ namespace Dreambit;
 
 public class Resources : Singleton<Resources>
 {
+    private static readonly Dictionary<Type, IAssetLoader> Loaders = [];
     private List<IDisposable> _disposableAssets;
 
     private Dictionary<string, object> _loadedAssets;
     private ContentManager Content { get; } = Core.Instance.Content;
+    private static string ContentDirectory => Path.Combine(AppContext.BaseDirectory, Instance.Content.RootDirectory);
+    public static bool UsePak { get; set; } = true;
+    public static string PakName { get; set; } = "content.pak";
 
     private List<IDisposable> DisposableAssets
     {
@@ -37,6 +42,21 @@ public class Resources : Singleton<Resources>
         }
     }
 
+    public void Init()
+    {
+        var loaderTypes = ReflectionUtils.GetAllTypesAssignableFrom(
+            typeof(IAssetLoader),
+            true);
+
+        foreach (var type in loaderTypes)
+        {
+            var instance = (IAssetLoader)Activator.CreateInstance(type);
+            if (instance is null) continue;
+
+            Loaders[instance.TargetType] = instance;
+        }
+    }
+
     /// <summary>
     ///     Tries to Load an asset and returns default if not found
     /// </summary>
@@ -53,37 +73,106 @@ public class Resources : Singleton<Resources>
         try
         {
             Instance.Logger.Trace("Loading {0} - {1}", typeof(T).Name, assetName);
-            var asset = Instance.Content.Load<T>(assetName);
-            Instance.Logger.Debug("Loaded {0} - {1}", typeof(T).Name, assetName);
 
-            if (asset is Texture2D texture) asset = PremultiplyTexture(texture) as T;
+            object asset;
+            if (Loaders.TryGetValue(typeof(T), out var loader))
+                asset = loader.Load(assetName, PakName, UsePak, ContentDirectory);
+            else
+                asset = Instance.Content.Load<T>(assetName);
 
-            return asset;
+            Instance.LoadedAssets[assetName] = (T)asset;
+
+            if (asset is IDisposable disposable)
+                Instance.DisposableAssets.Add(disposable);
+
+            return (T)asset;
         }
         catch (Exception e)
         {
             Instance.Logger.Warn("Could not load {0} | {1}", typeof(T).Name, assetName);
             Instance.Logger.Error(e.Message);
 
-            return default;
+            return null;
         }
     }
 
-    public static Task LoadAssetQueueAsync<T>(AssetQueue<T> assetQueue) where T : class
+    public static object LoadDreambitAsset(string assetName, Type type)
     {
-        assetQueue.IsLoading = true;
+        if (!type.IsSubclassOf(typeof(DreambitAsset)))
+            return null;
 
-        for (var i = 0; i < assetQueue.Count; i++)
+        //if we already have the asset we will return it
+        if (Instance.LoadedAssets.TryGetValue(assetName, out var rawAsset))
+            return rawAsset;
+
+        try
         {
-            if (!assetQueue.TryGetNext(out var assetName)) continue;
+            Instance.Logger.Trace("Loading {0} - {1}", type.Name, assetName);
 
-            var asset = LoadAsset<T>(assetName);
+            object asset = null;
+            if (Loaders.TryGetValue(type, out var loader))
+                asset = loader.Load(assetName, PakName, UsePak, ContentDirectory);
 
-            assetQueue.AddAsset(assetName, asset);
+            Instance.LoadedAssets[assetName] = asset;
+
+            if (asset is IDisposable disposable)
+                Instance.DisposableAssets.Add(disposable);
+
+            return asset;
         }
+        catch (Exception e)
+        {
+            Instance.Logger.Warn("Could not load {0} | {1}", type.Name, assetName);
+            Instance.Logger.Error(e.Message);
 
-        return Task.CompletedTask;
+            return null;
+        }
     }
+
+    public static void UnloadAsset(string assetName)
+    {
+        Instance.Content.UnloadAsset(assetName);
+    }
+
+    public static SpriteFontBase LoadSpriteFont(string assetName, float fontSize = 12f)
+    {
+        //if we already have the asset we will return it
+        if (Instance.LoadedAssets.TryGetValue(assetName + fontSize, out var rawAsset))
+            if (rawAsset is SpriteFontBase font)
+                return font;
+
+        try
+        {
+            Instance.Logger.Trace("Loading SpriteFontBase - {0}", assetName + fontSize);
+
+            SpriteFontBase font;
+            if (Loaders.TryGetValue(typeof(SpriteFontBaseLoader), out var loader))
+            {
+                var sfLoader = (SpriteFontBaseLoader)loader;
+
+                font = sfLoader.LoadFont(assetName, ContentDirectory, fontSize);
+            }
+            else
+            {
+                Instance.Logger.Warn("Could not load {0} | {1}", nameof(SpriteFontBase), assetName + fontSize);
+                return null;
+            }
+
+            Instance.LoadedAssets[assetName + fontSize] = font;
+
+            var disposable = font as IDisposable;
+            if (disposable != null)
+                Instance.DisposableAssets.Add(disposable);
+
+            return font;
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            throw;
+        }
+    }
+
 
     private static Texture2D PremultiplyTexture(Texture2D texture)
     {

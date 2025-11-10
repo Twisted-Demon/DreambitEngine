@@ -1,0 +1,30 @@
+﻿{
+  "name": "Alan",
+  "tags": ["enemy"],
+  "position": [0.0, 0.0, 0.0],
+  "rotation": [0.0, 0.0, 0.0],
+  "scale": [1.0, 1.0, 1.0],
+  "components": [
+    {
+      "type": "Dreambit.Examples.SpaceGame.SpaceGameEnemy, Dreambit.Examples"
+    },
+    {
+      "type": "Dreambit.ECS.BoxCollider, Dreambit",
+      "properties": {
+        "Bounds": [
+          [-7,-7],
+          [7,-7],
+          [7, 7],
+          [-7,7]
+        ]
+      }
+    },
+    {
+      "type": "Dreambit.ECS.SpriteAnimator, Dreambit",
+      "properties": {
+        "AnimationPath": "SpaceGame/Animations/alan_default",
+        "PlayOnStart": true
+      }
+    }
+  ]
+}

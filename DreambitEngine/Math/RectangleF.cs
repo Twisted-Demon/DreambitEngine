@@ -9,63 +9,63 @@ namespace Dreambit;
 [DebuggerDisplay("{DebugDisplayString,nq}")]
 public struct RectangleF : IEquatable<RectangleF>
 {
-  /// <summary>
-  ///     The x coordinate of the top-left corner of this <see cref="T:Microsoft.Xna.Framework.Rectangle" />.
-  /// </summary>
-  [DataMember] public float X;
+    /// <summary>
+    ///     The x coordinate of the top-left corner of this <see cref="T:Microsoft.Xna.Framework.Rectangle" />.
+    /// </summary>
+    [DataMember] public float X;
 
-  /// <summary>
-  ///     The y coordinate of the top-left corner of this <see cref="T:Microsoft.Xna.Framework.Rectangle" />.
-  /// </summary>
-  [DataMember] public float Y;
+    /// <summary>
+    ///     The y coordinate of the top-left corner of this <see cref="T:Microsoft.Xna.Framework.Rectangle" />.
+    /// </summary>
+    [DataMember] public float Y;
 
-  /// <summary>
-  ///     The width of this <see cref="T:Microsoft.Xna.Framework.Rectangle" />.
-  /// </summary>
-  [DataMember] public float Width;
+    /// <summary>
+    ///     The width of this <see cref="T:Microsoft.Xna.Framework.Rectangle" />.
+    /// </summary>
+    [DataMember] public float Width;
 
-  /// <summary>
-  ///     The height of this <see cref="T:Microsoft.Xna.Framework.Rectangle" />.
-  /// </summary>
-  [DataMember] public float Height;
+    /// <summary>
+    ///     The height of this <see cref="T:Microsoft.Xna.Framework.Rectangle" />.
+    /// </summary>
+    [DataMember] public float Height;
 
-  /// <summary>
-  ///     Returns a <see cref="T:Microsoft.Xna.Framework.Rectangle" /> with X=0, Y=0, Width=0, Height=0.
-  /// </summary>
-  public static RectangleF Empty { get; }
+    /// <summary>
+    ///     Returns a <see cref="T:Microsoft.Xna.Framework.Rectangle" /> with X=0, Y=0, Width=0, Height=0.
+    /// </summary>
+    public static RectangleF Empty { get; }
 
-  /// <summary>
-  ///     Returns the x coordinate of the left edge of this <see cref="T:Microsoft.Xna.Framework.Rectangle" />.
-  /// </summary>
-  public float Left => X;
+    /// <summary>
+    ///     Returns the x coordinate of the left edge of this <see cref="T:Microsoft.Xna.Framework.Rectangle" />.
+    /// </summary>
+    public float Left => X;
 
-  /// <summary>
-  ///     Returns the x coordinate of the right edge of this <see cref="T:Microsoft.Xna.Framework.Rectangle" />.
-  /// </summary>
-  public float Right => X + Width;
+    /// <summary>
+    ///     Returns the x coordinate of the right edge of this <see cref="T:Microsoft.Xna.Framework.Rectangle" />.
+    /// </summary>
+    public float Right => X + Width;
 
-  /// <summary>
-  ///     Returns the y coordinate of the top edge of this <see cref="T:Microsoft.Xna.Framework.Rectangle" />.
-  /// </summary>
-  public float Top => Y;
+    /// <summary>
+    ///     Returns the y coordinate of the top edge of this <see cref="T:Microsoft.Xna.Framework.Rectangle" />.
+    /// </summary>
+    public float Top => Y;
 
-  /// <summary>
-  ///     Returns the y coordinate of the bottom edge of this <see cref="T:Microsoft.Xna.Framework.Rectangle" />.
-  /// </summary>
-  public float Bottom => Y + Height;
+    /// <summary>
+    ///     Returns the y coordinate of the bottom edge of this <see cref="T:Microsoft.Xna.Framework.Rectangle" />.
+    /// </summary>
+    public float Bottom => Y + Height;
 
-  /// <summary>
-  ///     Whether or not this <see cref="T:Microsoft.Xna.Framework.Rectangle" /> has a
-  ///     <see cref="F:Microsoft.Xna.Framework.Rectangle.Width" /> and
-  ///     <see cref="F:Microsoft.Xna.Framework.Rectangle.Height" /> of 0, and a
-  ///     <see cref="P:Microsoft.Xna.Framework.Rectangle.Location" /> of (0, 0).
-  /// </summary>
-  public bool IsEmpty => Width == 0 && Height == 0 && X == 0 && Y == 0;
+    /// <summary>
+    ///     Whether or not this <see cref="T:Microsoft.Xna.Framework.Rectangle" /> has a
+    ///     <see cref="F:Microsoft.Xna.Framework.Rectangle.Width" /> and
+    ///     <see cref="F:Microsoft.Xna.Framework.Rectangle.Height" /> of 0, and a
+    ///     <see cref="P:Microsoft.Xna.Framework.Rectangle.Location" /> of (0, 0).
+    /// </summary>
+    public bool IsEmpty => Width == 0 && Height == 0 && X == 0 && Y == 0;
 
-  /// <summary>
-  ///     The top-left coordinates of this <see cref="T:Microsoft.Xna.Framework.Rectangle" />.
-  /// </summary>
-  public Vector2 Location
+    /// <summary>
+    ///     The top-left coordinates of this <see cref="T:Microsoft.Xna.Framework.Rectangle" />.
+    /// </summary>
+    public Vector2 Location
     {
         get => new(X, Y);
         set
@@ -75,10 +75,10 @@ public struct RectangleF : IEquatable<RectangleF>
         }
     }
 
-  /// <summary>
-  ///     The width-height coordinates of this <see cref="T:Microsoft.Xna.Framework.Rectangle" />.
-  /// </summary>
-  public Vector2 Size
+    /// <summary>
+    ///     The width-height coordinates of this <see cref="T:Microsoft.Xna.Framework.Rectangle" />.
+    /// </summary>
+    public Vector2 Size
     {
         get => new(Width, Height);
         set
@@ -88,16 +88,16 @@ public struct RectangleF : IEquatable<RectangleF>
         }
     }
 
-  /// <summary>
-  ///     A <see cref="T:Microsoft.Xna.Framework.Point" /> located in the center of this
-  ///     <see cref="T:Microsoft.Xna.Framework.Rectangle" />.
-  /// </summary>
-  /// <remarks>
-  ///     If <see cref="F:Microsoft.Xna.Framework.Rectangle.Width" /> or
-  ///     <see cref="F:Microsoft.Xna.Framework.Rectangle.Height" /> is an odd number,
-  ///     the center point will be rounded down.
-  /// </remarks>
-  public Vector2 Center => new(X + Width / 2, Y + Height / 2);
+    /// <summary>
+    ///     A <see cref="T:Microsoft.Xna.Framework.Point" /> located in the center of this
+    ///     <see cref="T:Microsoft.Xna.Framework.Rectangle" />.
+    /// </summary>
+    /// <remarks>
+    ///     If <see cref="F:Microsoft.Xna.Framework.Rectangle.Width" /> or
+    ///     <see cref="F:Microsoft.Xna.Framework.Rectangle.Height" /> is an odd number,
+    ///     the center point will be rounded down.
+    /// </remarks>
+    public Vector2 Center => new(X + Width / 2, Y + Height / 2);
 
     internal string DebugDisplayString => X + "  " + Y + "  " + Width + "  " + Height;
 

@@ -35,14 +35,10 @@ internal class ScriptFactory
                     var value = scriptData[p.Name];
                     return ConvertToExpectedType(value, p.ParameterType);
                 }
-                else if (p.IsOptional)
-                {
-                    return p.DefaultValue;
-                }
-                else
-                {
-                    return GetDefault(p.ParameterType);
-                }
+
+                if (p.IsOptional) return p.DefaultValue;
+
+                return GetDefault(p.ParameterType);
             }).ToArray();
 
             var script = (ScriptAction)Activator.CreateInstance(scriptType, paramValues);
@@ -59,15 +55,12 @@ internal class ScriptFactory
         Logger.Warn("No valid script found in YAML data.");
         return null;
     }
-    
+
     // Helper method to convert types, including arrays
     private static object ConvertToExpectedType(object value, Type targetType)
     {
-        if (value == null)
-        {
-            return null;
-        }
-        
+        if (value == null) return null;
+
         // Handle Vector2 conversion
         if (targetType == typeof(Vector2))
         {
@@ -75,13 +68,14 @@ internal class ScriptFactory
             if (valueList != null && valueList.Count == 2)
             {
                 // Assuming the List<object> contains [x, y] as floats or ints
-                float x = Convert.ToSingle(valueList[0]);
-                float y = Convert.ToSingle(valueList[1]);
+                var x = Convert.ToSingle(valueList[0]);
+                var y = Convert.ToSingle(valueList[1]);
                 return new Vector2(x, y);
             }
+
             throw new Exception("Invalid format for Vector2. Expected [x, y].");
         }
-        
+
         // Handle Vector2 conversion
         if (targetType == typeof(Vector3))
         {
@@ -89,28 +83,27 @@ internal class ScriptFactory
             if (valueList != null && valueList.Count == 2)
             {
                 // Assuming the List<object> contains [x, y] as floats or ints
-                float x = Convert.ToSingle(valueList[0]);
-                float y = Convert.ToSingle(valueList[1]);
-                float z = Convert.ToSingle(valueList[2]);
+                var x = Convert.ToSingle(valueList[0]);
+                var y = Convert.ToSingle(valueList[1]);
+                var z = Convert.ToSingle(valueList[2]);
                 return new Vector3(x, y, z);
             }
+
             throw new Exception("Invalid format for Vector2. Expected [x, y].");
         }
 
         // Handle arrays
         if (targetType.IsArray)
         {
-            Type elementType = targetType.GetElementType();
+            var elementType = targetType.GetElementType();
             var valueList = value as List<object>;
 
             if (valueList != null)
             {
                 // Convert the List<object> to the appropriate array type
-                Array array = Array.CreateInstance(elementType, valueList.Count);
-                for (int i = 0; i < valueList.Count; i++)
-                {
+                var array = Array.CreateInstance(elementType, valueList.Count);
+                for (var i = 0; i < valueList.Count; i++)
                     array.SetValue(Convert.ChangeType(valueList[i], elementType), i);
-                }
                 return array;
             }
         }

@@ -9,6 +9,80 @@ public static class Mathf
     public const float Epsilon = 0.00001f;
     public const float Deg2Rad = 0.0174532924f;
     public const float Rad2Deg = 57.29578f;
+    public const float Pi = 3.14159265358979323846f;
+    public const float TwoPi = 6.2831853071795864769f;
+    public const float HalfPi = 1.5707963267948966192f;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static float Abs(float value)
+    {
+        return value >= 0f ? value : -value;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static float Min(float min, float max)
+    {
+        return min < max ? min : max;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static float MinInt(int min, int max)
+    {
+        return min < max ? min : max;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static float Max(float min, float max)
+    {
+        return min > max ? min : max;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int MaxInt(int min, int max)
+    {
+        return min > max ? min : max;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static float Saturate(float value)
+    {
+        return Max(0f, Min(1f, value));
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static float Clamp(float value, float min, float max)
+    {
+        return Max(min, Min(max, value));
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static float Mod(float x, float y)
+    {
+        // Euclidean, result in [0,y)
+        var r = x % y;
+        return r < 0f ? r + y : r;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static float Fract(float x)
+    {
+        return x - (int)x;
+        // works for +/-; for large |x| consider bit tricks
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static float SmoothStep(float a, float b, float t)
+    {
+        t = Saturate((t - a) / (b - a));
+        return t * t * (3f - 2f * t);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static float SmootherStep(float a, float b, float t)
+    {
+        t = Saturate((t - a) / (b - a));
+        return t * t * t * (t * (t * 6f - 15f) + 10f);
+    }
 
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -31,6 +105,39 @@ public static class Mathf
         return (int)Math.Ceiling(f);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static float FMA(float a, float b, float c)
+    {
+#if NET8_0_OR_GREATER
+        // JIT recognizes and emits FMA on supported CPUs
+        return MathF.FusedMultiplyAdd(a, b, c);
+#else
+    return a * b + c;
+#endif
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void SinCos(float x, out float s, out float c)
+    {
+        // Range reduce to [-Pi,Pi]
+        x = x - TwoPi * MathF.Round(x * (1f / TwoPi)); // keep this one MathF or replace with your own Round
+
+        // Use odd/even polynomials (Estrin’s scheme)
+        var x2 = x * x;
+        // Cos approx: c ≈ 1 + x2*(-0.5 + x2*( 0.041666638 - x2*0.0013888378))
+        var c2 = FMA(x2, FMA(x2, FMA(x2, -0.0013888378f, 0.041666638f), -0.5f), 1f);
+        // Sin approx: s ≈ x + x^3*(-0.16666667 + x2*(0.0083333310 - x2*0.00019840874))
+        var s2 = FMA(x2, FMA(x2, -0.00019840874f, 0.0083333310f), -0.16666667f);
+        s = FMA(s2, x * x2, x);
+        c = c2;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static float WrapRadians(float a)
+    {
+        a = a - TwoPi * MathF.Floor(a / TwoPi);
+        return a > Pi ? a - TwoPi : a;
+    }
 
     /// <summary>
     ///     ceils the float to the nearest int value above y. note that this only works for values in the range of short
@@ -118,20 +225,6 @@ public static class Mathf
 
         return value;
     }
-
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static float Clamp(float value, float min, float max)
-    {
-        if (value < min)
-            return min;
-
-        if (value > max)
-            return max;
-
-        return value;
-    }
-
 
     /// <summary>
     ///     Restricts a value to be within a specified range.
@@ -560,7 +653,7 @@ public static class Mathf
     public static float RoundWithRoundedAmount(float value, out float roundedAmount)
     {
         var rounded = Round(value);
-        roundedAmount = value - rounded * Round(value / rounded);
+        roundedAmount = value - rounded;
         return rounded;
     }
 

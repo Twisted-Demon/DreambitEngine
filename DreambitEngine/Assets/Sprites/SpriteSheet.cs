@@ -34,7 +34,6 @@ public class SpriteSheet : DreambitAsset
         SplitSprite();
     }
 
-
     public SpriteSheet()
     {
     }
@@ -43,9 +42,11 @@ public class SpriteSheet : DreambitAsset
 
     [JsonIgnore] public string TexturePath => _texturePath;
 
-    [JsonIgnore] public Rectangle[] Frames { get; private set; } = [];
+    [JsonIgnore] public Sprite[] Frames { get; private set; } = [];
 
     [JsonIgnore] public int FrameCount => Frames.Length;
+
+    public Sprite this[int index] => Frames[index];
 
     public static SpriteSheet Create(int columns, int rows, string texturePath)
     {
@@ -61,14 +62,21 @@ public class SpriteSheet : DreambitAsset
         return texture == null ? null : new SpriteSheet(gridSize, texturePath, texture);
     }
 
-    public void SplitSprite()
+    internal void LoadSpriteSheet()
+    {
+        Texture = Resources.LoadAsset<Texture2D>(_texturePath);
+        SplitSprite();
+        AssetName = _texturePath;
+    }
+
+    private void SplitSprite()
     {
         if (Columns < 1 || Rows < 1) return;
         if (Texture == null) return;
 
-        var totalFrames = Columns * Rows;
+        var totalFrames = Mathf.MaxInt(1, Columns * Rows);
 
-        Frames = new Rectangle[totalFrames];
+        Frames = new Sprite[totalFrames];
 
         switch (Frames.Length)
         {
@@ -82,32 +90,40 @@ public class SpriteSheet : DreambitAsset
                     var x = i % Columns;
                     var y = i / Columns;
 
-                    Frames[i] = new Rectangle(x * frameWidth, y * frameHeight, frameWidth, frameHeight);
+                    Frames[i] = new Sprite
+                    {
+                        Texture = Texture,
+                        SourceRect = new Rectangle(x * frameWidth, y * frameHeight, frameWidth, frameHeight)
+                    };
                 }
 
                 break;
             }
-            case 1:
-                Frames[0] = new Rectangle(0, 0, Texture.Width, Texture.Height);
-                break;
             default:
-                Frames = new Rectangle[1];
-                Frames[0] = new Rectangle(0, 0, Texture.Width, Texture.Height);
+                Frames[0] = new Sprite
+                {
+                    Texture = Texture,
+                    SourceRect = new Rectangle(0, 0, Texture.Width, Texture.Height)
+                };
                 break;
         }
     }
 
-    public bool TryGetFrame(int frame, out Rectangle frameRect)
+    public bool TryGetFrame(int frame, out Sprite sprite)
     {
         try
         {
-            frameRect = Frames[frame];
+            sprite = Frames[frame];
             return true;
         }
         catch
         {
             Logger.Warn("Frame out of bounds, unable to get frame using default source rect");
-            frameRect = new Rectangle(0, 0, Texture.Width, Texture.Height);
+            sprite = new Sprite
+            {
+                Texture = Texture,
+                SourceRect = new Rectangle(0, 0, Texture.Width, Texture.Height)
+            };
             return false;
         }
     }

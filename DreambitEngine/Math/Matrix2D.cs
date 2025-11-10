@@ -158,8 +158,7 @@ public struct Matrix2D : IEquatable<Matrix2D>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Matrix2D CreateRotation(float radians)
     {
-        Matrix2D result;
-        CreateRotation(radians, out result);
+        CreateRotation(radians, out var result);
         return result;
     }
 
@@ -192,8 +191,7 @@ public struct Matrix2D : IEquatable<Matrix2D>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Matrix2D CreateScale(float scale)
     {
-        Matrix2D result;
-        CreateScale(scale, scale, out result);
+        CreateScale(scale, scale, out var result);
         return result;
     }
 
@@ -253,8 +251,7 @@ public struct Matrix2D : IEquatable<Matrix2D>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Matrix2D CreateScale(Vector2 scale)
     {
-        Matrix2D result;
-        CreateScale(ref scale, out result);
+        CreateScale(ref scale, out var result);
         return result;
     }
 
@@ -287,8 +284,7 @@ public struct Matrix2D : IEquatable<Matrix2D>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Matrix2D CreateTranslation(float xPosition, float yPosition)
     {
-        Matrix2D result;
-        CreateTranslation(xPosition, yPosition, out result);
+        CreateTranslation(xPosition, yPosition, out var result);
         return result;
     }
 
@@ -320,8 +316,7 @@ public struct Matrix2D : IEquatable<Matrix2D>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Matrix2D CreateTranslation(Vector2 position)
     {
-        Matrix2D result;
-        CreateTranslation(ref position, out result);
+        CreateTranslation(ref position, out var result);
         return result;
     }
 

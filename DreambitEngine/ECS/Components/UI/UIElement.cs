@@ -2,6 +2,7 @@
 
 namespace Dreambit.ECS;
 
+[Require(typeof(Canvas))]
 public abstract class UIElement : UIComponent
 {
     public Canvas Canvas { get; internal set; }
@@ -13,6 +14,7 @@ public abstract class UIElement : UIComponent
     public PivotType PivotType { get; set; } = PivotType.Center;
 
     public Vector2 Pivot { get; set; }
+
 
     public Vector2 GetScreenPos()
     {

@@ -9,7 +9,7 @@ namespace Dreambit;
 public class LDtkEntity<T> : LDtkEntity where T : new()
 {
     protected Scene Scene = Core.Instance.CurrentScene;
-    
+
     protected Entity CreateEntity<TU>(TU data, string name = null, HashSet<string> tags = null) where TU : ILDtkEntity
     {
         name ??= data.Identifier;
@@ -25,14 +25,18 @@ public class LDtkEntity<T> : LDtkEntity where T : new()
     {
         if (tilesetRect == null) return;
 
-        var sprite = entity.AttachComponent<SpriteDrawer>();
+        var drawer = entity.AttachComponent<SpriteDrawer>();
 
-        sprite.Pivot = new Vector2(data.Pivot.X * tilesetRect.W, data.Pivot.Y * tilesetRect.H);
-        sprite.PivotType = PivotType.Custom;
-        sprite.Color = color ?? data.SmartColor;
+        drawer.WithPivot(new Vector2(data.Pivot.X * tilesetRect.W, data.Pivot.Y * tilesetRect.H));
+        drawer.WithPivot(PivotType.Custom);
+        drawer.WithTint(color ?? data.SmartColor);
 
-        sprite.SpriteSheet = LDtkManager.Instance.SpriteSheets[tilesetRect.TilesetUid];
-        sprite.FrameRect = tilesetRect;
+        var sprite = new Sprite
+        {
+            Texture = LDtkManager.Instance.SpriteSheets[tilesetRect.TilesetUid].Texture,
+            SourceRect = tilesetRect
+        };
+        drawer.SetSprite(sprite);
     }
 
     protected PolyShapeCollider CreatePolyCollider(Entity entity, Point[] points, Vector2 entityPosition)
@@ -40,7 +44,7 @@ public class LDtkEntity<T> : LDtkEntity where T : new()
         var verts = points.Select(p => new Vector2(p.X, p.Y) - entityPosition).ToArray();
 
         var bounds = entity.AttachComponent<PolyShapeCollider>();
-        var shape = PolyShape.Create(verts);
+        var shape = PolyShape2D.Create(verts);
         bounds.SetShape(shape);
         return bounds;
     }

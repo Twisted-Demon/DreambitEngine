@@ -5,15 +5,8 @@ namespace Dreambit.ECS;
 
 public class Canvas : UIComponent
 {
-    private int _targetHeight;
-    private int _targetWidth;
     private List<UIElement> _uiComponents = [];
 
-    internal void UpdateInternalCanvasSize(int targetHeight)
-    {
-        _targetHeight = targetHeight;
-        _targetWidth = (int)(Window.AspectRatio * _targetHeight);
-    }
 
     public override void OnDrawUI()
     {
@@ -22,16 +15,20 @@ public class Canvas : UIComponent
 
     internal Vector2 ConvertToScreenCoord(Vector2 position)
     {
-        var xScale = _targetWidth / (float)100;
-        var yScale = _targetHeight / (float)100;
+        var camera = Scene.UICamera;
+
+        var xScale = camera.Bounds.Width / (float)100;
+        var yScale = camera.Bounds.Height / (float)100;
 
         return new Vector2(position.X * xScale, position.Y * yScale);
     }
 
     internal Vector2 ConvertToScreenSize(Vector2 size)
     {
-        var xScale = _targetWidth / 100;
-        var yScale = _targetHeight / 100;
+        var camera = Scene.UICamera;
+
+        var xScale = camera.Bounds.Width / 100;
+        var yScale = camera.Bounds.Height / 100;
 
         return new Vector2(size.X * xScale, size.Y * yScale);
     }
@@ -42,13 +39,16 @@ public class Canvas : UIComponent
 
         var entity = Entity.CreateChildOf(Entity, name);
         var uiElement = entity.AttachComponent<T>();
-        uiElement.Canvas = this;
 
-        _uiComponents.Add(uiElement);
+        foreach (var component in entity.GetAllComponents())
+            if (component is UIElement element)
+            {
+                element.Canvas = this;
+                _uiComponents.Add(element);
+            }
 
         return uiElement;
     }
-
 
     public static (Canvas canvas, Entity entity) Create()
     {

@@ -3,10 +3,26 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace Dreambit.ECS;
 
+[Require(typeof(Canvas))]
 public class UITexture : UIElement
 {
     private string _texturePath = string.Empty;
+
+    public string TexturePath
+    {
+        get => _texturePath;
+        set
+        {
+            if (_texturePath == value)
+                return;
+
+            _texturePath = value;
+            Texture = Resources.LoadAsset<Texture2D>(_texturePath);
+        }
+    }
+
     public Texture2D Texture { get; private set; }
+
     public bool HorizontalFlip { get; set; } = false;
     public bool VerticalFlip { get; set; } = false;
 
@@ -15,7 +31,10 @@ public class UITexture : UIElement
 
     public float Margin { get; set; } = 0;
 
-    public bool CanScale { get; set; } = false;
+    public bool CanScale { get; set; } = true;
+
+    public override Rectangle Bounds => GetDestinationRect();
+
 
     public static UITexture Create(Canvas canvas, string texturePath, PivotType pivotType = PivotType.Center,
         Vector2? pivot = null)

@@ -1,160 +1,209 @@
 ﻿using System.Collections.Generic;
 using Dreambit.ECS;
+using Microsoft.Xna.Framework;
 
 namespace Dreambit;
 
 public class PhysicsSystem : Singleton<PhysicsSystem>
 {
-    private List<Collider> Colliders { get; } = [];
-    private Dictionary<string, List<Collider>> CollidersByTag { get; } = [];
+    private readonly Dictionary<string, List<Collider>> _byTag = [];
+    private readonly List<Collider> _candidateList = new(256);
 
-    public void RegisterCollider(Collider collider)
+    //scratch buffers to avoid allocs per frame
+    private readonly HashSet<Collider> _candidateSet = new(256);
+    private readonly List<Collider> _colliders = [];
+    private readonly SpatialHash _grid = new(16f);
+
+    public void RegisterCollider(Collider c)
     {
-        if (!Colliders.Contains(collider)) Colliders.Add(collider);
+        if (!_colliders.Contains(c)) _colliders.Add(c);
 
-        var tags = collider.Entity.Tags;
+        var tags = c.Entity.Tags;
 
         foreach (var tag in tags)
         {
-            if (!CollidersByTag.ContainsKey(tag))
-                CollidersByTag.Add(tag, []);
-
-            if (CollidersByTag[tag].Contains(collider))
-                continue;
-
-            CollidersByTag[tag].Add(collider);
+            if (!_byTag.TryGetValue(tag, out var list)) _byTag[tag] = list = new List<Collider>(64);
+            if (!list.Contains(c)) list.Add(c);
         }
+
+        var poly = c.GetTransformedPolygon();
+        _grid.InsertOrUpdate(c, poly.ComputeAABB());
     }
 
-    public void DeregisterCollider(Collider collider)
+    public void DeregisterCollider(Collider c)
     {
-        Colliders.Remove(collider);
+        _colliders.Remove(c);
 
-        foreach (var tag in CollidersByTag.Keys) CollidersByTag[tag].Remove(collider);
+        foreach (var tag in _byTag.Keys) _byTag[tag].Remove(c);
+        _grid.Remove(c);
+    }
+
+    /// <summary>
+    ///     This should be called when a collider's transform/shape changes
+    /// </summary>
+    /// <param name="c"></param>
+    public void Touch(Collider c)
+    {
+        var poly = c.GetTransformedPolygon();
+        _grid.InsertOrUpdate(c, poly.ComputeAABB());
     }
 
     public void CleanUp()
     {
-        Colliders.Clear();
+        _colliders.Clear();
+        _byTag.Clear();
+        _grid.Clear();
     }
 
-    public bool ColliderCast(Collider @this, out CollisionResult collisionResult)
+    public bool ColliderCast(Collider @this, out CollisionResult result)
     {
-        collisionResult = new CollisionResult();
+        result = new CollisionResult();
+        if (@this == null) return false;
 
-        foreach (var other in Colliders)
+
+        _candidateSet.Clear();
+        var ap = @this.GetTransformedPolygon();
+        var aabb = ap.ComputeAABB();
+
+        _candidateSet.Add(@this);
+        _grid.QueryAABB(aabb, _candidateSet);
+
+        foreach (var other in _candidateSet)
         {
-            if (@this == null) continue;
-            if (other == @this) continue;
-            if (other == null) continue;
-
+            if (other == null || other == @this) continue;
             if (!other.Enabled || !other.Entity.Enabled) continue;
 
-            var polygon = @this.GetTransformedPolygon();
-            var otherPolygon = other.GetTransformedPolygon();
-
-            if (!polygon.Intersects(otherPolygon)) continue;
-
-            collisionResult.Collisions.Add(other);
+            var bp = other.GetTransformedPolygon();
+            if (!ap.Intersects(bp)) continue;
+            result.Collisions.Add(other);
         }
 
-        return collisionResult.Collisions.Count > 0;
+        return result.Collisions.Count > 0;
     }
 
-    public bool ColliderCastByTag(Collider @this, out CollisionResult collisionResult, params string[] tags)
+
+    public bool ColliderCastByTag(Collider @this, out CollisionResult result, params string[] tags)
     {
-        collisionResult = new CollisionResult();
+        result = new CollisionResult();
+        if (@this == null) return false;
+
+        _candidateSet.Clear();
+        var ap = @this.GetTransformedPolygon();
+        var aabb = ap.ComputeAABB();
+
+        _candidateSet.Add(@this);
+        _grid.QueryAABB(aabb, _candidateSet);
 
         foreach (var tag in tags)
         {
-            if (!CollidersByTag.TryGetValue(tag, out var value))
-
-                continue;
-            foreach (var other in value)
+            if (!_byTag.TryGetValue(tag, out var tagged)) continue;
+            foreach (var other in tagged)
             {
-                if (@this == null) continue;
-                if (other == @this) continue;
-                if (other == null) continue;
-
+                if (!_candidateSet.Contains(other)) continue;
+                if (other == null || other == @this) continue;
                 if (!other.Enabled || !other.Entity.Enabled) continue;
 
-                var polygon = @this.GetTransformedPolygon();
-                var otherPolygon = other.GetTransformedPolygon();
-
-                if (!polygon.Intersects(otherPolygon)) continue;
-
-                collisionResult.Collisions.Add(other);
+                var op = other.GetTransformedPolygon();
+                if (!ap.Intersects(op)) continue;
+                result.Collisions.Add(other);
             }
         }
 
-        return collisionResult.Collisions.Count > 0;
+        return result.Collisions.Count > 0;
     }
 
-    public bool PolygonCastByTag(Polygon @this, out CollisionResult collisionResult, params string[] tags)
+    public bool PointCast(Vector2 p, out CollisionResult result)
     {
-        collisionResult = new CollisionResult();
+        result = new CollisionResult();
 
-        foreach (var tag in tags)
-        {
-            if (!CollidersByTag.TryGetValue(tag, out var value))
-                continue;
+        _candidateList.Clear();
+        _grid.QueryPoint(p, _candidateList);
 
-            foreach (var other in value)
-            {
-                if (other == null || !other.Enabled || !other.Entity.Enabled) continue;
+        _candidateSet.Clear();
+        for (var i = 0; i < _candidateList.Count; i++) _candidateSet.Add(_candidateList[i]);
 
-                var otherPolygon = other.GetTransformedPolygon();
-
-                if (!@this.Intersects(otherPolygon)) continue;
-
-                collisionResult.Collisions.Add(other);
-            }
-        }
-
-        return collisionResult.Collisions.Count > 0;
-    }
-
-    public bool RayCastByTag(Ray2D ray, out CollisionResult collisionResult, params string[] tags)
-    {
-        collisionResult = new CollisionResult();
-        foreach (var tag in tags)
-        {
-            if (!CollidersByTag.TryGetValue(tag, out var value))
-                continue;
-
-            foreach (var other in value)
-            {
-                if (other == null) continue;
-
-                if (!other.Enabled || !other.Entity.Enabled) continue;
-
-                var otherPoly = other.GetTransformedPolygon();
-                if (!otherPoly.RayIntersects(ray.Start, ray.End, out _)) continue;
-
-                collisionResult.Collisions.Add(other);
-            }
-        }
-
-        return collisionResult.Collisions.Count > 0;
-    }
-
-    public bool RayCast(Ray2D ray, out CollisionResult collisionResult)
-    {
-        collisionResult = new CollisionResult();
-
-        foreach (var other in Colliders)
+        foreach (var other in _candidateSet)
         {
             if (other == null) continue;
-
             if (!other.Enabled || !other.Entity.Enabled) continue;
 
-            var otherPoly = other.GetTransformedPolygon();
-            if (!otherPoly.RayIntersects(ray.Start, ray.End, out _)) continue;
-
-            collisionResult.Collisions.Add(other);
+            var poly = other.GetTransformedPolygon();
+            if (!poly.ContainsPoint(p)) continue;
+            result.Collisions.Add(other);
         }
 
-        return collisionResult.Collisions.Count > 0;
+        return result.Collisions.Count > 0;
+    }
+
+    public bool PointCastByTag(Vector2 p, out CollisionResult result, params string[] tags)
+    {
+        result = new CollisionResult();
+
+        _candidateList.Clear();
+        _grid.QueryPoint(p, _candidateList);
+
+        _candidateSet.Clear();
+        for (var i = 0; i < _candidateList.Count; i++) _candidateSet.Add(_candidateList[i]);
+
+        foreach (var tag in tags)
+        {
+            if (!_byTag.TryGetValue(tag, out var tagged)) continue;
+            foreach (var other in tagged)
+            {
+                if (!_candidateSet.Contains(other)) continue;
+                if (!other.Enabled || !other.Entity.Enabled) continue;
+                var poly = other.GetTransformedPolygon();
+                if (poly.ContainsPoint(p)) result.Collisions.Add(other);
+            }
+        }
+
+        return result.Collisions.Count > 0;
+    }
+
+    public bool RayCast(Ray2D ray, out CollisionResult result)
+    {
+        result = new CollisionResult();
+
+        _candidateList.Clear();
+        _grid.QueryRay(ray.Start, ray.End, _candidateList);
+
+        _candidateSet.Clear();
+        for (var i = 0; i < _candidateList.Count; i++) _candidateSet.Add(_candidateList[i]);
+
+        foreach (var other in _candidateSet)
+        {
+            if (other == null) continue;
+            if (!other.Enabled || !other.Entity.Enabled) continue;
+            var poly = other.GetTransformedPolygon();
+            if (!poly.RayIntersects(ray.Start, ray.End, out _)) continue;
+            result.Collisions.Add(other);
+        }
+
+        return result.Collisions.Count > 0;
+    }
+
+    public bool RayCastByTag(Ray2D ray, out CollisionResult result, params string[] tags)
+    {
+        result = new CollisionResult();
+        _candidateList.Clear();
+        _grid.QueryRay(ray.Start, ray.End, _candidateList);
+
+        _candidateSet.Clear();
+        for (var i = 0; i < _candidateList.Count; i++) _candidateSet.Add(_candidateList[i]);
+
+        foreach (var tag in tags)
+        {
+            if (!_byTag.TryGetValue(tag, out var tagged)) continue;
+            foreach (var other in tagged)
+            {
+                if (!_candidateSet.Contains(other)) continue;
+                if (!other.Enabled || !other.Entity.Enabled) continue;
+                var poly = other.GetTransformedPolygon();
+                if (poly.RayIntersects(ray.Start, ray.End, out _)) result.Collisions.Add(other);
+            }
+        }
+
+        return result.Collisions.Count > 0;
     }
 }
 

@@ -1,5 +1,6 @@
 ﻿using Dreambit.BriGame.Components;
 using Dreambit.ECS;
+using Dreambit.ECS.Audio;
 using LDtk;
 using Microsoft.Xna.Framework;
 
@@ -22,5 +23,16 @@ public partial class PlayerStart : LDtkEntity<PlayerStart>
         lightComponent.Color = Color.White;
         lightComponent.Radius = 75f;
         lightComponent.Intensity = 0.5f;
+
+        entity.AttachComponent<SoundListener2d>();
+
+        var collider = Entity.CreateChildOf(entity, "Player Collider", ["player"])
+            .AttachComponent<BoxCollider>();
+        
+        collider.SetShape(Box2D.CreateRectangle(new Vector2(0, -5), 5, 10));
+        collider.IsTrigger = true;
+        collider.IsSilent = false;
+        collider.IsQueryable = false;
+        collider.InterestedIn = ["foliage"];
     }
 }

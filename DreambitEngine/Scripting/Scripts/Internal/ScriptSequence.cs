@@ -20,7 +20,7 @@ public class ScriptSequence
                 script.IsStarted = false;
             }
         }
-        
+
         return queue;
     }
 

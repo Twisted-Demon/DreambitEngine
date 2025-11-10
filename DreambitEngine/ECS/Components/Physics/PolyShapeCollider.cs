@@ -2,8 +2,8 @@
 
 public class PolyShapeCollider : Collider
 {
-    public void SetShape(PolyShape shape)
+    public void SetShape(PolyShape2D shape2D)
     {
-        Bounds = shape;
+        Bounds = shape2D;
     }
 }

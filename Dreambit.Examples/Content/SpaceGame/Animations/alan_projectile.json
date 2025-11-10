@@ -1,0 +1,15 @@
+﻿{
+  "frames": [
+    {
+      "frame_index": 0,
+      "pivot": "7,7"
+    },
+    {
+      "frame_index": 1,
+      "pivot": "7,7"
+    }
+  ],
+  "frame_rate": 8,
+  "sprite_sheet_path": "SpaceGame/SpriteSheets/enemy_projectile",
+  "one_shot": false
+}

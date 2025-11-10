@@ -2,5 +2,5 @@
 
 public static class Fonts
 {
-    public const string Default = "Fonts/monogram-font";
+    public const string Default = "Fonts/monogram";
 }

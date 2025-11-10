@@ -9,7 +9,7 @@ public class RectDrawer : DrawableComponent
     public int Width = 32;
     public override Rectangle Bounds => GetBounds();
 
-    public PivotType PivotType { get; set; } = PivotType.TopRight;
+    public PivotType PivotType { get; set; } = PivotType.Center;
 
     public Vector2 Pivot { get; set; }
 

@@ -7,11 +7,11 @@ public class Quadtree<T>
 {
     private const int MaxObjects = 12; // Maximum objects in a node before it splits
     private const int MaxLevels = 8; // Maximum levels to prevent infinite recursion
-    private Rectangle _bounds; // Bounding box of this node
     private readonly List<(T Entity, Vector2 Position)> _entities; // Entities in this node
 
     private readonly int _level; // Current level of this node
     private readonly Quadtree<T>[] _nodes; // Child nodes (NE, NW, SW, SE)
+    private Rectangle _bounds; // Bounding box of this node
 
     public Quadtree(int level, Rectangle bounds)
     {

@@ -1,12 +1,22 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Reflection;
 
 namespace Dreambit.ECS;
 
+public abstract class Component<T> : Component where T : Component
+{
+    protected new static readonly ILogger Logger = new Logger<T>();
+}
+
 public abstract class Component : IDisposable
 {
-    private bool _enabled;
+    protected static readonly ILogger Logger = new Logger<Component>();
+    private bool _enabled = true;
+    private bool _guarded = true;
     private bool _isDisposed;
     internal bool IsDestroyed;
+    internal IReadOnlyList<Type> RequiredComponentTypes = [];
 
     public Transform Transform => Entity?.Transform;
 
@@ -23,9 +33,9 @@ public abstract class Component : IDisposable
             _enabled = value;
 
             if (value)
-                OnEnabled();
+                Enable();
             else
-                OnDisabled();
+                Disable();
         }
     }
 
@@ -40,18 +50,46 @@ public abstract class Component : IDisposable
         Dispose(false);
     }
 
-    internal virtual Component SetUp(Entity entity, bool enabled)
+    internal virtual Component SetUpAndCreateChildren(Entity entity, bool enabled = true)
     {
         Entity = entity;
         _enabled = enabled;
 
-        ProcessAttributes();
+        RequiredComponentTypes = GetRequiredComponents();
 
+        foreach (var cType in RequiredComponentTypes) Entity.AttachComponent(cType);
+        MapRequiredFieldComponents();
         return this;
     }
 
-    private void ProcessAttributes()
+    internal static Component BpFromType(Type type, Entity entity, bool enabled = true)
     {
+        if (!type.IsSubclassOf(typeof(Component)))
+        {
+            Logger.Warn("{0} is not a valid component type on deserialization", type.FullName);
+            return null;
+        }
+
+        // check if already created, if not create a new one
+        var component =
+            entity.GetComponent(type) ??
+            (Component)Activator.CreateInstance(type);
+
+        if (component is null)
+            return null;
+
+        component.Entity = entity;
+        component._enabled = enabled;
+        component.RequiredComponentTypes = component.GetRequiredComponents();
+
+
+        return component;
+    }
+
+    private IReadOnlyList<Type> GetRequiredComponents()
+    {
+        var list = new List<Type>();
+
         var attributes = Attribute.GetCustomAttributes(GetType());
         foreach (var attribute in attributes)
         {
@@ -62,13 +100,69 @@ public abstract class Component : IDisposable
                 var hasRequired = Entity.HasComponentOfType(requiredType);
                 if (hasRequired) continue;
 
-                Entity.AttachComponent(requiredType);
+                list.Add(requiredType);
             }
+        }
+
+        return list;
+    }
+
+    internal void MapRequiredFieldComponents()
+    {
+        const BindingFlags flags =
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+
+        var type = GetType();
+
+        var fields = type.GetFields(flags);
+        foreach (var field in fields)
+        {
+            var attribute = field.GetCustomAttribute<FromRequiredAttribute>();
+            if (attribute == null) continue;
+
+            var requiredType = field.FieldType;
+            var requiredComponent = Entity.GetComponent(requiredType);
+
+            if (requiredComponent is null)
+                Logger.Warn("{0} unable to reference component. Ensure use of Require component attribute",
+                    requiredType.FullName);
+
+            field.SetValue(this, requiredComponent);
+        }
+
+        var props = type.GetProperties(flags);
+        foreach (var prop in props)
+        {
+            var attribute = prop.GetCustomAttribute<FromRequiredAttribute>();
+            if (attribute == null) continue;
+
+            var requiredType = prop.PropertyType;
+            var requiredComponent = Entity.GetComponent(requiredType);
+
+            if (requiredComponent is null)
+                Logger.Warn("{0} unable to reference component. Ensure use of Require component attribute",
+                    requiredType.FullName);
+
+            prop.SetValue(this, requiredComponent);
         }
     }
 
     /// <summary>
-    ///     Gets called immediately when the component is created. Imagine this is an Initialization function
+    ///     Gets called immediately before the component is de-serialized
+    /// </summary>
+    public virtual void OnBeforeDeserialize()
+    {
+    }
+
+    /// <summary>
+    ///     Gets called immediately after the component is de-serialized
+    /// </summary>
+    public virtual void OnAfterDeserialize()
+    {
+    }
+
+    /// <summary>
+    ///     Gets called immediately when the component is instantiated and serialized.
     /// </summary>
     public virtual void OnCreated()
     {
@@ -121,16 +215,77 @@ public abstract class Component : IDisposable
     }
 
     /// <summary>
+    ///     Called every physics update during the loop of the game
+    /// </summary>
+    public virtual void OnPhysicsUpdate()
+    {
+    }
+
+    /// <summary>
     ///     Called if debug mode is activated. Used to render debug data.
     /// </summary>
     public virtual void OnDebugDraw()
     {
     }
 
+    internal void BeforeDeserialize()
+    {
+        if (!_guarded) return;
+        _guarded = Guard.SafeCall(OnBeforeDeserialize, "OnBeforeDeserialize");
+    }
+
+    internal void AfterDeserialize()
+    {
+        if (!_guarded) return;
+        _guarded = Guard.SafeCall(OnAfterDeserialize, "OnAfterDeserialize");
+    }
+
+    internal void Create()
+    {
+        if (!_guarded) return;
+        _guarded = Guard.SafeCall(OnCreated, "OnCreated");
+    }
+
+    internal void AddToEntity()
+    {
+        if (!_guarded) return;
+        _guarded = Guard.SafeCall(OnAddedToEntity, "OnAddedToEntity");
+    }
+
+    internal void Update()
+    {
+        if (!_guarded) return;
+        _guarded = Guard.SafeCall(OnUpdate, "OnUpdate");
+    }
+
+    internal void PhysicsUpdate()
+    {
+        if (!_guarded) return;
+        _guarded = Guard.SafeCall(OnPhysicsUpdate, "OnPhysicsUpdate");
+    }
+
+    internal void RemoveFromEntity()
+    {
+        if (!_guarded) return;
+        _guarded = Guard.SafeCall(OnRemovedFromEntity, "OnRemovedFromEntity");
+    }
+
+    internal void Enable()
+    {
+        if (!_guarded) return;
+        _guarded = Guard.SafeCall(OnEnabled, "OnEnable");
+    }
+
+    internal void Disable()
+    {
+        if (!_guarded) return;
+        _guarded = Guard.SafeCall(OnDisabled, "OnDisable");
+    }
+
     internal void Destroy()
     {
         IsDestroyed = true;
-        OnDestroyed();
+        _guarded = Guard.SafeCall(OnDestroyed, "OnDestroyed");
     }
 
     public static bool operator ==(Component a, Component b)
@@ -196,10 +351,10 @@ public class SingletonComponent<T> : Component where T : SingletonComponent<T>
 {
     public static T Instance { get; private set; }
 
-    internal override Component SetUp(Entity entity, bool enabled)
+    internal override Component SetUpAndCreateChildren(Entity entity, bool enabled)
     {
         Instance = this as T;
 
-        return base.SetUp(entity, enabled);
+        return base.SetUpAndCreateChildren(entity, enabled);
     }
 }
