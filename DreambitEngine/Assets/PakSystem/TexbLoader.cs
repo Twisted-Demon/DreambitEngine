@@ -29,7 +29,7 @@ public static class TexbLoader
         s.ReadExactly(head[..4]);
         var flags = BinaryPrimitives.ReadUInt32LittleEndian(head[..4]);
 
-        var tex = new Texture2D(GraphicsUtil.Device, w, h, mips > 1, SurfaceFormat.Color);
+        var tex = new Texture2D(Graphics.Device, w, h, mips > 1, SurfaceFormat.Color);
 
         for (var mip = 0; mip < mips; mip++)
         {

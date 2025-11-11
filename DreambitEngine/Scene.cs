@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using Dreambit.ECS;
-using Dreambit.Graphics;
 using Dreambit.Scripting;
 using Microsoft.Xna.Framework;
 

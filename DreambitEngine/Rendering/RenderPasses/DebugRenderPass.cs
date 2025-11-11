@@ -1,6 +1,6 @@
 ﻿using Microsoft.Xna.Framework.Graphics;
 
-namespace Dreambit.Graphics;
+namespace Dreambit;
 
 public class DebugRenderPass : RenderPass
 {
