@@ -365,7 +365,7 @@ public class Scene : IDisposable
     /// <returns></returns>
     public Entity CreateEntity(
         EntityBlueprint blueprint,
-        bool enabled = true,
+        bool? enabled = true,
         Vector3? createAt = null,
         Vector3? rotation = null,
         Vector3? scale = null)
@@ -381,32 +381,36 @@ public class Scene : IDisposable
             rot = rotation.Value;
         if (scale.HasValue)
             scl = scale.Value;
+        if(enabled.HasValue)
+            en = enabled.Value;
 
-        var entity = Entities.CreateEntity(blueprint.Name, blueprint.Tags, enabled, pos, rot, scl, blueprint.Guid);
+        var rootEntity = Entities.CreateEntity(blueprint.Name, blueprint.Tags, en, pos, rot, scl);
+        blueprint.WorldGuid = rootEntity.Id;
         foreach (var childBp in blueprint.Children)
         {
-            CreateChildOfEntity(childBp, entity);
+            CreateChildOfEntity(childBp, rootEntity);
         }
 
         var entityFamilyTree = blueprint.FlattenedHirearchy().ToArray();
         
+        
         foreach (var bp in entityFamilyTree)
         {
-            entity = FindEntity(bp.Guid);
-            entity.BuildComponentsFromBlueprint(blueprint);
+            var entity = FindEntity(bp.WorldGuid);
+            entity.BuildComponentsFromBlueprint(bp);
         }
         foreach (var bp in entityFamilyTree)
         {
-            entity = FindEntity(bp.Guid);
-            entity.DeserializeComponentsFromBlueprints(blueprint);
+            var entity = FindEntity(bp.WorldGuid);
+            entity.DeserializeComponentsFromBlueprints(bp);
         }
         foreach (var bp in entityFamilyTree)
         {
-            entity = FindEntity(bp.Guid);
+            var entity = FindEntity(bp.WorldGuid);
             entity.CallComponentOnCreateAfterDeserialized();
         }
         
-        return entity;
+        return rootEntity;
     }
 
     public Entity CreateChildOfEntity(
@@ -418,9 +422,10 @@ public class Scene : IDisposable
         var scl = blueprint.Scale;
         var en = blueprint.Enabled;
         
-
+        
         var entity = Entities.CreateEntity(blueprint.Name, blueprint.Tags, blueprint.Enabled, pos, 
-            rot, scl, blueprint.Guid);
+            rot, scl);
+        blueprint.WorldGuid = entity.Id;
         
         entity.Parent = parent;
         foreach (var childBp in blueprint.Children)

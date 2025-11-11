@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Xna.Framework;
 
 namespace Dreambit.ECS;
@@ -321,7 +322,11 @@ public class Entity : IDisposable
             component.BeforeDeserialize();
             try
             {
-                BlueprintResolver.ResolveComponent(componentBlueprint, component);
+                BlueprintResolver.ResolveComponent(
+                    componentBlueprint, 
+                    ebp.FlattenedHirearchy()
+                        .ToDictionary(x => x.Guid, x => x), 
+                    component);
             }
             catch (Exception e)
             {

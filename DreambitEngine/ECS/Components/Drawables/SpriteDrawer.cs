@@ -30,6 +30,8 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
     {
         get
         {
+            if (Sprite is null) return new Rectangle(0, 0, 1, 1);
+            
             var originToUse = Pivot;
 
             if (PivotType != PivotType.Custom)

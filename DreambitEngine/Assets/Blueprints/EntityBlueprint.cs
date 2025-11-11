@@ -12,7 +12,7 @@ public class EntityBlueprint : DreambitAsset
     public string Name { get; set; } = string.Empty;
     
     [JsonProperty("guid")] public Guid Guid { get; set; } = Guid.NewGuid();
-
+    [JsonIgnore] public Guid WorldGuid { get; set; } = Guid.NewGuid();
     [JsonProperty("tags")] public HashSet<string> Tags { get; set; } = [];
 
     [JsonProperty("enabled")] public bool Enabled { get; set; } = true;

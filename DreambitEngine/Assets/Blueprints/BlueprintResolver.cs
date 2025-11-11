@@ -45,15 +45,21 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
     }
 
 
-    public static void ResolveComponent(ComponentBlueprint bp, Component component)
+    public static void ResolveComponent(ComponentBlueprint bp, 
+        Dictionary<Guid, EntityBlueprint> blueprintMap, 
+        Component component)
     {
         var type = component.GetType();
 
-        ResolveProperties(type, bp, component);
-        ResolveFields(type, bp, component);
+        ResolveProperties(type, bp, blueprintMap, component);
+        ResolveFields(type, bp, blueprintMap, component);
     }
 
-    private static void ResolveProperties(Type type, ComponentBlueprint bp, Component component)
+    private static void ResolveProperties(
+        Type type, 
+        ComponentBlueprint bp, 
+        Dictionary<Guid, EntityBlueprint> blueprintMap, 
+        Component component)
     {
         foreach (var (propName, token) in bp.Properties)
         {
@@ -73,6 +79,29 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
 
                 value = GetAssetReference(assetName, propType);
             }
+            else if (IsComponentReference(propType))
+            {
+                // parse the uuid string
+                var uidString =  token.Value<string>();
+                if (string.IsNullOrWhiteSpace(uidString))
+                    return;
+
+                if (Guid.TryParse(uidString, out var blueprintGuid))
+                {
+                    //get the blueprint of the reference, then the world entity
+                    if (!blueprintMap.TryGetValue(blueprintGuid, out var bpReference)) 
+                        return;
+                    var referenceGuid = bpReference.WorldGuid;
+                    var entityReference = Scene.Instance.FindEntity(referenceGuid);
+
+                    //get the component reference
+                    var componentReference = entityReference?.GetComponent(propType);
+                    if (componentReference is null) return;
+                    
+                    //set the value
+                    value = componentReference;
+                }
+            }
             else
             {
                 value = ConvertJToken(token, propType);
@@ -82,7 +111,11 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
         }
     }
 
-    private static void ResolveFields(Type type, ComponentBlueprint bp, Component component)
+    private static void ResolveFields(
+        Type type, 
+        ComponentBlueprint bp, 
+        Dictionary<Guid, EntityBlueprint> blueprintMap, 
+        Component component)
     {
         foreach (var (propName, token) in bp.Properties)
         {
@@ -101,6 +134,26 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
                     return;
 
                 value = GetAssetReference(assetName, fieldType);
+            } 
+            else if (IsComponentReference(fieldType))
+            {
+                // parse the uuid string
+                var uidString =  token.Value<string>();
+                if (string.IsNullOrWhiteSpace(uidString))
+                    return;
+
+                if (Guid.TryParse(uidString, out var referenceGuid))
+                {
+                    //get the entity,
+                    var entityReference = Scene.Instance.FindEntity(referenceGuid);
+
+                    //get the component reference
+                    var componentReference = entityReference?.GetComponent(fieldType);
+                    if (componentReference is null) return;
+                    
+                    //set the value
+                    value = componentReference;
+                }
             }
             else
             {
@@ -114,6 +167,11 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
     private static bool IsDreambitAsset(Type type)
     {
         return type.IsSubclassOf(typeof(DreambitAsset));
+    }
+
+    private static bool IsComponentReference(Type type)
+    {
+        return type.IsSubclassOf(typeof(Component));
     }
 
     public static object GetAssetReference(string assetName, Type assetType)
