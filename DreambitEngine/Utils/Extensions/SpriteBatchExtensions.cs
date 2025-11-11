@@ -137,24 +137,27 @@ public static class SpriteBatchExtensions
             _ => Vector2.Zero
         };
     }
-
+    
+    
     // Draw a Line
     public static void DrawLine(this SpriteBatch spriteBatch, Vector2 start, Vector2 end, Color color,
         float thickness = 1f)
     {
         EnsurePixelTextureExists(spriteBatch.GraphicsDevice);
 
-        var edge = end - start;
-        var angle = (float)Math.Atan2(edge.Y, edge.X);
-
-        spriteBatch.Draw(PixelTexture,
-            new Rectangle((int)start.X, (int)start.Y, (int)edge.Length(), (int)thickness),
+        var distance = Vector2.Distance(start, end);
+        var angle = Mathf.Atan2(end.Y - start.Y, end.X - start.X);
+        
+        spriteBatch.Draw(
+            PixelTexture,
+            start,
             null,
             color,
             angle,
             Vector2.Zero,
+            new Vector2(distance, thickness),
             SpriteEffects.None,
-            0);
+            0f);
     }
 
     // Draw a line
@@ -163,17 +166,19 @@ public static class SpriteBatchExtensions
     {
         EnsurePixelTextureExists(spriteBatch.GraphicsDevice);
 
-        var edge = end - start;
-        var angle = (float)Math.Atan2(edge.Y, edge.X);
-
-        spriteBatch.Draw(PixelTexture,
-            new Rectangle((int)start.X, (int)start.Y, (int)edge.Length(), (int)thickness),
+        var distance = Vector3.Distance(start, end);
+        var angle = Mathf.Atan2(end.Y - start.Y, end.X - start.X);
+        
+        spriteBatch.Draw(
+            PixelTexture,
+            start.ToVector2(),
             null,
             color,
             angle,
             Vector2.Zero,
+            new Vector2(distance, thickness),
             SpriteEffects.None,
-            0);
+            0f);
     }
 
     //Draw a polygon
