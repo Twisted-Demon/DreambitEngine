@@ -61,7 +61,7 @@ public class RenderPipeline(Scene scene) : IDisposable
         Core.Instance.GraphicsDevice.SetRenderTarget(null);
         Core.Instance.GraphicsDevice.Clear(scene.BackgroundColor);
 
-        Core.SpriteBatch.Begin(SpriteSortMode.Deferred, BlendState.Opaque, scene.RenderingOptions.SamplerState);
+        Core.SpriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, scene.RenderingOptions.SamplerState);
 
         Core.SpriteBatch.Draw(SceneRenderTarget, Vector2.Zero, Color.White);
 
