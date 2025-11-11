@@ -8,14 +8,14 @@ namespace Dreambit;
 
 public static class SpriteBatchExtensions
 {
-    private static Texture2D _pixelTexture;
+    public static Texture2D PixelTexture;
 
-    private static void EnsurePixelTextureExists(GraphicsDevice graphicsDevice)
+    public static void EnsurePixelTextureExists(GraphicsDevice graphicsDevice)
     {
-        if (_pixelTexture == null)
+        if (PixelTexture == null)
         {
-            _pixelTexture = new Texture2D(graphicsDevice, 1, 1);
-            _pixelTexture.SetData([Color.White]);
+            PixelTexture = new Texture2D(graphicsDevice, 1, 1);
+            PixelTexture.SetData([Color.White]);
         }
     }
 
@@ -147,7 +147,7 @@ public static class SpriteBatchExtensions
         var edge = end - start;
         var angle = (float)Math.Atan2(edge.Y, edge.X);
 
-        spriteBatch.Draw(_pixelTexture,
+        spriteBatch.Draw(PixelTexture,
             new Rectangle((int)start.X, (int)start.Y, (int)edge.Length(), (int)thickness),
             null,
             color,
@@ -166,7 +166,7 @@ public static class SpriteBatchExtensions
         var edge = end - start;
         var angle = (float)Math.Atan2(edge.Y, edge.X);
 
-        spriteBatch.Draw(_pixelTexture,
+        spriteBatch.Draw(PixelTexture,
             new Rectangle((int)start.X, (int)start.Y, (int)edge.Length(), (int)thickness),
             null,
             color,
@@ -218,7 +218,7 @@ public static class SpriteBatchExtensions
 
         var pos = new Vector2(point.X - thickness * 0.5f, point.Y - thickness * 0.5f);
 
-        spriteBatch.Draw(_pixelTexture, pos, null, color, 0, Vector2.Zero, thickness, SpriteEffects.None, 0);
+        spriteBatch.Draw(PixelTexture, pos, null, color, 0, Vector2.Zero, thickness, SpriteEffects.None, 0);
     }
 
     // Draw a Filled Rectangle
@@ -226,7 +226,7 @@ public static class SpriteBatchExtensions
     {
         EnsurePixelTextureExists(spriteBatch.GraphicsDevice);
 
-        spriteBatch.Draw(_pixelTexture, rectangle, color);
+        spriteBatch.Draw(PixelTexture, rectangle, color);
     }
 
     //draw a filled rectangle with a square
