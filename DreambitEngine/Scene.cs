@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Dreambit.ECS;
 using Dreambit.Scripting;
 using Microsoft.Xna.Framework;
@@ -381,12 +382,52 @@ public class Scene : IDisposable
         if (scale.HasValue)
             scl = scale.Value;
 
-        var entity = Entities.CreateEntity(blueprint.Name, blueprint.Tags, enabled, pos, rot, scl);
+        var entity = Entities.CreateEntity(blueprint.Name, blueprint.Tags, enabled, pos, rot, scl, blueprint.Guid);
+        foreach (var childBp in blueprint.Children)
+        {
+            CreateChildOfEntity(childBp, entity);
+        }
 
-        entity.BuildComponentsFromBlueprint(blueprint);
-        entity.DeserializeComponentsFromBlueprints(blueprint);
-        entity.CallComponentOnCreateAfterDeserialized();
+        var entityFamilyTree = blueprint.FlattenedHirearchy().ToArray();
+        
+        foreach (var bp in entityFamilyTree)
+        {
+            entity = FindEntity(bp.Guid);
+            entity.BuildComponentsFromBlueprint(blueprint);
+        }
+        foreach (var bp in entityFamilyTree)
+        {
+            entity = FindEntity(bp.Guid);
+            entity.DeserializeComponentsFromBlueprints(blueprint);
+        }
+        foreach (var bp in entityFamilyTree)
+        {
+            entity = FindEntity(bp.Guid);
+            entity.CallComponentOnCreateAfterDeserialized();
+        }
+        
+        return entity;
+    }
 
+    public Entity CreateChildOfEntity(
+        EntityBlueprint blueprint,
+        Entity parent)
+    {
+        var pos = blueprint.Position;
+        var rot = blueprint.Rotation;
+        var scl = blueprint.Scale;
+        var en = blueprint.Enabled;
+        
+
+        var entity = Entities.CreateEntity(blueprint.Name, blueprint.Tags, blueprint.Enabled, pos, 
+            rot, scl, blueprint.Guid);
+        
+        entity.Parent = parent;
+        foreach (var childBp in blueprint.Children)
+        {
+            CreateChildOfEntity(childBp, entity);
+        }
+        
         return entity;
     }
 

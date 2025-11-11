@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Xna.Framework;
 using Newtonsoft.Json;
 
@@ -9,7 +10,7 @@ public class EntityBlueprint : DreambitAsset
 {
     [JsonProperty("name", Required = Required.Always)]
     public string Name { get; set; } = string.Empty;
-
+    
     [JsonProperty("guid")] public Guid Guid { get; set; } = Guid.NewGuid();
 
     [JsonProperty("tags")] public HashSet<string> Tags { get; set; } = [];
@@ -31,4 +32,21 @@ public class EntityBlueprint : DreambitAsset
     public Vector3 Scale { get; set; } = new(1, 1, 1);
 
     [JsonProperty("components")] public List<ComponentBlueprint> Components { get; set; } = [];
+    
+    [JsonProperty("children")] public IEnumerable<EntityBlueprint> Children { get; set; } = [];
+
+    public IEnumerable<EntityBlueprint> FlattenedHirearchy()
+    {
+        var stack = new Stack<EntityBlueprint>();
+        stack.Push(this);
+
+        while (stack.TryPop(out var ent))
+        {
+            yield return ent;
+            foreach (var child in ent.Children.Reverse())
+            {
+                stack.Push(child);
+            }
+        }
+    }
 }
