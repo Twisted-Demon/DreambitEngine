@@ -212,8 +212,14 @@ public class Scene : IDisposable
     /// </summary>
     private void UpdateInternals()
     {
+        _coroutineScheduler.Update();
         ScriptingManager.Update();
         Entities.OnTick();
+    }
+
+    private void EndOfFrame()
+    {
+        _coroutineScheduler.EndOfFrame();
     }
 
     /// <summary>
@@ -271,6 +277,7 @@ public class Scene : IDisposable
             case SceneState.Running:
                 UpdateInternals();
                 Guard.SafeCall(OnUpdate, "OnUpdate");
+                EndOfFrame();
                 break;
 
             case SceneState.Ending:
@@ -292,6 +299,7 @@ public class Scene : IDisposable
         {
             Guard.SafeCall(OnPhysicsUpdate, "OnPhysicsUpdate");
             Guard.SafeCall(Entities.OnPhysicsTick, "Entities.OnPhysicsTick");
+            Guard.SafeCall(_coroutineScheduler.FixedUpdate,  "Coroutines.FixedUpdate");
         }
     }
 

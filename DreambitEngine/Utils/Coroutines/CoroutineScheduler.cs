@@ -7,42 +7,21 @@ namespace Dreambit;
 
 internal sealed class CoroutineScheduler : ICoroutineService
 {
-    private sealed class Node
-    {
-        public IYieldInstruction CurrentYield;
-        public IEnumerator Enumerator;
-        public int Id;
-        public Node Next;
-        public object Owner;
-        public readonly Stack<IEnumerator> Stack = new(8);
-        public bool WaitingEndOfFrame;
-        public bool WaitingFixedUpdate;
-
-        public void Reset()
-        {
-            Id = 0;
-            Owner = null;
-            Enumerator = null;
-            CurrentYield = null;
-            Stack.Clear();
-            WaitingEndOfFrame = false;
-            WaitingFixedUpdate = false;
-            Next = null;
-        }
-    }
-
-    private ILogger _logger = new Logger<CoroutineScheduler>();
-    
-    private Node _head;
     private readonly Dictionary<int, Node> _byId = [];
-    private readonly Stack<Node> _pool = [];
-    private int _idSeq = 1;
 
     private readonly List<Node> _endOfFrameQueue = new(64);
     private readonly List<Node> _fixedQueue = new(64);
-    
-    public CoroutineHandle StartCoroutine(IEnumerator routine) => StartCoroutineInternal(routine, owner: null);
-    public CoroutineHandle StartCoroutine(IEnumerator routine, object owner) => StartCoroutineInternal(routine, owner);
+    private readonly Stack<Node> _pool = [];
+
+    private Node _head;
+    private int _idSeq = 1;
+
+    private readonly ILogger _logger = new Logger<CoroutineScheduler>();
+
+    public CoroutineHandle StartCoroutine(IEnumerator routine)
+    {
+        return StartCoroutineInternal(routine, null);
+    }
 
     public void StopCoroutine(CoroutineHandle handle)
     {
@@ -55,34 +34,72 @@ internal sealed class CoroutineScheduler : ICoroutineService
         if (owner == null)
         {
             var cur = _head;
-            while (cur != null) { var next = cur.Next; Recycle(cur); cur = next; }
-            _head = null; _byId.Clear(); _endOfFrameQueue.Clear(); _fixedQueue.Clear();
-        }
-        else
-        {
-            var cur = _head; Node prev = null;
             while (cur != null)
             {
                 var next = cur.Next;
-                if (ReferenceEquals(cur.Owner, owner)) { Unlink(prev, cur); Recycle(cur); }
-                else prev = cur;
+                Recycle(cur);
+                cur = next;
+            }
+
+            _head = null;
+            _byId.Clear();
+            _endOfFrameQueue.Clear();
+            _fixedQueue.Clear();
+        }
+        else
+        {
+            var cur = _head;
+            Node prev = null;
+            while (cur != null)
+            {
+                var next = cur.Next;
+                if (ReferenceEquals(cur.Owner, owner))
+                {
+                    Unlink(prev, cur);
+                    Recycle(cur);
+                }
+                else
+                {
+                    prev = cur;
+                }
+
                 cur = next;
             }
         }
     }
-    
-    public bool IsRunning(CoroutineHandle h) => h.IsValid && _byId.ContainsKey(h.Id);
+
+    public bool IsRunning(CoroutineHandle h)
+    {
+        return h.IsValid && _byId.ContainsKey(h.Id);
+    }
+
+    public CoroutineHandle StartCoroutine(IEnumerator routine, object owner)
+    {
+        return StartCoroutineInternal(routine, owner);
+    }
 
     public void Update()
     {
         var clock = CoroutineClock.Now();
 
-        var cur = _head; Node prev = null;
+        var cur = _head;
+        Node prev = null;
         while (cur != null)
         {
             var next = cur.Next;
-            if (cur.WaitingFixedUpdate) { prev = cur; cur = next; continue; }
-            if (cur.WaitingEndOfFrame)  { prev = cur; cur = next; continue; }
+            if (cur.WaitingFixedUpdate)
+            {
+                prev = cur;
+                cur = next;
+                continue;
+            }
+
+            if (cur.WaitingEndOfFrame)
+            {
+                prev = cur;
+                cur = next;
+                continue;
+            }
 
             if (!TickCoroutine(cur, clock))
             {
@@ -93,6 +110,7 @@ internal sealed class CoroutineScheduler : ICoroutineService
             {
                 prev = cur;
             }
+
             cur = next;
         }
 
@@ -103,9 +121,10 @@ internal sealed class CoroutineScheduler : ICoroutineService
             if (cur.WaitingEndOfFrame) _endOfFrameQueue.Add(cur);
             cur = cur.Next;
         }
+
         foreach (var n in _endOfFrameQueue) n.WaitingEndOfFrame = false;
     }
-    
+
     public void FixedUpdate()
     {
         var clock = CoroutineClock.NowFixed();
@@ -117,24 +136,22 @@ internal sealed class CoroutineScheduler : ICoroutineService
             if (cur.WaitingFixedUpdate) _fixedQueue.Add(cur);
             cur = cur.Next;
         }
+
         foreach (var n in _fixedQueue)
         {
             n.WaitingFixedUpdate = false;
             TickCoroutine(n, clock);
         }
     }
-    
+
     public void EndOfFrame()
     {
         var clock = CoroutineClock.Now(); // EoF usually shares the frame clock
 
-        foreach (var n in _endOfFrameQueue)
-        {
-            TickCoroutine(n, clock);
-        }
+        foreach (var n in _endOfFrameQueue) TickCoroutine(n, clock);
         _endOfFrameQueue.Clear();
     }
-    
+
     private bool TickCoroutine(Node node, CoroutineClock clock)
     {
         try
@@ -147,22 +164,24 @@ internal sealed class CoroutineScheduler : ICoroutineService
                     node.WaitingEndOfFrame = true;
                     return true;
                 }
+
                 if (node.CurrentYield is WaitForFixedUpdate fx)
                 {
                     fx.pending = false;
                     node.WaitingFixedUpdate = true;
                     return true;
                 }
+
                 if (node.CurrentYield.KeepWaiting(clock)) return true;
                 node.CurrentYield = null;
             }
 
-            IEnumerator e = node.Enumerator ?? PopEnumerator(node);
+            var e = node.Enumerator ?? PopEnumerator(node);
             while (true)
             {
                 if (e == null) return false;
 
-                bool moved = e.MoveNext();
+                var moved = e.MoveNext();
                 if (!moved)
                 {
                     e = PopEnumerator(node);
@@ -171,7 +190,7 @@ internal sealed class CoroutineScheduler : ICoroutineService
                     continue;
                 }
 
-                object yielded = e.Current;
+                var yielded = e.Current;
 
                 if (yielded == null)
                 {
@@ -189,12 +208,14 @@ internal sealed class CoroutineScheduler : ICoroutineService
                         node.WaitingEndOfFrame = true;
                         return true;
                     }
+
                     if (yi is WaitForFixedUpdate fx2)
                     {
                         fx2.pending = true;
                         node.WaitingFixedUpdate = true;
                         return true;
                     }
+
                     return true;
                 }
 
@@ -221,12 +242,12 @@ internal sealed class CoroutineScheduler : ICoroutineService
             return false;
         }
     }
-    
+
     private CoroutineHandle StartCoroutineInternal(IEnumerator routine, object owner)
     {
         if (routine == null) return default;
 
-        var node = (_pool.Count > 0) ? _pool.Pop() : new Node();
+        var node = _pool.Count > 0 ? _pool.Pop() : new Node();
         node.Reset();
         node.Id = ++_idSeq;
         node.Owner = owner;
@@ -237,15 +258,22 @@ internal sealed class CoroutineScheduler : ICoroutineService
         _byId[node.Id] = node;
         return new CoroutineHandle(node.Id);
     }
-    
+
     private void Remove(Node node)
     {
         Node prev = null, cur = _head;
         while (cur != null)
         {
-            if (ReferenceEquals(cur, node)) { Unlink(prev, cur); break; }
-            prev = cur; cur = cur.Next;
+            if (ReferenceEquals(cur, node))
+            {
+                Unlink(prev, cur);
+                break;
+            }
+
+            prev = cur;
+            cur = cur.Next;
         }
+
         Recycle(node);
     }
 
@@ -261,8 +289,38 @@ internal sealed class CoroutineScheduler : ICoroutineService
         node.Reset();
         _pool.Push(node);
     }
-    
-    private static void PushEnumerator(Node n, IEnumerator e) => n.Stack.Push(e);
-    private static IEnumerator PopEnumerator(Node n) => n.Stack.Count > 0 ? n.Stack.Pop() : null;
 
+    private static void PushEnumerator(Node n, IEnumerator e)
+    {
+        n.Stack.Push(e);
+    }
+
+    private static IEnumerator PopEnumerator(Node n)
+    {
+        return n.Stack.Count > 0 ? n.Stack.Pop() : null;
+    }
+
+    private sealed class Node
+    {
+        public readonly Stack<IEnumerator> Stack = new(8);
+        public IYieldInstruction CurrentYield;
+        public IEnumerator Enumerator;
+        public int Id;
+        public Node Next;
+        public object Owner;
+        public bool WaitingEndOfFrame;
+        public bool WaitingFixedUpdate;
+
+        public void Reset()
+        {
+            Id = 0;
+            Owner = null;
+            Enumerator = null;
+            CurrentYield = null;
+            Stack.Clear();
+            WaitingEndOfFrame = false;
+            WaitingFixedUpdate = false;
+            Next = null;
+        }
+    }
 }
