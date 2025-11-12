@@ -18,6 +18,8 @@ public abstract class Component : IDisposable
     internal bool IsDestroyed;
     internal IReadOnlyList<Type> RequiredComponentTypes = [];
 
+    protected ICoroutineService CoroutineService => Core.Instance.CurrentScene.CoroutineService;
+
     public Transform Transform => Entity?.Transform;
 
     public Entity Entity { get; internal set; }

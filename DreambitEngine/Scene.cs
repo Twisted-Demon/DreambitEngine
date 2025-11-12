@@ -22,6 +22,7 @@ public class Scene : IDisposable
         Entities = new EntityRepository(this);
         Drawables = new DrawableRepository();
         ScriptingManager = new ScriptingManager();
+        _coroutineScheduler = new CoroutineScheduler();
 
         PostProcessSettings = new PostProcessSettings();
         RenderingOptions = new RenderingOptions();
@@ -93,12 +94,17 @@ public class Scene : IDisposable
     /// <summary>Tracks disposal state to avoid double-dispose.</summary>
     private bool _isDisposed;
 
+    private readonly CoroutineScheduler _coroutineScheduler;
+
     #endregion
 
     #region Public Members & Properties
 
     /// <summary>Convenience access to the active scene from the core.</summary>
     public static Scene Instance => Core.Instance.CurrentScene;
+
+    /// <summary>Access to the coroutine system</summary>
+    public ICoroutineService CoroutineService => _coroutineScheduler;
 
     /// <summary>Current scene lifecycle state.</summary>
     public SceneState State { get; internal set; }

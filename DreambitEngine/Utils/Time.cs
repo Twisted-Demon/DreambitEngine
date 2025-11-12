@@ -22,9 +22,13 @@ public static class Time
     public static ulong FrameCount { get; private set; }
 
     public static int FrameRate { get; private set; }
-
-    public static float PhysicsDeltaTime { get; }
-    public static float UnscaledPhysicsDeltaTime { get; }
+    
+    public static float ScaledTime { get; private set; }
+    public static float UnscaledTime => TotalTime;
+    public static float PhysicsDeltaTime { get; private set; }
+    public static float UnscaledPhysicsDeltaTime { get; private set; }
+    public static float PhysicsTime { get; private set; }
+    public static float UnscaledPhysicsTime { get; private set; }
 
     public static GameTime GameTime { get; private set; }
 
@@ -36,17 +40,26 @@ public static class Time
 
         if (dt > MaxDeltaTime)
             dt = MaxDeltaTime;
-        TotalTime += dt;
-        DeltaTime = dt * TimeScale;
+
+        TotalTime += dt;                        // unscaled
+        UnscaledDeltaTime = dt;                 // unscaled frame dt
+
+        DeltaTime = dt * TimeScale;             // scaled frame dt
         AltDeltaTime = dt * AltTimeScale;
-        UnscaledDeltaTime = dt;
+
+        ScaledTime += DeltaTime;                // <<< accumulate scaled time >>>
         TimeSinceSceneLoaded += dt;
         FrameCount++;
         FrameRate = Mathf.RoundToInt(1 / DeltaTime);
     }
 
-    internal static void UpdatePhysicsTime()
+    internal static void UpdatePhysicsTime(float fixedUnscaledDelta)
     {
+        UnscaledPhysicsDeltaTime = fixedUnscaledDelta;             // unscaled fixed dt
+        PhysicsDeltaTime = fixedUnscaledDelta * TimeScale;         // scaled fixed dt
+
+        UnscaledPhysicsTime += UnscaledPhysicsDeltaTime;           // advance clocks
+        PhysicsTime += PhysicsDeltaTime;
     }
 
     internal static void SceneLoaded()
