@@ -212,9 +212,10 @@ public class Scene : IDisposable
     /// </summary>
     private void UpdateInternals()
     {
-        _coroutineScheduler.Update();
+        
         ScriptingManager.Update();
         Entities.OnTick();
+        _coroutineScheduler.Update();
     }
 
     private void EndOfFrame()

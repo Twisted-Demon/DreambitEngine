@@ -1,4 +1,6 @@
-﻿namespace Dreambit;
+﻿using System.ComponentModel;
+
+namespace Dreambit;
 
 public abstract class State
 {
@@ -11,6 +13,8 @@ public abstract class State
     ///     fully-qualified identifier
     /// </summary>
     public string Identifier { get; internal set; } = null;
+    
+    protected ICoroutineService CoroutineService => Core.Instance.CurrentScene.CoroutineService;
 
     /// <summary>
     ///     Called once after the State instance is created and registered.
