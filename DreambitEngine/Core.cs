@@ -71,8 +71,8 @@ public class Core : Game
         Dreambit.Window.Tick(gameTime);
 
         UpdateDebug();
-
-        Input.PreUpdate();
+        
+        InputSystem.Instance.Update();
         {
             if (NextScene != null)
                 ChangeScenes();
@@ -80,7 +80,7 @@ public class Core : Game
             HandlePhysics();
             CurrentScene.Tick();
         }
-        Input.PostUpdate();
+        InputSystem.Instance.PostUpdate();
 
         base.Update(gameTime);
     }
