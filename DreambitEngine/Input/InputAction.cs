@@ -8,7 +8,7 @@ public sealed class InputAction
 {
     public string Name { get; set; }
     public InputActionType Type { get; set; }
-    public float Deadzone { get; set; } = 0.001f;
+    public float DeadZone { get; set; } = 0.001f;
     public bool Enabled { get; private set; } = true;
 
     private readonly List<InputBinding> _bindings = new(4);
@@ -16,8 +16,6 @@ public sealed class InputAction
     private float _time;
     private float _v1;
     private Vector2 _v2;
-
-    private ILogger _logger = new Logger<InputAction>();
     
     public event Action<InputActionContext> Started;
     public event Action<InputActionContext> Performed;
@@ -80,10 +78,10 @@ public sealed class InputAction
             {
                 var v = 0f;
                 for (var i = 0; i < _bindings.Count; i++) v += _bindings[i].Read1D();
-                if(Mathf.Abs(v) < Deadzone) v = 0f;
+                if(Mathf.Abs(v) < DeadZone) v = 0f;
                 
-                var wasZero = Mathf.Abs(_v1) < Deadzone;
-                var isZero = Mathf.Abs(v) < Deadzone;
+                var wasZero = Mathf.Abs(_v1) < DeadZone;
+                var isZero = Mathf.Abs(v) < DeadZone;
 
                 if (wasZero && !isZero)
                 {
@@ -110,10 +108,10 @@ public sealed class InputAction
             {
                 var v = Microsoft.Xna.Framework.Vector2.Zero;
                 for (var i = 0; i < _bindings.Count; i++) v += _bindings[i].Read2D();
-                if (v.LengthSquared() < Deadzone * Deadzone) v = Microsoft.Xna.Framework.Vector2.Zero;
+                if (v.LengthSquared() < DeadZone * DeadZone) v = Microsoft.Xna.Framework.Vector2.Zero;
 
-                var wasZero = _v2.LengthSquared() < Deadzone * Deadzone;
-                var isZero  = v.LengthSquared()   < Deadzone * Deadzone;
+                var wasZero = _v2.LengthSquared() < DeadZone * DeadZone;
+                var isZero  = v.LengthSquared()   < DeadZone * DeadZone;
 
                 if (wasZero && !isZero)
                 {

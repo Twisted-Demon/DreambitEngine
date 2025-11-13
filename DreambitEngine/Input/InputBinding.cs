@@ -12,6 +12,7 @@ public struct InputBinding
     public MouseButton MouseButton { get; private set; }
 
     public Axis1D Axis { get; private set; }
+    public Axis2D Axis2D { get; private set; }
     public float Scale { get; private set; }
 
     public  Keys Up { get; private set; }
@@ -38,8 +39,11 @@ public struct InputBinding
     public static InputBinding AxisType(Axis1D axis, float scale = 1f) =>
         new(BindingType.Axis1D) { Axis = axis, Scale = scale == 0 ? 1f : scale };
     
-    public static InputBinding Composite2DType(Keys up, Keys down, Keys left, Keys right) =>
-        new(BindingType.Composite2D) { Up = up, Down = down, Left = left, Right = right };
+    public static InputBinding Composite2DKeys(Keys up, Keys down, Keys left, Keys right) =>
+        new(BindingType.Composite2D) { Up = up, Down = down, Left = left, Right = right, Axis2D = Axis2D.Keys};
+
+    public static InputBinding Composite2DMouse() =>
+        new(BindingType.Composite2D) { Axis2D = Axis2D.Mouse };
     
     public static InputBinding ChordType(Keys modifier, Keys primary) =>
         new(BindingType.Chord) { ModKey = modifier, PrimaryKey = primary };
@@ -96,27 +100,32 @@ public struct InputBinding
     {
         if (BindingType == BindingType.Composite2D)
         {
-            float x = 0f, y = 0f;
-            if (Input.IsKeyHeld(Right)) x += 1f;
-            if (Input.IsKeyHeld(Left))  x -= 1f;
-            if (Input.IsKeyHeld(Up))    y -= 1f;
-            if (Input.IsKeyHeld(Down))  y += 1f;
-            if (x != 0 || y != 0)
+            switch (Axis2D)
             {
-                var v = new Vector2(x, y);
-                var len = v.Length();
-                return len > 1e-5f ? v / len : Vector2.Zero; // normalize for consistent speed
+                case Axis2D.Mouse:
+                    var delta = Input.GetMouseDelta();
+                    if(delta != Vector2.Zero)
+                        delta.Normalize();
+                    
+                    return delta;
+                case Axis2D.Joystick:
+                    break;
+                case Axis2D.Keys:
+                    float x = 0f, y = 0f;
+                    if (Input.IsKeyHeld(Right)) x += 1f;
+                    if (Input.IsKeyHeld(Left))  x -= 1f;
+                    if (Input.IsKeyHeld(Up))    y -= 1f;
+                    if (Input.IsKeyHeld(Down))  y += 1f;
+                    
+                    var axis = new Vector2(x, y);
+                    if(axis != Vector2.Zero)
+                        axis.Normalize();
+                    
+                    return axis;
+                default:
+                    throw new ArgumentOutOfRangeException();
             }
         }
         return Vector2.Zero;
     }
-}
-
-public enum BindingType
-{
-    Key = 0,
-    MouseButton = 1,
-    Axis1D = 2,
-    Composite2D = 3,
-    Chord = 4,
 }
