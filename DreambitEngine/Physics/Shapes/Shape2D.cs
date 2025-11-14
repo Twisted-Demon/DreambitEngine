@@ -37,4 +37,6 @@ public class Shape2D
     {
         return Polygon2D.TransformWithDesiredPos(transform, desiredPos);
     }
+
+    public Polygon2D GetPolygon() => Polygon2D;
 }

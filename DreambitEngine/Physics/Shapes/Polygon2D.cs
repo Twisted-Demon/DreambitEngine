@@ -275,6 +275,41 @@ public struct Polygon2D
         return isInside;
     }
 
+    public bool IntersectsCircle(Vector2 center, float radius)
+    {
+        var radiusSq = radius * radius;
+        var verts = Vertices;
+        var count = verts.Length;
+
+        if (count == 0) return false;
+
+        // 1. Any vertex inside circle?
+        for (var i = 0; i < count; i++)
+        {
+            var diff = verts[i] - center;
+            if (diff.LengthSquared() <= radiusSq)
+                return true;
+        }
+
+        // 2. Circle center inside polygon?
+        if (ContainsPoint(center))
+            return true;
+
+        // 3. Edge-circle intersection
+        for (var i = 0; i < count; i++)
+        {
+            var a = verts[i];
+            var b = verts[(i + 1) % count];
+
+            var closest = ClosestPointOnSegment(center, a, b);
+            var diff = closest - center;
+            if (diff.LengthSquared() <= radiusSq)
+                return true;
+        }
+
+        return false;
+    }
+
     public bool RayIntersects(Vector2 rayStart, Vector2 rayEnd, out Vector2 intersection)
     {
         intersection = Vector2.Zero;
@@ -468,5 +503,17 @@ public struct Polygon2D
     private float Sign(Vector2 p1, Vector2 p2, Vector2 p3)
     {
         return (p1.X - p3.X) * (p2.Y - p3.Y) - (p2.X - p3.X) * (p1.Y - p3.Y);
+    }
+    
+    private static Vector2 ClosestPointOnSegment(Vector2 p, Vector2 a, Vector2 b)
+    {
+        var ab = b - a;
+        var abLenSq = ab.LengthSquared();
+        if (abLenSq <= float.Epsilon)
+            return a;
+
+        var t = Vector2.Dot(p - a, ab) / abLenSq;
+        t = MathHelper.Clamp(t, 0f, 1f);
+        return a + ab * t;
     }
 }
