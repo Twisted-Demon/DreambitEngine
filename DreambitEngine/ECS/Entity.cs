@@ -17,6 +17,7 @@ public class Entity : IDisposable
     private bool _enabled;
     private bool _isDestroyed;
     private bool _isDisposed;
+    private bool _isDead;
     private Entity _parent;
     public string Name;
 
@@ -163,12 +164,28 @@ public class Entity : IDisposable
         return entity;
     }
 
+    public Entity FindChild(string name)
+    {
+        var children = GetChildren();
+        
+        foreach(var child in children)
+            if (child.Name == name)
+                return child;
+        
+        return null;
+    }
+
     public List<Entity> GetChildren()
     {
-        var children = new List<Entity>();
-        children.AddRange(_children);
+        var result = new List<Entity>();
 
-        return children;
+        foreach (var child in _children)
+        {
+            result.Add(child);
+            result.AddRange(child.GetChildren());
+        }
+
+        return result;
     }
 
     public static void Destroy(Entity entity)
@@ -176,11 +193,17 @@ public class Entity : IDisposable
         if (entity == null || entity._isDestroyed) return;
 
         Core.Instance.CurrentScene.DestroyEntity(entity);
+        entity._isDead = true;
 
         if (entity._children.Count <= 0) return;
 
         foreach (var child in entity._children)
             Destroy(child);
+    }
+
+    public static bool IsDestroyed(Entity entity)
+    {
+        return entity is null || entity._isDead;
     }
 
     public static bool CompareTag(Component component, string tag)
