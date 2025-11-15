@@ -26,9 +26,8 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
             if (!_byTag.TryGetValue(tag, out var list)) _byTag[tag] = list = new List<Collider>(64);
             if (!list.Contains(c)) list.Add(c);
         }
-
-        var poly = c.GetTransformedPolygon();
-        _grid.InsertOrUpdate(c, poly.ComputeAABB());
+        
+        _grid.InsertOrUpdate(c, c.AABB);
     }
 
     public void DeregisterCollider(Collider c)
@@ -46,7 +45,7 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
     public void Touch(Collider c)
     {
         var poly = c.GetTransformedPolygon();
-        _grid.InsertOrUpdate(c, poly.ComputeAABB());
+        _grid.InsertOrUpdate(c, poly.ComputeAabb());
     }
 
     public void CleanUp()
@@ -64,7 +63,7 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
 
         _candidateSet.Clear();
         var ap = @this.GetTransformedPolygon();
-        var aabb = ap.ComputeAABB();
+        var aabb = ap.ComputeAabb();
 
         _candidateSet.Add(@this);
         _grid.QueryAABB(aabb, _candidateSet);
@@ -89,7 +88,7 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         _candidateSet.Clear();
         _resultSet.Clear();
 
-        var aabb = poly.ComputeAABB();
+        var aabb = poly.ComputeAabb();
 
         _grid.QueryAABB(aabb, _candidateSet);
 
@@ -115,7 +114,7 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         _candidateSet.Clear();
         _resultSet.Clear();
 
-        var aabb = poly.ComputeAABB();
+        var aabb = poly.ComputeAabb();
         _grid.QueryAABB(aabb, _candidateSet);
 
         foreach (var tag in tags)
@@ -148,7 +147,7 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         _resultSet.Clear();
 
         var ap = @this.GetTransformedPolygon();
-        var aabb = ap.ComputeAABB();
+        var aabb = ap.ComputeAabb();
 
         _candidateSet.Add(@this);
         _grid.QueryAABB(aabb, _candidateSet);
@@ -296,7 +295,7 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         return result.Collisions.Count > 0;
     }
 
-    public bool CircleCast(Vector2 center, float radius, out CollisionResult result)
+    public bool CircleCast(Vector2 center, float radius, out CollisionResult result, AABB? aabb = null)
     {
         result = new CollisionResult();
         if (radius <= 0f) return false;
@@ -304,13 +303,16 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         _candidateList.Clear();
         _resultSet.Clear();
 
-        var aabb = new AABB
+        if (aabb is null)
         {
-            Min = new Vector2(center.X - radius, center.Y - radius),
-            Max = new Vector2(center.X + radius, center.Y + radius)
-        };
+            aabb = new AABB
+            {
+                Min = new Vector2(center.X - radius, center.Y - radius),
+                Max = new Vector2(center.X + radius, center.Y + radius)
+            };
+        }
 
-        _grid.QueryAABB(aabb, _candidateSet);
+        _grid.QueryAABB(aabb.Value, _candidateSet);
 
         foreach (var other in _candidateSet)
         {

@@ -61,6 +61,20 @@ public class Collider : Component
     }
 
     #endregion
+    
+    #region Collision Casting Checks
+
+    public virtual void ColliderCast(out CollisionResult hits)
+    {
+        PhysicsSystem.Instance.ColliderCast(this, out hits);
+    }
+
+    public virtual void ColliderCastByTags(out CollisionResult hits, params string[] tags)
+    {
+        PhysicsSystem.Instance.ColliderCastByTag(this, out hits, tags);
+    }
+    
+    #endregion
 
     #region Broadphase / Spatial Hash Participation
 
@@ -75,9 +89,19 @@ public class Collider : Component
         _currentPosition = Transform.Position;
 
         if (_lastPosition != _currentPosition)
+        {
+            SetAabb();
+            
             PhysicsSystem.Instance.Touch(this);
-
+        }
+        
         _lastPosition = _currentPosition;
+    }
+
+    //this is to be overridden by circle collider and capsule collider
+    protected virtual void SetAabb()
+    {
+        AABB = WorldPolygon2D.ComputeAabb();
     }
 
     #endregion
@@ -115,6 +139,8 @@ public class Collider : Component
 
     /// <summary>Local-space shape used for collision/trigger checks.</summary>
     public Shape2D Bounds { get; set; } = null;
+    
+    public AABB AABB { get; set; }
 
     /// <summary>World-space polygon computed from <see cref="Bounds" /> and current transform.</summary>
     public Polygon2D WorldPolygon2D => GetTransformedPolygon();
