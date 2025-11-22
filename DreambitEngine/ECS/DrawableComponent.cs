@@ -30,6 +30,11 @@ public abstract class DrawableComponent : Component
     {
     }
 
+    public virtual void OnDrawUi()
+    {
+        
+    }
+
     private void OnDrawLayerChanged(int newDrawLayer)
     {
         if (_drawLayer == newDrawLayer)

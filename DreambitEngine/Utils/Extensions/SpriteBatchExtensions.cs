@@ -63,10 +63,10 @@ public static class SpriteBatchExtensions
         SpriteFontBase font,
         string text,
         Vector2 position,
-        HorizontalAlignment horizontalAlignment,
-        VerticalAlignment verticalAlignment,
         Color color,
-        float maxWidth,
+        HorizontalAlignment horizontalAlignment = HorizontalAlignment.Center,
+        VerticalAlignment verticalAlignment = VerticalAlignment.Center,
+        float maxWidth = float.MaxValue,
         float lineSpacingMultiplier = 1f)
     {
         var lines = SplitTextIntoLines(font, text, maxWidth);

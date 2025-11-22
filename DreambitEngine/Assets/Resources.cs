@@ -136,6 +136,8 @@ public class Resources : Singleton<Resources>
 
     public static SpriteFontBase LoadSpriteFont(string assetName, float fontSize = 12f)
     {
+        
+        
         //if we already have the asset we will return it
         if (Instance.LoadedAssets.TryGetValue(assetName + fontSize, out var rawAsset))
             if (rawAsset is SpriteFontBase font)
@@ -146,7 +148,7 @@ public class Resources : Singleton<Resources>
             Instance.Logger.Trace("Loading SpriteFontBase - {0}", assetName + fontSize);
 
             SpriteFontBase font;
-            if (Loaders.TryGetValue(typeof(SpriteFontBaseLoader), out var loader))
+            if (Loaders.TryGetValue(typeof(SpriteFontBase), out var loader))
             {
                 var sfLoader = (SpriteFontBaseLoader)loader;
 

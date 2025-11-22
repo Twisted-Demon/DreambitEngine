@@ -71,6 +71,24 @@ public class Camera2D : Component
         }
     }
 
+    public Rectangle BoundsNoPosition
+    {
+        get
+        {
+            // Calculate the width and height of the camera view based on the current zoom
+            var width = Window.Width * WorldUnitsPerScreenPixel;
+            var height = Window.Height * WorldUnitsPerScreenPixel;
+
+            // Return the bounds of the camera view
+            return new Rectangle(
+                0, // Center the X position based on the zoomed width
+                0, // Center the Y position based on the zoomed height
+                (int)width,
+                (int)height
+            );
+        }
+    }
+
     public RectangleF BoundsF
     {
         get
@@ -124,8 +142,7 @@ public class Camera2D : Component
     {
         return Matrix.CreateTranslation(-Transform.WorldPosition) *
                Matrix.CreateRotationZ(-Transform.WorldZRotation) *
-               Matrix.CreateScale(new Vector3(scalePixelsPerUnit, scalePixelsPerUnit, 1)) *
-               Matrix.CreateTranslation(new Vector3(0.5f * Window.ScreenSize.X, 0.5f * Window.ScreenSize.Y, 0f));
+               Matrix.CreateScale(new Vector3(scalePixelsPerUnit, scalePixelsPerUnit, 1));
     }
 
 

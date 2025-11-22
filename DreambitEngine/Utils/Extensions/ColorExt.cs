@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Globalization;
 using Microsoft.Xna.Framework;
 
 namespace Dreambit;
@@ -63,5 +64,36 @@ public static class ColorExt
         if (t < 1f / 2f) return q;
         if (t < 2f / 3f) return p + (q - p) * (2f / 3f - t) * 6f;
         return p;
+    }
+
+    public static Color FromHex(string hexString)
+    {
+        if (hexString.StartsWith("#"))
+            hexString = hexString.Substring(1);
+
+        byte r = 0;
+        byte g = 0;
+        byte b = 0;
+        byte a = 255;
+
+        if (hexString.Length == 6) // RRGGBB format
+        {
+            r = byte.Parse(hexString.Substring(0, 2), NumberStyles.HexNumber);
+            g = byte.Parse(hexString.Substring(2, 2), NumberStyles.HexNumber);
+            b = byte.Parse(hexString.Substring(4, 2), NumberStyles.HexNumber);
+        }
+        else if (hexString.Length == 8) // AARRGGBB format
+        {
+            a = byte.Parse(hexString.Substring(0, 2), NumberStyles.HexNumber);
+            r = byte.Parse(hexString.Substring(2, 2), NumberStyles.HexNumber);
+            g = byte.Parse(hexString.Substring(4, 2), NumberStyles.HexNumber);
+            b = byte.Parse(hexString.Substring(6, 2), NumberStyles.HexNumber);
+        }
+        else
+        {
+            return new Color(255, 0, 220, 255);
+        }
+
+        return new Color(r, g, b, a);
     }
 }
