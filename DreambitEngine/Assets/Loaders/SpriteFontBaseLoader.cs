@@ -30,7 +30,8 @@ public class SpriteFontBaseLoader : AssetLoaderBase<SpriteFontBaseLoader>
         if (!_byName.TryGetValue(assetName, out var value))
         {
             var fontSystem = new FontSystem();
-            var ttf = File.ReadAllBytes(Path.Combine(contentPath, assetName + Extension));
+            var path = Path.Combine(contentPath + @"\Fonts", assetName + Extension);
+            var ttf = File.ReadAllBytes(path);
             fontSystem.AddFont(ttf);
             value = fontSystem;
             _byName.Add(assetName, value);

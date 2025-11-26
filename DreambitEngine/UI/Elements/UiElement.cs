@@ -66,8 +66,8 @@ public abstract class UiElement
                 offsetY = h / 2;
                 break;
             case UiAnchor.Center:
-                offsetX = w / 2;
-                offsetY = h / 2;
+                offsetX = parentBounds.Width - (w / 2);
+                offsetY = parentBounds.Height / 2 - (h / 2);
                 break;
             case UiAnchor.CenterRight:
                 offsetX = w;

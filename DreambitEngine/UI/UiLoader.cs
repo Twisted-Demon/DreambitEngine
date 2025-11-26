@@ -70,8 +70,8 @@ public static class UiLoader
 
         element.Parent = parent;
         element.Id = GetString(node, "id", string.Empty);
-        element.X = ParseLength(GetString(node, "x", "0"));
-        element.Y = ParseLength(GetString(node, "y", "0"));
+        element.X = ParseLength(GetString(node, "x", "0%"));
+        element.Y = ParseLength(GetString(node, "y", "0%"));
         element.Width = ParseLength(GetString(node, "width", "100%"));
         element.Height = ParseLength(GetString(node, "height", "100%"));
         element.Anchor = ParseAnchor(GetString(node, "anchor", "TopLeft"));

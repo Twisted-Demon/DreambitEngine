@@ -19,6 +19,9 @@ public class UiFrame : DrawableComponent<UiFrame>
     public override void OnUpdate()
     {
         var screenSize = Window.ScreenSize;
+
+        Scene.UICamera.SetTargetVerticalResolution(screenSize.Y);
+        
         _layout.Root.Width = UiLength.Pixels(screenSize.X);
         _layout.Root.Height = UiLength.Pixels(screenSize.Y);
         _layout.Root.Arrange(new Rectangle(0, 0, screenSize.X, screenSize.Y));
