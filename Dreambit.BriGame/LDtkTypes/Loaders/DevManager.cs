@@ -14,22 +14,6 @@ public partial class DevManager : LDtkEntity<DevManager>
         entity.AttachComponent<DebugToggleComponent>();
 
         entity.Transform.Position = Vector3.Zero;
-
-        var canvas = entity.AttachComponent<Canvas>();
-
-
-        var button = canvas.CreateUIElement<UIButton>();
-        button.Texture.TexturePath = "Textures/Ui/ui_button";
-        button.Texture.CanScale = false;
-
-        button.UIText.FontPath = "Fonts/monogram";
-        button.UIText.Text = "button Text";
-        button.UIText.HAlignment = HorizontalAlignment.Center;
-
-        button.OnClick += () =>
-        {
-            ILogger logger = new Logger<UIButton>();
-            logger.Info("Clicked");
-        };
+        
     }
 }
