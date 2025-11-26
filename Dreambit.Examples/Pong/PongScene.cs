@@ -57,6 +57,5 @@ public class PongScene : Scene
 
     private void SetUpScoreKeeper()
     {
-        var score = CreateEntity("score").AttachComponent<PongScoreKeeper>();
     }
 }
