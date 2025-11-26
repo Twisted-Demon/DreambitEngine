@@ -16,6 +16,8 @@ public class SpaceGameScene : Scene<SpaceGameScene>
         AmbientLight.Intensity = 1.0f;
         AmbientLight.Color = Color.White;
         
+        BackgroundColor = Color.Black;
+        
         SpawnPlayer();
         
         var alanBp = Resources.LoadAsset<EntityBlueprint>("SpaceGame/Blueprints/alan");
