@@ -46,6 +46,10 @@
       <Content Include="Content\Fonts\monogram.ttf">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
+      <None Remove="Content\content.pak" />
+      <Content Include="Content\content.pak">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
     </ItemGroup>
     <ItemGroup>
       <ProjectReference Include="..\DreambitEngine\DreambitEngine.csproj" />
