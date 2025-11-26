@@ -9,12 +9,12 @@ public abstract class RenderPass : IDisposable
     private bool _isDisposed;
     public int Order = 0;
 
-    internal Scene Scene { get; set; }
+    internal Scene Scene { get; init; }
     protected static GraphicsDevice Device => Core.Instance.GraphicsDevice;
     protected Effect DefaultEffect { get; private set; }
     protected DrawableRepository Drawables => Scene.Drawables;
 
-    public RenderPipeline RenderPipeline { get; internal set; }
+    public RenderPipeline RenderPipeline { get; internal init; }
 
     public bool IsActive { get; set; } = true;
 
@@ -28,6 +28,8 @@ public abstract class RenderPass : IDisposable
         OnDisposing();
 
         _isDisposed = true;
+        
+        GC.SuppressFinalize(this);
     }
 
     protected virtual void OnWindowResized(object sender, WindowResizedEventArgs args)

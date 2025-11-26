@@ -8,15 +8,11 @@ app.Configure(cfg =>
 {
     cfg.SetApplicationName("asset baker");
     cfg.SetApplicationVersion("1.0.0");
-
-    cfg.AddCommand<BakeAssetCommand>("bake")
-        .WithDescription("Bake an input asset");
     
-    cfg.AddCommand<BakeDirectoryCommand>("bake-dir")
-        .WithDescription("Bake an input asset");
     
     cfg.AddCommand<BakePakCommand>("bake-pak")
-        .WithDescription("Bake an input asset");
+        .WithDescription("Bake assets into a pak file")
+        .WithExample(new[] { "/Content", "/Content/content.pak" });
 });
 
 try

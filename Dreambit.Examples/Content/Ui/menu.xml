@@ -1,0 +1,7 @@
+﻿<Ui>
+    <Text id="line1"
+          anchor="Center"
+          font="monogram.ttf"
+          fontSize="24"
+          text = "Hello World"/>
+</Ui>
