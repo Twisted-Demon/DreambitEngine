@@ -6,13 +6,13 @@ var app = new CommandApp();
 
 app.Configure(cfg =>
 {
-    cfg.SetApplicationName("asset baker");
+    cfg.SetApplicationName("assetbaker");
     cfg.SetApplicationVersion("1.0.0");
     
     
     cfg.AddCommand<BakePakCommand>("bake-pak")
         .WithDescription("Bake assets into a pak file")
-        .WithExample(new[] { "/Content", "/Content/content.pak" });
+        .WithExample(new[] { "bake-pak", "/Content", "/Content/content.pak" });
 });
 
 try

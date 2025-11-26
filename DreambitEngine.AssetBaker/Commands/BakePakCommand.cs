@@ -19,8 +19,13 @@ public class BakePakSettings : CommandSettings
     [Description("Output PAK file")]
     public string OutputPak { get; set; } = default!;
     
-    [CommandOption("--mips")] public bool GenerateMips { get; set; }
-    [CommandOption("--premul")] public bool PremultiplyAlpha { get; set; }
+    [CommandOption("--mips")] 
+    [Description("Generate mips")]
+    public bool GenerateMips { get; set; }
+    
+    [CommandOption("--premul")] 
+    [Description("Premultiply alpha")]
+    public bool PremultiplyAlpha { get; set; }
     [CommandOption("--max-size <N>")] public int? MaxSize { get; set; }
     [CommandOption("--srgb")] public bool SRgb { get; set; }
 
