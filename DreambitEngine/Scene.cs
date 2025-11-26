@@ -116,7 +116,7 @@ public class Scene : IDisposable
     public readonly ScriptingManager ScriptingManager;
 
     /// <summary>Clear color used before drawing this scene.</summary>
-    public Color BackgroundColor = Color.CornflowerBlue;
+    public Color BackgroundColor = Color.Black;
 
     /// <summary>Post-process configuration shared with passes.</summary>
     public readonly PostProcessSettings PostProcessSettings;
