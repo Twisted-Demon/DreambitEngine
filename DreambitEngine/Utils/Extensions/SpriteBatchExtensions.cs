@@ -19,7 +19,7 @@ public static class SpriteBatchExtensions
         }
     }
 
-    private static float GetLineHeight(SpriteFontBase font, float lineSpacingMultiplier = 1f)
+    public static float GetLineHeight(SpriteFontBase font, float lineSpacingMultiplier = 1f)
     {
         float h = font.LineHeight;
         if (h <= 0f)
@@ -28,7 +28,7 @@ public static class SpriteBatchExtensions
         return h * lineSpacingMultiplier;
     }
 
-    private static List<string> SplitTextIntoLines(SpriteFontBase spriteFont, string text, float maxWidth)
+    public static List<string> SplitTextIntoLines(SpriteFontBase spriteFont, string text, float maxWidth)
     {
         var lines = new List<string>();
         var words = text.Split(' ');

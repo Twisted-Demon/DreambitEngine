@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Xml;
 using Dreambit.ECS;
 using Microsoft.Xna.Framework;
@@ -37,6 +38,15 @@ public abstract class UiElement
     
     public virtual void Arrange(Rectangle parentBounds)
     {
+        CalculateBounds(parentBounds);
+
+        // default: arrange children within own bounds
+        foreach (var child in Children)
+            child.Arrange(Bounds);
+    }
+    
+    private void CalculateBounds(Rectangle parentBounds)
+    {
         int w = Width.Resolve(parentBounds.Width);
         int h = Height.Resolve(parentBounds.Height);
 
@@ -54,36 +64,36 @@ public abstract class UiElement
                 offsetY = 0;
                 break;
             case UiAnchor.TopCenter:
-                offsetX = w / 2;
+                offsetX = parentBounds.Width / 2 - (w / 2);
                 offsetY = 0;
                 break;
             case UiAnchor.TopRight:
-                offsetX = w;
+                offsetX = parentBounds.Width - w;
                 offsetY = 0;
                 break;
             case UiAnchor.CenterLeft:
                 offsetX = 0;
-                offsetY = h / 2;
+                offsetY = parentBounds.Height / 2 - (h / 2);
                 break;
             case UiAnchor.Center:
-                offsetX = parentBounds.Width - (w / 2);
+                offsetX = parentBounds.Width / 2 - (w / 2);
                 offsetY = parentBounds.Height / 2 - (h / 2);
                 break;
             case UiAnchor.CenterRight:
-                offsetX = w;
-                offsetY = h / 2;
+                offsetX = parentBounds.Width - w;
+                offsetY = parentBounds.Height / 2 - (h / 2);
                 break;
             case UiAnchor.BottomLeft:
                 offsetX = 0;
-                offsetY = h;
+                offsetY = parentBounds.Height - h;
                 break;
             case UiAnchor.BottomCenter:
-                offsetX = w / 2;
-                offsetY = h;
+                offsetX = parentBounds.Width / 2 - (w / 2);
+                offsetY = parentBounds.Height - h;
                 break;
             case UiAnchor.BottomRight:
-                offsetX = w;
-                offsetY = h;
+                offsetX = parentBounds.Width - w;
+                offsetY = parentBounds.Height - h;
                 break;
         }
 
@@ -91,10 +101,6 @@ public abstract class UiElement
         int screenY = parentBounds.Y + y + offsetY;
 
         Bounds = new Rectangle(screenX, screenY, w, h);
-
-        // default: arrange children within own bounds
-        foreach (var child in Children)
-            child.Arrange(Bounds);
     }
 
     public virtual void Draw()
