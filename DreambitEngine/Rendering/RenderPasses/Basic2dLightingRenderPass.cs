@@ -51,36 +51,36 @@ public class Basic2dLightingRenderPass : RenderPass
                 .ToList();
 
             Effect currentEffect = null;
-
-            Core.SpriteBatch.Begin(
-                transformMatrix: cameraMatrix,
-                samplerState: Scene.RenderingOptions.SamplerState,
-                sortMode: SpriteSortMode.Deferred,
-                blendState: BlendState.AlphaBlend,
-                effect: DefaultEffect
-            );
+            var batchStarted = false;
 
             foreach (var drawable in sortedDrawables)
             {
-                var drawableEffect = drawable.UsesEffect ? drawable.Effect : DefaultEffect;
+                var drawableEffect =
+                    drawable.UsesEffect ? drawable.Effect : DefaultEffect;
 
-                if (drawableEffect != currentEffect)
+                if (!ReferenceEquals(drawableEffect, currentEffect))
                 {
-                    Core.SpriteBatch.End();
+                    if (batchStarted)
+                        Core.SpriteBatch.End();
+
+                    ApplySpriteBatchMatrix(drawableEffect, cameraMatrix);
+
                     Core.SpriteBatch.Begin(
-                        transformMatrix: cameraMatrix,
                         samplerState: Scene.RenderingOptions.SamplerState,
                         sortMode: SpriteSortMode.Deferred,
                         blendState: BlendState.AlphaBlend,
                         effect: drawableEffect
                     );
+
                     currentEffect = drawableEffect;
+                    batchStarted = true;
                 }
 
                 drawable.OnDraw();
             }
 
-            Core.SpriteBatch.End();
+            if (batchStarted)
+                Core.SpriteBatch.End();
         }
     }
 
@@ -98,6 +98,8 @@ public class Basic2dLightingRenderPass : RenderPass
         Device.SetRenderTarget(RenderPipeline.SceneRenderTarget);
         Device.Clear(Color.Transparent);
 
+        ApplySpriteBatchMatrix(LightingFx, Matrix.Identity);
+        
         Core.SpriteBatch.Begin(
             samplerState: SamplerState.PointClamp,
             sortMode: SpriteSortMode.Deferred,

@@ -1,5 +1,6 @@
 ﻿using System;
 using Dreambit.ECS;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
 namespace Dreambit;
@@ -18,7 +19,29 @@ public abstract class RenderPass : IDisposable
 
     public bool IsActive { get; set; } = true;
 
+    protected void ApplySpriteBatchMatrix(Effect effect, Matrix transformMatrix)
+    {
+        if (effect == null) return;
 
+        var matrixParam = effect.Parameters["MatrixTransform"];
+
+        if (matrixParam == null)
+            return;
+        
+        var viewport = Device.Viewport;
+        
+        var projection = Matrix.CreateOrthographicOffCenter(
+            left: 0f,
+            right: viewport.Width,
+            bottom: viewport.Height,
+            top: 0f,
+            zNearPlane: 0f,
+            zFarPlane: -1f
+        );
+
+        matrixParam.SetValue(transformMatrix * projection);
+    }
+    
     public void Dispose()
     {
         if (_isDisposed) return;
