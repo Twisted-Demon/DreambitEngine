@@ -18,29 +18,6 @@ public abstract class RenderPass : IDisposable
     public RenderPipeline RenderPipeline { get; internal init; }
 
     public bool IsActive { get; set; } = true;
-
-    protected void ApplySpriteBatchMatrix(Effect effect, Matrix transformMatrix)
-    {
-        if (effect == null) return;
-
-        var matrixParam = effect.Parameters["MatrixTransform"];
-
-        if (matrixParam == null)
-            return;
-        
-        var viewport = Device.Viewport;
-        
-        var projection = Matrix.CreateOrthographicOffCenter(
-            left: 0f,
-            right: viewport.Width,
-            bottom: viewport.Height,
-            top: 0f,
-            zNearPlane: 0f,
-            zFarPlane: -1f
-        );
-
-        matrixParam.SetValue(transformMatrix * projection);
-    }
     
     public void Dispose()
     {

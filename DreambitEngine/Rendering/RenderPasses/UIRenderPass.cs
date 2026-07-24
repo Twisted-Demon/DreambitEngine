@@ -12,8 +12,6 @@ public class UIRenderPass : RenderPass
     {
         base.Initialize();
         Order = 2;
-
-        
     }
 
     private void DrawUIComponents()

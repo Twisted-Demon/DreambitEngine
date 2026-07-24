@@ -27,49 +27,59 @@ public class Basic2dLightingRenderPass : RenderPass
     private void RenderDrawables()
     {
         var drawLayers = Drawables.GetDrawLayers();
-        var layerOrder = drawLayers.Keys.OrderBy(x => x).ToList();
+
+        var layerOrder = drawLayers.Keys
+            .OrderBy(layer => layer)
+            .ToList();
+
         var cameraMatrix = Scene.MainCamera.TransformMatrix;
 
         Device.SetRenderTarget(AlbedoRt);
         Device.Clear(Color.Transparent);
 
-        for (var i = 0; i < layerOrder.Count; i++)
+        foreach (var layer in layerOrder)
         {
-            var drawables = drawLayers[layerOrder[i]]
-                .Where(x => x.Enabled && x.Entity.Enabled && x.DrawLayer != DrawLayers.LightLayer)
+            var visibleDrawables = drawLayers[layer]
+                .Where(drawable =>
+                    drawable.Enabled &&
+                    drawable.Entity.Enabled &&
+                    drawable.DrawLayer != DrawLayers.LightLayer &&
+                    drawable.IsVisibleFromCamera(
+                        Scene.MainCamera.Bounds
+                    ))
+                .OrderBy(drawable =>
+                    drawable.Transform.WorldPosition.Y)
+                .ThenBy(drawable =>
+                    drawable.UsesEffect
+                        ? drawable.Effect
+                        : DefaultEffect)
                 .ToList();
 
-            var visibleDrawables = drawables
-                .Where(d => d.IsVisibleFromCamera(Scene.MainCamera.Bounds))
-                .ToList();
-
-            if (visibleDrawables.Count == 0) continue;
-
-            var sortedDrawables = visibleDrawables
-                .OrderBy(d => d.Transform.WorldPosition.Y)
-                .ThenBy(d => d.UsesEffect ? d.Effect : DefaultEffect)
-                .ToList();
+            if (visibleDrawables.Count == 0)
+                continue;
 
             Effect currentEffect = null;
             var batchStarted = false;
 
-            foreach (var drawable in sortedDrawables)
+            foreach (var drawable in visibleDrawables)
             {
-                var drawableEffect =
-                    drawable.UsesEffect ? drawable.Effect : DefaultEffect;
+                var drawableEffect = drawable.UsesEffect
+                    ? drawable.Effect
+                    : DefaultEffect;
 
-                if (!ReferenceEquals(drawableEffect, currentEffect))
+                if (!batchStarted ||
+                    !ReferenceEquals(drawableEffect, currentEffect))
                 {
-                    if (batchStarted)
-                        Core.SpriteBatch.End();
-
-                    ApplySpriteBatchMatrix(drawableEffect, cameraMatrix);
+                    if (batchStarted) Core.SpriteBatch.End();
 
                     Core.SpriteBatch.Begin(
-                        samplerState: Scene.RenderingOptions.SamplerState,
-                        sortMode: SpriteSortMode.Deferred,
-                        blendState: BlendState.AlphaBlend,
-                        effect: drawableEffect
+                        SpriteSortMode.Deferred,
+                        BlendState.AlphaBlend,
+                        Scene.RenderingOptions.SamplerState,
+                        DepthStencilState.None,
+                        RasterizerState.CullNone,
+                        drawableEffect,
+                        cameraMatrix
                     );
 
                     currentEffect = drawableEffect;
@@ -79,8 +89,7 @@ public class Basic2dLightingRenderPass : RenderPass
                 drawable.OnDraw();
             }
 
-            if (batchStarted)
-                Core.SpriteBatch.End();
+            if (batchStarted) Core.SpriteBatch.End();
         }
     }
 
@@ -98,16 +107,26 @@ public class Basic2dLightingRenderPass : RenderPass
         Device.SetRenderTarget(RenderPipeline.SceneRenderTarget);
         Device.Clear(Color.Transparent);
 
-        ApplySpriteBatchMatrix(LightingFx, Matrix.Identity);
-        
         Core.SpriteBatch.Begin(
-            samplerState: SamplerState.PointClamp,
-            sortMode: SpriteSortMode.Deferred,
-            blendState: BlendState.AlphaBlend,
-            effect: LightingFx
+            SpriteSortMode.Immediate,
+            BlendState.Opaque,
+            Scene.RenderingOptions.SamplerState,
+            DepthStencilState.None,
+            RasterizerState.CullNone,
+            LightingFx,
+            Matrix.Identity
         );
 
-        Core.SpriteBatch.Draw(AlbedoRt, Vector2.Zero, Color.White);
+        Core.SpriteBatch.Draw(
+            AlbedoRt,
+            new Rectangle(
+                0,
+                0,
+                RenderPipeline.SceneRenderTarget.Width,
+                RenderPipeline.SceneRenderTarget.Height
+            ),
+            Color.White
+        );
 
         Core.SpriteBatch.End();
     }
