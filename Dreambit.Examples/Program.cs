@@ -9,9 +9,10 @@ using var game = new Core(1280, 720);
 
 Window.SetAllowUserResizing(true);
 Window.SetFixedTimeStep(false);
+Window.SetVsync(false);
 
 Core.Level = LogLevel.Trace;
-var scene = new UiExampleScene();
+var scene = new PongScene();
 Scene.SetNextScene(scene);
 
 game.Run();

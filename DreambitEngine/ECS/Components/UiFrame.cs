@@ -14,6 +14,13 @@ public class UiFrame : DrawableComponent<UiFrame>
 
         _layout = UiLoader.LoadFromXml(xml);
         Scene.DebugMode = true;
+
+        Window.WindowResized += OnWindowResized;
+    }
+
+    private void OnWindowResized(object sender, WindowResizedEventArgs e)
+    {
+        _layout.Root.InvalidateLayout();
     }
 
     public override void OnUpdate()
@@ -25,13 +32,15 @@ public class UiFrame : DrawableComponent<UiFrame>
         _layout.Root.Width = UiLength.Pixels(screenSize.X);
         _layout.Root.Height = UiLength.Pixels(screenSize.Y);
         _layout.Root.Arrange(new Rectangle(0, 0, screenSize.X, screenSize.Y));
-        _layout.Root.OnUpdate();
+        _layout.Root.Update();
     }
 
     public override void OnDrawUi()
     {
-        _layout.Root.Draw();
+        _layout.Root.OnDraw();
     }
+    
+    
     
 
     public override Rectangle Bounds => Scene.MainCamera.Bounds;

@@ -113,7 +113,7 @@ public static class SpriteBatchExtensions
         };
 
         // Horizontal
-        var xOffset = horizontalAlignment switch
+        position.X -= horizontalAlignment switch
         {
             HorizontalAlignment.Left => 0f,
             HorizontalAlignment.Center => size.X * 0.5f,
@@ -121,7 +121,7 @@ public static class SpriteBatchExtensions
             _ => 0f
         };
 
-        spriteBatch.DrawString(font, text, new Vector2(position.X + xOffset, position.Y), color);
+        spriteBatch.DrawString(font, text, new Vector2(position.X, position.Y), color);
     }
 
     private static Vector2 GetAlignmentOffset(SpriteFontBase spriteFont, string text,

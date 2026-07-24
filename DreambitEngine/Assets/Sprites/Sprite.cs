@@ -6,11 +6,24 @@ namespace Dreambit;
 
 public class Sprite : DreambitAsset
 {
-    [JsonProperty("texture")] public Texture2D Texture { get; init; }
+    private string _texturePath;
+    
+    public Texture2D Texture { get; internal set; }
 
     [JsonProperty("source")]
     [JsonConverter(typeof(RectangleConverter))]
     public Rectangle SourceRect { get; init; }
+
+    [JsonProperty("texture")]
+    public string TexturePath
+    {
+        get => _texturePath;
+        set
+        {
+            _texturePath = value;
+            Texture = Resources.LoadAsset<Texture2D>(value);
+        }
+    }
 
     public static Sprite Create(string texturePath, int sourceX, int sourceY, int sourceWidth, int sourceHeight)
     {

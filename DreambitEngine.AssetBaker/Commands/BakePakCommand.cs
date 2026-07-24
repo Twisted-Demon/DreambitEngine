@@ -55,6 +55,7 @@ public sealed class BakePakCommand : Command<BakePakSettings>
         var registry = new AssetBakerRegistry()
             .Register(AssetType.Texture, new TextureBaker())
             .Register(AssetType.Json, new JsonbBaker())
+            .Register(AssetType.Yaml, new YamlBaker())
             .Register(AssetType.Audio, new AudioBaker());
 
         var pak = new PakWriter();

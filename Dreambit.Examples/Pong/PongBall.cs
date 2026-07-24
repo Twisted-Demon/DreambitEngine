@@ -11,7 +11,7 @@ public class PongBall : Component<PongBall>
     private RectDrawer _rectDrawer;
 
     private Vector2 _direction;
-    private float _velocity = 256.0f;
+    private float _velocity = 326.0f;
     
     public override void OnCreated()
     {

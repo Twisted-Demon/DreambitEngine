@@ -1,11 +1,18 @@
 ﻿<Ui>
-    <Text id="line1"
-          anchor="TopLeft"
-          font="monogram"
-          font-size="18"
-          width="30%"
-          color="#FFCAE9"
-          text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
-          horizontal-alignment="left"
+    <Texture    id="texture1"
+                anchor="center"
+                origin="center"
+                width="96"
+                height="32"
+                sprite="Ui/red-button.sprite"
+                tint="#FFFFFF"/>
+    
+    <Button id="text1"
+            anchor="topleft"
+            origin="topleft"
+            fit-to-texture="true"
+            text="test"
+            text-color="#FFFFFF"
+            sprite="Ui/red-button.sprite"
     />
 </Ui>

@@ -72,17 +72,17 @@ public class UiStackPanel : UiContainer
 
     public override void Parse(XmlNode node)
     {
-        var orientation = UiLoader.GetString(node, "orientation", "Vertical");
+        var orientation = ParseString(node, "orientation", "Vertical");
         Orientation = string.Equals(orientation, "Horizontal", StringComparison.OrdinalIgnoreCase) 
             ? StackOrientation.Horizontal : 
             StackOrientation.Vertical;
         
         // optional combined padding="20" or "10,5,10,5"
-        var padding = UiLoader.GetString(node, "padding", null);
+        var padding = ParseString(node, "padding", null);
         if (!string.IsNullOrEmpty(padding))
             ParsePadding(padding);
 
-        Spacing = UiLoader.GetInt(node, "spacing", 0);
+        Spacing = ParseInt(node, "spacing", 0);
     }
     
 

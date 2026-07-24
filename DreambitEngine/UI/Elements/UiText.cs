@@ -9,60 +9,153 @@ public class UiText : UiElement
 {
     public SpriteFontBase Font { get; private set; }
     
-    public string Text { get; set; }
-    public Color Color { get; set; }
+    private string _fontPath;
+    private bool _multiLine = true;
+    private string _text;
+    private float _fontSize;
+
+    public bool AutoResizeHeight { get; set; } = true;  
+    public Color TextColor { get; set; }
     public HorizontalAlignment HorizontalAlignment { get; set; } = HorizontalAlignment.Center;
     
-    private float _fontSize;
+    public string Text
+    {
+        get => _text;
+        set
+        {
+            _text = value ?? string.Empty;
+            InvalidateLayout();
+        }
+    }
+    
+    public bool MultiLine
+    {
+        get => _multiLine;
+        set
+        {
+            if(_multiLine == value) return;
+            
+            _multiLine = value;
+            InvalidateLayout();
+        }
+    }
+
     public float FontSize
     {
         get => _fontSize;
         set
         {
+            if (Math.Abs(_fontSize - value) < float.Epsilon)
+                return;
+            
             _fontSize = value;
-            IsDirty = true;
+            
+            InvalidateLayout();
+            InvalidateDependencies();
         }
     }
     
-    private string _fontPath;
     public string FontPath
     {
         get => _fontPath;
         set
         {
+            if (_fontPath == value) return;
+            
             _fontPath = value;
-            IsDirty = true;
+            InvalidateDependencies();
         }
+    }
+    
+    private int _lastLayoutWidth;
+    private readonly System.Collections.Generic.List<string> _lines = [];
+    private readonly System.Collections.Generic.List<float> _lineWidths = [];
+    private float _lineHeight;
+    private float _totalHeight;
+    private bool _layoutDirty = true;
+    
+    public override void Arrange(Rectangle parentBounds)
+    {
+        base.Arrange(parentBounds);
+        EnsureLayout();
     }
 
     public override void ResolveDependencies()
     {
         if(!string.IsNullOrEmpty(_fontPath))
-            Font = Resources.LoadSpriteFont(_fontPath, _fontSize);
-
-        
-        
-        IsDirty = false;
+            Font = Resources.LoadSpriteFont(_fontPath, FontSize);
     }
 
-    public override void OnUpdate()
+    private void EnsureLayout()
     {
         if (Font is null) return;
+        if (!_multiLine) return;
+
+        var width = Bounds.Width;
+
+        if (width <= 0)
+        {
+            _lines.Clear();
+            _lineWidths.Clear();
+            _lineHeight = 0;
+            _totalHeight = 0;
+            Height = UiLength.Pixels(0);
+            return;
+        }
+
+        if (!_layoutDirty && width == _lastLayoutWidth)
+            return;
+
+        _layoutDirty = false;
+        _lastLayoutWidth = width;
         
-        var lineCount = SpriteBatchExtensions.SplitTextIntoLines(Font, Text, Bounds.Width).Count;
-        Height = UiLength.Pixels(Font.LineHeight * lineCount);
+        _lines.Clear();
+        _lines.AddRange(SpriteBatchExtensions.SplitTextIntoLines(Font, Text, Bounds.Width));
+        
+        _lineWidths.Clear();
+        
+        foreach (var line in _lines)
+        {
+            var size = Font.MeasureString(line);
+            _lineWidths.Add(size.X);
+        }
+
+        _lineHeight = SpriteBatchExtensions.GetLineHeight(Font);
+        _totalHeight = _lines.Count * _lineHeight;
+        
+        if(AutoResizeHeight)
+            Height = UiLength.Pixels(_totalHeight);
     }
 
-    public override void Draw()
+    protected override void OnUpdate()
     {
-        base.Draw();
+        if (Font is null)
+            return;
         
-        if (Font is null) return;
-        var windowSize = Window.ScreenSize;
+        EnsureLayout();
+
+        if (_multiLine) return;
+
+        var lineHeight = SpriteBatchExtensions.GetLineHeight(Font);
         
+        if(AutoResizeHeight)
+            Height = UiLength.Pixels(lineHeight);
+    }
+
+    public override void OnDraw()
+    {
+        base.OnDraw();
+
+        if (Font is null)
+            return;
+
+        if (string.IsNullOrEmpty(_text))
+            return;
+
         int xOffset = 0;
         int yOffset = Bounds.Height / 2;
-        switch(HorizontalAlignment)
+
+        switch (HorizontalAlignment)
         {
             case HorizontalAlignment.Left:
                 xOffset = 0;
@@ -77,19 +170,64 @@ public class UiText : UiElement
                 throw new ArgumentOutOfRangeException();
         }
 
-        var pos = new Vector2(Bounds.X + xOffset, Bounds.Y + yOffset);
-        Graphics.SpriteBatch.DrawMultiLineText(Font, Text, pos, Color, HorizontalAlignment, maxWidth: Bounds.Width);
+        var anchorPos = new Vector2(Bounds.X + xOffset, Bounds.Y + yOffset);
+
+        if (_multiLine)
+        {
+            EnsureLayout();
+
+            if (_lines.Count == 0)
+                return;
+
+            // Vertically center block of text around anchorPos.Y
+            var baseY = anchorPos.Y - _totalHeight * 0.5f;
+
+            for (int i = 0; i < _lines.Count; i++)
+            {
+                var line = _lines[i];
+                var lineWidth = _lineWidths[i];
+
+                float lineX = anchorPos.X;
+                switch (HorizontalAlignment)
+                {
+                    case HorizontalAlignment.Left:
+                        // anchorPos is already at left edge
+                        break;
+                    case HorizontalAlignment.Center:
+                        lineX -= lineWidth * 0.5f;
+                        break;
+                    case HorizontalAlignment.Right:
+                        lineX -= lineWidth;
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+
+                // Center each line within its own line-height band
+                float lineY = baseY + i * _lineHeight + _lineHeight * 0.5f;
+
+                Graphics.SpriteBatch.DrawString(Font, line, new Vector2(lineX, lineY), TextColor);
+            }
+        }
+        else
+        {
+            Graphics.SpriteBatch.DrawTextAligned(
+                Font,
+                _text,
+                anchorPos,
+                HorizontalAlignment,
+                VerticalAlignment.Center,
+                TextColor);
+        }
     }
     
-
-
     public override void Parse(XmlNode node)
     {
-        FontSize = UiLoader.GetFloat(node, "font-size", 12.0f);
-        FontPath = UiLoader.GetString(node, "font", "Fonts/monogram");
-        Text = UiLoader.GetString(node, "text", "");
-        HorizontalAlignment = ParseHAlignment(UiLoader.GetString(node, "horizontal-alignment", "Center"));
-        Color = UiLoader.GetColor(node,  "color");
+        Text = ParseString(node, "text", "");
+        FontSize = ParseFloat(node, "font-size", 12.0f);
+        FontPath = ParseString(node, "font", "monogram");
+        HorizontalAlignment = ParseHAlignment(ParseString(node, "horizontal-alignment", "Center"));
+        TextColor = ParseColor(node,  "text-color");
     }
 
     private static HorizontalAlignment ParseHAlignment(string value)

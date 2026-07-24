@@ -1,7 +1,6 @@
 ﻿using Dreambit;
 using Dreambit.BriGame;
 using Dreambit.BriGame.Scenes;
-using Dreambit.BriGame.Scenes.Galaga;
 
 
 using var game = new Core(1280,720, "Galaga Clone");
