@@ -7,7 +7,9 @@ namespace Dreambit;
 
 public class SpriteSheetAnimation : DreambitAsset
 {
-    [JsonProperty("frames")] private AnimationFrame[] _frames;
+    private AnimationFrame[] Frames { get; set; } = [];
+
+    [JsonProperty("frame_overrides")] private List<AnimationFrame> FrameOverrides { get; set; } = [];
 
     [JsonProperty("frame_rate")] public int FrameRate { get; set; }
 
@@ -16,19 +18,47 @@ public class SpriteSheetAnimation : DreambitAsset
     [JsonProperty("one_shot", NullValueHandling = NullValueHandling.Ignore)]
     public bool OneShot { get; set; }
 
-    [JsonIgnore] public int FrameCount => _frames.Length;
+    [JsonIgnore] public int FrameCount => Frames.Length;
+    
+    [JsonProperty("index_start")] public int  IndexStart { get; set; }
+    [JsonProperty("index_end")] public int  IndexEnd { get; set; }
+    [JsonProperty("pivot")] public  Vector2 Pivot { get; set; }
 
     public AnimationFrame this[int key]
     {
-        get => _frames[key];
-        set => _frames[key] = value;
+        get => Frames[key];
+        set => Frames[key] = value;
     }
 
     public bool TryGetFrame(int key, out AnimationFrame frame)
     {
-        frame = _frames.ElementAtOrDefault(key);
+        frame = Frames.ElementAtOrDefault(key);
 
         return frame != null;
+    }
+
+    public void Initialize()
+    {
+        var totalFrames = IndexEnd - IndexStart + 1;
+        Frames = new AnimationFrame[totalFrames];
+
+        for (int i = IndexStart; i < IndexEnd + 1; i++)
+        {
+            Frames[i] = new AnimationFrame
+            {
+                FrameIndex = i,
+                Pivot = Pivot,
+            };
+        }
+        
+        foreach(var frameOverride in FrameOverrides)
+        {
+            if (TryGetFrame(frameOverride.FrameIndex, out AnimationFrame frame))
+            {
+                frame.Pivot =  frameOverride.Pivot;
+                frame.AnimationEvent = frameOverride.AnimationEvent;
+            }
+        }
     }
 }
 

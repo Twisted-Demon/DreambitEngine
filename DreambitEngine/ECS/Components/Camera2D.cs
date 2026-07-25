@@ -13,7 +13,7 @@ public class Camera2D : Component
     private float ResolutionZoom { get; set; } = 1f;
     public float LerpSpeed { get; set; } = 5f;
     public float Zoom { get; set; } = 1f;
-
+    
     public float PixelsPerUnit { get; set; } = 1f;
 
     public float TotalZoom => Zoom * ResolutionZoom;

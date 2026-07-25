@@ -121,7 +121,7 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
             Tint * Opacity,
             Transform.WorldZRotation,
             originToUse,
-            Transform.WorldScaleToVec2,
+            Transform.WorldScaleToVec2 / Sprite.PixelsPerUnit,
             spriteEffect,
             0f
         );

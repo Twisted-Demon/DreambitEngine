@@ -192,6 +192,7 @@ public class Scene : IDisposable
         AmbientLight = Entity.Create("ambient-light").AttachComponent<AmbientLight2D>();
 
         // Setup default render passes
+        _renderPipeline.Initialize();
         SetUpRenderPipeLine();
     }
 
@@ -200,7 +201,6 @@ public class Scene : IDisposable
     /// </summary>
     protected virtual void SetUpRenderPipeLine()
     {
-        _renderPipeline.Initialize();
         _renderPipeline.AddRenderPass<Basic2dLightingRenderPass>();
         _renderPipeline.AddRenderPass<DebugRenderPass>();
         _renderPipeline.AddRenderPass<PostProcessRenderPass>();
@@ -311,7 +311,8 @@ public class Scene : IDisposable
     {
         if (State != SceneState.Running) return;
 
-        Guard.SafeCall(_renderPipeline.OnDraw, "RenderPipeline.OnDraw");
+        //Guard.SafeCall(_renderPipeline.OnDraw, "RenderPipeline.OnDraw");
+        _renderPipeline.OnDraw();
     }
 
     #endregion

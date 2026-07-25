@@ -44,17 +44,13 @@ public class Basic2dLightingRenderPass : RenderPass
                     drawable.Enabled &&
                     drawable.Entity.Enabled &&
                     drawable.DrawLayer != DrawLayers.LightLayer &&
-                    drawable.IsVisibleFromCamera(
-                        Scene.MainCamera.Bounds
-                    ))
-                .OrderBy(drawable =>
-                    drawable.Transform.WorldPosition.Y)
-                .ThenBy(drawable =>
-                    drawable.UsesEffect
-                        ? drawable.Effect
-                        : DefaultEffect)
+                    drawable.IsVisibleFromCamera(Scene.MainCamera.Bounds))
+                .OrderBy(
+                    drawable => drawable,
+                    new DrawableComparer(DefaultEffect))
                 .ToList();
-
+                
+                
             if (visibleDrawables.Count == 0)
                 continue;
 

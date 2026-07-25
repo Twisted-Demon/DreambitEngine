@@ -13,23 +13,27 @@ public class SpriteSheet : DreambitAsset
     [JsonProperty("rows")] public readonly int Rows = 1;
 
     [JsonProperty("texture_path")] private string _texturePath;
+    
+    [JsonProperty("pixels_per_unit")] public  readonly int PixelsPerUnit = 1;
 
-    private SpriteSheet(int columns, int rows, string texturePath, Texture2D texture)
+    private SpriteSheet(int columns, int rows, string texturePath, Texture2D texture, int pixelsPerUnit)
     {
         Columns = columns;
         Rows = rows;
         _texturePath = texturePath;
         Texture = texture;
+        PixelsPerUnit = pixelsPerUnit;
 
         SplitSprite();
     }
 
-    private SpriteSheet(int gridSize, string texturePath, Texture2D texture)
+    private SpriteSheet(int gridSize, string texturePath, Texture2D texture, int pixelsPerUnit)
     {
         Columns = texture.Width / gridSize;
         Rows = texture.Height / gridSize;
         _texturePath = texturePath;
         Texture = texture;
+        PixelsPerUnit = pixelsPerUnit;
 
         SplitSprite();
     }
@@ -48,18 +52,18 @@ public class SpriteSheet : DreambitAsset
 
     public Sprite this[int index] => Frames[index];
 
-    public static SpriteSheet Create(int columns, int rows, string texturePath)
+    public static SpriteSheet Create(int columns, int rows, string texturePath, int pixelsPerUnit = 1)
     {
         var texture = Resources.LoadAsset<Texture2D>(texturePath);
 
-        return texture == null ? null : new SpriteSheet(columns, rows, texturePath, texture);
+        return texture == null ? null : new SpriteSheet(columns, rows, texturePath, texture, pixelsPerUnit);
     }
 
-    public static SpriteSheet Create(int gridSize, string texturePath)
+    public static SpriteSheet Create(int gridSize, string texturePath, int pixelsPerUnit = 1)
     {
         var texture = Resources.LoadAsset<Texture2D>(texturePath);
 
-        return texture == null ? null : new SpriteSheet(gridSize, texturePath, texture);
+        return texture == null ? null : new SpriteSheet(gridSize, texturePath, texture, pixelsPerUnit);
     }
 
     internal void LoadSpriteSheet()
@@ -92,6 +96,7 @@ public class SpriteSheet : DreambitAsset
 
                     Frames[i] = new Sprite
                     {
+                        PixelsPerUnit = PixelsPerUnit,
                         Texture = Texture,
                         SourceRect = new Rectangle(x * frameWidth, y * frameHeight, frameWidth, frameHeight)
                     };
@@ -102,6 +107,7 @@ public class SpriteSheet : DreambitAsset
             default:
                 Frames[0] = new Sprite
                 {
+                    PixelsPerUnit = PixelsPerUnit,
                     Texture = Texture,
                     SourceRect = new Rectangle(0, 0, Texture.Width, Texture.Height)
                 };
