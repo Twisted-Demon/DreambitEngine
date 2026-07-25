@@ -31,20 +31,50 @@ public static class LogSink
         Channel.Writer.TryWrite(entry);
     }
 
-    private static void SpectreWrite(LogLevel level, string prefix, string msg, object[]? args)
+    private static void SpectreWrite(
+        LogLevel level,
+        string prefix,
+        string msg,
+        object[]? args)
     {
-        // choose color by level; cheap switch
-        var (hdr, body) = level switch
+        var (header, body) = level switch
         {
-            LogLevel.Trace => ("[white]", "[grey69]"),
-            LogLevel.Debug => ("[white]", "[cyan]"),
-            LogLevel.Info => ("[white]", "[deepskyblue1]"),
-            LogLevel.Warn => ("[white]", "[orange1]"),
-            LogLevel.Error => ("[white]", "[red1]"),
-            _ => ("[white]", "[grey70]")
+            LogLevel.Trace => (
+                "[dim grey58]",
+                "[dim grey58]"),
+
+            LogLevel.Debug => (
+                "[bold mediumpurple1]",
+                "[grey74]"),
+
+            LogLevel.Info => (
+                "[bold turquoise2]",
+                "[grey93]"),
+
+            LogLevel.Warn => (
+                "[bold orange1]",
+                "[wheat1]"),
+
+            LogLevel.Error => (
+                "[bold indianred1]",
+                "[mistyrose1]"),
+
+            _ => (
+                "[bold deepskyblue1]",
+                "[grey74]")
         };
-        var line = $"{hdr}{prefix}: [/]{body}{msg}[/]";
-        if (args is null) AnsiConsole.MarkupLine(line);
-        else AnsiConsole.MarkupLine(line, args);
+
+        var line =
+            $"{header}{Markup.Escape(prefix)}:[/] " +
+            $"{body}{Markup.Escape(msg)}[/]";
+
+        if (args is { Length: > 0 })
+        {
+            AnsiConsole.MarkupLine(line, args);
+        }
+        else
+        {
+            AnsiConsole.MarkupLine(line);
+        }
     }
 }
