@@ -7,8 +7,8 @@ public class CircleDrawer : DrawableComponent
     public override Rectangle Bounds => GetBounds();
 
     public Color Color { get; set; } = Color.White;
-    public bool IsFilled { get; set; } = true;
     public float Radius { get; set; } = 128f;
+    public int Segments { get; set; } = 64;
 
     private Rectangle GetBounds()
     {
@@ -29,6 +29,6 @@ public class CircleDrawer : DrawableComponent
     public override void OnDraw()
     {
         var center = Transform.WorldPosToVec2;
-        Core.SpriteBatch.DrawCircle(center, Radius, Color);
+        Core.SpriteBatch.DrawCircle(center, Radius, Color, Segments);
     }
 }
