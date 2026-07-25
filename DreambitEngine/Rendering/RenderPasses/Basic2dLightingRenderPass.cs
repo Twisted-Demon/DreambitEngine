@@ -74,7 +74,7 @@ public class Basic2dLightingRenderPass : RenderPass
 
                     Core.SpriteBatch.Begin(
                         SpriteSortMode.Deferred,
-                        BlendState.AlphaBlend,
+                        Scene.RenderingOptions.BlendState,
                         Scene.RenderingOptions.SamplerState,
                         DepthStencilState.None,
                         RasterizerState.CullNone,
