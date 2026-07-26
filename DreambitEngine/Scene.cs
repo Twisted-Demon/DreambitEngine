@@ -17,7 +17,7 @@ public class Scene : IDisposable
     /// <summary>
     ///     Initializes base repositories, managers, and the render pipeline.
     /// </summary>
-    public Scene()
+    protected Scene()
     {
         Entities = new EntityRepository(this);
         Drawables = new DrawableRepository();
@@ -127,7 +127,7 @@ public class Scene : IDisposable
     public Camera2D MainCamera { get; private set; }
 
     /// <summary>UI camera for screen-space/UI rendering.</summary>
-    public Camera2D UICamera { get; private set; }
+    public Camera2D UiCamera { get; private set; }
 
     /// <summary>Ambient light for the scene/// </summary>
     public AmbientLight2D AmbientLight { get; private set; }
@@ -186,8 +186,8 @@ public class Scene : IDisposable
         MainCamera = Entity.Create("main-camera").AttachComponent<Camera2D>();
         MainCamera.Entity.AlwaysUpdate = true;
 
-        UICamera = Entity.Create("ui-camera").AttachComponent<Camera2D>();
-        UICamera.Entity.AlwaysUpdate = true;
+        UiCamera = Entity.Create("ui-camera").AttachComponent<Camera2D>();
+        UiCamera.Entity.AlwaysUpdate = true;
 
         AmbientLight = Entity.Create("ambient-light").AttachComponent<AmbientLight2D>();
 
