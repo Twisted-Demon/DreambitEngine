@@ -18,14 +18,14 @@ public class UIRenderPass : RenderPass
     {
         var drawLayers = Scene.Drawables.GetDrawLayers();
         var layerOrder = drawLayers.Keys.OrderBy(x => x).ToList();
-        Scene.UICamera.SetTargetVerticalResolution(Window.Height);
+        Scene.UiCamera.SetTargetVerticalResolution(Window.Height);
 
         Device.SetRenderTarget(RenderPipeline.SceneRenderTarget);
         
         for (var i = 0; i < layerOrder.Count; i++)
         {
             Core.SpriteBatch.Begin(
-                transformMatrix: Scene.UICamera.TopLeftTransformMatrix,
+                transformMatrix: Scene.UiCamera.TopLeftTransformMatrix,
                 sortMode: SpriteSortMode.Deferred,
                 samplerState: Scene.RenderingOptions.UISamplerState,
                 blendState: BlendState.AlphaBlend,
