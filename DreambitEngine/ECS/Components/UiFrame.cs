@@ -27,7 +27,7 @@ public class UiFrame : DrawableComponent<UiFrame>
     {
         var screenSize = Window.ScreenSize;
 
-        Scene.UICamera.SetTargetVerticalResolution(screenSize.Y);
+        Scene.UiCamera.SetTargetVerticalResolution(screenSize.Y);
         
         _layout.Root.Width = UiLength.Pixels(screenSize.X);
         _layout.Root.Height = UiLength.Pixels(screenSize.Y);
