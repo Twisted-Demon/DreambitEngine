@@ -129,9 +129,42 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
 
     public override void OnDebugDraw()
     {
-        var vec2 = Transform.WorldPosToVec2;
-        Core.SpriteBatch.DrawHollowRectangle(Bounds, Color.Yellow);
-        Core.SpriteBatch.DrawPoint(vec2, Color.Red, 3.0f);
+        if (Sprite is null)
+            return;
+
+        Core.SpriteBatch.DrawHollowRectangle(
+            Transform.WorldPosToVec2,
+            new Vector2(Sprite.SourceRect.Width, Sprite.SourceRect.Height),
+            Color.Yellow,
+            Transform.WorldZRotation,
+            GetOriginToUse(),
+            GetSpriteScale(),
+            1f);
+
+        Core.SpriteBatch.DrawPoint(Transform.WorldPosToVec2, Color.Red, 3f);
+    }
+    
+    private Vector2 GetOriginToUse()
+    {
+        var origin = Pivot;
+
+        if (PivotType != PivotType.Custom)
+        {
+            var relative = PivotHelper.GetRelativePivot(PivotType);
+            origin = new Vector2(
+                relative.X * Sprite.SourceRect.Width,
+                relative.Y * Sprite.SourceRect.Height);
+        }
+
+        if (FlipX)
+            origin.X = Sprite.SourceRect.Width - origin.X;
+
+        return origin;
+    }
+
+    private Vector2 GetSpriteScale()
+    {
+        return Transform.WorldScaleToVec2 / Sprite.PixelsPerUnit;
     }
 
     public override void OnDestroyed()
