@@ -121,7 +121,7 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
             Tint * Opacity,
             Transform.WorldZRotation,
             originToUse,
-            Transform.WorldScaleToVec2 / Sprite.PixelsPerUnit,
+            Transform.WorldScaleToVec2 / Scene.MainCamera.PixelsPerUnit,
             spriteEffect,
             0f
         );
@@ -164,7 +164,7 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
 
     private Vector2 GetSpriteScale()
     {
-        return Transform.WorldScaleToVec2 / Sprite.PixelsPerUnit;
+        return Transform.WorldScaleToVec2 / Scene.MainCamera.PixelsPerUnit;
     }
 
     public override void OnDestroyed()
