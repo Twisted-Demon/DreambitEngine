@@ -24,6 +24,8 @@ public class RenderPipeline(Scene scene) : IDisposable
         _renderers.Clear();
 
         _disposed = true;
+        
+        GC.SuppressFinalize(this);
     }
 
     public void Initialize()
@@ -68,7 +70,7 @@ public class RenderPipeline(Scene scene) : IDisposable
         Core.SpriteBatch.End();
     }
 
-    public RenderTarget2D CreateRenderTarget()
+    public static RenderTarget2D CreateRenderTarget()
     {
         var target = new RenderTarget2D(
             Core.Instance.GraphicsDevice,
@@ -82,7 +84,7 @@ public class RenderPipeline(Scene scene) : IDisposable
         return target;
     }
 
-    public RenderTarget2D CreateRenderTarget(int width, int height)
+    public static RenderTarget2D CreateRenderTarget(int width, int height)
     {
         var target = new RenderTarget2D(
             Core.Instance.GraphicsDevice,
@@ -96,7 +98,7 @@ public class RenderPipeline(Scene scene) : IDisposable
         return target;
     }
 
-    public RenderTarget2D CreateRenderTarget(Point size)
+    public static RenderTarget2D CreateRenderTarget(Point size)
     {
         var target = new RenderTarget2D(
             Core.Instance.GraphicsDevice,
