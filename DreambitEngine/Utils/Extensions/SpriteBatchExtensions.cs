@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Dreambit.ECS;
 using FontStashSharp;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -18,6 +19,37 @@ public static class SpriteBatchExtensions
             PixelTexture = new Texture2D(graphicsDevice, 1, 1);
             PixelTexture.SetData([Color.White]);
         }
+    }
+
+    public static void DrawWorldSprite(
+        this SpriteBatch spriteBatch,
+        Camera2D camera,
+        Texture2D texture,
+        Vector2 worldPosition,
+        Rectangle? sourceRectangle,
+        Color color,
+        float rotation,
+        Vector2 origin,
+        Vector2 worldScale,
+        SpriteEffects effects = SpriteEffects.None,
+        float layerDepth = 0f)
+    {
+        ArgumentNullException.ThrowIfNull(spriteBatch);
+        ArgumentNullException.ThrowIfNull(camera);
+        ArgumentNullException.ThrowIfNull(texture);
+
+        var spriteBatchScale = camera.GetSpriteDrawScale(worldScale);
+        
+        spriteBatch.Draw(
+            texture,
+            worldPosition,
+            sourceRectangle,
+            color,
+            rotation,
+            origin,
+            spriteBatchScale,
+            effects,
+            layerDepth);
     }
 
     public static float GetLineHeight(SpriteFontBase font, float lineSpacingMultiplier = 1f)
@@ -509,24 +541,25 @@ public static class SpriteBatchExtensions
 
     public static void DrawFilledRectangle(
         this SpriteBatch spriteBatch,
-        Rectangle rectangle,
+        RectangleF rectangle,
         Color color)
     {
-        EnsurePixelTextureExists(spriteBatch.GraphicsDevice);
-        spriteBatch.Draw(PixelTexture, rectangle, color);
+        //EnsurePixelTextureExists(spriteBatch.GraphicsDevice);
+       // spriteBatch.Draw(PixelTexture, rectangle, color);
     }
 
     public static void DrawHollowRectangle(
         this SpriteBatch spriteBatch,
-        Rectangle rectangle,
+        RectangleF rectangle,
         Color color,
-        float thickness = 1f)
+        float thickness = 1f,
+        float rotation = 0f)
     {
         spriteBatch.DrawHollowRectangle(
             new Vector2(rectangle.X, rectangle.Y),
             new Vector2(rectangle.Width, rectangle.Height),
             color,
-            0f,
+            rotation,
             Vector2.Zero,
             Vector2.One,
             thickness);
@@ -542,6 +575,10 @@ public static class SpriteBatchExtensions
         Vector2? scale = null,
         float thickness = 1f)
     {
+        var minimumThickness = Scene.Instance.MainCamera.WorldUnitsPerTexturePixel;
+        if(thickness < minimumThickness)
+            thickness = minimumThickness;
+        
         var points = CreateTransformedRectanglePoints(position, size, rotation, origin, scale);
         spriteBatch.DrawHollowPolygon(points, color, thickness);
     }

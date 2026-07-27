@@ -43,5 +43,5 @@ public class UiFrame : DrawableComponent<UiFrame>
     
     
 
-    public override Rectangle Bounds => Scene.MainCamera.Bounds;
+    public override RectangleF Bounds => Scene.MainCamera.BoundsF;
 }

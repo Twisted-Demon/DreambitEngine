@@ -4,96 +4,374 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace Dreambit;
 
-public static class Window
+public class Window
 {
-    // Cashed "windowed mode" state so we can restore after fullscreen
-    private static Point _prevWindowedSize;
-    private static Point _prevWindowedPos;
-    private static bool _hasPrevWindowed;
+    private static readonly TimeSpan ResizeDebounce =
+        TimeSpan.FromMilliseconds(50);
 
-    // Debounce for resize spam (Windows/SDL can fire many per drag)
-    private static readonly TimeSpan ResizeDebounce = TimeSpan.FromMilliseconds(50);
-    private static TimeSpan _lastResizeAt = TimeSpan.Zero;
+    private static Point _previousWindowedSize;
+    private static Point _previousWindowedPosition;
+    private static Point _pendingClientSize;
+    private static Point _lastNotifiedBackBufferSize;
+
+    private static long _lastResizeTimestampMilliseconds;
+
+    private static bool _hasPreviousWindowedState;
     private static bool _pendingResize;
-    private static int _pendingW, _pendingH;
+    private static bool _applyingGraphicsChanges;
+    private static bool _initialized;
 
-    public static int MonitorCount => GraphicsAdapter.Adapters.Count;
+    public static ILogger Logger = new Logger<Window>();
 
-    public static int Width => Core.Instance.GraphicsDevice.PresentationParameters.BackBufferWidth;
-    public static int Height => Core.Instance.GraphicsDevice.PresentationParameters.BackBufferHeight;
+    public static int MonitorCount =>
+        GraphicsAdapter.Adapters.Count;
 
-    public static Point ScreenSize => new(Width, Height);
+    public static GraphicsAdapter Adapter =>
+        Core.Instance?.GraphicsDevice?.Adapter ??
+        GraphicsAdapter.DefaultAdapter;
 
-    public static GraphicsAdapter Adapter => Core.Instance.GraphicsDevice.Adapter;
-
-    public static float AspectRatio
+    public static int BackBufferWidth
     {
         get
         {
-            var h = Height;
-            return h > 0 ? Width / (float)h : 1f; // avoid div-by-zero during device transitions
+            var graphicsDevice =
+                Core.Instance?.GraphicsDevice;
+
+            if (graphicsDevice != null)
+            {
+                return Math.Max(
+                    1,
+                    graphicsDevice
+                        .PresentationParameters
+                        .BackBufferWidth);
+            }
+
+            return Math.Max(
+                1,
+                Core.GraphicsDeviceManager?
+                    .PreferredBackBufferWidth ?? 1);
         }
     }
 
+    public static int BackBufferHeight
+    {
+        get
+        {
+            var graphicsDevice =
+                Core.Instance?.GraphicsDevice;
+
+            if (graphicsDevice != null)
+            {
+                return Math.Max(
+                    1,
+                    graphicsDevice
+                        .PresentationParameters
+                        .BackBufferHeight);
+            }
+
+            return Math.Max(
+                1,
+                Core.GraphicsDeviceManager?
+                    .PreferredBackBufferHeight ?? 1);
+        }
+    }
+
+    public static Point BackBufferSize =>
+        new(BackBufferWidth, BackBufferHeight);
+
+    public static int ClientWidth
+    {
+        get
+        {
+            var instance =
+                Core.Instance;
+
+            if (instance?.Window == null)
+                return BackBufferWidth;
+
+            return Math.Max(
+                1,
+                instance.Window.ClientBounds.Width);
+        }
+    }
+
+    public static int ClientHeight
+    {
+        get
+        {
+            var instance =
+                Core.Instance;
+
+            if (instance?.Window == null)
+                return BackBufferHeight;
+
+            return Math.Max(
+                1,
+                instance.Window.ClientBounds.Height);
+        }
+    }
+
+    public static Point ClientSize =>
+        new(ClientWidth, ClientHeight);
+
+    // Preserve the original API: Width/Height represent renderable pixels.
+    public static int Width => BackBufferWidth;
+    public static int Height => BackBufferHeight;
+    public static Point ScreenSize => BackBufferSize;
+
+    public static float AspectRatio =>
+        BackBufferHeight > 0
+            ? BackBufferWidth / (float)BackBufferHeight
+            : 1f;
+
     /// <summary>
-    ///     Raised when the backbuffer size has *settled* (debounced).
+    /// Raised after the backbuffer has been synchronized with a settled
+    /// window-client resize.
     /// </summary>
     public static event EventHandler<WindowResizedEventArgs> WindowResized;
 
     public static void Init()
     {
-        // Capture initial windowed state
-        if (Core.Instance != null)
+        if (_initialized)
+            return;
+
+        var instance =
+            Core.Instance ??
+            throw new InvalidOperationException(
+                "Core.Instance must exist before Window.Init().");
+
+        if (instance.GraphicsDevice == null)
         {
-            _prevWindowedSize = new Point(
-                Core.GraphicsDeviceManager.PreferredBackBufferWidth,
-                Core.GraphicsDeviceManager.PreferredBackBufferHeight);
-            _prevWindowedPos = Core.Instance.Window.Position;
-            _hasPrevWindowed = true;
+            throw new InvalidOperationException(
+                "Window.Init() requires an initialized GraphicsDevice. " +
+                "Call it from Core.Initialize(), not the Core constructor.");
         }
 
-        // Debounced resize handler
-        Core.Instance!.Window.ClientSizeChanged += OnClientSizeChanged;
+        _previousWindowedSize =
+            BackBufferSize;
+
+        _previousWindowedPosition =
+            instance.Window.Position;
+
+        _hasPreviousWindowedState = true;
+        _lastNotifiedBackBufferSize = BackBufferSize;
+
+        instance.Window.ClientSizeChanged +=
+            OnClientSizeChanged;
+
+        // Set this only after initialization succeeds. Otherwise a failed
+        // first call would permanently block later initialization.
+        _initialized = true;
     }
 
-    public static void Tick(GameTime time)
+    public static void Shutdown()
     {
-        // Drive debounce delivery from the game loop
-        if (_pendingResize && time.TotalGameTime - _lastResizeAt >= ResizeDebounce)
+        if (!_initialized)
+            return;
+
+        if (Core.Instance?.Window != null)
         {
-            _pendingResize = false;
-            WindowResized?.Invoke(null, new WindowResizedEventArgs { Width = _pendingW, Height = _pendingH });
+            Core.Instance.Window.ClientSizeChanged -=
+                OnClientSizeChanged;
         }
+
+        _initialized = false;
+        _pendingResize = false;
     }
 
-    private static void OnClientSizeChanged(object sender, EventArgs args)
+    /// <summary>
+    /// Call once per game update, before scene/component updates.
+    /// </summary>
+    public static void Tick(GameTime gameTime)
     {
-        // Track latest size; fire later (debounced)
-        _pendingW = Width;
-        _pendingH = Height;
-        _lastResizeAt = Time.GameTime.TotalGameTime; // Core.GameTime optional; otherwise raise next Tick
+        _ = gameTime;
+
+        if (!_pendingResize)
+            return;
+
+        var elapsedMilliseconds =
+            Environment.TickCount64 -
+            _lastResizeTimestampMilliseconds;
+
+        if (elapsedMilliseconds <
+            ResizeDebounce.TotalMilliseconds)
+        {
+            return;
+        }
+
+        _pendingResize = false;
+
+        SynchronizeBackBufferToClient(
+            _pendingClientSize);
+    }
+
+    private static void OnClientSizeChanged(
+        object sender,
+        EventArgs args)
+    {
+        _ = sender;
+        _ = args;
+
+        if (_applyingGraphicsChanges)
+            return;
+
+        var bounds =
+            Core.Instance.Window.ClientBounds;
+
+        // Minimized windows can temporarily report zero-sized bounds.
+        if (bounds.Width <= 0 || bounds.Height <= 0)
+            return;
+
+        _pendingClientSize =
+            new Point(bounds.Width, bounds.Height);
+
+        _lastResizeTimestampMilliseconds =
+            Environment.TickCount64;
+
         _pendingResize = true;
     }
 
-    public static void SetSize(int width, int height)
+    private static void SynchronizeBackBufferToClient(
+        Point clientSize)
     {
-        if (width <= 0 || height <= 0) return;
+        if (clientSize.X <= 0 || clientSize.Y <= 0)
+            return;
 
-        var gdm = Core.GraphicsDeviceManager;
+        var graphics =
+            Core.GraphicsDeviceManager;
 
-        gdm.PreferredBackBufferWidth = width;
-        gdm.PreferredBackBufferHeight = height;
-        gdm.ApplyChanges();
+        if (BackBufferSize != clientSize)
+        {
+            graphics.PreferredBackBufferWidth =
+                clientSize.X;
 
-        RememberWindowedStateIfBordered();
+            graphics.PreferredBackBufferHeight =
+                clientSize.Y;
 
-        WindowResized?.Invoke(null, new WindowResizedEventArgs { Width = width, Height = height });
+            ApplyGraphicsChanges();
+        }
+
+        RaiseResizeIfBackBufferChanged();
     }
 
-    public static void SetPosition(int x, int y)
+    private static void ApplyGraphicsChanges()
     {
-        var p = new Point(x, y);
-        Core.Instance.Window.Position = p;
+        var graphics =
+            Core.GraphicsDeviceManager;
+
+        if (graphics == null ||
+            Core.Instance?.GraphicsDevice == null)
+        {
+            return;
+        }
+
+        _applyingGraphicsChanges = true;
+
+        try
+        {
+            graphics.ApplyChanges();
+        }
+        finally
+        {
+            _applyingGraphicsChanges = false;
+        }
+    }
+
+    private static void RaiseResizeIfBackBufferChanged()
+    {
+        var size =
+            BackBufferSize;
+
+        if (size.X <= 0 || size.Y <= 0)
+            return;
+
+        if (size == _lastNotifiedBackBufferSize)
+            return;
+
+        _lastNotifiedBackBufferSize = size;
+
+        WindowResized?.Invoke(
+            null,
+            new WindowResizedEventArgs
+            {
+                Width = size.X,
+                Height = size.Y,
+                ClientWidth = ClientWidth,
+                ClientHeight = ClientHeight
+            });
+        
+        Logger.Debug($"Window resized: {Window.ScreenSize}");
+    }
+
+    public static Vector2 ClientToBackBuffer(
+        Vector2 clientPosition)
+    {
+        var clientSize =
+            ClientSize;
+
+        var backBufferSize =
+            BackBufferSize;
+
+        return new Vector2(
+            clientPosition.X *
+            backBufferSize.X / clientSize.X,
+
+            clientPosition.Y *
+            backBufferSize.Y / clientSize.Y);
+    }
+
+    public static Vector2 BackBufferToClient(
+        Vector2 backBufferPosition)
+    {
+        var backBufferSize =
+            BackBufferSize;
+
+        var clientSize =
+            ClientSize;
+
+        return new Vector2(
+            backBufferPosition.X *
+            clientSize.X / Math.Max(1, backBufferSize.X),
+
+            backBufferPosition.Y *
+            clientSize.Y / Math.Max(1, backBufferSize.Y));
+    }
+
+    public static void SetSize(
+        int width,
+        int height)
+    {
+        if (width <= 0 || height <= 0)
+            return;
+
+        _pendingResize = false;
+
+        var graphics =
+            Core.GraphicsDeviceManager ??
+            throw new InvalidOperationException(
+                "GraphicsDeviceManager has not been created.");
+
+        graphics.PreferredBackBufferWidth = width;
+        graphics.PreferredBackBufferHeight = height;
+
+        // Before Core.Initialize(), these preferred values are enough.
+        // MonoGame will use them while creating GraphicsDevice.
+        if (Core.Instance?.GraphicsDevice == null)
+            return;
+
+        ApplyGraphicsChanges();
+        RaiseResizeIfBackBufferChanged();
+
+        RememberWindowedStateIfBordered();
+    }
+
+    public static void SetPosition(
+        int x,
+        int y)
+    {
+        Core.Instance.Window.Position =
+            new Point(x, y);
+
         RememberWindowedStateIfBordered();
     }
 
@@ -104,170 +382,245 @@ public static class Window
 
     public static Point GetCenter()
     {
-        var pos = GetPosition();
+        var position =
+            GetPosition();
 
-        var center = new Point(
-            pos.X + Width / 2,
-            pos.Y + Height / 2
-        );
-
-        return center;
+        return new Point(
+            position.X + ClientWidth / 2,
+            position.Y + ClientHeight / 2);
     }
 
     public static void CenterOnPrimaryDisplay()
     {
-        var dm = Core.Instance.GraphicsDevice.Adapter.CurrentDisplayMode;
-        var winSize = new Point(Width, Height);
-        var pos = new Point(Math.Max(0, (dm.Width - winSize.X) / 2),
-            Math.Max(0, (dm.Height - winSize.Y) / 2));
-        Core.Instance.Window.Position = pos;
+        var displayMode =
+            Adapter.CurrentDisplayMode;
+
+        var clientSize =
+            ClientSize;
+
+        Core.Instance.Window.Position =
+            new Point(
+                Math.Max(
+                    0,
+                    (displayMode.Width - clientSize.X) / 2),
+                Math.Max(
+                    0,
+                    (displayMode.Height - clientSize.Y) / 2));
+
         RememberWindowedStateIfBordered();
     }
 
-    // ---- Window chrome & behavior -----------------------------------------
-
-    public static void SetAllowUserResizing(bool value)
+    public static void SetAllowUserResizing(
+        bool value)
     {
-        Core.Instance.Window.AllowUserResizing = value;
+        Core.Instance.Window.AllowUserResizing =
+            value;
     }
 
-    public static void SetTitle(string title)
+    public static void SetTitle(
+        string title)
     {
-        Core.Instance.Window.Title = title ?? string.Empty;
+        Core.Instance.Window.Title =
+            title ?? string.Empty;
     }
 
-    public static void SetBorderless(bool value)
+    public static void SetBorderless(
+        bool value)
     {
-        Core.Instance.Window.IsBorderless = value;
-        // Borderless flips window chrome only; backbuffer stays as-is
-        if (!value) RememberWindowedStateIfBordered();
+        Core.Instance.Window.IsBorderless =
+            value;
+
+        if (!value)
+            RememberWindowedStateIfBordered();
     }
 
-    // ---- Fullscreen modes --------------------------------------------------
-
-    /// <summary>
-    ///     Exclusive fullscreen using GraphicsDeviceManager.IsFullScreen.
-    ///     Note: on DesktopGL this may change video mode & vsync behavior.
-    /// </summary>
-    public static void SetFullscreen(bool enabled)
+    public static void SetFullscreen(
+        bool enabled)
     {
-        var gdm = Core.GraphicsDeviceManager;
+        var graphics =
+            Core.GraphicsDeviceManager;
 
-        if (enabled)
-        {
-            RememberWindowedStateIfBordered(); // store windowed state for restore
-            var dm = Core.Instance.GraphicsDevice.Adapter.CurrentDisplayMode;
-            gdm.PreferredBackBufferWidth = dm.Width;
-            gdm.PreferredBackBufferHeight = dm.Height;
-            gdm.IsFullScreen = true;
-            gdm.ApplyChanges();
-        }
-        else
-        {
-            gdm.IsFullScreen = false;
+        _pendingResize = false;
 
-            if (_hasPrevWindowed && _prevWindowedSize is { X: > 0, Y: > 0 })
-            {
-                gdm.PreferredBackBufferWidth = _prevWindowedSize.X;
-                gdm.PreferredBackBufferHeight = _prevWindowedSize.Y;
-            }
-
-            gdm.ApplyChanges();
-
-            if (_hasPrevWindowed)
-                Core.Instance.Window.Position = _prevWindowedPos;
-
-            // Return to bordered window unless caller wants borderless explicitly
-            Core.Instance.Window.IsBorderless = false;
-        }
-    }
-
-    /// <summary>
-    ///     Borderless fullscreen (aka “fullscreen window”). Safer than exclusive.
-    ///     Toggles cleanly and restores previous windowed size/pos.
-    /// </summary>
-    public static void SetBorderlessFullscreen(bool enabled)
-    {
-        var gdm = Core.GraphicsDeviceManager;
         if (enabled)
         {
             RememberWindowedStateIfBordered();
 
-            var dm = Core.Instance.GraphicsDevice.Adapter.CurrentDisplayMode;
-            gdm.IsFullScreen = false; // ensure windowed mode behind the scenes
-            gdm.PreferredBackBufferWidth = dm.Width;
-            gdm.PreferredBackBufferHeight = dm.Height;
-            gdm.ApplyChanges();
+            var displayMode =
+                Adapter.CurrentDisplayMode;
+
+            graphics.PreferredBackBufferWidth =
+                displayMode.Width;
+
+            graphics.PreferredBackBufferHeight =
+                displayMode.Height;
+
+            graphics.IsFullScreen = true;
+
+            ApplyGraphicsChanges();
+            RaiseResizeIfBackBufferChanged();
+            return;
+        }
+
+        graphics.IsFullScreen = false;
+
+        if (_hasPreviousWindowedState &&
+            _previousWindowedSize.X > 0 &&
+            _previousWindowedSize.Y > 0)
+        {
+            graphics.PreferredBackBufferWidth =
+                _previousWindowedSize.X;
+
+            graphics.PreferredBackBufferHeight =
+                _previousWindowedSize.Y;
+        }
+
+        ApplyGraphicsChanges();
+
+        Core.Instance.Window.IsBorderless = false;
+
+        if (_hasPreviousWindowedState)
+        {
+            Core.Instance.Window.Position =
+                _previousWindowedPosition;
+        }
+
+        RaiseResizeIfBackBufferChanged();
+    }
+
+    public static void SetBorderlessFullscreen(
+        bool enabled)
+    {
+        var graphics =
+            Core.GraphicsDeviceManager;
+
+        _pendingResize = false;
+
+        if (enabled)
+        {
+            RememberWindowedStateIfBordered();
+
+            var displayMode =
+                Adapter.CurrentDisplayMode;
+
+            graphics.IsFullScreen = false;
+
+            graphics.PreferredBackBufferWidth =
+                displayMode.Width;
+
+            graphics.PreferredBackBufferHeight =
+                displayMode.Height;
 
             Core.Instance.Window.IsBorderless = true;
-            Core.Instance.Window.Position = new Point(0, 0);
-        }
-        else
-        {
-            Core.Instance.Window.IsBorderless = false;
 
-            if (_hasPrevWindowed && _prevWindowedSize.X > 0 && _prevWindowedSize.Y > 0)
-            {
-                gdm.PreferredBackBufferWidth = _prevWindowedSize.X;
-                gdm.PreferredBackBufferHeight = _prevWindowedSize.Y;
-                gdm.ApplyChanges();
-                Core.Instance.Window.Position = _prevWindowedPos;
-            }
+            ApplyGraphicsChanges();
+
+            Core.Instance.Window.Position =
+                Point.Zero;
+
+            RaiseResizeIfBackBufferChanged();
+            return;
         }
+
+        Core.Instance.Window.IsBorderless = false;
+
+        if (_hasPreviousWindowedState &&
+            _previousWindowedSize.X > 0 &&
+            _previousWindowedSize.Y > 0)
+        {
+            graphics.PreferredBackBufferWidth =
+                _previousWindowedSize.X;
+
+            graphics.PreferredBackBufferHeight =
+                _previousWindowedSize.Y;
+        }
+
+        ApplyGraphicsChanges();
+
+        if (_hasPreviousWindowedState)
+        {
+            Core.Instance.Window.Position =
+                _previousWindowedPosition;
+        }
+
+        RaiseResizeIfBackBufferChanged();
     }
 
     public static void ToggleBorderlessFullscreen()
     {
-        SetBorderlessFullscreen(!Core.Instance.Window.IsBorderless ||
-                                Width != Core.Instance.GraphicsDevice.Adapter.CurrentDisplayMode.Width ||
-                                Height != Core.Instance.GraphicsDevice.Adapter.CurrentDisplayMode.Height);
+        var displayMode =
+            Adapter.CurrentDisplayMode;
+
+        var isBorderlessFullscreen =
+            Core.Instance.Window.IsBorderless &&
+            BackBufferWidth == displayMode.Width &&
+            BackBufferHeight == displayMode.Height;
+
+        SetBorderlessFullscreen(
+            !isBorderlessFullscreen);
     }
 
-    // ---- Timing / VSync ----------------------------------------------------
-
-    /// <summary>Enable/disable VSync (swap interval).</summary>
-    public static void SetVsync(bool enabled)
+    public static void SetVsync(
+        bool enabled)
     {
-        Core.GraphicsDeviceManager.SynchronizeWithVerticalRetrace = enabled;
-        Core.GraphicsDeviceManager.ApplyChanges();
+        Core.GraphicsDeviceManager
+            .SynchronizeWithVerticalRetrace = enabled;
+
+        ApplyGraphicsChanges();
+        RaiseResizeIfBackBufferChanged();
     }
 
-    /// <summary>
-    ///     Fixed timestep proxy (if your Core exposes the Game instance).
-    ///     Useful to hard-cap logic rate while allowing unlocked rendering.
-    /// </summary>
-    public static void SetFixedTimeStep(bool enabled, double targetFps = 60.0)
+    public static void SetFixedTimeStep(
+        bool enabled,
+        double targetFps = 60.0)
     {
-        try
+        Core.Instance.IsFixedTimeStep =
+            enabled;
+
+        if (enabled && targetFps > 0.0)
         {
-            Core.Instance.IsFixedTimeStep = enabled;
-            if (enabled && targetFps > 0)
-                Core.Instance.TargetElapsedTime = TimeSpan.FromSeconds(1.0 / targetFps);
-        }
-        catch
-        {
-            // Some platforms or Core wrappers may not expose these—ignore safely.
+            Core.Instance.TargetElapsedTime =
+                TimeSpan.FromSeconds(
+                    1.0 / targetFps);
         }
     }
-
-    // ---- Helpers -----------------------------------------------------------
 
     private static void RememberWindowedStateIfBordered()
     {
-        // Only remember if NOT already borderless/fullscreen (true windowed)
-        if (!Core.Instance.Window.IsBorderless && !Core.GraphicsDeviceManager.IsFullScreen)
+        if (Core.Instance.Window.IsBorderless ||
+            Core.GraphicsDeviceManager.IsFullScreen)
         {
-            _prevWindowedSize = new Point(
-                Core.GraphicsDeviceManager.PreferredBackBufferWidth,
-                Core.GraphicsDeviceManager.PreferredBackBufferHeight);
-            _prevWindowedPos = Core.Instance.Window.Position;
-            _hasPrevWindowed = true;
+            return;
         }
+
+        _previousWindowedSize =
+            BackBufferSize;
+
+        _previousWindowedPosition =
+            Core.Instance.Window.Position;
+
+        _hasPreviousWindowedState = true;
     }
 }
 
-public class WindowResizedEventArgs : EventArgs
+public sealed class WindowResizedEventArgs : EventArgs
 {
-    public int Width { get; set; }
-    public int Height { get; set; }
+    /// <summary>
+    /// Actual backbuffer width after GraphicsDeviceManager.ApplyChanges().
+    /// </summary>
+    public int Width { get; init; }
+
+    /// <summary>
+    /// Actual backbuffer height after GraphicsDeviceManager.ApplyChanges().
+    /// </summary>
+    public int Height { get; init; }
+
+    public int ClientWidth { get; init; }
+    public int ClientHeight { get; init; }
+
+    public Point BackBufferSize =>
+        new(Width, Height);
+
+    public Point ClientSize =>
+        new(ClientWidth, ClientHeight);
 }

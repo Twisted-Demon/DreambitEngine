@@ -7,15 +7,15 @@ public class PointLight2D : Light2D
 {
     public float Radius { get; set; }
 
-    public override Rectangle Bounds
+    public override RectangleF Bounds
     {
         get
         {
             var r = MathF.Max(0f, Radius); // safety
-            var left = (int)MathF.Floor(Position.X - r);
-            var top = (int)MathF.Floor(Position.Y - r);
-            var size = (int)MathF.Ceiling(r * 2f);
-            return new Rectangle(left, top, size, size);
+            var left = MathF.Floor(Position.X - r);
+            var top = MathF.Floor(Position.Y - r);
+            var size = MathF.Ceiling(r * 2f);
+            return new RectangleF(left, top, size, size);
         }
     }
 

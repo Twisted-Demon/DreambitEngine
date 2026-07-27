@@ -31,7 +31,7 @@ public class ParticleSystemDrawer : DrawableComponent<ParticleSystemDrawer>
     }
 
     public ParticleSimulation2D Simulation { get; private set; }
-    public override Rectangle Bounds => Simulation.Bounds;
+    public override RectangleF Bounds => Simulation.Bounds;
 
     public override void OnCreated()
     {
@@ -73,8 +73,9 @@ public class ParticleSystemDrawer : DrawableComponent<ParticleSystemDrawer>
             var rot = parts.ROT[phys];
 
             var color = parts.COLOR[phys];
-
-            Core.SpriteBatch.Draw(
+            
+            Core.SpriteBatch.DrawWorldSprite(
+                Scene.MainCamera,
                 Texture,
                 new Vector2(px, py),
                 null,
@@ -83,8 +84,7 @@ public class ParticleSystemDrawer : DrawableComponent<ParticleSystemDrawer>
                 Origin,
                 new Vector2(sx, sy),
                 SpriteEffects.None,
-                0f
-            );
+                0f);
         }
     }
 
@@ -104,7 +104,7 @@ public class ParticleSystemDrawer : DrawableComponent<ParticleSystemDrawer>
         if (Simulation == null) Simulation = new ParticleSimulation2D(Transform) { UseLocalSpace = true };
     }
 
-    public override bool IsVisibleFromCamera(Rectangle cameraBounds)
+    public override bool IsVisibleFromCamera(RectangleF cameraBounds)
     {
         return true;
     }

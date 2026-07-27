@@ -20,9 +20,13 @@ public class Core : Game
 
         GameName = title;
 
-        Dreambit.Window.Init();
-        Dreambit.Window.SetTitle(title);
-        Dreambit.Window.SetSize(width, height);
+        GraphicsDeviceManager.PreferredBackBufferWidth =
+            Math.Max(1, width);
+
+        GraphicsDeviceManager.PreferredBackBufferHeight =
+            Math.Max(1, height);
+
+        Window.Title = title ?? string.Empty;
 
         Resources.Instance.Init();
 
@@ -42,8 +46,10 @@ public class Core : Game
     protected override void Initialize()
     {
         base.Initialize();
+        
+        Dreambit.Window.Init();
 
-        GraphicsDevice.BlendState = BlendState.NonPremultiplied;
+        GraphicsDevice.BlendState = BlendState.AlphaBlend;
         Input.Init();
     }
 

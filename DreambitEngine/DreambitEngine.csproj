@@ -14,15 +14,15 @@
         <OutputPath>$(BaseOutputPath)</OutputPath> <!-- No version folder for Release -->
     </PropertyGroup>
     <ItemGroup>
-        <PackageReference Include="FontStashSharp.MonoGame" Version="1.5.1" />
+        <PackageReference Include="FontStashSharp.MonoGame" Version="1.5.6" />
         <PackageReference
                 Include="MonoGame.Framework.Native"
                 Version="3.8.5">
             <PrivateAssets>All</PrivateAssets>
         </PackageReference>
-        <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-        <PackageReference Include="Spectre.Console" Version="0.53.0" />
-        <PackageReference Include="YamlDotNet" Version="16.3.0" />
+        <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+        <PackageReference Include="Spectre.Console" Version="0.57.2" />
+        <PackageReference Include="YamlDotNet" Version="18.1.0" />
     </ItemGroup>
     <ItemGroup>
       <Compile Remove="bin\**" />

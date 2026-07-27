@@ -6,7 +6,7 @@ namespace Dreambit.ECS;
 public abstract class DrawableComponent : Component
 {
     private int _drawLayer;
-    public abstract Rectangle Bounds { get; }
+    public abstract RectangleF Bounds { get; }
 
     public Effect Effect { get; set; } = null;
 
@@ -46,7 +46,7 @@ public abstract class DrawableComponent : Component
         Scene.Drawables.UpdateDrawableDrawLayer(this, oldDrawLayer, newDrawLayer);
     }
 
-    public virtual bool IsVisibleFromCamera(Rectangle cameraBounds)
+    public virtual bool IsVisibleFromCamera(RectangleF cameraBounds)
     {
         return cameraBounds.Intersects(Bounds);
     }

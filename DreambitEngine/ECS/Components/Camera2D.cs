@@ -93,6 +93,17 @@ public class Camera2D : Component
     /// Final number of screen pixels occupied by one world unit.
     /// </summary>
     public float Scale => PixelsPerUnit * TotalZoom;
+    
+    public float WorldUnitsWidth => Window.BackBufferWidth / PixelsPerUnit;
+    public float WorldUnitsHeight => Window.BackBufferHeight / PixelsPerUnit;
+
+    /// <summary>
+    /// size of one texture pixel expressed in world units
+    ///
+    /// At 16 pixels per unit, one texture pixel occupies 1 / 16th of a world unit
+    /// aka 1 world unit has a width and height of 16 pixels
+    /// </summary>
+    public float WorldUnitsPerTexturePixel => 1f / PixelsPerUnit;
 
     private float ScreenPixelsPerWorldUnit => Scale;
 
@@ -211,10 +222,10 @@ public class Camera2D : Component
     {
         if (!float.IsFinite(value) || value < MinimumScale)
         {
-            throw new ArgumentOutOfRangeException(
-                parameterName,
-                value,
-                $"Value must be finite and at least {MinimumScale}.");
+            //throw new ArgumentOutOfRangeException(
+            //    parameterName,
+            //    value,
+            //    $"Value must be finite and at least {MinimumScale}.");
         }
     }
 
@@ -436,6 +447,7 @@ public class Camera2D : Component
             targetVerticalResolution;
 
         SetResolutionZoom();
+        _matricesDirty = true;
     }
 
     public void ForcePosition(Vector3 position)
@@ -573,5 +585,21 @@ public class Camera2D : Component
         return Vector2.Transform(
             cameraLocalPosition,
             _inverseTopLeftTransformMatrix);
+    }
+
+    /// <summary>
+    /// convert a texture's world scale into the correct world scale
+    /// to match pixels per unit. 
+    /// </summary>
+    /// <param name="worldScale"></param>
+    /// <returns></returns>
+    public Vector2 GetSpriteDrawScale(Vector2 worldScale)
+    {
+        return worldScale * WorldUnitsPerTexturePixel;
+    }
+
+    public Vector2 SpriteSizeToWorld(Vector2 spriteSize, Vector2 worldScale)
+    {
+        return spriteSize * GetSpriteDrawScale(worldScale);
     }
 }

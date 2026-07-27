@@ -7,7 +7,7 @@ namespace Dreambit.ECS;
 public class LDtkRenderer : DrawableComponent<LDtkRenderer>
 {
     private ExampleRenderer _renderer;
-    public override Rectangle Bounds { get; }
+    public override RectangleF Bounds { get; }
     public LDtkLevel Level { get; set; }
 
     public override void OnCreated()
@@ -34,7 +34,7 @@ public class LDtkRenderer : DrawableComponent<LDtkRenderer>
     {
     }
 
-    public override bool IsVisibleFromCamera(Rectangle cameraBounds)
+    public override bool IsVisibleFromCamera(RectangleF cameraBounds)
     {
         return true;
     }

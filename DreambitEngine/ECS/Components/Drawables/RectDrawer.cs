@@ -7,7 +7,7 @@ public class RectDrawer : DrawableComponent
     public int Height = 32;
 
     public int Width = 32;
-    public override Rectangle Bounds => GetBounds();
+    public override RectangleF Bounds => GetBounds();
 
     public PivotType PivotType { get; set; } = PivotType.Center;
 
@@ -15,7 +15,7 @@ public class RectDrawer : DrawableComponent
 
     public Color Color { get; set; } = Color.White;
 
-    private Rectangle GetBounds()
+    private RectangleF GetBounds()
     {
         var pivotToUse = Transform.WorldPosToVec2;
 
@@ -30,9 +30,9 @@ public class RectDrawer : DrawableComponent
                 break;
         }
 
-        var bounds = new Rectangle(
-            (int)pivotToUse.X,
-            (int)pivotToUse.Y,
+        var bounds = new RectangleF(
+            pivotToUse.X,
+            pivotToUse.Y,
             Width,
             Height);
 
@@ -41,7 +41,7 @@ public class RectDrawer : DrawableComponent
 
     public override void OnDraw()
     {
-        Core.SpriteBatch.DrawFilledRectangle(
+        Core.SpriteBatch.DrawHollowRectangle(
             Bounds, Color
         );
     }

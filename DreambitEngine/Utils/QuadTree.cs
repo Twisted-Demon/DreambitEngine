@@ -11,9 +11,9 @@ public class Quadtree<T>
 
     private readonly int _level; // Current level of this node
     private readonly Quadtree<T>[] _nodes; // Child nodes (NE, NW, SW, SE)
-    private Rectangle _bounds; // Bounding box of this node
+    private RectangleF _bounds; // Bounding box of this node
 
-    public Quadtree(int level, Rectangle bounds)
+    public Quadtree(int level, RectangleF bounds)
     {
         _level = level;
         _bounds = bounds;
@@ -51,12 +51,12 @@ public class Quadtree<T>
         var extraWidth = _bounds.Width % 2;
         var extraHeight = _bounds.Height % 2;
 
-        _nodes[0] = new Quadtree<T>(_level + 1, new Rectangle(x + subWidth, y, subWidth + extraWidth, subHeight)); // NE
-        _nodes[1] = new Quadtree<T>(_level + 1, new Rectangle(x, y, subWidth, subHeight)); // NW
+        _nodes[0] = new Quadtree<T>(_level + 1, new RectangleF(x + subWidth, y, subWidth + extraWidth, subHeight)); // NE
+        _nodes[1] = new Quadtree<T>(_level + 1, new RectangleF(x, y, subWidth, subHeight)); // NW
         _nodes[2] = new Quadtree<T>(_level + 1,
-            new Rectangle(x, y + subHeight, subWidth, subHeight + extraHeight)); // SW
+            new RectangleF(x, y + subHeight, subWidth, subHeight + extraHeight)); // SW
         _nodes[3] = new Quadtree<T>(_level + 1,
-            new Rectangle(x + subWidth, y + subHeight, subWidth + extraWidth, subHeight + extraHeight)); // SE
+            new RectangleF(x + subWidth, y + subHeight, subWidth + extraWidth, subHeight + extraHeight)); // SE
     }
 
     /// <summary>
@@ -184,7 +184,7 @@ public class Quadtree<T>
     /// <summary>
     ///     Retrieves all objects that could collide with the given area.
     /// </summary>
-    public void Query(Rectangle area, List<T> results)
+    public void Query(RectangleF area, List<T> results)
     {
         if (!_bounds.Intersects(area))
             return;

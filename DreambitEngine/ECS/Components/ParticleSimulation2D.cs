@@ -63,7 +63,7 @@ public class ParticleSimulation2D : ICanLog<ParticleSimulation2D>
     private Transform Transform { get; }
 
     // -------- Global AABB -----------------
-    public Rectangle Bounds { get; private set; }
+    public RectangleF Bounds { get; private set; }
 
     public ILogger Logger { get; } = new Logger<ParticleSimulation2D>();
 
@@ -131,7 +131,7 @@ public class ParticleSimulation2D : ICanLog<ParticleSimulation2D>
         }
 
         _alive = 0;
-        Bounds = Rectangle.Empty;
+        Bounds = RectangleF.Empty;
         Version++;
 
         // Continuous timing
@@ -357,7 +357,7 @@ public class ParticleSimulation2D : ICanLog<ParticleSimulation2D>
         var dt = Time.DeltaTime;
         if (dt <= 0f || _alive == 0)
         {
-            Bounds = Rectangle.Empty;
+            Bounds = RectangleF.Empty;
             return;
         }
 
@@ -454,7 +454,7 @@ public class ParticleSimulation2D : ICanLog<ParticleSimulation2D>
 
         if (_alive == 0)
         {
-            Bounds = Rectangle.Empty;
+            Bounds = RectangleF.Empty;
         }
         else
         {
@@ -470,7 +470,7 @@ public class ParticleSimulation2D : ICanLog<ParticleSimulation2D>
             var y = (int)Mathf.Floor(minY + oy);
             var w = (int)Mathf.Max(1, Mathf.Ceil(maxX - minX));
             var h = (int)Mathf.Max(1, Mathf.Ceil(maxY - minY));
-            Bounds = new Rectangle(x, y, w, h);
+            Bounds = new RectangleF(x, y, w, h);
         }
     }
 

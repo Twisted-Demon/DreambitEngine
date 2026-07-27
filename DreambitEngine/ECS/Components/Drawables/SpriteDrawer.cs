@@ -26,28 +26,47 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
 
     public bool FlipX { get; set; } = false;
 
-    public override Rectangle Bounds
+    public override RectangleF Bounds
     {
         get
         {
-            if (Sprite is null) return new Rectangle(0, 0, 1, 1);
-            
-            var originToUse = Pivot;
+            if (Sprite is null)
+                return new RectangleF(0, 0, 1, 1);
 
-            if (PivotType != PivotType.Custom)
-            {
-                var relative = PivotHelper.GetRelativePivot(PivotType);
-                originToUse = new Vector2(relative.X * Sprite.SourceRect.Width, relative.Y * Sprite.SourceRect.Height);
-            }
+            var origin = GetOriginToUse();
 
-            var rect = new Rectangle(
-                (int)(Transform.WorldPosition.X - originToUse.X),
-                (int)(Transform.WorldPosition.Y - originToUse.Y),
-                Sprite.SourceRect.Width,
-                Sprite.SourceRect.Height
-            );
+            var drawScale =
+                Scene.MainCamera.GetSpriteDrawScale(
+                    Transform.WorldScaleToVec2);
 
-            return rect;
+            var worldOrigin =
+                origin * drawScale;
+
+            var worldSize =
+                new Vector2(
+                    Sprite.SourceRect.Width,
+                    Sprite.SourceRect.Height) * drawScale;
+
+            var position =
+                Transform.WorldPosToVec2;
+
+            var left =
+                position.X - worldOrigin.X;
+
+            var top =
+                position.Y - worldOrigin.Y;
+
+            var right =
+                left + worldSize.X;
+
+            var bottom =
+                top + worldSize.Y;
+
+            return new RectangleF(
+                left,
+                top,
+                right - left,
+                bottom - top);
         }
     }
 
@@ -92,7 +111,10 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
     {
         if (Sprite?.Texture == null)
         {
-            Logger.Warn("Entity {0} is missing a texture", Entity.Name);
+            Logger.Warn(
+                "Entity {0} is missing a texture",
+                Entity.Name);
+
             return;
         }
 
@@ -100,31 +122,35 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
 
         if (PivotType != PivotType.Custom)
         {
-            var relative = PivotHelper.GetRelativePivot(PivotType);
-            originToUse = new Vector2(relative.X * Sprite.SourceRect.Width, relative.Y * Sprite.SourceRect.Height);
-        }
+            var relative =
+                PivotHelper.GetRelativePivot(PivotType);
 
-        //var depth = Transform.WorldPosition.Y / float.MaxValue;
+            originToUse = new Vector2(
+                relative.X * Sprite.SourceRect.Width,
+                relative.Y * Sprite.SourceRect.Height);
+        }
 
         var spriteEffect = SpriteEffects.None;
 
         if (FlipX)
         {
             spriteEffect |= SpriteEffects.FlipHorizontally;
-            originToUse.X = Sprite.SourceRect.Width - originToUse.X;
+
+            originToUse.X =
+                Sprite.SourceRect.Width - originToUse.X;
         }
 
-        Core.SpriteBatch.Draw(
+        Core.SpriteBatch.DrawWorldSprite(
+            Scene.MainCamera,
             Sprite.Texture,
             Transform.WorldPosToVec2,
             Sprite.SourceRect,
             Tint * Opacity,
             Transform.WorldZRotation,
             originToUse,
-            Transform.WorldScaleToVec2 / Scene.MainCamera.PixelsPerUnit,
+            Transform.WorldScaleToVec2,
             spriteEffect,
-            0f
-        );
+            0f);
     }
 
     public override void OnDebugDraw()
@@ -132,16 +158,19 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
         if (Sprite is null)
             return;
 
+        //Core.SpriteBatch.DrawHollowRectangle(
+        //    Transform.WorldPosToVec2,
+        //    new Vector2(Sprite.SourceRect.Width, Sprite.SourceRect.Height),
+        //    Color.Yellow,
+        //    Transform.WorldZRotation,
+        //    GetOriginToUse(),
+        //    GetSpriteScale(),
+        //    1f / Scene.MainCamera.PixelsPerUnit);
+        
         Core.SpriteBatch.DrawHollowRectangle(
-            Transform.WorldPosToVec2,
-            new Vector2(Sprite.SourceRect.Width, Sprite.SourceRect.Height),
-            Color.Yellow,
-            Transform.WorldZRotation,
-            GetOriginToUse(),
-            GetSpriteScale(),
-            1f);
+            Bounds, Color.Yellow, Scene.MainCamera.WorldUnitsPerTexturePixel);
 
-        Core.SpriteBatch.DrawPoint(Transform.WorldPosToVec2, Color.Red, 3f);
+        Core.SpriteBatch.DrawPoint(Transform.WorldPosToVec2, Color.Red, 3f * Scene.MainCamera.WorldUnitsPerTexturePixel);
     }
     
     private Vector2 GetOriginToUse()

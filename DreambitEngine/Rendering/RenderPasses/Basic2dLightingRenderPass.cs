@@ -44,7 +44,7 @@ public class Basic2dLightingRenderPass : RenderPass
                     drawable.Enabled &&
                     drawable.Entity.Enabled &&
                     drawable.DrawLayer != DrawLayers.LightLayer &&
-                    drawable.IsVisibleFromCamera(Scene.MainCamera.Bounds))
+                    drawable.IsVisibleFromCamera(Scene.MainCamera.BoundsF))
                 .OrderBy(
                     drawable => drawable,
                     new DrawableComparer(DefaultEffect))
@@ -92,7 +92,7 @@ public class Basic2dLightingRenderPass : RenderPass
     private void RenderLighting()
     {
         var lights = Drawables.GetAllDrawablesByType<PointLight2D>()
-            .Where(x => x.IsVisibleFromCamera(Scene.MainCamera.Bounds)).ToList();
+            .Where(x => x.IsVisibleFromCamera(Scene.MainCamera.BoundsF)).ToList();
 
         var ambientLight = Drawables.GetAllDrawablesByType<AmbientLight2D>().FirstOrDefault();
 

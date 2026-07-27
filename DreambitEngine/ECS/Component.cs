@@ -349,7 +349,7 @@ public abstract class Component : IDisposable
     }
 }
 
-public class SingletonComponent<T> : Component where T : SingletonComponent<T>
+public class SingletonComponent<T> : Component<T> where T : SingletonComponent<T>
 {
     public static T Instance { get; private set; }
 
