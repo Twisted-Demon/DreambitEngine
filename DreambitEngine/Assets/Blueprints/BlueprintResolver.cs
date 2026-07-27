@@ -79,6 +79,10 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
 
                 value = GetAssetReference(assetName, propType);
             }
+            else if (IsEntityReference(propType))
+            {
+                value = ResolveEntityReference(token, blueprintMap);
+            }
             else if (IsComponentReference(propType))
             {
                 // parse the uuid string
@@ -135,6 +139,10 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
 
                 value = GetAssetReference(assetName, fieldType);
             } 
+            else if (IsEntityReference(fieldType))
+            {
+                value = ResolveEntityReference(token, blueprintMap);
+            }
             else if (IsComponentReference(fieldType))
             {
                 // parse the uuid string
@@ -164,6 +172,39 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
         }
     }
 
+    private static Entity ResolveEntityReference(
+        JToken token,
+        Dictionary<Guid, EntityBlueprint> blueprintMap)
+    {
+        var guidString = token.Value<string>();
+        
+        if (string.IsNullOrWhiteSpace(guidString))
+            return null;
+
+        if (!Guid.TryParse(guidString, out var blueprintGuid))
+            return null;
+
+        if (!blueprintMap.TryGetValue(blueprintGuid, out var bpReference))
+        {
+            Instance.Logger.Warn(
+                "Unable to find entity blueprint reference {0}",
+                blueprintGuid);
+
+            return null;
+        }
+        
+        var entity = Scene.Instance.FindEntity(bpReference.WorldGuid);
+        
+        if (entity is null)
+        {
+            Instance.Logger.Warn(
+                "Unable to find runtime entity for blueprint {0}",
+                blueprintGuid);
+        }
+
+        return entity;
+    }
+
     private static bool IsDreambitAsset(Type type)
     {
         return type.IsSubclassOf(typeof(DreambitAsset));
@@ -172,6 +213,11 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
     private static bool IsComponentReference(Type type)
     {
         return type.IsSubclassOf(typeof(Component));
+    }
+
+    private static bool IsEntityReference(Type type)
+    {
+        return typeof(Entity).IsAssignableFrom(type);
     }
 
     public static object GetAssetReference(string assetName, Type assetType)
