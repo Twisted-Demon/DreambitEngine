@@ -1,3 +1,0 @@
-Source File,Dest File,Processor Type,Content Type,Source File Size,Dest File Size,Build Seconds
-"C:/Dev/DreambitEngine/Dreambit.BriGame/Content/BriWorld.ldtk","C:/Dev/DreambitEngine/Dreambit.BriGame/Build/Debug/Content/BriWorld.xnb","LDtkFileProcessor","LDtkFile",49513,4480,0.1833824
-"C:/Dev/DreambitEngine/Dreambit.BriGame/Content/BriWorld/Level_0.ldtkl","C:/Dev/DreambitEngine/Dreambit.BriGame/Build/Debug/Content/BriWorld/Level_0.xnb","LDtkLevelProcessor","LDtkLevel",42803,28263,0.0109616
