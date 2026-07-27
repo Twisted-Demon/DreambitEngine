@@ -70,4 +70,12 @@ public class Transform
 
         return Parent.GetTransformationMatrix() * localMatrix;
     }
+
+    internal void DebugDraw()
+    {
+        Core.SpriteBatch.DrawPoint(
+            WorldPosToVec2, 
+            Color.Red, 
+            3f * Scene.Instance.MainCamera.WorldUnitsPerTexturePixel);
+    }
 }

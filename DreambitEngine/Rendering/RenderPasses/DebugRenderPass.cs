@@ -29,7 +29,11 @@ public class DebugRenderPass : RenderPass
         foreach (var entity in entities)
         {
             var comps = entity.GetAllActiveComponents();
-            foreach (var c in comps) c.OnDebugDraw();
+            foreach (var c in comps)
+            {
+                c.Transform.DebugDraw();
+                c.OnDebugDraw();
+            }
         }
 
         Core.SpriteBatch.End();

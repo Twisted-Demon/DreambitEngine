@@ -157,20 +157,10 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
     {
         if (Sprite is null)
             return;
-
-        //Core.SpriteBatch.DrawHollowRectangle(
-        //    Transform.WorldPosToVec2,
-        //    new Vector2(Sprite.SourceRect.Width, Sprite.SourceRect.Height),
-        //    Color.Yellow,
-        //    Transform.WorldZRotation,
-        //    GetOriginToUse(),
-        //    GetSpriteScale(),
-        //    1f / Scene.MainCamera.PixelsPerUnit);
         
         Core.SpriteBatch.DrawHollowRectangle(
             Bounds, Color.Yellow, Scene.MainCamera.WorldUnitsPerTexturePixel);
-
-        Core.SpriteBatch.DrawPoint(Transform.WorldPosToVec2, Color.Red, 3f * Scene.MainCamera.WorldUnitsPerTexturePixel);
+        
     }
     
     private Vector2 GetOriginToUse()
