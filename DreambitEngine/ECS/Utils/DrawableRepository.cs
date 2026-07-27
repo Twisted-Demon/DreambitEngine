@@ -72,6 +72,7 @@ public sealed class DrawableRepository
 
         _byLayer.Clear();
         _byLayerIdx.Clear();
+        _byType.Clear();
     }
 
     internal void UpdateDrawableDrawLayer(DrawableComponent drawable, int oldLayer, int newLayer)

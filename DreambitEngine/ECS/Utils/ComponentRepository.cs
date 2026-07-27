@@ -3,11 +3,11 @@ using Type = System.Type;
 
 namespace Dreambit.ECS;
 
-public class ComponentRepository
+public class    ComponentRepository
 {
-    private readonly HashSet<Component> _attachedComponents = new();
-    private readonly HashSet<Component> _componentsToAttach = new();
-    private readonly HashSet<Component> _componentsToDetach = new();
+    private readonly HashSet<Component> _attachedComponents = [];
+    private readonly HashSet<Component> _componentsToAttach = [];
+    private readonly HashSet<Component> _componentsToDetach = [];
     private readonly Logger<ComponentRepository> _logger = new();
 
     private Scene _scene;
@@ -62,9 +62,9 @@ public class ComponentRepository
         foreach (var c in _componentsToAttach)
         {
             if (_attachedComponents.Contains(c)) continue;
-            c.Entity = null;
             c.RemoveFromEntity();
             c.Destroy();
+            c.Entity = null;
             c.Dispose();
         }
 
@@ -76,9 +76,9 @@ public class ComponentRepository
             if (c is DrawableComponent dc && _scene != null)
                 _scene.Drawables.Remove(dc);
 
-            c.Entity = null;
             c.RemoveFromEntity();
-            c.Destroy();
+            c.Destroy();    
+            c.Entity = null;
             c.Dispose();
         }
 
@@ -217,9 +217,9 @@ public class ComponentRepository
                 if (det is DrawableComponent dc && _scene != null)
                     _scene.Drawables.Remove(dc);
 
-                det.Entity = null;
                 det.RemoveFromEntity();
                 det.Destroy();
+                det.Entity = null;
                 det.Dispose();
             }
 
