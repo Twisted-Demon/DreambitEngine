@@ -75,7 +75,7 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
             {
                 var assetName = token.Value<string>();
                 if (string.IsNullOrWhiteSpace(assetName))
-                    return;
+                    continue;
 
                 value = GetAssetReference(assetName, propType);
             }
@@ -88,19 +88,19 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
                 // parse the uuid string
                 var uidString =  token.Value<string>();
                 if (string.IsNullOrWhiteSpace(uidString))
-                    return;
+                    continue;
 
                 if (Guid.TryParse(uidString, out var blueprintGuid))
                 {
                     //get the blueprint of the reference, then the world entity
                     if (!blueprintMap.TryGetValue(blueprintGuid, out var bpReference)) 
-                        return;
+                        continue;
                     var referenceGuid = bpReference.WorldGuid;
                     var entityReference = Scene.Instance.FindEntity(referenceGuid);
 
                     //get the component reference
                     var componentReference = entityReference?.GetComponent(propType);
-                    if (componentReference is null) return;
+                    if (componentReference is null) continue;
                     
                     //set the value
                     value = componentReference;
@@ -135,7 +135,7 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
             {
                 var assetName = token.Value<string>();
                 if (string.IsNullOrWhiteSpace(assetName))
-                    return;
+                    continue;
 
                 value = GetAssetReference(assetName, fieldType);
             } 
@@ -148,7 +148,7 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
                 // parse the uuid string
                 var uidString =  token.Value<string>();
                 if (string.IsNullOrWhiteSpace(uidString))
-                    return;
+                    continue;
 
                 if (Guid.TryParse(uidString, out var referenceGuid))
                 {
@@ -157,7 +157,7 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
 
                     //get the component reference
                     var componentReference = entityReference?.GetComponent(fieldType);
-                    if (componentReference is null) return;
+                    if (componentReference is null) continue;
                     
                     //set the value
                     value = componentReference;
