@@ -54,7 +54,6 @@ public class Transform
 
     public Vector2 WorldPosToVec2 => new(WorldPosition.X, WorldPosition.Y);
     public float WorldZRotation => WorldRotation.Z;
-    public float ScaledZRotation => WorldZRotation / Scene.Instance.MainCamera.PixelsPerUnit;
     public Vector2 WorldScaleToVec2 => new(WorldScale.X, WorldScale.Y);
 
     public Matrix GetTransformationMatrix()
