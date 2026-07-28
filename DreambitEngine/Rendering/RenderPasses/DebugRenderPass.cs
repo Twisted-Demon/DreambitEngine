@@ -28,10 +28,10 @@ public class DebugRenderPass : RenderPass
         var entities = Scene.GetAllActiveEntities(); // ideally IReadOnlyList<Entity>
         foreach (var entity in entities)
         {
+            entity.Transform.DebugDraw();
             var comps = entity.GetAllActiveComponents();
             foreach (var c in comps)
             {
-                c.Transform.DebugDraw();
                 c.OnDebugDraw();
             }
         }
