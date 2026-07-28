@@ -68,8 +68,24 @@ public class Transform
         if (Parent == null)
             return localMatrix;
 
-        return Parent.GetTransformationMatrix() * localMatrix;
+        return localMatrix * Parent.GetTransformationMatrix();
     }
+
+    public Vector3 Forward
+    {
+        get
+        {
+            var rotationMatrix =
+                Matrix.CreateRotationZ(WorldRotation.Z) *
+                Matrix.CreateRotationY(WorldRotation.Y) *
+                Matrix.CreateRotationX(WorldRotation.X);
+
+            return Vector3.Normalize(
+                Vector3.TransformNormal(Vector3.UnitX, rotationMatrix));
+        }
+    }
+    
+    public Vector2 ForwardVec2 => new(Forward.X, Forward.Y);
 
     internal void DebugDraw()
     {
@@ -77,5 +93,11 @@ public class Transform
             WorldPosToVec2, 
             Color.Red, 
             3f * Scene.Instance.MainCamera.WorldUnitsPerTexturePixel);
+        
+        Core.SpriteBatch.DrawLine(
+            WorldPosToVec2, 
+            WorldPosToVec2 + (ForwardVec2 * 0.5f), 
+            Color.Red,
+            2f * Scene.Instance.MainCamera.WorldUnitsPerTexturePixel);
     }
 }

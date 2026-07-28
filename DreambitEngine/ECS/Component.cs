@@ -11,7 +11,7 @@ public abstract class Component<T> : Component where T : Component
 
 public abstract class Component : IDisposable
 {
-    protected static readonly ILogger Logger = new Logger<Component>();
+    private static readonly ILogger Logger = new Logger<Component>();
     private bool _enabled = true;
     private bool _guarded = true;
     private bool _isDisposed;
