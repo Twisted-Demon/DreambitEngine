@@ -238,7 +238,7 @@ public class Camera2D : Component
     private void EnsureMatricesCurrent()
     {
         var cameraPosition = Transform.WorldPosition;
-        var cameraRotation = Transform.WorldZRotation;
+        var cameraRotation = Transform.WorldRotation2D;
         var viewportSize = ViewportSize;
 
         var transformChanged =

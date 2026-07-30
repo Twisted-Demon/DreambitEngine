@@ -62,7 +62,7 @@ public class AStarPathFollower : Component
 
     public void Seek(Vector2 targetPosition)
     {
-        _path = _pathfinder.FindPath(Transform.WorldPosToVec2, targetPosition);
+        _path = _pathfinder.FindPath(Transform.WorldPosition2D, targetPosition);
         IsSeeking = true;
     }
 

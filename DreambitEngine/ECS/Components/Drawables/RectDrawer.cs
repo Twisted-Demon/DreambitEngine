@@ -17,7 +17,7 @@ public class RectDrawer : DrawableComponent
 
     private RectangleF GetBounds()
     {
-        var pivotToUse = Transform.WorldPosToVec2;
+        var pivotToUse = Transform.WorldPosition2D;
 
         switch (PivotType)
         {

@@ -13,7 +13,7 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
     private readonly HashSet<Collider> _candidateSet = new(256);
     private readonly HashSet<Collider> _resultSet = new(256);
     private readonly List<Collider> _colliders = [];
-    private readonly SpatialHash _grid = new(64f);
+    private readonly SpatialHash _grid = new(6f);
 
     public void RegisterCollider(Collider c)
     {
@@ -30,12 +30,21 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         _grid.InsertOrUpdate(c, c.AABB);
     }
 
-    public void DeregisterCollider(Collider c)
+    public void DeregisterCollider(Collider collider)
     {
-        _colliders.Remove(c);
+        _colliders.Remove(collider);
 
-        foreach (var tag in _byTag.Keys) _byTag[tag].Remove(c);
-        _grid.Remove(c);
+        foreach (var tag in collider.Entity.Tags)
+        {
+            if (!_byTag.TryGetValue(tag, out var list)) continue;
+
+            list.Remove(collider);
+
+            if (list.Count == 0)
+                _byTag.Remove(tag);
+        }
+
+        _grid.Remove(collider);
     }
 
     /// <summary>
@@ -44,8 +53,7 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
     /// <param name="c"></param>
     public void Touch(Collider c)
     {
-        var poly = c.GetTransformedPolygon();
-        _grid.InsertOrUpdate(c, poly.ComputeAabb());
+        _grid.InsertOrUpdate(c, c.AABB);
     }
 
     public void CleanUp()
@@ -94,8 +102,7 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
 
         foreach (var other in _candidateSet)
         {
-            if (other is null) continue;
-            if (!other.Enabled || !other.Entity.Enabled) continue;
+            if (!IsColliderValid(other)) continue;
 
             var otherPoly = other.GetTransformedPolygon();
             if (!poly.Intersects(otherPoly)) continue;
@@ -107,67 +114,56 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         return result.Collisions.Count > 0;
     }
 
-    public bool PolygonCastByTag(Polygon2D poly, out CollisionResult result, params string[] tags)
+    public bool PolygonCastByTag(Polygon2D polygon, out CollisionResult result, IReadOnlyList<string> tags)
     {
         result = new CollisionResult();
-
+        
         _candidateSet.Clear();
-        _resultSet.Clear();
 
-        var aabb = poly.ComputeAabb();
+        var aabb = polygon.ComputeAabb();
         _grid.QueryAABB(aabb, _candidateSet);
 
-        foreach (var tag in tags)
+        foreach (var other in _candidateSet)
         {
-            if (!_byTag.TryGetValue(tag, out var tagged)) continue;
+            if (!IsColliderValid(other)) continue;
 
-            foreach (var other in tagged)
-            {
-                if (!_candidateSet.Contains(other)) continue;
-                if (other == null) continue;
-                if (!other.Enabled || !other.Entity.Enabled) continue;
+            if (!other.Entity.HasAnyTag(tags)) continue;
 
-                var op = other.GetTransformedPolygon();
-                if (!poly.Intersects(op)) continue;
+            var otherPolygon = other.GetTransformedPolygon();
 
-                if (_resultSet.Add(other))
-                    result.Collisions.Add(other);
-            }
+            if (!polygon.Intersects(otherPolygon)) continue;
+
+            result.Collisions.Add(other);
         }
 
         return result.Collisions.Count > 0;
     }
 
-    public bool ColliderCastByTag(Collider @this, out CollisionResult result, params string[] tags)
+    public bool ColliderCastByTag(Collider collider, out CollisionResult result, IReadOnlyList<string> tags)
     {
         result = new CollisionResult();
-        if (@this == null) return false;
-
+        
+        if(collider == null) return false;
+        
         _candidateSet.Clear();
-        _resultSet.Clear();
 
-        var ap = @this.GetTransformedPolygon();
-        var aabb = ap.ComputeAabb();
+        var polygon = collider.GetTransformedPolygon();
+        var aabb = polygon.ComputeAabb();
 
-        _candidateSet.Add(@this);
         _grid.QueryAABB(aabb, _candidateSet);
 
-        foreach (var tag in tags)
+        foreach (var other in _candidateSet)
         {
-            if (!_byTag.TryGetValue(tag, out var tagged)) continue;
+            if (!IsColliderValid(other)) continue;
 
-            foreach (var other in tagged)
-            {
-                if (!_candidateSet.Contains(other)) continue;
-                if (other == null || other == @this) continue;
-                if (!other.Enabled || !other.Entity.Enabled) continue;
+            if (!other.Entity.HasAnyTag([.. tags])) continue;
+            
+            var otherPolygon = other.GetTransformedPolygon();
 
-                var op = other.GetTransformedPolygon();
-                if (!ap.Intersects(op)) continue;
+            if (!polygon.Intersects(otherPolygon))
+                continue;
 
-                if (_resultSet.Add(other))
-                    result.Collisions.Add(other);
-            }
+            result.Collisions.Add(other);
         }
 
         return result.Collisions.Count > 0;
@@ -201,36 +197,33 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         return result.Collisions.Count > 0;
     }
 
-    public bool PointCastByTag(Vector2 p, out CollisionResult result, params string[] tags)
+    public bool PointCastByTag(Vector2 point, out CollisionResult result, IReadOnlyList<string> tags)
     {
         result = new CollisionResult();
-
+        
         _candidateList.Clear();
-        _grid.QueryPoint(p, _candidateList);
-
         _candidateSet.Clear();
-        _resultSet.Clear();
-
-        for (var i = 0; i < _candidateList.Count; i++)
+        
+        _grid.QueryPoint(point, _candidateList);
+        
+        for(var i = 0; i < _candidateList.Count; i++)
             _candidateSet.Add(_candidateList[i]);
 
-        foreach (var tag in tags)
+        foreach (var other in _candidateSet)
         {
-            if (!_byTag.TryGetValue(tag, out var tagged)) continue;
+            if (!IsColliderValid(other)) continue;
 
-            foreach (var other in tagged)
-            {
-                if (!_candidateSet.Contains(other)) continue;
-                if (!other.Enabled || !other.Entity.Enabled) continue;
+            if (!other.Entity.HasAnyTag(tags))
+                continue;
 
-                var poly = other.GetTransformedPolygon();
-                if (!poly.ContainsPoint(p)) continue;
+            var polygon = other.GetTransformedPolygon();
 
-                if (_resultSet.Add(other))
-                    result.Collisions.Add(other);
-            }
+            if (!polygon.ContainsPoint(point))
+                continue;
+
+            result.Collisions.Add(other);
         }
-
+        
         return result.Collisions.Count > 0;
     }
 
@@ -262,42 +255,41 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         return result.Collisions.Count > 0;
     }
 
-    public bool RayCastByTag(Ray2D ray, out CollisionResult result, params string[] tags)
+    public bool RayCastByTag(Ray2D ray, out CollisionResult result, IReadOnlyList<string> tags)
     {
         result = new CollisionResult();
-
+        
         _candidateList.Clear();
-        _grid.QueryRay(ray.Start, ray.End, _candidateList);
-
         _candidateSet.Clear();
-        _resultSet.Clear();
+        
+        _grid.QueryRay(ray.Start, ray.End, _candidateList);
 
         for (var i = 0; i < _candidateList.Count; i++)
             _candidateSet.Add(_candidateList[i]);
 
-        foreach (var tag in tags)
+        foreach (var other in _candidateSet)
         {
-            if (!_byTag.TryGetValue(tag, out var tagged)) continue;
+            if(!IsColliderValid(other)) continue;
 
-            foreach (var other in tagged)
-            {
-                if (!_candidateSet.Contains(other)) continue;
-                if (!other.Enabled || !other.Entity.Enabled) continue;
+            if (!other.Entity.HasAnyTag(tags)) continue;
+            
+            var polygon =  other.GetTransformedPolygon();
 
-                var poly = other.GetTransformedPolygon();
-                if (!poly.RayIntersects(ray.Start, ray.End, out _)) continue;
+            if (!polygon.RayIntersects(
+                    ray.Start,
+                    ray.End,
+                    out _)) continue;
 
-                if (_resultSet.Add(other))
-                    result.Collisions.Add(other);
-            }
+            result.Collisions.Add(other);
         }
-
+        
         return result.Collisions.Count > 0;
     }
 
     public bool CircleCast(Vector2 center, float radius, out CollisionResult result, AABB? aabb = null)
     {
         result = new CollisionResult();
+
         if (radius <= 0f) return false;
         
         _candidateList.Clear();
@@ -307,68 +299,77 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         {
             aabb = new AABB
             {
-                Min = new Vector2(center.X - radius, center.Y - radius),
-                Max = new Vector2(center.X + radius, center.Y + radius)
+                Min = new Vector2(
+                    center.X - radius,
+                    center.Y - radius),
+
+                Max = new Vector2(
+                    center.X + radius,
+                    center.Y + radius)
             };
         }
-
+        
         _grid.QueryAABB(aabb.Value, _candidateSet);
 
         foreach (var other in _candidateSet)
         {
             if (other == null) continue;
-            if(!other.Enabled || !other.Entity.Enabled) continue;
-            
-            var poly = other.GetTransformedPolygon();
-            if (!poly.IntersectsCircle(center, radius)) continue;
+
+            if (!IsColliderValid(other)) continue;
+
+            var polygon = other.GetTransformedPolygon();
+
+            if (!polygon.IntersectsCircle(center, radius)) continue;
 
             if (_resultSet.Add(other))
                 result.Collisions.Add(other);
         }
-
+        
         return result.Collisions.Count > 0;
     }
 
-    public bool CircleCastByTag(Vector2 center, float radius, out CollisionResult result, params string[] tags)
+    public bool CircleCastByTag(Vector2 center, float radius, out CollisionResult result, IReadOnlyList<string> tags)
     {
         result = new CollisionResult();
-        if (radius <= 0f) return false;
         
-        _candidateList.Clear();
-        _resultSet.Clear();
+        if(radius <= 0f) return false;
+        
         _candidateSet.Clear();
         
         var aabb = new AABB
         {
-            Min = new Vector2(center.X - radius, center.Y - radius),
-            Max = new Vector2(center.X + radius, center.Y + radius)
-        };
+            Min = new Vector2(
+                center.X - radius,
+                center.Y - radius),
 
+            Max = new Vector2(
+                center.X + radius,
+                center.Y + radius)
+        };
+        
         _grid.QueryAABB(aabb, _candidateSet);
 
-        for (var i = 0; i < _candidateList.Count; i++)
+        foreach (var other in _candidateSet)
         {
-            _candidateSet.Add(_candidateList[i]);
+            if (!IsColliderValid(other)) continue;
+
+            if (!other.Entity.HasAnyTag(tags)) continue;
+            
+            var polygon = other.GetTransformedPolygon();
+
+            if (!polygon.IntersectsCircle(center, radius)) continue;
+            
+            result.Collisions.Add(other);
         }
-
-        foreach (var tag in tags)
-        {
-            if (!_byTag.TryGetValue(tag, out var tagged)) continue;
-
-            foreach (var other in tagged)
-            {
-                if (!_candidateSet.Contains(other)) continue;
-                if(!other.Enabled || !other.Entity.Enabled) continue;
-
-                var poly = other.GetTransformedPolygon();
-                if (!poly.IntersectsCircle(center, radius)) continue;
-                
-                if(_resultSet.Add(other))
-                    result.Collisions.Add(other);
-            }
-        }
-
+        
         return result.Collisions.Count > 0;
+    }
+
+    private bool IsColliderValid(Collider collider)
+    {
+        if(collider == null) return false;
+        
+        return collider.Enabled && collider.Entity.Enabled;
     }
 }
 

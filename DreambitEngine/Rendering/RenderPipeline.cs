@@ -44,6 +44,9 @@ public class RenderPipeline(Scene scene) : IDisposable
 
         renderer.InitializeInternals();
         _renderers.Add(renderer);
+
+        _renderers.Sort(static (left, right) =>
+            left.Order.CompareTo(right.Order));
     }
 
     public T GetRenderPass<T>() where T : RenderPass
@@ -58,14 +61,25 @@ public class RenderPipeline(Scene scene) : IDisposable
     public void OnDraw()
     {
         foreach (var renderer in _renderers)
+        {
+            if (!renderer.IsActive)
+                continue;
+            
             renderer.OnDraw();
+        }
 
         Core.Instance.GraphicsDevice.SetRenderTarget(null);
         Core.Instance.GraphicsDevice.Clear(scene.BackgroundColor);
+        
+        Core.SpriteBatch.Begin(
+            SpriteSortMode.Deferred,
+            BlendState.AlphaBlend,
+            scene.RenderingOptions.SamplerState);
 
-        Core.SpriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, scene.RenderingOptions.SamplerState);
-
-        Core.SpriteBatch.Draw(SceneRenderTarget, Vector2.Zero, Color.White);
+        Core.SpriteBatch.Draw(
+            SceneRenderTarget,
+            Vector2.Zero,
+            Color.White);
 
         Core.SpriteBatch.End();
     }

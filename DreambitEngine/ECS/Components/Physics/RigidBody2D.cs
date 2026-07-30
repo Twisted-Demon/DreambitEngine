@@ -26,12 +26,12 @@ public class RigidBody2D : Component<RigidBody2D>
             return;
         }
 
-        var lastPosition = Transform.Position;
+        Transform.CaptureLastWorldPosition();
         Transform.Position += Velocity.ToVector3() * Time.DeltaTime;
 
         if (CheckForCollision(out _))
             // reset position if we did collide
-            Transform.Position = lastPosition;
+            Transform.Position = Transform.LastWorldPosition;
     }
 
     #endregion

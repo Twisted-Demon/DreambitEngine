@@ -8,4 +8,9 @@ public static class Vector2Extensions
     {
         return new Vector3(vector.X, vector.Y, 0);
     }
+
+    public static float Angle(this Vector2 vector)
+    {
+        return Mathf.Atan2(vector.Y, vector.X);
+    }
 }

@@ -31,7 +31,7 @@ public class EntityRepository
         _scene = scene;
     }
 
-    internal Entity CreateEntity(string name, HashSet<string> tags, bool enabled, Vector3? createAt, Vector3? rotation,
+    internal Entity CreateEntity(string name, HashSet<string> tags, bool enabled, Vector3? createAt, Vector3? eulerRotation,
         Vector3? scale, Guid? guidOverride = null)
     {
         tags ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "default" };
@@ -43,11 +43,11 @@ public class EntityRepository
         if (createAt.HasValue)
         {
             entity.Transform.Position = createAt.Value;
-            entity.Transform.LastWorldPosition = entity.Transform.Position;
+            entity.Transform.CaptureLastWorldPosition();
         }
 
-        if (rotation.HasValue)
-            entity.Transform.Rotation = rotation.Value;
+        if (eulerRotation.HasValue)
+            entity.Transform.SetEulerRotation(eulerRotation.Value);
 
         if (scale.HasValue)
             entity.Transform.Scale = scale.Value;

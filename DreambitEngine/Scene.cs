@@ -362,11 +362,11 @@ public class Scene : IDisposable
         HashSet<string> tags = null,
         bool enabled = true,
         Vector3? createAt = null,
-        Vector3? rotation = null,
+        Vector3? eulerRotation = null,
         Vector3? scale = null,
         Guid? guidOverride = null)
     {
-        var entity = Entities.CreateEntity(name, tags, enabled, createAt, rotation, scale, guidOverride);
+        var entity = Entities.CreateEntity(name, tags, enabled, createAt, eulerRotation, scale, guidOverride);
         return entity;
     }
 
@@ -376,14 +376,14 @@ public class Scene : IDisposable
     /// <param name="blueprint"></param>
     /// <param name="enabled"></param>
     /// <param name="createAt"></param>
-    /// <param name="rotation"></param>
+    /// <param name="eulerRotation"></param>
     /// <param name="scale"></param>
     /// <returns></returns>
     public Entity CreateEntity(
         EntityBlueprint blueprint,
         bool? enabled = true,
         Vector3? createAt = null,
-        Vector3? rotation = null,
+        Vector3? eulerRotation = null,
         Vector3? scale = null)
     {
         var pos = blueprint.Position;
@@ -393,8 +393,8 @@ public class Scene : IDisposable
 
         if (createAt.HasValue)
             pos = createAt.Value;
-        if (rotation.HasValue)
-            rot = rotation.Value;
+        if (eulerRotation.HasValue)
+            rot = eulerRotation.Value;
         if (scale.HasValue)
             scl = scale.Value;
         if(enabled.HasValue)

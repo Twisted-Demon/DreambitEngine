@@ -52,7 +52,7 @@ public class ParticleSystemDrawer : DrawableComponent<ParticleSystemDrawer>
         float ox = 0f, oy = 0f;
         if (Simulation.UseLocalSpace)
         {
-            var wp = Transform.WorldPosToVec2;
+            var wp = Transform.WorldPosition2D;
             ox = wp.X;
             oy = wp.Y;
         }

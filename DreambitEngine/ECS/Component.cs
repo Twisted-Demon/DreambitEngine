@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
+using YamlDotNet.Serialization.Schemas;
 
 namespace Dreambit.ECS;
 
@@ -289,6 +290,7 @@ public abstract class Component : IDisposable
         IsDestroyed = true;
         _guarded = Guard.SafeCall(OnDestroyed, "OnDestroyed");
     }
+    
 
     public static bool operator ==(Component a, Component b)
     {

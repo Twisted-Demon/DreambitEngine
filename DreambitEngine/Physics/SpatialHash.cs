@@ -28,9 +28,15 @@ public readonly struct CellKey(int x, int y) : IEquatable<CellKey>
 
 public sealed class SpatialHash
 {
+    private readonly record struct CellRange(
+        int MinX,
+        int MinY,
+        int MaxX,
+        int MaxY);
+    
     private readonly Dictionary<CellKey, List<Collider>> _cells = new(1024);
     private readonly float _cellSize;
-    private readonly Dictionary<Collider, CellKey[]> _colliderCells = new(256);
+    private readonly Dictionary<Collider, CellRange> _colliderCells = new(256);
     private readonly float _invCell;
 
     public SpatialHash(float cellSize)
@@ -41,55 +47,84 @@ public sealed class SpatialHash
 
     public void Clear()
     {
-        foreach (var kv in _cells) kv.Value.Clear();
+        _cells.Clear();
         _colliderCells.Clear();
     }
 
-    public void Remove(Collider c)
+    public void Remove(Collider collider)
     {
-        if (!_colliderCells.TryGetValue(c, out var prev)) return;
-        for (var i = 0; i < prev.Length; i++)
-            if (_cells.TryGetValue(prev[i], out var list))
-            {
-                // swap-remove to avoid O(n) remove
-                var idx = list.IndexOf(c);
-                if (idx >= 0)
-                {
-                    var last = list.Count - 1;
-                    list[idx] = list[last];
-                    list.RemoveAt(last);
-                }
-            }
-
-        _colliderCells.Remove(c);
-    }
-
-    public void InsertOrUpdate(Collider c, AABB aabb)
-    {
-        // compute overlapped cells
-        var minX = WorldToCell(aabb.Min.X);
-        var minY = WorldToCell(aabb.Min.Y);
-        var maxX = WorldToCell(aabb.Max.X);
-        var maxY = WorldToCell(aabb.Max.Y);
-
-        // remove from previous cells (if any)
-        Remove(c);
-
-        // count cells and store
-        var count = (maxX - minX + 1) * (maxY - minY + 1);
-        var cells = new CellKey[count];
-        var k = 0;
-        for (var y = minY; y <= maxY; y++)
-        for (var x = minX; x <= maxX; x++)
+        if (!_colliderCells.Remove(
+            collider,
+            out var previousRange))
         {
-            var key = new CellKey(x, y);
-            if (!_cells.TryGetValue(key, out var list))
-                _cells[key] = list = new List<Collider>(4);
-            list.Add(c);
-            cells[k++] = key;
+            return;
         }
 
-        _colliderCells[c] = cells;
+        RemoveFromCells(collider, previousRange);
+    }
+
+    private void RemoveFromCells(Collider collider, CellRange range)
+    {
+        for (var y = range.MinY; y <= range.MaxY; y++)
+        {
+            for (var x = range.MinX; x <= range.MaxX; x++)
+            {
+                var key = new CellKey(x, y);
+
+                if (!_cells.TryGetValue(key, out var list))
+                    continue;
+
+                var index = list.IndexOf(collider);
+
+                if (index < 0)
+                    continue;
+
+                // Swap-remove avoids shifting every later element.
+                var lastIndex = list.Count - 1;
+
+                list[index] = list[lastIndex];
+                list.RemoveAt(lastIndex);
+
+                // Do not retain thousands of permanently empty cells.
+                if (list.Count == 0)
+                    _cells.Remove(key);
+            }
+        }
+    }
+
+    public void InsertOrUpdate(Collider collider, AABB aabb)
+    {
+        var newRange = new CellRange(
+            WorldToCell(aabb.Min.X),
+            WorldToCell(aabb.Min.Y),
+            WorldToCell(aabb.Max.X),
+            WorldToCell(aabb.Max.Y));
+
+        if (_colliderCells.TryGetValue(collider, out var previousRange))
+        {
+            if (previousRange == newRange)
+                return;
+
+            RemoveFromCells(collider, previousRange);
+        }
+
+        for (var y = newRange.MinY; y <= newRange.MaxY; y++)
+        {
+            for (var x = newRange.MinX; x <= newRange.MaxX; x++)
+            {
+                var key = new CellKey(x, y);
+
+                if (!_cells.TryGetValue(key, out var list))
+                {
+                    list = new List<Collider>(4);
+                    _cells.Add(key, list);
+                }
+
+                list.Add(collider);
+            }
+        }
+
+        _colliderCells[collider] = newRange;
     }
 
     public void QueryAABB(AABB aabb, HashSet<Collider> outSet)

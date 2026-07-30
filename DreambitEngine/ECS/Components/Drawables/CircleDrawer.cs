@@ -13,7 +13,7 @@ public class CircleDrawer : DrawableComponent
 
     private RectangleF GetBounds()
     {
-        var pivotToUse = Transform.WorldPosToVec2;
+        var pivotToUse = Transform.WorldPosition2D;
 
         var pivotOffset = PivotHelper.GetRelativePivot(PivotType.Center);
         pivotToUse -= new Vector2(pivotOffset.X * Radius, pivotOffset.Y * Radius);
@@ -29,7 +29,7 @@ public class CircleDrawer : DrawableComponent
 
     public override void OnDraw()
     {
-        var center = Transform.WorldPosToVec2;
+        var center = Transform.WorldPosition2D;
         Core.SpriteBatch.DrawCircle(center, Radius, Color, Segments, LineThickness * Scene.MainCamera.WorldUnitsPerTexturePixel);
     }
 }

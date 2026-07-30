@@ -24,7 +24,7 @@ public class TileMover : Component
 
         var desiredMovement = Velocity * Time.DeltaTime;
 
-        if (_astarGrid.IsWalkable(Transform.WorldPosToVec2 + desiredMovement.ToVector2()))
+        if (_astarGrid.IsWalkable(Transform.WorldPosition2D + desiredMovement.ToVector2()))
             Transform.Position += desiredMovement;
     }
 }

@@ -15,7 +15,7 @@ public class Collider : Component
     /// <summary>Renders polygon outline for debugging purposes.</summary>
     public override void OnDebugDraw()
     {
-        Core.SpriteBatch.DrawPolygon(WorldPolygon2D.Vertices, Color.White);
+        Core.SpriteBatch.DrawPolygon(WorldPolygon2D.Vertices, Color.White, Scene.Instance.MainCamera.WorldUnitsPerTexturePixel);
     }
 
     #endregion
@@ -33,7 +33,7 @@ public class Collider : Component
         if (InterestedIn.Count == 0)
             PhysicsSystem.Instance.ColliderCast(this, out hits);
         else
-            PhysicsSystem.Instance.ColliderCastByTag(this, out hits, InterestedIn.ToArray());
+            PhysicsSystem.Instance.ColliderCastByTag(this, out hits, InterestedIn);
 
         // Build current-frame overlap set
         _overlapsCurr.Clear();
@@ -91,7 +91,6 @@ public class Collider : Component
         if (_lastPosition != _currentPosition)
         {
             SetAabb();
-            
             PhysicsSystem.Instance.Touch(this);
         }
         
@@ -163,7 +162,12 @@ public class Collider : Component
     /// <summary>Registers this collider with the physics system.</summary>
     public override void OnAddedToEntity()
     {
+        if(Bounds != null)
+            SetAabb();
+        
         PhysicsSystem.Instance.RegisterCollider(this);
+        
+        Transform.CaptureLastWorldPosition();
     }
 
     /// <summary>Ensures deregistration and clears callbacks on destruction.</summary>
@@ -190,7 +194,12 @@ public class Collider : Component
     /// <summary>Re-register when enabled.</summary>
     public override void OnEnabled()
     {
+        if(Bounds != null)
+            SetAabb();
+        
         PhysicsSystem.Instance.RegisterCollider(this);
+        
+        Transform.CaptureLastWorldPosition();
     }
 
     /// <summary>Per-frame update; drives trigger collision checks when enabled.</summary>

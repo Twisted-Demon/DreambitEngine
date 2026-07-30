@@ -11,11 +11,17 @@ public class Basic2dLightingRenderPass : RenderPass
 
     private RenderTarget2D AlbedoRt { get; set; }
 
+    private DrawableComparer _drawableComparer;
+
     public override void Initialize()
     {
         base.Initialize();
+        
         CreateAlbedoRenderTarget();
+        
         LightingFx = Resources.LoadAsset<Effect>("Effects/ForwardLighting2D");
+        
+        _drawableComparer = new DrawableComparer(DefaultEffect);
     }
 
     public override void OnDraw()
@@ -47,7 +53,7 @@ public class Basic2dLightingRenderPass : RenderPass
                     drawable.IsVisibleFromCamera(Scene.MainCamera.BoundsF))
                 .OrderBy(
                     drawable => drawable,
-                    new DrawableComparer(DefaultEffect))
+                    _drawableComparer)
                 .ToList();
                 
                 

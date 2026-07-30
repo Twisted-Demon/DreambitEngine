@@ -37,7 +37,7 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
 
             var drawScale =
                 Scene.MainCamera.GetSpriteDrawScale(
-                    Transform.WorldScaleToVec2);
+                    Transform.WorldScale2D);
 
             var worldOrigin =
                 origin * drawScale;
@@ -48,7 +48,7 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
                     Sprite.SourceRect.Height) * drawScale;
 
             var position =
-                Transform.WorldPosToVec2;
+                Transform.WorldPosition2D;
 
             var left =
                 position.X - worldOrigin.X;
@@ -143,12 +143,12 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
         Core.SpriteBatch.DrawWorldSprite(
             Scene.MainCamera,
             Sprite.Texture,
-            Transform.WorldPosToVec2,
+            Transform.WorldPosition2D,
             Sprite.SourceRect,
             Tint * Opacity,
-            Transform.WorldZRotation,
+            Transform.WorldRotation2D,
             originToUse,
-            Transform.WorldScaleToVec2,
+            Transform.WorldScale2D,
             spriteEffect,
             0f);
     }
@@ -183,7 +183,7 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
 
     private Vector2 GetSpriteScale()
     {
-        return Transform.WorldScaleToVec2 / Scene.MainCamera.PixelsPerUnit;
+        return Transform.WorldScale2D / Scene.MainCamera.PixelsPerUnit;
     }
 
     public override void OnDestroyed()

@@ -380,7 +380,7 @@ public struct Polygon2D
         for (var i = 0; i < Length; i++)
         {
             var point3D = new Vector3(Vertices[i], 0);
-            var transformedPoint = Vector3.Transform(point3D, transform.GetTransformationMatrix());
+            var transformedPoint = Vector3.Transform(point3D, transform.WorldMatrix);
 
             polygon.Vertices[i] = new Vector2(transformedPoint.X, transformedPoint.Y);
         }
@@ -395,7 +395,7 @@ public struct Polygon2D
             Vertices = new Vector2[Length]
         };
 
-        var translationMatrix = transform.GetTransformationMatrix() * Matrix.CreateTranslation(desiredPos);
+        var translationMatrix = transform.WorldMatrix * Matrix.CreateTranslation(desiredPos);
 
         for (var i = 0; i < Length; i++)
         {

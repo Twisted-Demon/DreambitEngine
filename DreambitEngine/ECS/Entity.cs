@@ -112,14 +112,14 @@ public class Entity : IDisposable
         HashSet<string> tags = null,
         bool enabled = true,
         Vector3? createAt = null,
-        Vector3? rotation = null,
+        Vector3? eulerRotation = null,
         Vector3? scale = null,
         Guid? guidOverride = null)
     {
         var entity =
-            Core.Instance.CurrentScene.CreateEntity(name, tags, enabled, createAt, rotation, scale, guidOverride);
+            Core.Instance.CurrentScene.CreateEntity(name, tags, enabled, createAt, eulerRotation, scale, guidOverride);
 
-        entity.Transform.LastWorldPosition = entity.Transform.WorldPosition;
+        entity.Transform.CaptureLastWorldPosition();
         return entity;
     }
 
@@ -132,7 +132,7 @@ public class Entity : IDisposable
     {
         var entity = Core.Instance.CurrentScene.CreateEntity(blueprint, enabled, createAt, rotation, scale);
 
-        entity.Transform.LastWorldPosition = entity.Transform.WorldPosition;
+        entity.Transform.CaptureLastWorldPosition();
 
         return entity;
     }
@@ -146,7 +146,7 @@ public class Entity : IDisposable
         var entity = Core.Instance.CurrentScene.CreateEntity(name, tags, enabled);
         entity.Parent = parent;
 
-        entity.Transform.LastWorldPosition = entity.Transform.WorldPosition;
+        entity.Transform.CaptureLastWorldPosition();
         return entity;
     }
 
@@ -209,6 +209,17 @@ public class Entity : IDisposable
     public static bool CompareTag(Component component, string tag)
     {
         return component.Entity.Tags.Contains(tag);
+    }
+    
+    public bool HasTag(string tag) => Tags.Contains(tag);
+
+    public bool HasAnyTag(IReadOnlyList<string> tags)
+    {
+        foreach (var tag in tags)
+            if (Tags.Contains(tag))
+                return true;
+
+        return false;
     }
 
     internal void UpdateTransform()

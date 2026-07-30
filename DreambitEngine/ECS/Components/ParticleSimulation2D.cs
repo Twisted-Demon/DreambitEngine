@@ -461,7 +461,7 @@ public class ParticleSimulation2D : ICanLog<ParticleSimulation2D>
             float ox = 0f, oy = 0f;
             if (UseLocalSpace && Transform is not null)
             {
-                var p = Transform.WorldPosToVec2;
+                var p = Transform.WorldPosition2D;
                 ox = p.X;
                 oy = p.Y;
             }
