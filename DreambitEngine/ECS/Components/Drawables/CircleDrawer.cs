@@ -2,6 +2,7 @@
 
 namespace Dreambit.ECS;
 
+[BlueprintType($"Dreambit.{nameof(CircleDrawer)}")]
 public class CircleDrawer : DrawableComponent
 {
     public override RectangleF Bounds => GetBounds();

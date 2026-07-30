@@ -4,6 +4,7 @@ using Microsoft.Xna.Framework;
 
 namespace Dreambit.ECS;
 
+[BlueprintType($"Dreambit.{nameof(UiFrame)}")]
 public class UiFrame : DrawableComponent<UiFrame>
 {
     private UiLayout _layout;

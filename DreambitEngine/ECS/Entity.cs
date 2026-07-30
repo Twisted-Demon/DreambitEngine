@@ -8,6 +8,7 @@ namespace Dreambit.ECS;
 public class Entity : IDisposable
 {
     private readonly List<Entity> _children = [];
+    private readonly List<Component> _blueprintComponentCreateOrder = [];
 
     private readonly ILogger _logger = new Logger<Entity>();
 
@@ -125,15 +126,19 @@ public class Entity : IDisposable
 
     public static Entity Create(
         EntityBlueprint blueprint,
-        bool enabled = true,
+        bool? enabled = null,
         Vector3? createAt = null,
         Vector3? rotation = null,
         Vector3? scale = null)
     {
-        var entity = Core.Instance.CurrentScene.CreateEntity(blueprint, enabled, createAt, rotation, scale);
+        var entity = Core.Instance.CurrentScene.CreateEntity(
+            blueprint,
+            enabled,
+            createAt,
+            rotation,
+            scale);
 
         entity.Transform.CaptureLastWorldPosition();
-
         return entity;
     }
 
@@ -291,91 +296,89 @@ public class Entity : IDisposable
 
     internal void BuildComponentsFromBlueprint(EntityBlueprint entityBlueprint)
     {
-        // all components we will end up creating (one per Type)
-        var constructed = new Dictionary<Type, Component>();
+        _blueprintComponentCreateOrder.Clear();
 
-        //Seed all component types explicitly declared in the blueprint
-        var pending = new Stack<Type>();
-        foreach (var cbp in entityBlueprint.Components)
+        var declaredTypes = new List<Type>(entityBlueprint.Components.Count);
+        var enabledByType = new Dictionary<Type, bool>();
+
+        foreach (var componentBlueprint in entityBlueprint.Components)
         {
-            var type = BlueprintResolver.ResolveComponentType(cbp.Type);
-            if (type == null)
+            var componentType = BlueprintResolver.ResolveComponentType(componentBlueprint.Type);
+            if (componentType == null)
             {
-                _logger.Warn("{0} is not a valid component type", cbp.Type);
+                _logger.Warn("{0} is not a valid component type", componentBlueprint.Type);
                 continue;
             }
 
-            pending.Push(type);
+            declaredTypes.Add(componentType);
+            enabledByType[componentType] = componentBlueprint.Enabled;
         }
 
-        // Expand transitive requirements
-        while (pending.Count > 0)
-        {
-            var type = pending.Pop();
-            if (constructed.ContainsKey(type))
-                continue; // already constructed skip
+        var creationOrder = ComponentRequirementResolver.ResolveCreationOrder(
+            declaredTypes,
+            HasComponentOfType);
 
-            var component = Component.BpFromType(type, this);
+        foreach (var componentType in creationOrder)
+        {
+            // Required-only components default to enabled. Explicit blueprint components
+            // use the enabled state written in JSON.
+            var enabled = enabledByType.TryGetValue(componentType, out var configuredEnabled)
+                ? configuredEnabled
+                : true;
+
+            var component = Component.BpFromType(componentType, this, enabled);
             if (component == null)
             {
-                _logger.Warn("Could not construct component of type {0} for entity {1}", type.FullName, Name);
+                _logger.Warn(
+                    "Could not construct component of type {0} for entity {1}",
+                    componentType.FullName,
+                    Name);
                 continue;
             }
 
-            constructed[type] = component;
-
-            // Enqueue all direct requirements to be created
-            foreach (var requiredType in component.RequiredComponentTypes)
-            {
-                if (requiredType is null) continue;
-                if (!constructed.ContainsKey(requiredType))
-                    pending.Push(requiredType);
-            }
-        }
-
-        foreach (var component in constructed.Values)
             ComponentRepository.AttachComponent(component);
+            _blueprintComponentCreateOrder.Add(component);
+        }
     }
 
-    internal void DeserializeComponentsFromBlueprints(EntityBlueprint ebp)
+    internal void DeserializeComponentsFromBlueprints(
+        EntityBlueprint entityBlueprint,
+        BlueprintSpawnContext context)
     {
-        var components = new Dictionary<Type, Component>();
+        var componentsByType = new Dictionary<Type, Component>();
 
-        foreach (var component in ComponentRepository.GetAllComponentsToAttach())
+        foreach (var component in ComponentRepository.GetAllComponents())
         {
-            components[component.GetType()] = component;
+            componentsByType[component.GetType()] = component;
             component.MapRequiredFieldComponents();
         }
 
-        foreach (var componentBlueprint in ebp.Components)
+        foreach (var componentBlueprint in entityBlueprint.Components)
         {
-            var type = BlueprintResolver.ResolveComponentType(componentBlueprint.Type);
-            if (type == null) continue;
-            if (!components.TryGetValue(type, out var component) || component == null) continue;
+            var componentType = BlueprintResolver.ResolveComponentType(componentBlueprint.Type);
+            if (componentType == null)
+                continue;
+
+            if (!componentsByType.TryGetValue(componentType, out var component))
+            {
+                throw new InvalidOperationException(
+                    $"Entity '{Name}' did not construct blueprint component " +
+                    $"'{componentType.FullName}'.");
+            }
 
             component.BeforeDeserialize();
-            try
-            {
-                BlueprintResolver.ResolveComponent(
-                    componentBlueprint, 
-                    ebp.FlattenedHirearchy()
-                        .ToDictionary(x => x.Guid, x => x), 
-                    component);
-            }
-            catch (Exception e)
-            {
-                _logger.Error($"{e.Message}");
-            }
-
+            BlueprintResolver.ResolveComponent(componentBlueprint, context, component);
             component.AfterDeserialize();
         }
     }
 
+
     internal void CallComponentOnCreateAfterDeserialized()
     {
-        var components = ComponentRepository.GetAllComponentsToAttach();
-        foreach (var component in components)
+        foreach (var component in _blueprintComponentCreateOrder)
             component.Create();
+
+        _blueprintComponentCreateOrder.Clear();
     }
 
     /// <summary>
@@ -493,7 +496,9 @@ public class Entity : IDisposable
             _parent._children.Remove(this);
 
         _parent = parentEntity;
-        parentEntity._children.Add(this);
+
+        if (_parent != null && !_parent._children.Contains(this))
+            _parent._children.Add(this);
     }
 
     internal void Destroy()

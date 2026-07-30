@@ -369,89 +369,161 @@ public class Scene : IDisposable
         var entity = Entities.CreateEntity(name, tags, enabled, createAt, eulerRotation, scale, guidOverride);
         return entity;
     }
-
-    /// <summary>
-    ///     Creates an entity based on a blueprint, forwarded to the repository
-    /// </summary>
-    /// <param name="blueprint"></param>
-    /// <param name="enabled"></param>
-    /// <param name="createAt"></param>
-    /// <param name="eulerRotation"></param>
-    /// <param name="scale"></param>
-    /// <returns></returns>
+    
     public Entity CreateEntity(
         EntityBlueprint blueprint,
-        bool? enabled = true,
+        bool? enabled = null,
         Vector3? createAt = null,
         Vector3? eulerRotation = null,
         Vector3? scale = null)
     {
-        var pos = blueprint.Position;
-        var rot = blueprint.Rotation;
-        var scl = blueprint.Scale;
-        var en = blueprint.Enabled;
-
-        if (createAt.HasValue)
-            pos = createAt.Value;
-        if (eulerRotation.HasValue)
-            rot = eulerRotation.Value;
-        if (scale.HasValue)
-            scl = scale.Value;
-        if(enabled.HasValue)
-            en = enabled.Value;
-
-        var rootEntity = Entities.CreateEntity(blueprint.Name, blueprint.Tags, en, pos, rot, scl);
-        blueprint.WorldGuid = rootEntity.Id;
-        foreach (var childBp in blueprint.Children)
-        {
-            CreateChildOfEntity(childBp, rootEntity);
-        }
-
-        var entityFamilyTree = blueprint.FlattenedHirearchy().ToArray();
-        
-        
-        foreach (var bp in entityFamilyTree)
-        {
-            var entity = FindEntity(bp.WorldGuid);
-            entity.BuildComponentsFromBlueprint(bp);
-        }
-        foreach (var bp in entityFamilyTree)
-        {
-            var entity = FindEntity(bp.WorldGuid);
-            entity.DeserializeComponentsFromBlueprints(bp);
-        }
-        foreach (var bp in entityFamilyTree)
-        {
-            var entity = FindEntity(bp.WorldGuid);
-            entity.CallComponentOnCreateAfterDeserialized();
-        }
-        
-        return rootEntity;
+        return SpawnBlueprint(
+            blueprint,
+            null,
+            enabled,
+            createAt,
+            eulerRotation,
+            scale);
     }
-
+    
     public Entity CreateChildOfEntity(
         EntityBlueprint blueprint,
-        Entity parent)
+        Entity parent,
+        bool? enabled = null,
+        Vector3? createAt = null,
+        Vector3? eulerRotation = null,
+        Vector3? scale = null)
     {
-        var pos = blueprint.Position;
-        var rot = blueprint.Rotation;
-        var scl = blueprint.Scale;
-        var en = blueprint.Enabled;
-        
-        
-        var entity = Entities.CreateEntity(blueprint.Name, blueprint.Tags, blueprint.Enabled, pos, 
-            rot, scl);
-        blueprint.WorldGuid = entity.Id;
-        
-        entity.Parent = parent;
-        foreach (var childBp in blueprint.Children)
+        ArgumentNullException.ThrowIfNull(parent);
+
+        return SpawnBlueprint(
+            blueprint,
+            parent,
+            enabled,
+            createAt,
+            eulerRotation,
+            scale);
+    }
+    
+    private Entity SpawnBlueprint(
+        EntityBlueprint blueprint,
+        Entity parent,
+        bool? enabled,
+        Vector3? createAt,
+        Vector3? eulerRotation,
+        Vector3? scale)
+    {
+        ArgumentNullException.ThrowIfNull(blueprint);
+
+        BlueprintValidator.ValidateOrThrow(blueprint);
+        var context = new BlueprintSpawnContext(blueprint);
+
+        try
         {
-            CreateChildOfEntity(childBp, entity);
+            var rootEntity = CreateBlueprintHierarchy(
+                blueprint,
+                parent,
+                context,
+                true,
+                enabled,
+                createAt,
+                eulerRotation,
+                scale);
+
+            foreach (var entityBlueprint in context.Hierarchy)
+            {
+                context.GetEntity(entityBlueprint.Guid)
+                    .BuildComponentsFromBlueprint(entityBlueprint);
+            }
+
+            foreach (var entityBlueprint in context.Hierarchy)
+            {
+                context.GetEntity(entityBlueprint.Guid)
+                    .DeserializeComponentsFromBlueprints(entityBlueprint, context);
+            }
+
+            foreach (var entityBlueprint in context.Hierarchy)
+            {
+                context.GetEntity(entityBlueprint.Guid)
+                    .CallComponentOnCreateAfterDeserialized();
+            }
+
+            return rootEntity;
         }
-        
-        return entity;
+        catch
+        {
+            RollbackBlueprintSpawn(context);
+            throw;
+        }
     }
 
+    private Entity CreateBlueprintHierarchy(
+        EntityBlueprint blueprint,
+        Entity parent,
+        BlueprintSpawnContext context,
+        bool isRoot,
+        bool? rootEnabled,
+        Vector3? rootPosition,
+        Vector3? rootRotation,
+        Vector3? rootScale)
+    {
+        var enabled = isRoot && rootEnabled.HasValue
+            ? rootEnabled.Value
+            : blueprint.Enabled;
+
+        var position = isRoot && rootPosition.HasValue
+            ? rootPosition.Value
+            : blueprint.Position;
+
+        var rotation = isRoot && rootRotation.HasValue
+            ? rootRotation.Value
+            : blueprint.Rotation;
+
+        var scale = isRoot && rootScale.HasValue
+            ? rootScale.Value
+            : blueprint.Scale;
+
+        var entity = Entities.CreateEntity(
+            blueprint.Name,
+            blueprint.Tags,
+            enabled,
+            position,
+            rotation,
+            scale);
+
+        if (parent != null)
+            entity.Parent = parent;
+
+        context.Register(blueprint, entity);
+
+        foreach (var childBlueprint in blueprint.Children)
+        {
+            CreateBlueprintHierarchy(
+                childBlueprint,
+                entity,
+                context,
+                false,
+                null,
+                null,
+                null,
+                null);
+        }
+
+        return entity;
+    }
+    
+    private void RollbackBlueprintSpawn(BlueprintSpawnContext context)
+    {
+        for (var i = context.Hierarchy.Count - 1; i >= 0; i--)
+        {
+            var blueprint = context.Hierarchy[i];
+            if (!context.TryGetEntity(blueprint.Guid, out var entity))
+                continue;
+
+            entity.Parent = null;
+            Entities.DestroyEntityImmediately(entity);
+        }
+    }
 
     /// <summary>Sets AlwaysUpdate on a specific entity.</summary>
     public void SetEntityAlwaysUpdate(Entity entity, bool value)

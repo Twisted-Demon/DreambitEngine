@@ -3,6 +3,7 @@ using Microsoft.Xna.Framework;
 
 namespace Dreambit.ECS;
 
+[BlueprintType($"Dreambit.{nameof(PointLight2D)}")]
 public class PointLight2D : Light2D
 {
     public float Radius { get; set; }

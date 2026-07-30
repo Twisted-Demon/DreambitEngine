@@ -3,6 +3,7 @@ using Microsoft.Xna.Framework;
 
 namespace Dreambit.ECS;
 
+[BlueprintType("Dreambit.AStarPathFollower")]
 [Require(typeof(AStarPathfinder), typeof(Mover))]
 public class AStarPathFollower : Component
 {

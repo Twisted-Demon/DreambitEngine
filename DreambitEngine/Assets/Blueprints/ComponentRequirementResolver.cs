@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Dreambit.ECS;
 
-namespace Dreambit.ECS;
+namespace Dreambit;
 
 public static class ComponentRequirementResolver
 {

@@ -2,6 +2,7 @@
 
 namespace Dreambit.ECS;
 
+[BlueprintType($"Dreambit.{nameof(LDtkIid)}")]
 public class LDtkIid : Component
 {
     public Guid Iid { get; internal set; }

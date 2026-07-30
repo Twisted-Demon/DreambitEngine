@@ -321,4 +321,42 @@ public class EntityRepository
         result.AddRange(_entitiesToCreate);
         return result;
     }
+    
+    internal void DestroyEntityImmediately(Entity entity)
+    {
+        if (entity == null)
+            return;
+
+        var wasActive = _entitiesSet.Remove(entity);
+
+        _entitiesById.Remove(entity.Id);
+        _toCreateById.Remove(entity.Id);
+        _entitiesToCreateSet.Remove(entity);
+        _entitiesToDestroySet.Remove(entity);
+
+        RemoveByReference(_entities, entity);
+        RemoveByReference(_entitiesToCreate, entity);
+        RemoveByReference(_entitiesToDestroy, entity);
+        RemoveByReference(_alwaysUpdateEntities, entity);
+
+        if (wasActive)
+            entity.OnRemovedFromScene();
+
+        entity.Destroy();
+        entity.Dispose();
+    }
+
+    private static void RemoveByReference(List<Entity> list, Entity entity)
+    {
+        for (var i = 0; i < list.Count; i++)
+        {
+            if (!ReferenceEquals(list[i], entity))
+                continue;
+
+            var lastIndex = list.Count - 1;
+            list[i] = list[lastIndex];
+            list.RemoveAt(lastIndex);
+            return;
+        }
+    }
 }

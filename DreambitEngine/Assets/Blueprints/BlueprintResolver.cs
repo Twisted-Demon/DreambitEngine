@@ -1,5 +1,8 @@
 ﻿using System;
+using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using Dreambit.ECS;
@@ -10,6 +13,11 @@ namespace Dreambit;
 
 public class BlueprintResolver : Singleton<BlueprintResolver>
 {
+    private static readonly ConcurrentDictionary<Type, IReadOnlyDictionary<string, BlueprintMember>> MemberCache = new();
+    private static readonly Dictionary<string, Type> ComponentTypesById = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly object ComponentRegistryLock = new();
+    private static bool _componentRegistryBuilt;
+
     public BlueprintResolver()
     {
         BuildConvertersDictionary();
@@ -19,17 +27,16 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
 
     private void BuildConvertersDictionary()
     {
-        var converterTypes =
-            ReflectionUtils.GetAllTypesAssignableFrom(
-                typeof(IPropertyConverterMarker),
-                true);
+        var converterTypes = ReflectionUtils.GetAllTypesAssignableFrom(
+            typeof(IPropertyConverterMarker),
+            true);
 
         foreach (var type in converterTypes)
         {
             var instance = (JsonConverter)Activator.CreateInstance(type);
-            if (instance is null) continue;
+            if (instance is null)
+                continue;
 
-            // get the target type and store it
             var target = GetPropertyConverter(type);
             Converters[target] = instance;
         }
@@ -37,269 +44,566 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
 
     private static Type GetPropertyConverter(Type converterType)
     {
-        for (var bt = converterType; bt != null && bt != typeof(object); bt = bt.BaseType)
-            if (bt.IsGenericType && bt.GetGenericTypeDefinition() == typeof(PropertyConverter<>))
-                return bt.GetGenericArguments()[0];
+        for (var baseType = converterType;
+             baseType != null && baseType != typeof(object);
+             baseType = baseType.BaseType)
+        {
+            if (baseType.IsGenericType &&
+                baseType.GetGenericTypeDefinition() == typeof(PropertyConverter<>))
+            {
+                return baseType.GetGenericArguments()[0];
+            }
+        }
 
-        throw new ArgumentException($"{converterType} does not inherit PropertyConverter<>");
+        throw new ArgumentException(
+            $"{converterType} does not inherit PropertyConverter<>.",
+            nameof(converterType));
     }
 
-
-    public static void ResolveComponent(ComponentBlueprint bp, 
-        Dictionary<Guid, EntityBlueprint> blueprintMap, 
+    public static void ResolveComponent(
+        ComponentBlueprint blueprint,
+        BlueprintSpawnContext context,
         Component component)
     {
-        var type = component.GetType();
+        ArgumentNullException.ThrowIfNull(blueprint);
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(component);
 
-        ResolveProperties(type, bp, blueprintMap, component);
-        ResolveFields(type, bp, blueprintMap, component);
-    }
+        var componentType = component.GetType();
+        var members = GetBlueprintMembers(componentType);
+        var errors = new List<Exception>();
 
-    private static void ResolveProperties(
-        Type type, 
-        ComponentBlueprint bp, 
-        Dictionary<Guid, EntityBlueprint> blueprintMap, 
-        Component component)
-    {
-        foreach (var (propName, token) in bp.Properties)
+        foreach (var (memberName, token) in blueprint.Properties)
         {
-            var prop = type.GetProperty(propName,
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase);
-
-            if (prop is null || !prop.CanWrite) continue;
-            var propType = prop.PropertyType;
-
-            object value = null;
-
-            if (IsDreambitAsset(propType))
+            if (!members.TryGetValue(memberName, out var member))
             {
-                var assetName = token.Value<string>();
-                if (string.IsNullOrWhiteSpace(assetName))
-                    continue;
-
-                value = GetAssetReference(assetName, propType);
-            }
-            else if (IsEntityReference(propType))
-            {
-                value = ResolveEntityReference(token, blueprintMap);
-            }
-            else if (IsComponentReference(propType))
-            {
-                // parse the uuid string
-                var uidString =  token.Value<string>();
-                if (string.IsNullOrWhiteSpace(uidString))
-                    continue;
-
-                if (Guid.TryParse(uidString, out var blueprintGuid))
-                {
-                    //get the blueprint of the reference, then the world entity
-                    if (!blueprintMap.TryGetValue(blueprintGuid, out var bpReference)) 
-                        continue;
-                    var referenceGuid = bpReference.WorldGuid;
-                    var entityReference = Scene.Instance.FindEntity(referenceGuid);
-
-                    //get the component reference
-                    var componentReference = entityReference?.GetComponent(propType);
-                    if (componentReference is null) continue;
-                    
-                    //set the value
-                    value = componentReference;
-                }
-            }
-            else
-            {
-                value = ConvertJToken(token, propType);
+                errors.Add(new InvalidOperationException(
+                    $"Component '{componentType.FullName}' has no public writable " +
+                    $"property or field named '{memberName}'."));
+                continue;
             }
 
-            prop.SetValue(component, value);
+            try
+            {
+                var value = ConvertJToken(token, member.ValueType, context);
+                member.SetValue(component, value);
+            }
+            catch (Exception exception)
+            {
+                errors.Add(new InvalidOperationException(
+                    $"Could not assign blueprint member " +
+                    $"'{componentType.FullName}.{memberName}' from token '{token}'.",
+                    exception));
+            }
+        }
+
+        if (errors.Count > 0)
+        {
+            throw new AggregateException(
+                $"Failed to deserialize component '{componentType.FullName}'.",
+                errors);
         }
     }
 
-    private static void ResolveFields(
-        Type type, 
-        ComponentBlueprint bp, 
-        Dictionary<Guid, EntityBlueprint> blueprintMap, 
-        Component component)
+    internal static bool TryGetBlueprintMemberType(
+        Type componentType,
+        string memberName,
+        out Type memberType)
     {
-        foreach (var (propName, token) in bp.Properties)
+        var members = GetBlueprintMembers(componentType);
+        if (members.TryGetValue(memberName, out var member))
         {
-            var field = type.GetField(propName,
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase);
+            memberType = member.ValueType;
+            return true;
+        }
 
-            if (field is null) continue;
-            var fieldType = field.FieldType;
+        memberType = null!;
+        return false;
+    }
 
-            object value = null;
+    private static IReadOnlyDictionary<string, BlueprintMember> GetBlueprintMembers(Type componentType)
+    {
+        return MemberCache.GetOrAdd(componentType, static type =>
+        {
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public;
+            var members = new Dictionary<string, BlueprintMember>(StringComparer.OrdinalIgnoreCase);
 
-            if (IsDreambitAsset(fieldType))
+            foreach (var property in type.GetProperties(flags))
             {
-                var assetName = token.Value<string>();
-                if (string.IsNullOrWhiteSpace(assetName))
+                if (!property.CanWrite || property.GetIndexParameters().Length != 0)
                     continue;
 
-                value = GetAssetReference(assetName, fieldType);
-            } 
-            else if (IsEntityReference(fieldType))
-            {
-                value = ResolveEntityReference(token, blueprintMap);
+                members[property.Name] = new BlueprintMember(property);
             }
-            else if (IsComponentReference(fieldType))
+
+            foreach (var field in type.GetFields(flags))
             {
-                // parse the uuid string
-                var uidString =  token.Value<string>();
-                if (string.IsNullOrWhiteSpace(uidString))
+                if (field.IsInitOnly || field.IsLiteral)
                     continue;
 
-                if (Guid.TryParse(uidString, out var referenceGuid))
-                {
-                    //get the entity,
-                    var entityReference = Scene.Instance.FindEntity(referenceGuid);
-
-                    //get the component reference
-                    var componentReference = entityReference?.GetComponent(fieldType);
-                    if (componentReference is null) continue;
-                    
-                    //set the value
-                    value = componentReference;
-                }
-            }
-            else
-            {
-                value = ConvertJToken(token, fieldType);
+                // A writable property wins if a field has the same name.
+                members.TryAdd(field.Name, new BlueprintMember(field));
             }
 
-            field.SetValue(component, value);
-        }
-    }
-
-    private static Entity ResolveEntityReference(
-        JToken token,
-        Dictionary<Guid, EntityBlueprint> blueprintMap)
-    {
-        var guidString = token.Value<string>();
-        
-        if (string.IsNullOrWhiteSpace(guidString))
-            return null;
-
-        if (!Guid.TryParse(guidString, out var blueprintGuid))
-            return null;
-
-        if (!blueprintMap.TryGetValue(blueprintGuid, out var bpReference))
-        {
-            Instance.Logger.Warn(
-                "Unable to find entity blueprint reference {0}",
-                blueprintGuid);
-
-            return null;
-        }
-        
-        var entity = Scene.Instance.FindEntity(bpReference.WorldGuid);
-        
-        if (entity is null)
-        {
-            Instance.Logger.Warn(
-                "Unable to find runtime entity for blueprint {0}",
-                blueprintGuid);
-        }
-
-        return entity;
-    }
-
-    private static bool IsDreambitAsset(Type type)
-    {
-        return type.IsSubclassOf(typeof(DreambitAsset));
-    }
-
-    private static bool IsComponentReference(Type type)
-    {
-        return type.IsSubclassOf(typeof(Component));
-    }
-
-    private static bool IsEntityReference(Type type)
-    {
-        return typeof(Entity).IsAssignableFrom(type);
-    }
-
-    public static object GetAssetReference(string assetName, Type assetType)
-    {
-        var reference = Resources.LoadDreambitAsset(assetName, assetType);
-
-        if (reference is null)
-            Instance.Logger.Warn("Unable to serialize {0} reference {1}", assetType.Name, assetName);
-
-        return reference;
+            return members;
+        });
     }
 
     public static Type ResolveComponentType(string typeName)
     {
-        var type = Type.GetType(typeName);
-        if (type is null || !type.IsSubclassOf(typeof(Component)))
+        if (string.IsNullOrWhiteSpace(typeName))
             return null;
 
-        return type;
+        EnsureComponentTypeRegistry();
+
+        lock (ComponentRegistryLock)
+        {
+            if (ComponentTypesById.TryGetValue(typeName, out var registeredType))
+                return registeredType;
+        }
+
+        var resolvedType = Type.GetType(typeName, false, true);
+        if (IsValidComponentType(resolvedType))
+            return resolvedType;
+
+        // Also support a full type name without an assembly name.
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            resolvedType = assembly.GetType(typeName, false, true);
+            if (!IsValidComponentType(resolvedType))
+                continue;
+
+            lock (ComponentRegistryLock)
+                ComponentTypesById[typeName] = resolvedType;
+
+            return resolvedType;
+        }
+
+        return null;
     }
 
-    private static object ConvertJToken(JToken token, Type targetType)
+    public static void RebuildComponentTypeRegistry()
     {
-        // Enums
+        lock (ComponentRegistryLock)
+        {
+            ComponentTypesById.Clear();
+            _componentRegistryBuilt = false;
+        }
+
+        EnsureComponentTypeRegistry();
+    }
+
+    private static void EnsureComponentTypeRegistry()
+    {
+        lock (ComponentRegistryLock)
+        {
+            if (_componentRegistryBuilt)
+                return;
+
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                foreach (var type in GetLoadableTypes(assembly))
+                {
+                    if (!IsValidComponentType(type))
+                        continue;
+
+                    if (!string.IsNullOrWhiteSpace(type.FullName))
+                        RegisterComponentTypeKey(type.FullName, type, false);
+
+                    var attribute = type.GetCustomAttribute<BlueprintTypeAttribute>();
+                    if (attribute != null)
+                        RegisterComponentTypeKey(attribute.Id, type, true);
+                }
+            }
+
+            _componentRegistryBuilt = true;
+        }
+    }
+
+    private static void RegisterComponentTypeKey(
+        string key,
+        Type type,
+        bool throwOnDuplicate)
+    {
+        if (ComponentTypesById.TryGetValue(key, out var existingType) && existingType != type)
+        {
+            if (throwOnDuplicate)
+            {
+                throw new InvalidOperationException(
+                    $"Blueprint component type ID '{key}' is used by both " +
+                    $"'{existingType.FullName}' and '{type.FullName}'.");
+            }
+
+            return;
+        }
+
+        ComponentTypesById[key] = type;
+    }
+
+    private static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
+    {
+        try
+        {
+            return assembly.GetTypes();
+        }
+        catch (ReflectionTypeLoadException exception)
+        {
+            return exception.Types.OfType<Type>();
+        }
+    }
+
+    private static bool IsValidComponentType(Type type)
+    {
+        return type != null &&
+               !type.IsAbstract &&
+               typeof(Component).IsAssignableFrom(type);
+    }
+
+    private static object ConvertJToken(
+        JToken token,
+        Type targetType,
+        BlueprintSpawnContext context)
+    {
+        if (token.Type is JTokenType.Null or JTokenType.Undefined)
+        {
+            if (!targetType.IsValueType || Nullable.GetUnderlyingType(targetType) != null)
+                return null;
+
+            throw new InvalidOperationException(
+                $"Cannot assign null to non-nullable type '{targetType.FullName}'.");
+        }
+
+        var nullableType = Nullable.GetUnderlyingType(targetType);
+        if (nullableType != null)
+            return ConvertJToken(token, nullableType, context);
+
+        if (IsDreambitAsset(targetType))
+        {
+            var assetName = token.Value<string>();
+            if (string.IsNullOrWhiteSpace(assetName))
+                return null;
+
+            return GetAssetReference(assetName, targetType);
+        }
+
+        if (IsEntityReference(targetType))
+            return ResolveEntityReference(token, context);
+
+        if (IsComponentReference(targetType))
+            return ResolveComponentReference(token, targetType, context);
+
         if (targetType.IsEnum)
         {
             if (token.Type == JTokenType.String)
                 return Enum.Parse(targetType, token.Value<string>()!, true);
+
             if (token.Type == JTokenType.Integer)
-                return Enum.ToObject(targetType, token.Value<int>());
+                return Enum.ToObject(targetType, token.Value<long>());
         }
 
-        // Nullable<T>
-        var underlying = Nullable.GetUnderlyingType(targetType);
-        if (underlying != null)
-        {
-            if (token.Type == JTokenType.Null) return null;
-            return ConvertJToken(token, underlying);
-        }
-
-        // Arrays & Lists
         if (targetType.IsArray)
-        {
-            var elemType = targetType.GetElementType()!;
-            var arr = ((JArray)token).Select(j => ConvertJToken(j, elemType)).ToArray();
-            var typedArr = Array.CreateInstance(elemType, arr.Length);
-            for (var i = 0; i < arr.Length; i++) typedArr.SetValue(arr[i], i);
-            return typedArr;
-        }
+            return ConvertArray(token, targetType, context);
 
-        if (IsGenericList(targetType, out var listElem))
-        {
-            var jArr = (JArray)token;
-            var list = (IList<object>)Activator.CreateInstance(typeof(List<>).MakeGenericType(listElem))!;
-            foreach (var j in jArr)
-                list.Add(ConvertJToken(j, listElem));
-            return list;
-        }
+        if (TryGetDictionaryTypes(targetType, out var keyType, out var valueType))
+            return ConvertDictionary(token, targetType, keyType, valueType, context);
+
+        if (TryGetCollectionElementType(targetType, out var elementType))
+            return ConvertCollection(token, targetType, elementType, context);
 
         if (Instance.Converters.TryGetValue(targetType, out var converter))
         {
             var settings = new JsonSerializerSettings();
             settings.Converters.Add(converter);
-
             var serializer = JsonSerializer.CreateDefault(settings);
-
             return token.ToObject(targetType, serializer);
         }
-
 
         return token.ToObject(targetType);
     }
 
-    private static bool IsGenericList(Type t, out Type elem)
+    private static Array ConvertArray(
+        JToken token,
+        Type targetType,
+        BlueprintSpawnContext context)
     {
-        if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(List<>))
+        if (token is not JArray jsonArray)
+            throw new InvalidOperationException(
+                $"Expected a JSON array for '{targetType.FullName}'.");
+
+        var elementType = targetType.GetElementType()!;
+        var array = Array.CreateInstance(elementType, jsonArray.Count);
+
+        for (var i = 0; i < jsonArray.Count; i++)
+            array.SetValue(ConvertJToken(jsonArray[i], elementType, context), i);
+
+        return array;
+    }
+
+    private static object ConvertCollection(
+        JToken token,
+        Type targetType,
+        Type elementType,
+        BlueprintSpawnContext context)
+    {
+        if (token is not JArray jsonArray)
+            throw new InvalidOperationException(
+                $"Expected a JSON array for '{targetType.FullName}'.");
+
+        var concreteType = GetConcreteCollectionType(targetType, elementType);
+        var collection = Activator.CreateInstance(concreteType)
+                         ?? throw new InvalidOperationException(
+                             $"Could not instantiate collection type '{concreteType.FullName}'.");
+
+        var collectionInterface = typeof(ICollection<>).MakeGenericType(elementType);
+        var addMethod = collectionInterface.GetMethod(nameof(ICollection<object>.Add))!;
+
+        foreach (var childToken in jsonArray)
         {
-            elem = t.GetGenericArguments()[0];
+            var value = ConvertJToken(childToken, elementType, context);
+            addMethod.Invoke(collection, [value]);
+        }
+
+        return collection;
+    }
+
+    private static Type GetConcreteCollectionType(Type targetType, Type elementType)
+    {
+        if (!targetType.IsInterface && !targetType.IsAbstract)
+            return targetType;
+
+        if (targetType.IsGenericType &&
+            targetType.GetGenericTypeDefinition() == typeof(ISet<>))
+        {
+            return typeof(HashSet<>).MakeGenericType(elementType);
+        }
+
+        return typeof(List<>).MakeGenericType(elementType);
+    }
+
+    private static object ConvertDictionary(
+        JToken token,
+        Type targetType,
+        Type keyType,
+        Type valueType,
+        BlueprintSpawnContext context)
+    {
+        if (token is not JObject jsonObject)
+            throw new InvalidOperationException(
+                $"Expected a JSON object for dictionary '{targetType.FullName}'.");
+
+        var concreteType = targetType.IsInterface || targetType.IsAbstract
+            ? typeof(Dictionary<,>).MakeGenericType(keyType, valueType)
+            : targetType;
+
+        var dictionary = Activator.CreateInstance(concreteType)
+                         ?? throw new InvalidOperationException(
+                             $"Could not instantiate dictionary type '{concreteType.FullName}'.");
+
+        var dictionaryInterface = typeof(IDictionary<,>).MakeGenericType(keyType, valueType);
+        var addMethod = dictionaryInterface.GetMethod(nameof(IDictionary<object, object>.Add))!;
+
+        foreach (var property in jsonObject.Properties())
+        {
+            var key = ConvertDictionaryKey(property.Name, keyType);
+            var value = ConvertJToken(property.Value, valueType, context);
+            addMethod.Invoke(dictionary, [key, value]);
+        }
+
+        return dictionary;
+    }
+
+    internal static object ConvertDictionaryKey(string rawKey, Type keyType)
+    {
+        var nullableType = Nullable.GetUnderlyingType(keyType);
+        if (nullableType != null)
+            keyType = nullableType;
+
+        if (keyType == typeof(string))
+            return rawKey;
+
+        if (keyType == typeof(Guid))
+            return Guid.Parse(rawKey);
+
+        if (keyType.IsEnum)
+            return Enum.Parse(keyType, rawKey, true);
+
+        return Convert.ChangeType(rawKey, keyType, CultureInfo.InvariantCulture);
+    }
+
+    private static Entity ResolveEntityReference(
+        JToken token,
+        BlueprintSpawnContext context)
+    {
+        var blueprintGuid = ParseBlueprintReferenceGuid(token);
+
+        if (context.TryGetEntity(blueprintGuid, out var entity))
+            return entity;
+
+        throw new KeyNotFoundException(
+            $"Unable to find runtime entity for blueprint GUID '{blueprintGuid}'.");
+    }
+
+    private static Component ResolveComponentReference(
+        JToken token,
+        Type componentType,
+        BlueprintSpawnContext context)
+    {
+        var entity = ResolveEntityReference(token, context);
+        var component = entity.GetComponent(componentType);
+
+        if (component != null)
+            return component;
+
+        throw new KeyNotFoundException(
+            $"Entity '{entity.Name}' does not contain component '{componentType.FullName}'.");
+    }
+
+    private static Guid ParseBlueprintReferenceGuid(JToken token)
+    {
+        var guidString = token.Value<string>();
+        if (!Guid.TryParse(guidString, out var blueprintGuid))
+        {
+            throw new FormatException(
+                $"'{guidString}' is not a valid blueprint entity GUID.");
+        }
+
+        return blueprintGuid;
+    }
+
+    internal static bool IsDreambitAsset(Type type)
+    {
+        return typeof(DreambitAsset).IsAssignableFrom(type);
+    }
+
+    internal static bool IsComponentReference(Type type)
+    {
+        return typeof(Component).IsAssignableFrom(type);
+    }
+
+    internal static bool IsEntityReference(Type type)
+    {
+        return typeof(Entity).IsAssignableFrom(type);
+    }
+
+    internal static bool TryGetCollectionElementType(Type type, out Type elementType)
+    {
+        if (type == typeof(string) || type.IsArray)
+        {
+            elementType = null!;
+            return false;
+        }
+
+        if (type.IsGenericType)
+        {
+            var genericDefinition = type.GetGenericTypeDefinition();
+            if (genericDefinition == typeof(List<>) ||
+                genericDefinition == typeof(IList<>) ||
+                genericDefinition == typeof(ICollection<>) ||
+                genericDefinition == typeof(IReadOnlyCollection<>) ||
+                genericDefinition == typeof(IReadOnlyList<>) ||
+                genericDefinition == typeof(IEnumerable<>) ||
+                genericDefinition == typeof(ISet<>) ||
+                genericDefinition == typeof(HashSet<>))
+            {
+                elementType = type.GetGenericArguments()[0];
+                return true;
+            }
+        }
+
+        var collectionInterface = type.GetInterfaces()
+            .FirstOrDefault(interfaceType =>
+                interfaceType.IsGenericType &&
+                interfaceType.GetGenericTypeDefinition() == typeof(ICollection<>));
+
+        if (collectionInterface != null)
+        {
+            elementType = collectionInterface.GetGenericArguments()[0];
             return true;
         }
 
-        elem = null!;
+        elementType = null!;
         return false;
+    }
+
+    internal static bool TryGetDictionaryTypes(
+        Type type,
+        out Type keyType,
+        out Type valueType)
+    {
+        Type dictionaryType = null;
+
+        if (type.IsGenericType)
+        {
+            var genericDefinition = type.GetGenericTypeDefinition();
+            if (genericDefinition == typeof(Dictionary<,>) ||
+                genericDefinition == typeof(IDictionary<,>) ||
+                genericDefinition == typeof(IReadOnlyDictionary<,>))
+            {
+                dictionaryType = type;
+            }
+        }
+
+        if (dictionaryType == null)
+        {
+            dictionaryType = type.GetInterfaces()
+                .FirstOrDefault(interfaceType =>
+                    interfaceType.IsGenericType &&
+                    (interfaceType.GetGenericTypeDefinition() == typeof(IDictionary<,>) ||
+                     interfaceType.GetGenericTypeDefinition() == typeof(IReadOnlyDictionary<,>)));
+        }
+
+        if (dictionaryType != null)
+        {
+            var genericArguments = dictionaryType.GetGenericArguments();
+            keyType = genericArguments[0];
+            valueType = genericArguments[1];
+            return true;
+        }
+
+        keyType = null!;
+        valueType = null!;
+        return false;
+    }
+
+    public static object GetAssetReference(string assetName, Type assetType)
+    {
+        var reference = Resources.LoadDreambitAsset(assetName, assetType);
+        if (reference is null)
+        {
+            Instance.Logger.Warn(
+                "Unable to deserialize {0} reference {1}",
+                assetType.Name,
+                assetName);
+        }
+
+        return reference;
+    }
+
+    private sealed class BlueprintMember
+    {
+        private readonly FieldInfo _field;
+        private readonly PropertyInfo _property;
+
+        public BlueprintMember(PropertyInfo property)
+        {
+            _property = property;
+            ValueType = property.PropertyType;
+        }
+
+        public BlueprintMember(FieldInfo field)
+        {
+            _field = field;
+            ValueType = field.FieldType;
+        }
+
+        public Type ValueType { get; }
+
+        public void SetValue(Component component, object value)
+        {
+            if (_property != null)
+                _property.SetValue(component, value);
+            else
+                _field!.SetValue(component, value);
+        }
     }
 }

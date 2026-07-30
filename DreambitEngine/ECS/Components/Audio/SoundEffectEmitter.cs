@@ -2,6 +2,7 @@
 
 namespace Dreambit.ECS.Audio;
 
+[BlueprintType("Dreambit.SoundEffectEmitter")]
 public class SoundEffectEmitter : Component<SoundEffectEmitter>
 {
     private SoundEffectInstance[] _pool = new SoundEffectInstance[5];

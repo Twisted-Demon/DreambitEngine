@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using Microsoft.Xna.Framework;
 using Newtonsoft.Json;
 
@@ -11,42 +10,44 @@ public class EntityBlueprint : DreambitAsset
     [JsonProperty("name", Required = Required.Always)]
     public string Name { get; set; } = string.Empty;
     
-    [JsonProperty("guid")] public Guid Guid { get; set; } = Guid.NewGuid();
-    [JsonIgnore] public Guid WorldGuid { get; set; } = Guid.NewGuid();
-    [JsonProperty("tags")] public HashSet<string> Tags { get; set; } = [];
-
-    [JsonProperty("enabled")] public bool Enabled { get; set; } = true;
-
-    // Prefer a proper Vector3 with a converter instead of a split string.
+    [JsonProperty("guid")]
+    public Guid Guid { get; set; } = Guid.NewGuid();
+    
+    [JsonProperty("tags")]
+    public HashSet<string> Tags { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    
+    [JsonProperty("enabled")]
+    public bool Enabled { get; set; } = true;
+    
     [JsonProperty("position")]
     [JsonConverter(typeof(Vector3Converter))]
-    public Vector3 Position { get; set; } = new(0, 0, 0);
-
-    // Optional: rotation/scale if you want
+    public Vector3 Position { get; set; } = Vector3.Zero;
+    
     [JsonProperty("rotation")]
     [JsonConverter(typeof(Vector3Converter))]
-    public Vector3 Rotation { get; set; } = new(0, 0, 0);
-
+    public Vector3 Rotation { get; set; } = Vector3.Zero;
+    
     [JsonProperty("scale")]
     [JsonConverter(typeof(Vector3Converter))]
-    public Vector3 Scale { get; set; } = new(1, 1, 1);
+    public Vector3 Scale { get; set; } = Vector3.One;
 
-    [JsonProperty("components")] public List<ComponentBlueprint> Components { get; set; } = [];
+    [JsonProperty("components")] 
+    public List<ComponentBlueprint> Components { get; set; } = [];
     
-    [JsonProperty("children")] public IEnumerable<EntityBlueprint> Children { get; set; } = [];
+    [JsonProperty("children")]
+    public List<EntityBlueprint> Children { get; set; } = [];
 
-    public IEnumerable<EntityBlueprint> FlattenedHirearchy()
+    public IEnumerable<EntityBlueprint> FlattenedHierarchy()
     {
         var stack = new Stack<EntityBlueprint>();
         stack.Push(this);
 
-        while (stack.TryPop(out var ent))
+        while (stack.TryPop(out var entity))
         {
-            yield return ent;
-            foreach (var child in ent.Children.Reverse())
-            {
-                stack.Push(child);
-            }
+            yield return entity;
+            
+            for (var i = entity.Children.Count - 1; i >= 0; i--)
+                stack.Push(entity.Children[i]);
         }
     }
 }
