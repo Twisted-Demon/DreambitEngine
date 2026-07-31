@@ -15,7 +15,7 @@ public static class Time
 
     public static float TimeSinceSceneLoaded { get; private set; }
 
-    public static float TimeScale { get; } = 1f;
+    public static float TimeScale { get; set; } = 1f;
 
     public static float AltTimeScale { get; } = 1f;
 
