@@ -4,8 +4,8 @@ namespace Dreambit;
 
 public static class RandomExtensions
 {
-    public static float Next(this Random random, float min, float max)
+    public static float NextFloat(this Random random, float min, float max)
     {
-        return random.NextSingle() * (max - min) + min;
+        return (random.NextSingle() + Mathf.Epsilon) * (max - min) + min;
     }
 }

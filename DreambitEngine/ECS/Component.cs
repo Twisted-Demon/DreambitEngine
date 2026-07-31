@@ -14,7 +14,6 @@ public abstract class Component : IDisposable
 {
     private static readonly ILogger Logger = new Logger<Component>();
     private bool _enabled = true;
-    private bool _guarded = true;
     private bool _isDisposed;
     internal bool IsDestroyed;
     internal IReadOnlyList<Type> RequiredComponentTypes = [];
@@ -233,62 +232,142 @@ public abstract class Component : IDisposable
 
     internal void BeforeDeserialize()
     {
-        if (!_guarded) return;
-        _guarded = Guard.SafeCall(OnBeforeDeserialize, "OnBeforeDeserialize");
+        if (IsFaulted()) return;
+
+        try
+        {
+            OnBeforeDeserialize();
+        }
+        catch (Exception exception)
+        {
+            HandleCallbackException(nameof(OnBeforeDeserialize), exception);
+        }
     }
 
     internal void AfterDeserialize()
     {
-        if (!_guarded) return;
-        _guarded = Guard.SafeCall(OnAfterDeserialize, "OnAfterDeserialize");
+        if (IsFaulted()) return;
+
+        try
+        {
+            OnAfterDeserialize();
+        }
+        catch (Exception exception)
+        {
+            HandleCallbackException(nameof(OnAfterDeserialize), exception);
+        }
     }
 
     internal void Create()
     {
-        if (!_guarded) return;
-        _guarded = Guard.SafeCall(OnCreated, "OnCreated");
+        if (IsFaulted()) return;
+
+        try
+        {
+            OnCreated();
+        }
+        catch (Exception exception)
+        {
+            HandleCallbackException(nameof(OnCreated), exception);
+        }
     }
 
     internal void AddToEntity()
     {
-        if (!_guarded) return;
-        _guarded = Guard.SafeCall(OnAddedToEntity, "OnAddedToEntity");
+        if (IsFaulted()) return;
+
+        try
+        {
+            OnAddedToEntity();
+        }
+        catch (Exception exception)
+        {
+            HandleCallbackException(nameof(OnAddedToEntity), exception);
+        }
     }
 
     internal void Update()
     {
-        if (!_guarded) return;
-        _guarded = Guard.SafeCall(OnUpdate, "OnUpdate");
+        if (IsFaulted() && !Enabled) return;
+
+        try
+        {
+            OnUpdate();
+        }
+        catch (Exception exception)
+        {
+            HandleCallbackException(nameof(OnUpdate), exception);
+        }
     }
 
     internal void PhysicsUpdate()
     {
-        if (!_guarded) return;
-        _guarded = Guard.SafeCall(OnPhysicsUpdate, "OnPhysicsUpdate");
+        if (IsFaulted() && !Enabled) return;
+
+        try
+        {
+            OnPhysicsUpdate();
+        }
+        catch (Exception exception)
+        {
+            HandleCallbackException(nameof(OnPhysicsUpdate), exception);
+        }
     }
 
     internal void RemoveFromEntity()
     {
-        if (!_guarded) return;
-        _guarded = Guard.SafeCall(OnRemovedFromEntity, "OnRemovedFromEntity");
+        if (IsFaulted()) return;
+
+        try
+        {
+            OnRemovedFromEntity();
+        }
+        catch (Exception exception)
+        {
+            HandleCallbackException(nameof(OnRemovedFromEntity), exception);
+        }
     }
 
     internal void Enable()
     {
-        if (!_guarded) return;
-        _guarded = Guard.SafeCall(OnEnabled, "OnEnable");
+        if (IsFaulted()) return;
+
+        try
+        {
+            OnEnabled();
+        }
+        catch (Exception exception)
+        {
+            HandleCallbackException(nameof(OnUpdate), exception);
+        }
     }
 
     internal void Disable()
     {
-        if (!_guarded) return;
-        _guarded = Guard.SafeCall(OnDisabled, "OnDisable");
+        if (IsFaulted()) return;
+
+        try
+        {
+            OnDisabled();
+        }
+        catch (Exception exception)
+        {
+            HandleCallbackException(nameof(OnDisabled), exception);
+        }
     }
 
     internal void Destroy()
     {
-        IsDestroyed = true;
-        _guarded = Guard.SafeCall(OnDestroyed, "OnDestroyed");
+        if (IsFaulted()) return;
+
+        try
+        {
+            OnDestroyed();
+        }
+        catch (Exception exception)
+        {
+            HandleCallbackException(nameof(OnDestroyed), exception);
+        }
     }
     
 
@@ -334,6 +413,32 @@ public abstract class Component : IDisposable
     public static bool IsNull(Component component)
     {
         return component == null || component.IsDestroyed;
+    }
+    
+    private bool HandleCallbackException(string callbackName, Exception exception)
+    {
+        if (Entity == null)
+            return false;
+
+        Entity.Quarantine(
+            this,
+            callbackName,
+            exception);
+
+        Logger.Error(
+            "Entity callback failed.\n" +
+            $"Entity: {Entity.Name}\n" +
+            $"Entity ID: {Entity.Id}\n" +
+            $"Component: {GetType().FullName}\n" +
+            $"Callback: {callbackName}\n" +
+            $"Exception: {exception}");
+
+        return false;
+    }
+
+    private bool IsFaulted()
+    {
+        return Entity != null && Entity.IsFaulted;
     }
 
     protected virtual void OnDisposing()

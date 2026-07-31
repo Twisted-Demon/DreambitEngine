@@ -216,5 +216,22 @@ public static class ReflectionUtils
             Type.DefaultBinder, parameters, null);
     }
 
+    public static bool OverridesMethods(Type derivedType, string methodName, params Type[] parameterTypes)
+    {
+        MethodInfo method = derivedType.GetMethod(
+            methodName,
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+            binder: null,
+            types: parameterTypes,
+            modifiers: null);
+
+
+        if (method is null) return false;
+
+        MethodInfo baseDefinition = method.GetBaseDefinition();
+        
+        return method.DeclaringType == derivedType && baseDefinition.DeclaringType != method.DeclaringType;
+    }
+
     #endregion
 }

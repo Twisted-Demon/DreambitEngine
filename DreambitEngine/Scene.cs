@@ -248,7 +248,7 @@ public class Scene : IDisposable
         if (State == SceneState.Ending) return;
 
         Transition(SceneState.Ending);
-        Guard.SafeCall(OnEnd, "OnEnd");
+        OnEnd();
         Dispose();
     }
 
@@ -264,9 +264,9 @@ public class Scene : IDisposable
             case SceneState.Created:
                 Transition(SceneState.Initializing);
                 InitializeInternals();
-                Guard.SafeCall(OnInitialize, "OnInitialize");
+                OnInitialize();
                 Transition(SceneState.Starting);
-                Guard.SafeCall(OnBegin, "OnBegin");
+                OnBegin();
                 Transition(SceneState.Running);
                 break;
 
@@ -277,7 +277,7 @@ public class Scene : IDisposable
 
             case SceneState.Running:
                 UpdateInternals();
-                Guard.SafeCall(OnUpdate, "OnUpdate");
+                OnUpdate();
                 EndOfFrame();
                 break;
 
@@ -298,9 +298,9 @@ public class Scene : IDisposable
     {
         if (State == SceneState.Running)
         {
-            Guard.SafeCall(OnPhysicsUpdate, "OnPhysicsUpdate");
-            Guard.SafeCall(Entities.OnPhysicsTick, "Entities.OnPhysicsTick");
-            Guard.SafeCall(_coroutineScheduler.FixedUpdate,  "Coroutines.FixedUpdate");
+            OnPhysicsUpdate();
+            Entities.OnPhysicsTick();
+            _coroutineScheduler.FixedUpdate();
         }
     }
 

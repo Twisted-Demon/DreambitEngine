@@ -21,6 +21,19 @@ public class Entity : IDisposable
     private bool _isDead;
     private Entity _parent;
     public string Name;
+    
+    private bool _isFaulted;
+    private Exception _faultException;
+    private Component _faultSource;
+    private string _faultCallback;
+    
+    public bool IsFaulted => _isFaulted;
+
+    public Exception FaultException => _faultException;
+
+    public Component FaultSource => _faultSource;
+
+    public string FaultCallback => _faultCallback;
 
     internal Entity(Guid id, string name, HashSet<string> tags, bool enabled, Scene scene)
     {
@@ -80,6 +93,9 @@ public class Entity : IDisposable
     {
         get
         {
+            if (_isFaulted)
+                return false;
+
             if (Parent == null)
                 return _enabled;
 
@@ -87,7 +103,9 @@ public class Entity : IDisposable
         }
         set
         {
-            if (_enabled == value) return;
+            if (_enabled == value)
+                return;
+
             _enabled = value;
 
             if (_enabled)
@@ -507,6 +525,16 @@ public class Entity : IDisposable
         Scene = null;
         ComponentRepository.DestroyAllComponentsNow();
         ComponentRepository.ClearLists();
+    }
+
+    internal void Quarantine(Component source, string callback, Exception exception)
+    {
+        if (_isFaulted) return;
+        
+        _isFaulted = true;
+        _faultSource = source;
+        _faultCallback = callback;
+        _faultException = exception;
     }
 
     public static bool operator ==(Entity a, Entity b)

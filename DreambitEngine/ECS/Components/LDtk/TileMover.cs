@@ -1,4 +1,5 @@
-﻿using Microsoft.Xna.Framework;
+﻿using System;
+using Microsoft.Xna.Framework;
 
 namespace Dreambit.ECS;
 
@@ -19,8 +20,7 @@ public class TileMover : Component
     {
         if (_astarGrid == null)
         {
-            _logger.Warn("No A* grid found");
-            return;
+            throw new ArgumentNullException(nameof(_astarGrid));
         }
 
         var desiredMovement = Velocity * Time.DeltaTime;
