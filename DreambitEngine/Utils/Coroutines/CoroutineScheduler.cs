@@ -5,19 +5,21 @@ using System.Threading.Tasks;
 
 namespace Dreambit;
 
-internal sealed class CoroutineScheduler : ICoroutineService
+internal sealed class CoroutineScheduler : ICoroutineService, ICanLog<CoroutineScheduler>
 {
     private readonly Dictionary<int, Node> _byId = [];
 
+    private readonly List<Node> _updateQueue = new(64);
     private readonly List<Node> _endOfFrameQueue = new(64);
     private readonly List<Node> _fixedQueue = new(64);
+    
     private readonly Stack<Node> _pool = [];
 
     private Node _head;
     private int _idSeq = 1;
 
-    private readonly ILogger _logger = new Logger<CoroutineScheduler>();
-
+    public ILogger Logger { get; } = new Logger<CoroutineScheduler>();
+    
     public CoroutineHandle StartCoroutine(IEnumerator routine)
     {
         return StartCoroutineInternal(routine, null);
@@ -82,47 +84,59 @@ internal sealed class CoroutineScheduler : ICoroutineService
     {
         var clock = CoroutineClock.Now();
 
-        var cur = _head;
-        Node prev = null;
-        while (cur != null)
+        // Snapshot the coroutines that are eligible to run at the beginning
+        // of this update. Coroutines started while processing this snapshot
+        // will begin during the next scheduler update.
+        _updateQueue.Clear();
+
+        var current = _head;
+
+        while (current != null)
         {
-            var next = cur.Next;
-            if (cur.WaitingFixedUpdate)
+            if (!current.WaitingFixedUpdate &&
+                !current.WaitingEndOfFrame)
             {
-                prev = cur;
-                cur = next;
+                _updateQueue.Add(current);
+            }
+
+            current = current.Next;
+        }
+
+        foreach (var node in _updateQueue)
+        {
+            // Save this before ticking because stopping a coroutine recycles
+            // the node and resets its ID.
+            var nodeId = node.Id;
+
+            // Another coroutine may have stopped this one earlier in the
+            // current update.
+            if (!_byId.ContainsKey(nodeId))
                 continue;
-            }
 
-            if (cur.WaitingEndOfFrame)
-            {
-                prev = cur;
-                cur = next;
+            var keepRunning = TickCoroutine(node, clock);
+
+            // The coroutine may have stopped itself while executing.
+            if (!_byId.ContainsKey(nodeId))
                 continue;
-            }
 
-            if (!TickCoroutine(cur, clock))
-            {
-                Unlink(prev, cur);
-                Recycle(cur);
-            }
-            else
-            {
-                prev = cur;
-            }
-
-            cur = next;
+            if (!keepRunning)
+                Remove(node);
         }
 
         _endOfFrameQueue.Clear();
-        cur = _head;
-        while (cur != null)
+
+        current = _head;
+
+        while (current != null)
         {
-            if (cur.WaitingEndOfFrame) _endOfFrameQueue.Add(cur);
-            cur = cur.Next;
+            if (current.WaitingEndOfFrame)
+                _endOfFrameQueue.Add(current);
+
+            current = current.Next;
         }
 
-        foreach (var n in _endOfFrameQueue) n.WaitingEndOfFrame = false;
+        foreach (var node in _endOfFrameQueue)
+            node.WaitingEndOfFrame = false;
     }
 
     public void FixedUpdate()
@@ -238,7 +252,7 @@ internal sealed class CoroutineScheduler : ICoroutineService
         }
         catch (Exception ex)
         {
-            _logger.Error(ex.Message, node.ToString());
+            Logger.Error(ex.Message, node.ToString());
             return false;
         }
     }
