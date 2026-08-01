@@ -87,10 +87,15 @@ public class Resources : Singleton<Resources>
 
             return (T)asset;
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            Instance.Logger.Warn("Could not load {0} | {1}", typeof(T).Name, assetName);
-            Instance.Logger.Error(e.Message);
+            var logger = Instance.Logger;
+            
+            logger.Error(
+                "Asset loading failed.\n" +
+                $"Asset path: {assetName}\n" +
+                $"Asset type: {nameof(T)}\n" +
+                $"Exception: {exception}");
 
             return null;
         }
@@ -134,10 +139,13 @@ public class Resources : Singleton<Resources>
         Instance.Content.UnloadAsset(assetName);
     }
 
+    public static bool TryRegisterAsset(DreambitAsset asset)
+    {
+        return Instance.LoadedAssets.TryAdd(asset.AssetName, asset);
+    }
+
     public static SpriteFontBase LoadSpriteFont(string assetName, float fontSize = 12f)
     {
-        
-        
         //if we already have the asset we will return it
         if (Instance.LoadedAssets.TryGetValue(assetName + fontSize, out var rawAsset))
             if (rawAsset is SpriteFontBase font)

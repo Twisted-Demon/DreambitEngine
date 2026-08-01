@@ -12,6 +12,7 @@ public class SongLoader : AssetLoaderBase
     public override object Load(string assetName, string pakName, bool usePak, string contentDirectory)
     {
         using var s = GetStream(assetName, pakName, usePak, contentDirectory);
-        return AudbLoader.LoadSong(s);
+        var song = AudbLoader.LoadSong(s);
+        return song;
     }
 }

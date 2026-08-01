@@ -1,4 +1,5 @@
 ﻿using System;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Audio;
 using Newtonsoft.Json;
 
@@ -20,6 +21,7 @@ public class SoundCue : DreambitAsset
 
     [JsonProperty("pan")] public float Pan;
     [JsonProperty("pitch")] public float Pitch;
+    [JsonProperty("pitch_jitter")] public Vector2 PitchJitter =  Vector2.Zero;
 
     /// <summary>
     ///     Where volume == 1 before falloff
@@ -34,6 +36,7 @@ public class SoundCue : DreambitAsset
     [JsonProperty("takes")] public string[] Takes = [];
 
     [JsonProperty("volume")] public float Volume = 1.00f;
+    [JsonProperty("volume_jitter")] public Vector2 VolumeJitter = Vector2.Zero;
     [JsonIgnore] public SoundEffect[] SfxTakes { get; internal set; }
 
     internal void LoadInternal()
@@ -53,7 +56,7 @@ public class SoundCue : DreambitAsset
         if (SfxTakes.Length == 1 && Takes.Length == 1)
             return SfxTakes[0]?.CreateInstance();
 
-        var randTake = new Random().Next(0, SfxTakes.Length - 1);
-        return SfxTakes[randTake]?.CreateInstance();
+        var index = Random.Shared.Next(SfxTakes.Length);
+        return SfxTakes[index]?.CreateInstance();
     }
 }

@@ -18,47 +18,7 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
     private static readonly object ComponentRegistryLock = new();
     private static bool _componentRegistryBuilt;
 
-    public BlueprintResolver()
-    {
-        BuildConvertersDictionary();
-    }
-
-    public Dictionary<Type, JsonConverter> Converters { get; } = [];
-
-    private void BuildConvertersDictionary()
-    {
-        var converterTypes = ReflectionUtils.GetAllTypesAssignableFrom(
-            typeof(IPropertyConverterMarker),
-            true);
-
-        foreach (var type in converterTypes)
-        {
-            var instance = (JsonConverter)Activator.CreateInstance(type);
-            if (instance is null)
-                continue;
-
-            var target = GetPropertyConverter(type);
-            Converters[target] = instance;
-        }
-    }
-
-    private static Type GetPropertyConverter(Type converterType)
-    {
-        for (var baseType = converterType;
-             baseType != null && baseType != typeof(object);
-             baseType = baseType.BaseType)
-        {
-            if (baseType.IsGenericType &&
-                baseType.GetGenericTypeDefinition() == typeof(PropertyConverter<>))
-            {
-                return baseType.GetGenericArguments()[0];
-            }
-        }
-
-        throw new ArgumentException(
-            $"{converterType} does not inherit PropertyConverter<>.",
-            nameof(converterType));
-    }
+    public Dictionary<Type, JsonConverter> Converters => PropertyConverterRegistry.Converters;
 
     public static void ResolveComponent(
         ComponentBlueprint blueprint,
@@ -215,7 +175,7 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
                     if (!string.IsNullOrWhiteSpace(componentName))
                         RegisterComponentTypeKey($"{assemblyName}.{componentName}", type, false);
                     
-                    logger.Info($"registered: {assemblyName}.{componentName}");
+                    logger.Trace($"registered: {assemblyName}.{componentName}");
                 }
             }
 

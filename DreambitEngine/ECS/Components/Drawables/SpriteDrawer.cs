@@ -13,6 +13,8 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
     public PivotType PivotType { get; internal set; } = PivotType.Center;
     public Sprite Sprite { get; set; }
 
+    private bool _warned = false;
+
     public string SpritePath
     {
         get => _spritePath;
@@ -112,9 +114,12 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
     {
         if (Sprite?.Texture == null)
         {
+            if (_warned) return;
             Logger.Warn(
                 "Entity {0} is missing a texture",
                 Entity.Name);
+                
+            _warned = true;
 
             return;
         }

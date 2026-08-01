@@ -1,4 +1,6 @@
-﻿using Microsoft.Xna.Framework.Audio;
+﻿using System;
+using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Audio;
 
 namespace Dreambit.ECS.Audio;
 
@@ -12,30 +14,18 @@ public class SoundEffectEmitter : Component<SoundEffectEmitter>
     private SoundCue _soundCue;
 
     private string _soundCuePath;
-
-    public SoundCue SoundCue
-    {
-        get => _soundCue;
-        set
-        {
-            if (value is null) return;
-            UpdateSoundCue(value);
-        }
-    }
-
-    public string SoundCuePath
-    {
-        get => _soundCuePath;
-        set
-        {
-            var cue = Resources.LoadAsset<SoundCue>(value);
-
-            if (cue is null) return;
-            UpdateSoundCue(cue);
-        }
-    }
-
     public bool CullWhenOffscreen { get; set; } = false;
+
+    private float _masterVolume = 1.0f;
+    public float MasterVolume
+    {
+        get => _masterVolume;
+        set
+        {
+            var volume = Mathf.Clamp(value, 0.0f, 1.0f);
+            _masterVolume = volume;
+        }
+    }
 
     public override void OnUpdate()
     {
@@ -48,6 +38,11 @@ public class SoundEffectEmitter : Component<SoundEffectEmitter>
                 _pool[i] = null;
             }
         }
+    }
+
+    public override void OnDestroyed()
+    {
+        StopAll();
     }
 
     private void UpdateSoundCue(SoundCue soundCue)
@@ -102,8 +97,11 @@ public class SoundEffectEmitter : Component<SoundEffectEmitter>
 
         var sfxInstance = cue.GetSfxInstance();
 
-        sfxInstance.Volume = cue.Volume;
-        sfxInstance.Pitch = cue.Pitch;
+        var currentVolume = cue.Volume * MasterVolume;
+        var currentJitter = cue.VolumeJitter * MasterVolume;
+        sfxInstance.Volume = GetValueWithJitter(currentVolume, currentJitter);
+        
+        sfxInstance.Pitch = GetValueWithJitter(cue.Pitch, cue.PitchJitter);
         sfxInstance.Pan = cue.Pan;
 
         sfxInstance.IsLooped = cue.Loop;
@@ -111,7 +109,10 @@ public class SoundEffectEmitter : Component<SoundEffectEmitter>
         if (cue.Loop)
         {
             if (_primaryInstance == null || _primaryInstance.IsDisposed)
+            {
                 _primaryInstance = sfxInstance;
+                _primaryInstance?.Play();
+            }
 
             var inst = _primaryInstance;
         }
@@ -137,6 +138,21 @@ public class SoundEffectEmitter : Component<SoundEffectEmitter>
                 c++;
 
         return c;
+    }
+    
+    private float GetValueWithJitter(float baseValue, Vector2 jitter)
+    {
+        var min = baseValue - jitter.X;
+        var max = baseValue + jitter.Y;
+        
+        var value = Random.Shared.NextFloat(min, max);
+
+        return value;
+    }
+
+    private float GetValueWithJitter(float baseValue, Vector2 jitter, float min, float max)
+    {
+        return Mathf.Clamp(GetValueWithJitter(baseValue, jitter), min, max);
     }
 
     private SoundEffectInstance NextPoolSlot()

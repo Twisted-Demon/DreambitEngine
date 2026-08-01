@@ -1,4 +1,5 @@
-﻿using Microsoft.Xna.Framework;
+﻿using System;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Newtonsoft.Json;
 
@@ -32,29 +33,41 @@ public class Sprite : DreambitAsset
         if (texture is null)
             return null;
 
-        return new Sprite
+        var sprite = new Sprite
         {
             Texture = texture,
             SourceRect = new Rectangle(sourceX, sourceY, sourceWidth, sourceHeight),
         };
+        
+        sprite.AssetName = $"sprites/{texturePath}";
+        Resources.TryRegisterAsset(sprite);
+        return sprite;
     }
 
     public static Sprite Create(Texture2D texture, int sourceX, int sourceY, int sourceWidth, int sourceHeight)
     {
-        return new Sprite
+        var sprite = new Sprite
         {
             Texture = texture,
             SourceRect = new Rectangle(sourceX, sourceY, sourceWidth, sourceHeight),
         };
+        
+        sprite.AssetName = $"sprites/{texture.Name}";
+        Resources.TryRegisterAsset(sprite);
+        return sprite;
     }
 
     public static Sprite Create(Texture2D texture, Rectangle sourceRect)
     {
-        return new Sprite
+        var sprite = new Sprite
         {
             Texture = texture,
             SourceRect = sourceRect,
         };
+        
+        sprite.AssetName = $"sprites/{texture.Name}";
+        Resources.TryRegisterAsset(sprite);
+        return sprite;
     }
 
     public static Sprite Create(string texturePath, Rectangle sourceRect)
@@ -62,11 +75,15 @@ public class Sprite : DreambitAsset
         var texture = Resources.LoadAsset<Texture2D>(texturePath);
         if (texture is null) return null;
 
-        return new Sprite
+        var sprite = new Sprite
         {
             Texture = texture,
             SourceRect = sourceRect,
         };
+        
+        sprite.AssetName = $"sprites/{texturePath}";
+        Resources.TryRegisterAsset(sprite);
+        return sprite;
     }
 
     public static Sprite Create(Texture2D texture)

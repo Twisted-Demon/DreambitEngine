@@ -10,7 +10,9 @@ public static class JsnbLoader
 {
     public static T Deserialize<T>(Stream s)
     {
-        return JsonConvert.DeserializeObject<T>(GetJsonString(s));
+        return JsonConvert.DeserializeObject<T>(
+            GetJsonString(s),
+            PropertyConverterRegistry.CreateSerializerSettings());
     }
 
     public static string GetJsonString(Stream s)
