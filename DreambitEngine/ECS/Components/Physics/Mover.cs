@@ -2,7 +2,7 @@
 
 namespace Dreambit.ECS;
 
-[BlueprintType($"Dreambit.{nameof(Mover)}")]
+[BlueprintType(nameof(Mover))]
 public class Mover : Component
 {
     private readonly Logger<Mover> _logger = new();

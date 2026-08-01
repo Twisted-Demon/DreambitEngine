@@ -3,7 +3,7 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace Dreambit.ECS;
 
-[BlueprintType($"Dreambit.{nameof(ParticleSystemDrawer)}")]
+[BlueprintType($"{nameof(ParticleSystemDrawer)}")]
 public class ParticleSystemDrawer : DrawableComponent<ParticleSystemDrawer>
 {
     private string _texturePath;

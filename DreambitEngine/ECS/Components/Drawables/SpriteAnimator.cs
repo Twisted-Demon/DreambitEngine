@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Dreambit.ECS;
 
-[BlueprintType($"Dreambit.{nameof(SpriteAnimator)}")]
+[BlueprintType(nameof(SpriteAnimator))]
 [Require(typeof(SpriteDrawer))]
 public class SpriteAnimator : Component<SpriteAnimator>
 {

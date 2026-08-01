@@ -3,7 +3,7 @@ using Microsoft.Xna.Framework;
 
 namespace Dreambit.ECS;
 
-[BlueprintType($"Dreambit.{nameof(TileMover)}")]
+[BlueprintType(nameof(TileMover))]
 public class TileMover : Component
 {
     private readonly Logger<TileMover> _logger = new();

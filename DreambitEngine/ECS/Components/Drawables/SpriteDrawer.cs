@@ -3,7 +3,7 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace Dreambit.ECS;
 
-[BlueprintType($"Dreambit.{nameof(SpriteDrawer)}")]
+[BlueprintType(nameof(SpriteDrawer))]
 public class SpriteDrawer : DrawableComponent<SpriteDrawer>
 {
     private string _spritePath;

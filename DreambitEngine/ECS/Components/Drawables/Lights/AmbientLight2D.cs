@@ -2,7 +2,7 @@
 
 namespace Dreambit.ECS;
 
-[BlueprintType($"Dreambit.{nameof(AmbientLight2D)}")]
+[BlueprintType($"{nameof(AmbientLight2D)}")]
 public class AmbientLight2D : Light2D
 {
     public override RectangleF Bounds

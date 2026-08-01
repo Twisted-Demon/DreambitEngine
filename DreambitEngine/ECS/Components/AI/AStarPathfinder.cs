@@ -4,7 +4,7 @@ using Microsoft.Xna.Framework;
 
 namespace Dreambit.ECS;
 
-[BlueprintType("Dreambit.AStarPathfinder")]
+[BlueprintType(nameof(AStarPathfinder))]
 public class AStarPathfinder : Component
 {
     private HashSet<PathNode> _closedList;

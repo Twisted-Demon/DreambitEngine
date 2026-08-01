@@ -206,13 +206,16 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
                 {
                     if (!IsValidComponentType(type))
                         continue;
+                    
+                    var logger = new Logger<BlueprintResolver>();
 
-                    if (!string.IsNullOrWhiteSpace(type.FullName))
-                        RegisterComponentTypeKey(type.FullName, type, false);
-
-                    var attribute = type.GetCustomAttribute<BlueprintTypeAttribute>();
-                    if (attribute != null)
-                        RegisterComponentTypeKey(attribute.Id, type, true);
+                    var assemblyName = type.Assembly.GetName().Name;
+                    var componentName = type.Name;
+                    
+                    if (!string.IsNullOrWhiteSpace(componentName))
+                        RegisterComponentTypeKey($"{assemblyName}.{componentName}", type, false);
+                    
+                    logger.Info($"registered: {assemblyName}.{componentName}");
                 }
             }
 
@@ -256,6 +259,7 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
     {
         return type != null &&
                !type.IsAbstract &&
+               !type.IsGenericType &&
                typeof(Component).IsAssignableFrom(type);
     }
 

@@ -8,7 +8,7 @@ namespace Dreambit.ECS;
 ///     Physics collider component. Can act as a trigger, participate in spatial queries,
 ///     and raise collision callbacks (enter/stay/exit). Rendering of bounds is available in debug.
 /// </summary>
-[BlueprintType($"Dreambit.{nameof(Collider)}")]
+[BlueprintType(nameof(Collider))]
 public class Collider : Component
 {
     #region Debug

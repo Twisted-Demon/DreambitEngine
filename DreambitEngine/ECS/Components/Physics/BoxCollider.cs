@@ -2,7 +2,7 @@
 
 namespace Dreambit.ECS;
 
-[BlueprintType($"Dreambit.{nameof(BoxCollider)}")]
+[BlueprintType(nameof(BoxCollider))]
 public class BoxCollider : Collider
 {
     public override void OnCreated()

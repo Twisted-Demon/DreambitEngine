@@ -2,7 +2,7 @@
 
 namespace Dreambit.ECS;
 
-[BlueprintType($"Dreambit.{nameof(RectDrawer)}")]
+[BlueprintType($"{nameof(RectDrawer)}")]
 public class RectDrawer : DrawableComponent
 {
     public int Height = 32;

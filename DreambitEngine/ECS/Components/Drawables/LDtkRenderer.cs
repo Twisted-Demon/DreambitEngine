@@ -4,7 +4,7 @@ using Microsoft.Xna.Framework;
 
 namespace Dreambit.ECS;
 
-[BlueprintType($"Dreambit.{nameof(LDtkRenderer)}")]
+[BlueprintType($"{nameof(LDtkRenderer)}")]
 public class LDtkRenderer : DrawableComponent<LDtkRenderer>
 {
     private ExampleRenderer _renderer;

@@ -3,7 +3,7 @@ using Microsoft.Xna.Framework;
 
 namespace Dreambit.ECS;
 
-[BlueprintType("Dreambit.AstarGrid")]
+[BlueprintType(nameof(AStarGrid))]
 public class AStarGrid : Component
 {
     private Node[,] _nodes;
