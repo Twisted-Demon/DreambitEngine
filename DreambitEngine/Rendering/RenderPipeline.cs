@@ -62,9 +62,6 @@ public class RenderPipeline(Scene scene) : IDisposable
     {
         foreach (var renderer in _renderers)
         {
-            if (!renderer.IsActive)
-                continue;
-            
             renderer.OnDraw();
         }
 

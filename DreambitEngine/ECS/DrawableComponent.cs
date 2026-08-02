@@ -12,7 +12,7 @@ public abstract class DrawableComponent : Component
 
     public bool UsesEffect => Effect != null;
 
-    public int DrawLayer
+    public virtual int DrawLayer
     {
         get => _drawLayer;
         set => OnDrawLayerChanged(value);
