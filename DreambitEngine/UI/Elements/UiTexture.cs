@@ -26,8 +26,9 @@ public class UiTexture : UiElement
 
     public override void ResolveDependencies()
     {
-        if(!string.IsNullOrEmpty(SpritePath))
-            _sprite = Resources.LoadAsset<Sprite>(SpritePath);
+        _sprite = string.IsNullOrEmpty(SpritePath)
+            ? null
+            : Resources.LoadAsset<Sprite>(SpritePath);
     }
 
     public override void OnDraw()

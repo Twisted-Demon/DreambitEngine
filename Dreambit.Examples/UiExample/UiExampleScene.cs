@@ -1,4 +1,5 @@
-﻿using Dreambit.ECS;
+using Dreambit.ECS;
+using Dreambit.UI;
 
 namespace Dreambit.Examples.UiExample;
 
@@ -10,9 +11,13 @@ public class UiExampleScene : Scene<UiExampleScene>
     protected override void OnInitialize()
     {
         InitializeSettings();
-        
+
         var menu = CreateEntity("menu")
             .AttachComponent<UiFrame>();
+
+        menu.Layout
+            .GetRequired<UiButton>("play-button")
+            .Clicked += OnPlayClicked;
     }
 
     private void InitializeSettings()
@@ -22,7 +27,12 @@ public class UiExampleScene : Scene<UiExampleScene>
         MainCamera.PixelsPerUnit = 1;
         MainCamera.SetTargetVerticalResolution(WindowHeight);
 
-        UICamera.PixelsPerUnit = 1;
-        UICamera.SetTargetVerticalResolution(WindowHeight);
+        UiCamera.PixelsPerUnit = 1;
+        UiCamera.SetTargetVerticalResolution(WindowHeight);
+    }
+
+    private void OnPlayClicked(UiButton button)
+    {
+        Logger.Info("Play clicked");
     }
 }

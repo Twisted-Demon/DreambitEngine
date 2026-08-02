@@ -13,9 +13,18 @@ public static class Input
     #region Properties
 
     /// <summary>
-    ///     Cached window client bounds for hit-testing the mouse position.
+    ///     Window-local client bounds for hit-testing the mouse position.
+    ///     Mouse coordinates are relative to the game window, so this rectangle
+    ///     must always start at zero rather than using the desktop window position.
     /// </summary>
-    public static Rectangle WindowClientBounds => Core.Instance.Window.ClientBounds;
+    public static Rectangle WindowClientBounds =>
+        new(0, 0, Window.ClientWidth, Window.ClientHeight);
+
+    /// <summary>
+    ///     True when Dreambit's high-polling-rate mouse optimization is active.
+    ///     The latest position and button state are still sampled once per frame.
+    /// </summary>
+    public static bool HighPollingRateMouseOptimizationActive { get; private set; }
 
     #endregion
 
@@ -28,6 +37,7 @@ public static class Input
     // --- Mouse ---
     private static MouseState _prevMs;
     private static MouseState _currMs;
+    private static string _lastMouseOptimizationDiagnostic;
 
     #endregion
 
@@ -38,8 +48,20 @@ public static class Input
     /// </summary>
     public static void Init()
     {
+        HighPollingRateMouseOptimizationActive =
+            HighPollingRateMouse.TryEnable(Core.Instance.Window);
+
+        LogHighPollingRateMouseOptimization();
+
         _prevKb = _currKb = Keyboard.GetState();
-        _prevMs = _currMs = Mouse.GetState();
+        _prevMs = _currMs = SampleMouseState();
+    }
+
+    internal static void Shutdown()
+    {
+        HighPollingRateMouse.Restore();
+        HighPollingRateMouseOptimizationActive = false;
+        _lastMouseOptimizationDiagnostic = null;
     }
 
     /// <summary>
@@ -47,8 +69,17 @@ public static class Input
     /// </summary>
     public static void PreUpdate()
     {
+        if (!HighPollingRateMouseOptimizationActive)
+        {
+            HighPollingRateMouseOptimizationActive =
+                HighPollingRateMouse.TryEnable(Core.Instance.Window);
+
+        }
+
+        LogHighPollingRateMouseOptimization();
+
         _currKb = Keyboard.GetState();
-        _currMs = Mouse.GetState();
+        _currMs = SampleMouseState();
     }
 
     /// <summary>
@@ -220,6 +251,29 @@ public static class Input
     #endregion
 
     #region Internals
+
+    private static void LogHighPollingRateMouseOptimization()
+    {
+        var diagnostic = HighPollingRateMouse.Diagnostic;
+
+        if (_lastMouseOptimizationDiagnostic == diagnostic)
+            return;
+
+        _lastMouseOptimizationDiagnostic = diagnostic;
+        Core.Logger.Debug(
+            $"High-polling-rate mouse optimization: {HighPollingRateMouseOptimizationActive}");
+        Core.Logger.Debug($"Mouse input path: {diagnostic}");
+    }
+
+    private static MouseState SampleMouseState()
+    {
+        var state = Mouse.GetState();
+
+        if (!HighPollingRateMouse.TryGetState(out var optimizedState))
+            return state;
+
+        return optimizedState;
+    }
 
     /// <summary>Returns true if the button is down for the given <see cref="MouseState" />.</summary>
     private static bool IsDown(in MouseState ms, MouseButton button)

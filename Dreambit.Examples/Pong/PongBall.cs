@@ -95,10 +95,8 @@ public class PongBall : Component<PongBall>
     {
         while (true)
         {
-            var random = new Random();
-
-            var randX = random.Next(-1.0f, 1.0f);
-            var randY = random.Next(-1.0f, 1.0f);
+            var randX = Random.Shared.NextSingle() * 2f - 1f;
+            var randY = Random.Shared.NextSingle() * 2f - 1f;
 
             var direction = new Vector2(randX, randY);
 

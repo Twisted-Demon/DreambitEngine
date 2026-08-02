@@ -1,4 +1,5 @@
-﻿using Microsoft.Xna.Framework;
+﻿using System;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
 namespace Dreambit.ECS;
@@ -12,8 +13,6 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
     public Vector2 Pivot { get; internal set; } = Vector2.Zero;
     public PivotType PivotType { get; internal set; } = PivotType.Center;
     public Sprite Sprite { get; set; }
-
-    private bool _warned = false;
 
     public string SpritePath
     {
@@ -112,17 +111,8 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
 
     public override void OnDraw()
     {
-        if (Sprite?.Texture == null)
-        {
-            if (_warned) return;
-            Logger.Warn(
-                "Entity {0} is missing a texture",
-                Entity.Name);
-                
-            _warned = true;
-
-            return;
-        }
+        ArgumentNullException.ThrowIfNull(Sprite);
+        ArgumentNullException.ThrowIfNull(Sprite.Texture);
 
         var originToUse = Pivot;
 

@@ -1,4 +1,5 @@
-﻿using System.IO;
+using System;
+using System.IO;
 using Dreambit.UI;
 using Microsoft.Xna.Framework;
 
@@ -7,42 +8,76 @@ namespace Dreambit.ECS;
 [BlueprintType(nameof(UiFrame))]
 public class UiFrame : DrawableComponent<UiFrame>
 {
-    private UiLayout _layout;
+    public string LayoutPath { get; set; } = "Ui/menu.xml";
+    public UiLayout Layout { get; private set; }
 
     public override void OnCreated()
     {
-        var xml = File.ReadAllText("Content/Ui/menu.xml");
-
-        _layout = UiLoader.LoadFromXml(xml);
-        Scene.DebugMode = true;
-
-        Window.WindowResized += OnWindowResized;
+        LoadLayout(LayoutPath);
     }
 
-    private void OnWindowResized(object sender, WindowResizedEventArgs e)
+    public void LoadLayout(string layoutPath)
     {
-        _layout.Root.InvalidateLayout();
+        if (string.IsNullOrWhiteSpace(layoutPath))
+            throw new ArgumentException(
+                "A UI layout path is required.",
+                nameof(layoutPath));
+
+        LayoutPath = layoutPath;
+
+        var contentRoot = Path.Combine(
+            AppContext.BaseDirectory,
+            Core.Instance.Content.RootDirectory);
+
+        var fullPath = Path.GetFullPath(
+            Path.Combine(contentRoot, LayoutPath));
+
+        if (!File.Exists(fullPath))
+        {
+            throw new FileNotFoundException(
+                $"UI layout '{LayoutPath}' was not found.",
+                fullPath);
+        }
+
+        Layout = UiLoader.LoadFromXml(
+            File.ReadAllText(fullPath));
     }
 
     public override void OnUpdate()
     {
-        var screenSize = Window.ScreenSize;
+        if (Layout is null)
+            return;
 
-        Scene.UiCamera.SetTargetVerticalResolution(screenSize.Y);
-        
-        _layout.Root.Width = UiLength.Pixels(screenSize.X);
-        _layout.Root.Height = UiLength.Pixels(screenSize.Y);
-        _layout.Root.Arrange(new Rectangle(0, 0, screenSize.X, screenSize.Y));
-        _layout.Root.Update();
+        var uiScale = MathF.Max(
+            Scene.UiCamera.Scale,
+            0.0001f);
+
+        var viewport = new Rectangle(
+            0,
+            0,
+            (int)MathF.Ceiling(Window.Width / uiScale),
+            (int)MathF.Ceiling(Window.Height / uiScale));
+
+        var backBufferPointer = Window.ClientToBackBuffer(
+            Input.GetMousePosition());
+
+        var uiPointer = Scene.UiCamera.CameraLocalToWorld(
+            backBufferPointer);
+
+        var input = new UiInputState(
+            uiPointer,
+            Input.IsMouseInWindow(),
+            Input.LeftPressed(),
+            Input.LeftHeld(),
+            Input.LeftReleased());
+
+        Layout.Update(viewport, input);
     }
 
     public override void OnDrawUi()
     {
-        _layout.Root.OnDraw();
+        Layout?.Draw();
     }
-    
-    
-    
 
-    public override RectangleF Bounds => Scene.MainCamera.BoundsF;
+    public override RectangleF Bounds => Scene.UiCamera.BoundsF;
 }

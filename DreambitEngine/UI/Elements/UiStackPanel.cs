@@ -21,13 +21,17 @@ public class UiStackPanel : UiContainer
 
     public override void Arrange(Rectangle parentBounds)
     {
-        // First, resolve our own bounds
-        base.Arrange(parentBounds);
+        // A stack panel owns child placement, so arrange only this panel here.
+        ArrangeSelf(parentBounds);
 
         int innerX = Bounds.X + PaddingLeft;
         int innerY = Bounds.Y + PaddingTop;
-        int maxInnerWidth  = Bounds.Width  - (PaddingLeft + PaddingRight);
-        int maxInnerHeight = Bounds.Height - (PaddingTop + PaddingBottom);
+        int maxInnerWidth = Math.Max(
+            0,
+            Bounds.Width - (PaddingLeft + PaddingRight));
+        int maxInnerHeight = Math.Max(
+            0,
+            Bounds.Height - (PaddingTop + PaddingBottom));
 
         if (Orientation == StackOrientation.Vertical)
         {
@@ -42,7 +46,8 @@ public class UiStackPanel : UiContainer
                 // Child spans across X, pinned to left
                 child.X = UiLength.Pixels(0);
                 child.Y = UiLength.Pixels(currentY - innerY);
-                child.Anchor = UiAnchor.Center;
+                child.Anchor = UiAnchor.TopLeft;
+                child.Origin = UiAnchor.TopLeft;
 
                 child.Arrange(new Rectangle(innerX, innerY, maxInnerWidth, maxInnerHeight));
 
@@ -62,6 +67,7 @@ public class UiStackPanel : UiContainer
                 child.X = UiLength.Pixels(currentX - innerX);
                 child.Y = UiLength.Pixels(0);
                 child.Anchor = UiAnchor.TopLeft;
+                child.Origin = UiAnchor.TopLeft;
 
                 child.Arrange(new Rectangle(innerX, innerY, maxInnerWidth, maxInnerHeight));
 

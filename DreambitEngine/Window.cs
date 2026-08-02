@@ -13,6 +13,7 @@ public class Window
     private static Point _previousWindowedPosition;
     private static Point _pendingClientSize;
     private static Point _lastNotifiedBackBufferSize;
+    private static Point _clientSize;
 
     private static long _lastResizeTimestampMilliseconds;
 
@@ -83,15 +84,10 @@ public class Window
     {
         get
         {
-            var instance =
-                Core.Instance;
+            if (_clientSize.X > 0)
+                return _clientSize.X;
 
-            if (instance?.Window == null)
-                return BackBufferWidth;
-
-            return Math.Max(
-                1,
-                instance.Window.ClientBounds.Width);
+            return ReadClientSize().X;
         }
     }
 
@@ -99,20 +95,23 @@ public class Window
     {
         get
         {
-            var instance =
-                Core.Instance;
+            if (_clientSize.Y > 0)
+                return _clientSize.Y;
 
-            if (instance?.Window == null)
-                return BackBufferHeight;
-
-            return Math.Max(
-                1,
-                instance.Window.ClientBounds.Height);
+            return ReadClientSize().Y;
         }
     }
 
-    public static Point ClientSize =>
-        new(ClientWidth, ClientHeight);
+    public static Point ClientSize
+    {
+        get
+        {
+            if (_clientSize.X > 0 && _clientSize.Y > 0)
+                return _clientSize;
+
+            return ReadClientSize();
+        }
+    }
 
     // Preserve the original API: Width/Height represent renderable pixels.
     public static int Width => BackBufferWidth;
@@ -155,6 +154,7 @@ public class Window
 
         _hasPreviousWindowedState = true;
         _lastNotifiedBackBufferSize = BackBufferSize;
+        _clientSize = ReadClientSize();
 
         instance.Window.ClientSizeChanged +=
             OnClientSizeChanged;
@@ -177,6 +177,7 @@ public class Window
 
         _initialized = false;
         _pendingResize = false;
+        _clientSize = Point.Zero;
     }
 
     /// <summary>
@@ -222,8 +223,11 @@ public class Window
         if (bounds.Width <= 0 || bounds.Height <= 0)
             return;
 
-        _pendingClientSize =
-            new Point(bounds.Width, bounds.Height);
+        _clientSize = new Point(
+            bounds.Width,
+            bounds.Height);
+
+        _pendingClientSize = _clientSize;
 
         _lastResizeTimestampMilliseconds =
             Environment.TickCount64;
@@ -274,7 +278,22 @@ public class Window
         finally
         {
             _applyingGraphicsChanges = false;
+            _clientSize = ReadClientSize();
         }
+    }
+
+    private static Point ReadClientSize()
+    {
+        var instance = Core.Instance;
+
+        if (instance?.Window == null)
+            return BackBufferSize;
+
+        var bounds = instance.Window.ClientBounds;
+
+        return new Point(
+            Math.Max(1, bounds.Width),
+            Math.Max(1, bounds.Height));
     }
 
     private static void RaiseResizeIfBackBufferChanged()

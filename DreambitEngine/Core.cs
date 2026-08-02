@@ -120,6 +120,7 @@ public class Core : Game
     protected override void OnExiting(object sender, ExitingEventArgs args)
     {
         CurrentScene?.Terminate();
+        Input.Shutdown();
         SpriteBatch.Dispose();
         base.OnExiting(sender, args);
     }

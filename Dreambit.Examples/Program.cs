@@ -12,7 +12,7 @@ Window.SetFixedTimeStep(false);
 Window.SetVsync(false);
 
 Core.Level = LogLevel.Trace;
-var scene = new PongScene();
+var scene = new UiExampleScene();
 Scene.SetNextScene(scene);
 
 game.Run();

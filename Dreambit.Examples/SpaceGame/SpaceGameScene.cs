@@ -44,8 +44,8 @@ public class SpaceGameScene : Scene<SpaceGameScene>
             0)); 
 
 
-        UICamera.PixelsPerUnit = 1;
-        UICamera.SetTargetVerticalResolution(SpaceGameSettings.TargetUIHeight); // e.g., 720
+        UiCamera.PixelsPerUnit = 1;
+        UiCamera.SetTargetVerticalResolution(SpaceGameSettings.TargetUIHeight); // e.g., 720
     }
     
 

@@ -18,7 +18,6 @@ public class UIRenderPass : RenderPass
     {
         var drawLayers = Scene.Drawables.GetDrawLayers();
         var layerOrder = drawLayers.Keys.OrderBy(x => x).ToList();
-        Scene.UiCamera.SetTargetVerticalResolution(Window.Height);
 
         Device.SetRenderTarget(RenderPipeline.SceneRenderTarget);
         
@@ -33,6 +32,9 @@ public class UIRenderPass : RenderPass
 
             foreach (var drawable  in drawLayers[layerOrder[i]])
             {
+                if (!drawable.Enabled || !drawable.Entity.Enabled)
+                    continue;
+
                 drawable.OnDrawUi();
             }
             

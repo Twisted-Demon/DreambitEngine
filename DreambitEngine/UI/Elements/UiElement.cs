@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Xml;
-using Dreambit.ECS;
 using Microsoft.Xna.Framework;
 
 namespace Dreambit.UI;
@@ -19,12 +18,16 @@ public abstract class UiElement
     private UiAnchor _anchor = UiAnchor.TopLeft;
     private UiAnchor _origin = UiAnchor.TopLeft;
     private int _zIndex = 0;
+    private Rectangle _lastParentBounds;
+    private bool _hasParentBounds;
 
     public UiLength X
     {
         get => _x;
         set
         {
+            if (LengthsEqual(_x, value)) return;
+
             _x = value;
             InvalidateLayout();
         }
@@ -35,6 +38,8 @@ public abstract class UiElement
         get => _y;
         set
         {
+            if (LengthsEqual(_y, value)) return;
+
             _y = value;
             InvalidateLayout();
         }
@@ -44,35 +49,60 @@ public abstract class UiElement
     {
         get => _width;
         set 
-        { 
-            _width = value; 
+        {
+            if (LengthsEqual(_width, value)) return;
+
+            _width = value;
             InvalidateLayout();
-            
         }
     }
 
     public UiLength Height
     {
         get => _height;
-        set { _height = value; InvalidateLayout();}
+        set
+        {
+            if (LengthsEqual(_height, value)) return;
+
+            _height = value;
+            InvalidateLayout();
+        }
     }
 
     public UiAnchor Anchor
     {
         get => _anchor;
-        set { _anchor = value; InvalidateLayout();}
+        set
+        {
+            if (_anchor == value) return;
+
+            _anchor = value;
+            InvalidateLayout();
+        }
     }
 
     public UiAnchor Origin
     {
         get => _origin;
-        set { _origin = value; InvalidateLayout();}
+        set
+        {
+            if (_origin == value) return;
+
+            _origin = value;
+            InvalidateLayout();
+        }
     }
 
     public int ZIndex
     {
         get => _zIndex;
-        set { _zIndex = value; InvalidateLayout();}
+        set
+        {
+            if (_zIndex == value) return;
+
+            _zIndex = value;
+            InvalidateLayout();
+        }
     }
 
     public Rectangle Bounds;
@@ -96,15 +126,31 @@ public abstract class UiElement
     {
         DependenciesDirty = true;
     }
-    
-    public virtual void Arrange(Rectangle parentBounds)
+
+    private static bool LengthsEqual(UiLength left, UiLength right)
     {
-        if (LayoutDirty)
+        return left.IsPercent == right.IsPercent &&
+               Math.Abs(left.Value - right.Value) < float.Epsilon;
+    }
+
+    protected void ArrangeSelf(Rectangle parentBounds)
+    {
+        if (!LayoutDirty &&
+            _hasParentBounds &&
+            _lastParentBounds == parentBounds)
         {
-            CalculateBounds(parentBounds);
-            LayoutDirty = false;
+            return;
         }
         
+        CalculateBounds(parentBounds);
+        _lastParentBounds = parentBounds;
+        _hasParentBounds = true;
+        LayoutDirty = false;
+    }
+
+    public virtual void Arrange(Rectangle parentBounds)
+    {
+        ArrangeSelf(parentBounds);
         // default: arrange children within own bounds
         foreach (var child in Children)
             child.Arrange(Bounds);
@@ -129,7 +175,7 @@ public abstract class UiElement
                 offsetY = 0;
                 break;
             case UiAnchor.TopCenter:
-                offsetX = parentBounds.Width;
+                offsetX = parentBounds.Width / 2;
                 offsetY = 0;
                 break;
             case UiAnchor.TopRight:
@@ -204,15 +250,21 @@ public abstract class UiElement
 
     #region Internal Lifecycle
 
-    public void Update()
+    internal void ResolveDependenciesRecursive()
     {
         if (DependenciesDirty)
         {
             ResolveDependencies();
             DependenciesDirty = false;
         }
-        
-        OnUpdate();
+
+        foreach (var child in Children)
+            child.ResolveDependenciesRecursive();
+    }
+
+    public void Update(in UiInputState input)
+    {
+        OnUpdate(input);
     }
     
     
@@ -220,10 +272,10 @@ public abstract class UiElement
 
     #region Lifecycle Hooks
 
-    protected virtual void OnUpdate() 
+    protected virtual void OnUpdate(in UiInputState input)
     {
-        foreach (var  child in Children)
-            child.Update();
+        foreach (var child in Children)
+            child.Update(input);
     }
 
     public virtual void OnDraw()
@@ -243,7 +295,7 @@ public abstract class UiElement
         Width = ParseLength(ParseString(node, "width", "100%"));
         Height = ParseLength(ParseString(node, "height", "100%"));
         Anchor = ParseAnchor(ParseString(node, "anchor", "TopLeft"));
-        Origin = ParseAnchor(ParseString(node, "origin", "Center"));
+        Origin = ParseAnchor(ParseString(node, "origin", "TopLeft"));
         ZIndex = ParseInt(node, "z", 0);
 
         Parse(node);

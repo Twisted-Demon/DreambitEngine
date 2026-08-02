@@ -9,13 +9,26 @@ public class UiText : UiElement
 {
     public SpriteFontBase Font { get; private set; }
     
-    private string _fontPath;
+    private string _fontPath = "monogram";
     private bool _multiLine = true;
-    private string _text;
-    private float _fontSize;
+    private string _text = string.Empty;
+    private float _fontSize = 12f;
+    private bool _autoResizeHeight = true;
 
-    public bool AutoResizeHeight { get; set; } = true;  
-    public Color TextColor { get; set; }
+    public bool AutoResizeHeight
+    {
+        get => _autoResizeHeight;
+        set
+        {
+            if (_autoResizeHeight == value) return;
+
+            _autoResizeHeight = value;
+            _layoutDirty = true;
+            InvalidateLayout();
+        }
+    }
+
+    public Color TextColor { get; set; } = Color.White;
     public HorizontalAlignment HorizontalAlignment { get; set; } = HorizontalAlignment.Center;
     
     public string Text
@@ -23,7 +36,11 @@ public class UiText : UiElement
         get => _text;
         set
         {
-            _text = value ?? string.Empty;
+            var next = value ?? string.Empty;
+            if(_text == next) return;
+
+            _text = next;
+            _layoutDirty = true;
             InvalidateLayout();
         }
     }
@@ -36,6 +53,7 @@ public class UiText : UiElement
             if(_multiLine == value) return;
             
             _multiLine = value;
+            _layoutDirty = true;
             InvalidateLayout();
         }
     }
@@ -49,7 +67,8 @@ public class UiText : UiElement
                 return;
             
             _fontSize = value;
-            
+
+            _layoutDirty = true;
             InvalidateLayout();
             InvalidateDependencies();
         }
@@ -60,10 +79,14 @@ public class UiText : UiElement
         get => _fontPath;
         set
         {
-            if (_fontPath == value) return;
-            
-            _fontPath = value;
+            var next = value ?? string.Empty;
+            if (_fontPath == next) return;
+
+            _fontPath = next;
             InvalidateDependencies();
+
+            _layoutDirty = true;
+            InvalidateLayout();
         }
     }
     
@@ -77,13 +100,33 @@ public class UiText : UiElement
     public override void Arrange(Rectangle parentBounds)
     {
         base.Arrange(parentBounds);
-        EnsureLayout();
+
+        if (Font is null)
+            return;
+
+        if (_multiLine)
+        {
+            EnsureLayout();
+        }
+        else
+        {
+            _lineHeight = SpriteBatchExtensions.GetLineHeight(Font);
+            _totalHeight = _lineHeight;
+        }
+
+        var measuredHeight = (int)MathF.Ceiling(_totalHeight);
+        if (AutoResizeHeight && Bounds.Height != measuredHeight)
+        {
+            Height = UiLength.Pixels(measuredHeight);
+            base.Arrange(parentBounds);
+        }
     }
 
     public override void ResolveDependencies()
     {
-        if(!string.IsNullOrEmpty(_fontPath))
-            Font = Resources.LoadSpriteFont(_fontPath, FontSize);
+        Font = string.IsNullOrEmpty(_fontPath)
+            ? null
+            : Resources.LoadSpriteFont(_fontPath, FontSize);
     }
 
     private void EnsureLayout()
@@ -99,7 +142,6 @@ public class UiText : UiElement
             _lineWidths.Clear();
             _lineHeight = 0;
             _totalHeight = 0;
-            Height = UiLength.Pixels(0);
             return;
         }
 
@@ -122,24 +164,6 @@ public class UiText : UiElement
 
         _lineHeight = SpriteBatchExtensions.GetLineHeight(Font);
         _totalHeight = _lines.Count * _lineHeight;
-        
-        if(AutoResizeHeight)
-            Height = UiLength.Pixels(_totalHeight);
-    }
-
-    protected override void OnUpdate()
-    {
-        if (Font is null)
-            return;
-        
-        EnsureLayout();
-
-        if (_multiLine) return;
-
-        var lineHeight = SpriteBatchExtensions.GetLineHeight(Font);
-        
-        if(AutoResizeHeight)
-            Height = UiLength.Pixels(lineHeight);
     }
 
     public override void OnDraw()
@@ -226,6 +250,11 @@ public class UiText : UiElement
         Text = ParseString(node, "text", "");
         FontSize = ParseFloat(node, "font-size", 12.0f);
         FontPath = ParseString(node, "font", "monogram");
+        MultiLine = ParseBool(node, "multi-line", MultiLine);
+        AutoResizeHeight = ParseBool(
+            node,
+            "auto-resize-height",
+            AutoResizeHeight);
         HorizontalAlignment = ParseHAlignment(ParseString(node, "horizontal-alignment", "Center"));
         TextColor = ParseColor(node,  "text-color");
     }

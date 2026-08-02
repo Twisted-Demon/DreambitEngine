@@ -128,6 +128,6 @@ public class ParticlesScene : Scene<ParticlesScene>
             windowHeight * 0.5f,
             0));
 
-        UICamera.SetTargetVerticalResolution(windowHeight);
+        UiCamera.SetTargetVerticalResolution(windowHeight);
     }
 }
