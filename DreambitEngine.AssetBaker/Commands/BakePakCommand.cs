@@ -90,13 +90,13 @@ public sealed class BakePakCommand : Command<BakePakSettings>
             catch (Exception e)
             {
                 AnsiConsole.WriteException(e);
-                return 0;
+                return -1;
             }
         }
         
         AnsiConsole.MarkupLine($"[green]Saving [/] {settings.OutputPak}");
         pak.Save(settings.OutputPak);
         
-        return 1;
+        return 0;
     }
 }

@@ -1,0 +1,45 @@
+<Project>
+  <PropertyGroup>
+    <DreambitExamplesContentBuilderProject>$(MSBuildThisFileDirectory)Dreambit.Examples.Content.csproj</DreambitExamplesContentBuilderProject>
+    <DreambitExamplesContentBuilderDll>$(MSBuildThisFileDirectory)bin\$(Configuration)\Dreambit.Examples.Content.dll</DreambitExamplesContentBuilderDll>
+    <DreambitExamplesContentSource>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)\Assets'))</DreambitExamplesContentSource>
+    <DreambitExamplesContentOutput>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\Build\$(Configuration)'))</DreambitExamplesContentOutput>
+    <DreambitExamplesContentIntermediate>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\obj\$(Configuration)\DreambitExamplesContent'))</DreambitExamplesContentIntermediate>
+    <DreambitAssetBakerProject>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)\..\DreambitEngine.AssetBaker\DreambitEngine.AssetBaker.csproj'))</DreambitAssetBakerProject>
+    <DreambitAssetBakerDll>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)\..\DreambitEngine.AssetBaker\Build\$(Configuration)\AssetBaker.dll'))</DreambitAssetBakerDll>
+    <DreambitExamplesPakOutput>$(DreambitExamplesContentOutput)\Content\content.pak</DreambitExamplesPakOutput>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <DreambitExamplesPakInput Include="$(DreambitExamplesContentSource)\**\*.png;$(DreambitExamplesContentSource)\**\*.jpg;$(DreambitExamplesContentSource)\**\*.jpeg;$(DreambitExamplesContentSource)\**\*.bmp;$(DreambitExamplesContentSource)\**\*.tga;$(DreambitExamplesContentSource)\**\*.json;$(DreambitExamplesContentSource)\**\*.ldtk;$(DreambitExamplesContentSource)\**\*.ldtkl;$(DreambitExamplesContentSource)\**\*.yaml;$(DreambitExamplesContentSource)\**\*.yml;$(DreambitExamplesContentSource)\**\*.wav;$(DreambitExamplesContentSource)\**\*.ogg;$(DreambitExamplesContentSource)\**\*.mp3" />
+  </ItemGroup>
+
+  <Target
+    Name="BakeDreambitExamplesPak"
+    Inputs="@(DreambitExamplesPakInput)"
+    Outputs="$(DreambitExamplesPakOutput)">
+    <MSBuild
+      Projects="$(DreambitAssetBakerProject)"
+      Targets="Build"
+      Properties="Configuration=$(Configuration)"
+      RemoveProperties="TargetFramework;RuntimeIdentifier;RuntimeIdentifiers;OutputPath;BaseOutputPath" />
+
+    <Exec Command="dotnet &quot;$(DreambitAssetBakerDll)&quot; bake-pak &quot;$(DreambitExamplesContentSource)&quot; &quot;$(DreambitExamplesPakOutput)&quot;" />
+  </Target>
+
+  <Target
+    Name="BuildDreambitExamplesContent"
+    AfterTargets="Build"
+    DependsOnTargets="BakeDreambitExamplesPak">
+    <MSBuild
+      Projects="$(DreambitExamplesContentBuilderProject)"
+      Targets="Build"
+      Properties="Configuration=$(Configuration)"
+      RemoveProperties="TargetFramework;RuntimeIdentifier;RuntimeIdentifiers;OutputPath;BaseOutputPath" />
+
+    <Exec
+      Command="dotnet &quot;$(DreambitExamplesContentBuilderDll)&quot; build -p &quot;$(MonoGamePlatform)&quot; -s &quot;$(DreambitExamplesContentSource)&quot; -o &quot;$(DreambitExamplesContentOutput)&quot; -i &quot;$(DreambitExamplesContentIntermediate)&quot;"
+      CustomErrorRegularExpression="\[E\] .+"
+      CustomWarningRegularExpression="\[W\] .+" />
+  </Target>
+</Project>

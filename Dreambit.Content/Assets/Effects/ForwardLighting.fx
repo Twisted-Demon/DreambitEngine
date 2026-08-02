@@ -56,6 +56,6 @@ technique MainTechnique
 {
     pass P0
     {
-        PixelShader = compile ps_3_0 MainPS();
+        PixelShader = compile ps_6_0 MainPS();
     }
 }

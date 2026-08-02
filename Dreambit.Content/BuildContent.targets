@@ -1,0 +1,22 @@
+<Project>
+  <PropertyGroup>
+    <DreambitContentBuilderProject>$(MSBuildThisFileDirectory)Dreambit.Content.csproj</DreambitContentBuilderProject>
+    <DreambitContentBuilderDll>$(MSBuildThisFileDirectory)bin\$(Configuration)\Dreambit.Content.dll</DreambitContentBuilderDll>
+    <DreambitContentSource>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)\Assets'))</DreambitContentSource>
+    <DreambitContentOutput>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\Build\$(Configuration)'))</DreambitContentOutput>
+    <DreambitContentIntermediate>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\obj\$(Configuration)\DreambitContent'))</DreambitContentIntermediate>
+  </PropertyGroup>
+
+  <Target Name="BuildDreambitContent" BeforeTargets="BeforeCompile">
+    <MSBuild
+      Projects="$(DreambitContentBuilderProject)"
+      Targets="Build"
+      Properties="Configuration=$(Configuration)"
+      RemoveProperties="TargetFramework;RuntimeIdentifier;RuntimeIdentifiers;OutputPath;BaseOutputPath" />
+
+    <Exec
+      Command="dotnet &quot;$(DreambitContentBuilderDll)&quot; build -p &quot;$(MonoGamePlatform)&quot; -s &quot;$(DreambitContentSource)&quot; -o &quot;$(DreambitContentOutput)&quot; -i &quot;$(DreambitContentIntermediate)&quot;"
+      CustomErrorRegularExpression="\[E\] .+"
+      CustomWarningRegularExpression="\[W\] .+" />
+  </Target>
+</Project>
