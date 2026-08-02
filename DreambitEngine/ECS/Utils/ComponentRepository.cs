@@ -1,11 +1,16 @@
 ﻿using System.Collections.Generic;
+using System.Collections.Concurrent;
+using System.Reflection;
 using Type = System.Type;
 
 namespace Dreambit.ECS;
 
 public class    ComponentRepository
 {
+    private static readonly ConcurrentDictionary<Type, bool> HasOnUpdateOverrideByType = [];
+
     private readonly HashSet<Component> _attachedComponents = [];
+    private readonly HashSet<Component> _updatableComponents = [];
     private readonly HashSet<Component> _componentsToAttach = [];
     private readonly HashSet<Component> _componentsToDetach = [];
     private readonly Logger<ComponentRepository> _logger = new();
@@ -83,6 +88,7 @@ public class    ComponentRepository
         }
 
         _attachedComponents.Clear();
+        _updatableComponents.Clear();
         _componentsToDetach.Clear();
     }
 
@@ -178,13 +184,14 @@ public class    ComponentRepository
     {
         _scene = null;
         _attachedComponents.Clear();
+        _updatableComponents.Clear();
         _componentsToAttach.Clear();
         _componentsToDetach.Clear();
     }
 
     public void UpdateComponents()
     {
-        foreach (var c in _attachedComponents)
+        foreach (var c in _updatableComponents)
             if (c.Enabled)
                 c.Update();
     }
@@ -206,6 +213,9 @@ public class    ComponentRepository
                     _scene.Drawables.Add(dc);
 
                 add.AddToEntity();
+
+                if (OverridesOnUpdate(add.GetType()))
+                    _updatableComponents.Add(add);
             }
 
         _componentsToAttach.Clear();
@@ -214,6 +224,8 @@ public class    ComponentRepository
         foreach (var det in _componentsToDetach)
             if (_attachedComponents.Remove(det))
             {
+                _updatableComponents.Remove(det);
+
                 if (det is DrawableComponent dc && _scene != null)
                     _scene.Drawables.Remove(dc);
 
@@ -224,5 +236,22 @@ public class    ComponentRepository
             }
 
         _componentsToDetach.Clear();
+    }
+
+    private static bool OverridesOnUpdate(Type componentType)
+    {
+        return HasOnUpdateOverrideByType.GetOrAdd(componentType, static type =>
+        {
+            var onUpdate = type.GetMethod(
+                nameof(Component.OnUpdate),
+                BindingFlags.Instance | BindingFlags.Public,
+                null,
+                Type.EmptyTypes,
+                null);
+
+            return onUpdate is not null &&
+                   onUpdate.DeclaringType != typeof(Component) &&
+                   onUpdate.GetBaseDefinition().DeclaringType == typeof(Component);
+        });
     }
 }
