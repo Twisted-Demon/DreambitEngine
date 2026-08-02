@@ -1,5 +1,6 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
+using Dreambit.UI;
 
 namespace Dreambit;
 
@@ -20,11 +21,23 @@ public static class Input
     public static Rectangle WindowClientBounds =>
         new(0, 0, Window.ClientWidth, Window.ClientHeight);
 
-    /// <summary>
-    ///     True when Dreambit's high-polling-rate mouse optimization is active.
-    ///     The latest position and button state are still sampled once per frame.
-    /// </summary>
-    public static bool HighPollingRateMouseOptimizationActive { get; private set; }
+    /// <summary>Gets the device channels consumed by UI during the current frame.</summary>
+    public static UiInputCapture UiCapture { get; private set; }
+
+    /// <summary>Gets whether any UI layout consumed input during this frame.</summary>
+    public static bool IsCapturedByUi => UiCapture != UiInputCapture.None;
+
+    /// <summary>Gets whether UI consumed pointer input during this frame.</summary>
+    public static bool IsPointerCapturedByUi =>
+        UiCapture.HasFlag(UiInputCapture.Pointer);
+
+    /// <summary>Gets whether UI consumed keyboard input during this frame.</summary>
+    public static bool IsKeyboardCapturedByUi =>
+        UiCapture.HasFlag(UiInputCapture.Keyboard);
+
+    /// <summary>Gets whether UI consumed game-pad input during this frame.</summary>
+    public static bool IsGamePadCapturedByUi =>
+        UiCapture.HasFlag(UiInputCapture.GamePad);
 
     #endregion
 
@@ -37,7 +50,10 @@ public static class Input
     // --- Mouse ---
     private static MouseState _prevMs;
     private static MouseState _currMs;
-    private static string _lastMouseOptimizationDiagnostic;
+
+    // --- Game pad ---
+    private static GamePadState _prevGp;
+    private static GamePadState _currGp;
 
     #endregion
 
@@ -48,20 +64,9 @@ public static class Input
     /// </summary>
     public static void Init()
     {
-        HighPollingRateMouseOptimizationActive =
-            HighPollingRateMouse.TryEnable(Core.Instance.Window);
-
-        LogHighPollingRateMouseOptimization();
-
         _prevKb = _currKb = Keyboard.GetState();
-        _prevMs = _currMs = SampleMouseState();
-    }
-
-    internal static void Shutdown()
-    {
-        HighPollingRateMouse.Restore();
-        HighPollingRateMouseOptimizationActive = false;
-        _lastMouseOptimizationDiagnostic = null;
+        _prevMs = _currMs = Mouse.GetState();
+        _prevGp = _currGp = GamePad.GetState(PlayerIndex.One);
     }
 
     /// <summary>
@@ -69,17 +74,10 @@ public static class Input
     /// </summary>
     public static void PreUpdate()
     {
-        if (!HighPollingRateMouseOptimizationActive)
-        {
-            HighPollingRateMouseOptimizationActive =
-                HighPollingRateMouse.TryEnable(Core.Instance.Window);
-
-        }
-
-        LogHighPollingRateMouseOptimization();
-
+        UiCapture = UiInputCapture.None;
         _currKb = Keyboard.GetState();
-        _currMs = SampleMouseState();
+        _currMs = Mouse.GetState();
+        _currGp = GamePad.GetState(PlayerIndex.One);
     }
 
     /// <summary>
@@ -89,6 +87,12 @@ public static class Input
     {
         _prevKb = _currKb;
         _prevMs = _currMs;
+        _prevGp = _currGp;
+    }
+
+    internal static void CaptureForUi(UiInputCapture capture)
+    {
+        UiCapture |= capture;
     }
 
     #endregion
@@ -98,37 +102,88 @@ public static class Input
     /// <summary>True on the frame a key transitions from Up to Down.</summary>
     public static bool IsKeyPressed(Keys key)
     {
-        return !_prevKb.IsKeyDown(key) && _currKb.IsKeyDown(key);
+        return !IsKeyboardCapturedByUi && IsRawKeyPressed(key);
     }
 
     /// <summary>True while the key is held down.</summary>
     public static bool IsKeyHeld(Keys key)
     {
-        return _currKb.IsKeyDown(key);
+        return !IsKeyboardCapturedByUi && IsRawKeyHeld(key);
     }
 
     /// <summary>True on the frame a key transitions from Down to Up.</summary>
     public static bool IsKeyReleased(Keys key)
     {
-        return _prevKb.IsKeyDown(key) && !_currKb.IsKeyDown(key);
+        return !IsKeyboardCapturedByUi && IsRawKeyReleased(key);
     }
 
     /// <summary>True while either Shift key is down.</summary>
     public static bool IsShiftDown()
     {
-        return _currKb.IsKeyDown(Keys.LeftShift) || _currKb.IsKeyDown(Keys.RightShift);
+        return !IsKeyboardCapturedByUi && IsRawShiftDown();
     }
 
     /// <summary>True while either Ctrl key is down.</summary>
     public static bool IsCtrlDown()
     {
-        return _currKb.IsKeyDown(Keys.LeftControl) || _currKb.IsKeyDown(Keys.RightControl);
+        return !IsKeyboardCapturedByUi &&
+               (_currKb.IsKeyDown(Keys.LeftControl) ||
+                _currKb.IsKeyDown(Keys.RightControl));
     }
 
     /// <summary>True while either Alt key is down.</summary>
     public static bool IsAltDown()
     {
-        return _currKb.IsKeyDown(Keys.LeftAlt) || _currKb.IsKeyDown(Keys.RightAlt);
+        return !IsKeyboardCapturedByUi &&
+               (_currKb.IsKeyDown(Keys.LeftAlt) ||
+                _currKb.IsKeyDown(Keys.RightAlt));
+    }
+
+    internal static bool IsRawKeyPressed(Keys key)
+    {
+        return !_prevKb.IsKeyDown(key) && _currKb.IsKeyDown(key);
+    }
+
+    internal static bool IsRawKeyHeld(Keys key)
+    {
+        return _currKb.IsKeyDown(key);
+    }
+
+    internal static bool IsRawKeyReleased(Keys key)
+    {
+        return _prevKb.IsKeyDown(key) && !_currKb.IsKeyDown(key);
+    }
+
+    internal static bool IsRawShiftDown()
+    {
+        return _currKb.IsKeyDown(Keys.LeftShift) ||
+               _currKb.IsKeyDown(Keys.RightShift);
+    }
+
+    internal static Keys[] GetRawPressedKeys()
+    {
+        var heldKeys = _currKb.GetPressedKeys();
+        var pressedKeys = new System.Collections.Generic.List<Keys>(heldKeys.Length);
+        foreach (var key in heldKeys)
+        {
+            if (!_prevKb.IsKeyDown(key))
+                pressedKeys.Add(key);
+        }
+
+        return pressedKeys.ToArray();
+    }
+
+    internal static Keys[] GetRawReleasedKeys()
+    {
+        var previousKeys = _prevKb.GetPressedKeys();
+        var releasedKeys = new System.Collections.Generic.List<Keys>(previousKeys.Length);
+        foreach (var key in previousKeys)
+        {
+            if (!_currKb.IsKeyDown(key))
+                releasedKeys.Add(key);
+        }
+
+        return releasedKeys.ToArray();
     }
 
     #endregion
@@ -144,6 +199,14 @@ public static class Input
     /// <summary>Returns per-frame mouse movement delta (pixels).</summary>
     public static Vector2 GetMouseDelta()
     {
+        if (IsPointerCapturedByUi)
+            return Vector2.Zero;
+
+        return GetRawMouseDelta();
+    }
+
+    internal static Vector2 GetRawMouseDelta()
+    {
         var dx = _currMs.X - _prevMs.X;
         var dy = _currMs.Y - _prevMs.Y;
         return new Vector2(dx, dy);
@@ -153,6 +216,13 @@ public static class Input
     ///     Returns scroll delta this frame (Positive = up, Negative = down).
     /// </summary>
     public static int GetScrollDelta()
+    {
+        return IsPointerCapturedByUi
+            ? 0
+            : GetRawScrollDelta();
+    }
+
+    internal static int GetRawScrollDelta()
     {
         return _currMs.ScrollWheelValue - _prevMs.ScrollWheelValue;
     }
@@ -167,17 +237,32 @@ public static class Input
     /// <summary>True on the frame the specified mouse button is pressed.</summary>
     public static bool IsMousePressed(MouseButton button)
     {
-        return !WasDown(_prevMs, button) && IsDown(_currMs, button);
+        return !IsPointerCapturedByUi && IsRawMousePressed(button);
     }
 
     /// <summary>True on the frame the specified mouse button is released.</summary>
     public static bool IsMouseReleased(MouseButton button)
     {
-        return WasDown(_prevMs, button) && !IsDown(_currMs, button);
+        return !IsPointerCapturedByUi && IsRawMouseReleased(button);
     }
 
     /// <summary>True while the specified mouse button is held.</summary>
     public static bool IsMouseHeld(MouseButton button)
+    {
+        return !IsPointerCapturedByUi && IsRawMouseHeld(button);
+    }
+
+    internal static bool IsRawMousePressed(MouseButton button)
+    {
+        return !WasDown(_prevMs, button) && IsDown(_currMs, button);
+    }
+
+    internal static bool IsRawMouseReleased(MouseButton button)
+    {
+        return WasDown(_prevMs, button) && !IsDown(_currMs, button);
+    }
+
+    internal static bool IsRawMouseHeld(MouseButton button)
     {
         return IsDown(_currMs, button);
     }
@@ -250,30 +335,84 @@ public static class Input
 
     #endregion
 
+    #region Game Pad Helpers
+
+    /// <summary>Gets whether the primary game pad is connected.</summary>
+    public static bool IsGamePadConnected()
+    {
+        return _currGp.IsConnected;
+    }
+
+    /// <summary>Gets whether a primary game-pad button was pressed this frame.</summary>
+    public static bool IsGamePadButtonPressed(Buttons button)
+    {
+        return !IsGamePadCapturedByUi && IsRawGamePadButtonPressed(button);
+    }
+
+    /// <summary>Gets whether a primary game-pad button is held.</summary>
+    public static bool IsGamePadButtonHeld(Buttons button)
+    {
+        return !IsGamePadCapturedByUi && IsRawGamePadButtonHeld(button);
+    }
+
+    /// <summary>Gets whether a primary game-pad button was released this frame.</summary>
+    public static bool IsGamePadButtonReleased(Buttons button)
+    {
+        return !IsGamePadCapturedByUi && IsRawGamePadButtonReleased(button);
+    }
+
+    /// <summary>Gets the primary game pad's left stick, or zero when UI consumed it.</summary>
+    public static Vector2 GetGamePadLeftStick()
+    {
+        return IsGamePadCapturedByUi
+            ? Vector2.Zero
+            : _currGp.ThumbSticks.Left;
+    }
+
+    internal static bool IsRawGamePadButtonPressed(Buttons button)
+    {
+        return !_prevGp.IsButtonDown(button) && _currGp.IsButtonDown(button);
+    }
+
+    internal static bool IsRawGamePadButtonHeld(Buttons button)
+    {
+        return _currGp.IsButtonDown(button);
+    }
+
+    internal static bool IsRawGamePadButtonReleased(Buttons button)
+    {
+        return _prevGp.IsButtonDown(button) && !_currGp.IsButtonDown(button);
+    }
+
+    internal static Vector2 GetRawGamePadLeftStick()
+    {
+        return _currGp.ThumbSticks.Left;
+    }
+
+    internal static bool IsRawLeftStickDirectionPressed(
+        UiNavigationDirection direction,
+        float threshold = 0.5f)
+    {
+        var previous = _prevGp.ThumbSticks.Left;
+        var current = _currGp.ThumbSticks.Left;
+
+        return direction switch
+        {
+            UiNavigationDirection.Left =>
+                current.X <= -threshold && previous.X > -threshold,
+            UiNavigationDirection.Right =>
+                current.X >= threshold && previous.X < threshold,
+            UiNavigationDirection.Up =>
+                current.Y >= threshold && previous.Y < threshold,
+            UiNavigationDirection.Down =>
+                current.Y <= -threshold && previous.Y > -threshold,
+            _ => false
+        };
+    }
+
+    #endregion
+
     #region Internals
-
-    private static void LogHighPollingRateMouseOptimization()
-    {
-        var diagnostic = HighPollingRateMouse.Diagnostic;
-
-        if (_lastMouseOptimizationDiagnostic == diagnostic)
-            return;
-
-        _lastMouseOptimizationDiagnostic = diagnostic;
-        Core.Logger.Debug(
-            $"High-polling-rate mouse optimization: {HighPollingRateMouseOptimizationActive}");
-        Core.Logger.Debug($"Mouse input path: {diagnostic}");
-    }
-
-    private static MouseState SampleMouseState()
-    {
-        var state = Mouse.GetState();
-
-        if (!HighPollingRateMouse.TryGetState(out var optimizedState))
-            return state;
-
-        return optimizedState;
-    }
 
     /// <summary>Returns true if the button is down for the given <see cref="MouseState" />.</summary>
     private static bool IsDown(in MouseState ms, MouseButton button)

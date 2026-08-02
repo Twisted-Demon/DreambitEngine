@@ -12,6 +12,12 @@ public class UiButton : UiContentControl
 {
     private bool _pressStartedInside;
 
+    /// <summary>Creates a focusable button that participates in pointer hit testing.</summary>
+    public UiButton()
+    {
+        IsFocusable = true;
+    }
+
     /// <summary>Raised after a press begins inside and is released inside the button.</summary>
     public event Action<UiButton> Clicked;
 
@@ -23,26 +29,49 @@ public class UiButton : UiContentControl
     public Color HoverTint { get; set; } = Color.LightGray;
     /// <summary>Gets or sets the background tint used while pressed.</summary>
     public Color PressedTint { get; set; } = Color.Gray;
+    /// <summary>Gets or sets the background tint used while keyboard/controller focused.</summary>
+    public Color FocusedTint { get; set; } = Color.LightGray;
 
     /// <inheritdoc />
-    protected override void OnUpdate(in UiInputState input)
+    protected override void OnPointerPressed(UiPointerEventArgs args)
     {
-        base.OnUpdate(input);
+        _pressStartedInside = args.IsInside;
+        IsPressed = _pressStartedInside;
 
-        IsHovered = input.PointerInWindow &&
-                    Bounds.Contains(input.PointerPosition.ToPoint());
+        if (_pressStartedInside)
+            args.CapturePointer();
 
-        if (input.PrimaryPressed)
-            _pressStartedInside = IsHovered;
+        args.Handled = true;
+    }
 
-        IsPressed = _pressStartedInside && input.PrimaryHeld;
-
-        if (!input.PrimaryReleased)
-            return;
-
-        if (_pressStartedInside && IsHovered)
+    /// <inheritdoc />
+    protected override void OnPointerReleased(UiPointerEventArgs args)
+    {
+        if (_pressStartedInside && IsPointerOver)
             Clicked?.Invoke(this);
 
+        _pressStartedInside = false;
+        IsPressed = false;
+        args.ReleasePointerCapture();
+        args.Handled = true;
+    }
+
+    /// <inheritdoc />
+    protected override void OnPointerOverChanged(bool isPointerOver)
+    {
+        IsHovered = isPointerOver;
+    }
+
+    /// <inheritdoc />
+    protected override void OnActivated(UiCommandEventArgs args)
+    {
+        Clicked?.Invoke(this);
+        args.Handled = true;
+    }
+
+    /// <inheritdoc />
+    protected internal override void OnPointerCaptureLost()
+    {
         _pressStartedInside = false;
         IsPressed = false;
     }
@@ -54,7 +83,9 @@ public class UiButton : UiContentControl
             ? PressedTint
             : IsHovered
                 ? HoverTint
-                : BackgroundTint;
+                : IsFocused
+                    ? FocusedTint
+                    : BackgroundTint;
     }
 
     /// <inheritdoc />
@@ -67,6 +98,9 @@ public class UiButton : UiContentControl
 
         if (node.Attributes?["pressed-tint"] is not null)
             PressedTint = UiXmlParser.ParseColor(node, "pressed-tint");
+
+        if (node.Attributes?["focused-tint"] is not null)
+            FocusedTint = UiXmlParser.ParseColor(node, "focused-tint");
     }
     
 }

@@ -13,6 +13,12 @@ public class UiContentControl : UiContainer
 {
     private IUiBrush _background;
 
+    /// <summary>Creates a single-content control that participates in hit testing.</summary>
+    public UiContentControl()
+    {
+        IsHitTestVisible = true;
+    }
+
     /// <summary>Gets the single element hosted by this control.</summary>
     public UiElement Content => Children.Count == 0
         ? null
@@ -62,19 +68,32 @@ public class UiContentControl : UiContainer
     public void SetContent(UiElement content)
     {
         if (Content is not null)
+        {
             Content.Parent = null;
+            Content.AttachToLayout(null);
+        }
 
         Children.Clear();
 
         if (content is not null)
             AddChild(content);
         else
+        {
             InvalidateLayout();
+        }
+
+        Layout?.ValidateInteractionState();
     }
 
     /// <inheritdoc />
     public override void Arrange(Rectangle parentBounds)
     {
+        if (!IsEffectivelyVisible)
+        {
+            Bounds = Rectangle.Empty;
+            return;
+        }
+
         ArrangeSelf(parentBounds, Width.IsAuto || Height.IsAuto);
 
         if (Content is null)

@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Linq;
 using Microsoft.Xna.Framework;
 
 namespace Dreambit.UI;
@@ -16,6 +15,7 @@ public class UiContainer : UiElement
         ArgumentNullException.ThrowIfNull(child);
 
         child.Parent = this;
+        child.AttachToLayout(Layout);
         Children.Add(child);
         InvalidateLayout();
     }
@@ -28,6 +28,9 @@ public class UiContainer : UiElement
 
         foreach (var child in Children)
         {
+            if (!child.IsVisible)
+                continue;
+
             child.Measure(availableSize);
             width = Math.Max(
                 width,
@@ -39,17 +42,4 @@ public class UiContainer : UiElement
 
         return new Point(width, height);
     }
-
-    /// <inheritdoc />
-    public override void OnDraw()
-    {
-        base.OnDraw();
-        
-        // sort children by ZIndex and draw
-        var ordered = Children.OrderBy(c => c.ZIndex).ToList();
-
-        foreach (var child in ordered)
-            child.OnDraw();
-    }
-    
 }

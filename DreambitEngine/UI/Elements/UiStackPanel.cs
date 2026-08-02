@@ -70,6 +70,12 @@ public abstract class UiStackPanelBase : UiContainer
     /// <inheritdoc />
     public override void Arrange(Rectangle parentBounds)
     {
+        if (!IsEffectivelyVisible)
+        {
+            Bounds = Rectangle.Empty;
+            return;
+        }
+
         // Auto-sized panels must remeasure even when their parent rectangle has
         // not changed, because a child's content may have changed.
         ArrangeSelf(parentBounds, Width.IsAuto || Height.IsAuto);
@@ -83,6 +89,9 @@ public abstract class UiStackPanelBase : UiContainer
 
         foreach (var child in Children)
         {
+            if (!child.IsVisible)
+                continue;
+
             SetChildPosition(child, cursor);
             child.Arrange(innerBounds);
 
@@ -137,16 +146,21 @@ public abstract class UiStackPanelBase : UiContainer
     private int MeasureChildren(Rectangle innerBounds)
     {
         var contentLength = 0;
+        var visibleChildren = 0;
 
         foreach (var child in Children)
         {
+            if (!child.IsVisible)
+                continue;
+
             ApplyAutomaticCrossSize(child, innerBounds);
             child.Measure(innerBounds.Size);
             contentLength += GetMainLength(child.DesiredSize);
+            visibleChildren++;
         }
 
-        if (Children.Count > 1)
-            contentLength += Spacing * (Children.Count - 1);
+        if (visibleChildren > 1)
+            contentLength += Spacing * (visibleChildren - 1);
 
         return contentLength;
     }
@@ -242,7 +256,12 @@ public abstract class UiStackPanelBase : UiContainer
     {
         var width = 0;
         foreach (var child in Children)
+        {
+            if (!child.IsVisible)
+                continue;
+
             width = Math.Max(width, child.DesiredSize.X);
+        }
 
         return width;
     }
@@ -251,7 +270,12 @@ public abstract class UiStackPanelBase : UiContainer
     {
         var height = 0;
         foreach (var child in Children)
+        {
+            if (!child.IsVisible)
+                continue;
+
             height = Math.Max(height, child.DesiredSize.Y);
+        }
 
         return height;
     }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Dreambit.ECS;
 using Dreambit.Scripting;
+using Dreambit.UI;
 using Microsoft.Xna.Framework;
 
 namespace Dreambit;
@@ -214,8 +215,74 @@ public class Scene : IDisposable
     {
         
         ScriptingManager.Update();
-        Entities.OnTick();
+        Entities.Tick();
         _coroutineScheduler.Update();
+    }
+
+    /// <summary>
+    /// Routes raw input through UI frames from front to back before gameplay
+    /// action maps and components are updated.
+    /// </summary>
+    internal void RouteUiInput()
+    {
+        if (State != SceneState.Running)
+            return;
+
+        var frameEntries = Drawables.GetAllUiFrames()
+            .Select((frame, index) => (frame, index))
+            .ToList();
+
+        foreach (var item in frameEntries)
+        {
+            if (!item.Item1.Enabled || item.Item1.Entity?.Enabled != true)
+                item.Item1.Layout?.ClearInteractionState();
+        }
+
+        var frames = frameEntries
+            .Where(item =>
+                item.Item1.Enabled &&
+                item.Item1.Entity?.Enabled == true)
+            .OrderByDescending(item =>
+                item.Item1.Layout?.IsPointerInputCaptured == true)
+            .ThenByDescending(item => item.Item1.DrawLayer)
+            .ThenByDescending(item => item.index)
+            .ToList();
+
+        var consumed = UiInputCapture.None;
+        var focusedFrame = frames
+            .Select(item => item.Item1)
+            .FirstOrDefault(frame => frame.Layout?.FocusedElement is not null);
+        UiFrame pointerPressOwner = null;
+        foreach (var item in frames)
+        {
+            var available = UiInputCapture.All & ~consumed;
+            if (focusedFrame is not null &&
+                !ReferenceEquals(item.Item1, focusedFrame))
+            {
+                available &= ~(UiInputCapture.Keyboard | UiInputCapture.GamePad);
+            }
+
+            var frameCapture = item.Item1.RouteInput(available);
+            consumed |= frameCapture;
+
+            if (pointerPressOwner is null &&
+                Input.IsRawMousePressed(MouseButton.Left) &&
+                frameCapture.HasFlag(UiInputCapture.Pointer))
+            {
+                pointerPressOwner = item.Item1;
+            }
+        }
+
+        if (pointerPressOwner is not null)
+        {
+            foreach (var item in frames)
+            {
+                if (!ReferenceEquals(item.Item1, pointerPressOwner))
+                    item.Item1.Layout?.ClearFocus();
+            }
+        }
+
+        Input.CaptureForUi(consumed);
     }
 
     private void EndOfFrame()
@@ -299,7 +366,7 @@ public class Scene : IDisposable
         if (State == SceneState.Running)
         {
             OnPhysicsUpdate();
-            Entities.OnPhysicsTick();
+            Entities.PhysicsTick();
             _coroutineScheduler.FixedUpdate();
         }
     }

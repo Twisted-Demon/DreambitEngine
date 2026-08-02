@@ -79,13 +79,15 @@ public class Core : Game
 
         UpdateDebug();
         
+        InputSystem.Instance.PreUpdate();
+        CurrentScene?.RouteUiInput();
         InputSystem.Instance.Update();
         {
             if (NextScene != null)
                 ChangeScenes();
 
             HandlePhysics();
-            CurrentScene.Tick();
+            CurrentScene?.Tick();
         }
         InputSystem.Instance.PostUpdate();
 
@@ -120,7 +122,6 @@ public class Core : Game
     protected override void OnExiting(object sender, ExitingEventArgs args)
     {
         CurrentScene?.Terminate();
-        Input.Shutdown();
         SpriteBatch.Dispose();
         base.OnExiting(sender, args);
     }

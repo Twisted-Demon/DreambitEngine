@@ -217,14 +217,14 @@ public class EntityRepository
         _entitiesToDestroySet.Clear();
     }
 
-    internal void OnTick()
+    internal void Tick()
     {
         HandleEntityCreations();
         UpdateEntities();
         HandleEntityDeletions();
     }
 
-    internal void OnPhysicsTick()
+    internal void PhysicsTick()
     {
         PhysicsUpdateEntities();
     }

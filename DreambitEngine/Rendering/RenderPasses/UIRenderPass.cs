@@ -8,10 +8,17 @@ namespace Dreambit;
 [SuppressMessage("ReSharper", "InconsistentNaming")]
 public class UIRenderPass : RenderPass
 {
+    private RasterizerState _scissorRasterizerState;
+
     public override void Initialize()
     {
         base.Initialize();
         Order = 2;
+        _scissorRasterizerState = new RasterizerState
+        {
+            CullMode = CullMode.None,
+            ScissorTestEnable = true
+        };
     }
 
     private void DrawUIComponents()
@@ -25,9 +32,10 @@ public class UIRenderPass : RenderPass
         {
             Core.SpriteBatch.Begin(
                 transformMatrix: Scene.UiCamera.TopLeftTransformMatrix,
-                sortMode: SpriteSortMode.Deferred,
+                sortMode: SpriteSortMode.Immediate,
                 samplerState: Scene.RenderingOptions.UISamplerState,
                 blendState: BlendState.AlphaBlend,
+                rasterizerState: _scissorRasterizerState,
                 effect: DefaultEffect);
 
             foreach (var drawable  in drawLayers[layerOrder[i]])
@@ -45,5 +53,12 @@ public class UIRenderPass : RenderPass
     public override void OnDraw()
     {
         DrawUIComponents();
+    }
+
+    protected override void OnDisposing()
+    {
+        _scissorRasterizerState?.Dispose();
+        _scissorRasterizerState = null;
+        base.OnDisposing();
     }
 }

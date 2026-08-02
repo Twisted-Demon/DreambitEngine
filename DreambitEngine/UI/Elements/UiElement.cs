@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Xml;
 using Microsoft.Xna.Framework;
 
@@ -15,6 +16,15 @@ public abstract class UiElement
     public string Id;
     /// <summary>Gets or sets the container that owns this element.</summary>
     public UiContainer Parent;
+
+    private bool _isVisible = true;
+    private bool _isEnabled = true;
+    private bool _isHitTestVisible;
+    private bool _isFocusable;
+    private bool _capturesKeyboardInput;
+    private bool _clipToBounds;
+
+    internal UiLayout Layout { get; private set; }
     
     private UiLength _x = UiLength.Pixels(0);
     private UiLength _y = UiLength.Pixels(0);
@@ -27,6 +37,118 @@ public abstract class UiElement
     private bool _hasParentBounds;
     private Point _lastMeasureAvailableSize;
     private bool _hasMeasure;
+
+    /// <summary>
+    /// Gets or sets whether this element and its subtree participate in layout,
+    /// drawing, and input.
+    /// </summary>
+    public bool IsVisible
+    {
+        get => _isVisible;
+        set
+        {
+            if (_isVisible == value)
+                return;
+
+            _isVisible = value;
+            InvalidateLayout();
+            Layout?.ValidateInteractionState();
+        }
+    }
+
+    /// <summary>Gets or sets whether this element and its subtree can receive input.</summary>
+    public bool IsEnabled
+    {
+        get => _isEnabled;
+        set
+        {
+            if (_isEnabled == value)
+                return;
+
+            _isEnabled = value;
+            Layout?.ValidateInteractionState();
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets whether this element can be the direct target of pointer
+    /// input. Descendants retain their own hit-test settings.
+    /// </summary>
+    public bool IsHitTestVisible
+    {
+        get => _isHitTestVisible;
+        set => _isHitTestVisible = value;
+    }
+
+    /// <summary>Gets or sets whether keyboard or controller focus can move to this element.</summary>
+    public bool IsFocusable
+    {
+        get => _isFocusable;
+        set
+        {
+            if (_isFocusable == value)
+                return;
+
+            _isFocusable = value;
+            Layout?.ValidateInteractionState();
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets whether this element consumes all keyboard input while it
+    /// owns focus, as required by controls such as text fields.
+    /// </summary>
+    public bool CapturesKeyboardInput
+    {
+        get => _capturesKeyboardInput;
+        set => _capturesKeyboardInput = value;
+    }
+
+    /// <summary>Gets or sets whether descendants are clipped to this element's bounds.</summary>
+    public bool ClipToBounds
+    {
+        get => _clipToBounds;
+        set => _clipToBounds = value;
+    }
+
+    /// <summary>Gets whether this element currently owns keyboard/controller focus.</summary>
+    public bool IsFocused { get; private set; }
+
+    /// <summary>Gets whether the pointer is over this element or one of its descendants.</summary>
+    public bool IsPointerOver { get; private set; }
+
+    /// <summary>Raised when the primary pointer button is pressed over this element.</summary>
+    public event EventHandler<UiPointerEventArgs> PointerPressed;
+
+    /// <summary>Raised when the primary pointer button is released for this element.</summary>
+    public event EventHandler<UiPointerEventArgs> PointerReleased;
+
+    /// <summary>Raised when the pointer moves over this element or while it owns capture.</summary>
+    public event EventHandler<UiPointerEventArgs> PointerMoved;
+
+    /// <summary>Raised when the pointer wheel moves over this element.</summary>
+    public event EventHandler<UiPointerEventArgs> PointerWheelChanged;
+
+    /// <summary>Raised when a key is pressed while this element is on the focus route.</summary>
+    public event EventHandler<UiKeyEventArgs> KeyPressed;
+
+    /// <summary>Raised when a key is released while this element is on the focus route.</summary>
+    public event EventHandler<UiKeyEventArgs> KeyReleased;
+
+    /// <summary>Raised when directional focus navigation is requested.</summary>
+    public event EventHandler<UiNavigationEventArgs> NavigationRequested;
+
+    /// <summary>Raised when the focused element is activated.</summary>
+    public event EventHandler<UiCommandEventArgs> Activated;
+
+    /// <summary>Raised when the focused element receives a cancel command.</summary>
+    public event EventHandler<UiCommandEventArgs> Cancelled;
+
+    /// <summary>Raised when this element receives focus.</summary>
+    public event EventHandler GotFocus;
+
+    /// <summary>Raised when this element loses focus.</summary>
+    public event EventHandler LostFocus;
 
     /// <summary>Gets or sets the horizontal offset relative to the parent.</summary>
     public UiLength X
@@ -148,6 +270,46 @@ public abstract class UiElement
         DependenciesDirty = true;
     }
 
+    /// <summary>Gets whether this element and all of its ancestors are visible.</summary>
+    public bool IsEffectivelyVisible =>
+        IsVisible && (Parent?.IsEffectivelyVisible ?? true);
+
+    /// <summary>Gets whether this element and all of its ancestors are enabled.</summary>
+    public bool IsEffectivelyEnabled =>
+        IsEnabled && (Parent?.IsEffectivelyEnabled ?? true);
+
+    /// <summary>Attempts to move keyboard/controller focus to this element.</summary>
+    /// <returns><see langword="true"/> when this element received focus.</returns>
+    public bool Focus()
+    {
+        return Layout?.Focus(this) ?? false;
+    }
+
+    /// <summary>Attempts to capture subsequent pointer events to this element.</summary>
+    /// <returns><see langword="true"/> when this element owns pointer capture.</returns>
+    public bool CapturePointer()
+    {
+        return Layout?.CapturePointer(this) ?? false;
+    }
+
+    /// <summary>Releases pointer capture when this element owns it.</summary>
+    public void ReleasePointerCapture()
+    {
+        Layout?.ReleasePointerCapture(this);
+    }
+
+    internal void AttachToLayout(UiLayout layout)
+    {
+        var previousLayout = Layout;
+        Layout = layout;
+
+        foreach (var child in Children)
+            child.AttachToLayout(layout);
+
+        if (!ReferenceEquals(previousLayout, layout))
+            previousLayout?.ValidateInteractionState();
+    }
+
     private static bool LengthsEqual(UiLength left, UiLength right)
     {
         return left.IsAuto == right.IsAuto &&
@@ -187,6 +349,14 @@ public abstract class UiElement
     /// <param name="availableSize">The maximum width and height offered by the parent.</param>
     public void Measure(Point availableSize)
     {
+        if (!IsEffectivelyVisible)
+        {
+            DesiredSize = Point.Zero;
+            _lastMeasureAvailableSize = availableSize;
+            _hasMeasure = true;
+            return;
+        }
+
         availableSize = new Point(
             Math.Max(0, availableSize.X),
             Math.Max(0, availableSize.Y));
@@ -213,6 +383,12 @@ public abstract class UiElement
     /// <param name="parentBounds">The rectangle available from the parent.</param>
     public virtual void Arrange(Rectangle parentBounds)
     {
+        if (!IsEffectivelyVisible)
+        {
+            Bounds = Rectangle.Empty;
+            return;
+        }
+
         ArrangeSelf(parentBounds, Width.IsAuto || Height.IsAuto);
         // default: arrange children within own bounds
         foreach (var child in Children)
@@ -357,6 +533,9 @@ public abstract class UiElement
     /// <param name="input">The pointer state for the current frame.</param>
     public void Update(in UiInputState input)
     {
+        if (!IsEffectivelyVisible || !IsEffectivelyEnabled)
+            return;
+
         OnUpdate(input);
     }
     
@@ -373,11 +552,150 @@ public abstract class UiElement
             child.Update(input);
     }
 
-    /// <summary>Draws this element. Containers are responsible for drawing their children.</summary>
+    /// <summary>Draws this element before the UI system draws its children.</summary>
     public virtual void OnDraw()
     {
         
     }
+
+    internal void DrawRecursive(UiDrawContext context)
+    {
+        if (!IsEffectivelyVisible)
+            return;
+
+        var pushedClip = ClipToBounds;
+        if (pushedClip)
+            context.PushClip(Bounds);
+
+        if (!context.IsEmpty)
+        {
+            OnDraw();
+
+            var orderedChildren = Children
+                .Select((child, index) => (child, index))
+                .OrderBy(item => item.child.ZIndex)
+                .ThenBy(item => item.index);
+
+            foreach (var item in orderedChildren)
+                item.child.DrawRecursive(context);
+        }
+
+        if (pushedClip)
+            context.PopClip();
+    }
+
+    internal void SetFocused(bool value)
+    {
+        if (IsFocused == value)
+            return;
+
+        IsFocused = value;
+        OnFocusChanged(value);
+
+        if (value)
+            GotFocus?.Invoke(this, EventArgs.Empty);
+        else
+            LostFocus?.Invoke(this, EventArgs.Empty);
+    }
+
+    internal void SetPointerOver(bool value)
+    {
+        if (IsPointerOver == value)
+            return;
+
+        IsPointerOver = value;
+        OnPointerOverChanged(value);
+    }
+
+    internal void RaisePointerPressed(UiPointerEventArgs args)
+    {
+        OnPointerPressed(args);
+        PointerPressed?.Invoke(this, args);
+    }
+
+    internal void RaisePointerReleased(UiPointerEventArgs args)
+    {
+        OnPointerReleased(args);
+        PointerReleased?.Invoke(this, args);
+    }
+
+    internal void RaisePointerMoved(UiPointerEventArgs args)
+    {
+        OnPointerMoved(args);
+        PointerMoved?.Invoke(this, args);
+    }
+
+    internal void RaisePointerWheelChanged(UiPointerEventArgs args)
+    {
+        OnPointerWheelChanged(args);
+        PointerWheelChanged?.Invoke(this, args);
+    }
+
+    internal void RaiseKeyPressed(UiKeyEventArgs args)
+    {
+        OnKeyPressed(args);
+        KeyPressed?.Invoke(this, args);
+    }
+
+    internal void RaiseKeyReleased(UiKeyEventArgs args)
+    {
+        OnKeyReleased(args);
+        KeyReleased?.Invoke(this, args);
+    }
+
+    internal void RaiseNavigationRequested(UiNavigationEventArgs args)
+    {
+        OnNavigationRequested(args);
+        NavigationRequested?.Invoke(this, args);
+    }
+
+    internal void RaiseActivated(UiCommandEventArgs args)
+    {
+        OnActivated(args);
+        Activated?.Invoke(this, args);
+    }
+
+    internal void RaiseCancelled(UiCommandEventArgs args)
+    {
+        OnCancelled(args);
+        Cancelled?.Invoke(this, args);
+    }
+
+    /// <summary>Handles a routed primary-pointer press.</summary>
+    protected virtual void OnPointerPressed(UiPointerEventArgs args) { }
+
+    /// <summary>Handles a routed primary-pointer release.</summary>
+    protected virtual void OnPointerReleased(UiPointerEventArgs args) { }
+
+    /// <summary>Handles routed pointer movement.</summary>
+    protected virtual void OnPointerMoved(UiPointerEventArgs args) { }
+
+    /// <summary>Handles routed pointer-wheel movement.</summary>
+    protected virtual void OnPointerWheelChanged(UiPointerEventArgs args) { }
+
+    /// <summary>Handles a routed key press.</summary>
+    protected virtual void OnKeyPressed(UiKeyEventArgs args) { }
+
+    /// <summary>Handles a routed key release.</summary>
+    protected virtual void OnKeyReleased(UiKeyEventArgs args) { }
+
+    /// <summary>Handles directional navigation before default focus movement.</summary>
+    protected virtual void OnNavigationRequested(UiNavigationEventArgs args) { }
+
+    /// <summary>Handles activation of this focused element.</summary>
+    protected virtual void OnActivated(UiCommandEventArgs args) { }
+
+    /// <summary>Handles cancellation on this focused element.</summary>
+    protected virtual void OnCancelled(UiCommandEventArgs args) { }
+
+    /// <summary>Responds when this element gains or loses focus.</summary>
+    protected virtual void OnFocusChanged(bool isFocused) { }
+
+    /// <summary>Responds when the pointer enters or leaves this element's route.</summary>
+    protected virtual void OnPointerOverChanged(bool isPointerOver) { }
+
+    /// <summary>Responds when pointer capture is removed from this element.</summary>
+    protected internal virtual void OnPointerCaptureLost() { }
     
 
     #endregion
@@ -401,6 +719,24 @@ public abstract class UiElement
         Origin = UiXmlParser.ParseAnchor(
             UiXmlParser.ParseString(node, "origin", "TopLeft"));
         ZIndex = UiXmlParser.ParseInt(node, "z", 0);
+        IsVisible = UiXmlParser.ParseBool(node, "is-visible", true);
+        IsEnabled = UiXmlParser.ParseBool(node, "is-enabled", true);
+        IsHitTestVisible = UiXmlParser.ParseBool(
+            node,
+            "is-hit-test-visible",
+            IsHitTestVisible);
+        IsFocusable = UiXmlParser.ParseBool(
+            node,
+            "is-focusable",
+            IsFocusable);
+        CapturesKeyboardInput = UiXmlParser.ParseBool(
+            node,
+            "captures-keyboard-input",
+            CapturesKeyboardInput);
+        ClipToBounds = UiXmlParser.ParseBool(
+            node,
+            "clip-to-bounds",
+            false);
 
         Parse(node);
     }

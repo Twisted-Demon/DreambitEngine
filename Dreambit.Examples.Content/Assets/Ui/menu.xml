@@ -21,6 +21,7 @@
                 height="32"
                 background-tint="#FFFFFF"
                 hover-tint="#D8E8FF"
+                focused-tint="#D8E8FF"
                 pressed-tint="#9FB9D4">
 
             <Text width="*"
@@ -36,6 +37,7 @@
                 height="32"
                 background-tint="#FFFFFF"
                 hover-tint="#D8E8FF"
+                focused-tint="#D8E8FF"
                 pressed-tint="#9FB9D4">
             <Button.Background>
                 <SpriteBrush sprite="Ui/red-button.sprite" />
@@ -54,6 +56,7 @@
                 height="32"
                 background-tint="#FFFFFF"
                 hover-tint="#D8E8FF"
+                focused-tint="#D8E8FF"
                 pressed-tint="#9FB9D4">
             <Button.Background>
                 <SpriteBrush sprite="Ui/red-button.sprite" />

@@ -147,6 +147,26 @@ public static class UiLoader
         return brush;
     }
 
+    private static IList<IUiBrush> ParseBrushes(
+        XmlNode propertyNode,
+        UiTypeCatalog typeCatalog)
+    {
+        IList<IUiBrush> result = [];
+        
+        foreach (XmlNode childNode in propertyNode.ChildNodes)
+        {
+            if (childNode.NodeType != XmlNodeType.Element)
+                continue;
+            
+            var brush = typeCatalog.CreateBrush(childNode.Name);
+            brush.Parse(childNode);
+
+            result.Add(brush);
+        }
+
+        return result;
+    }
+
     private static void ValidateUniqueIds(
         UiElement element,
         HashSet<string> ids)
