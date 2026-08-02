@@ -13,8 +13,12 @@
         <OutputPath>$(BaseOutputPath)</OutputPath> <!-- No version folder for Release -->
     </PropertyGroup>
     <ItemGroup>
-        <ProjectReference Include="..\MonoGame\MonoGame.Framework\MonoGame.Framework.Native.csproj" />
-        <ProjectReference Include="..\MonoGame\MonoGame.Framework.Content.Pipeline\MonoGame.Framework.Content.Pipeline.csproj" />
+        <PackageReference Include="MonoGame.Framework.Content.Pipeline" Version="3.8.5">
+            <PrivateAssets>All</PrivateAssets>
+        </PackageReference>
+        <PackageReference Include="MonoGame.Framework.Native" Version="3.8.5">
+            <PrivateAssets>All</PrivateAssets>
+        </PackageReference>
     </ItemGroup>
     <ItemGroup>
       <ProjectReference Include="..\DreambitEngine\DreambitEngine.csproj" />

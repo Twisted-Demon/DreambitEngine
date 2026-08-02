@@ -30,10 +30,12 @@
         </EmbeddedResource>
     </ItemGroup>
     <ItemGroup>
-      <ProjectReference Include="..\MonoGame\MonoGame.Framework\MonoGame.Framework.Native.csproj" />
-      <ProjectReference Include="..\MonoGame\src\NuGetPackages\MonoGame.Runtime.Windows.Vulkan\MonoGame.Runtime.Windows.Vulkan.csproj" />
-      <ProjectReference Include="..\MonoGame\src\NuGetPackages\MonoGame.Runtime.Mac.Vulkan\MonoGame.Runtime.Mac.Vulkan.csproj" />
-      <ProjectReference Include="..\MonoGame\src\NuGetPackages\MonoGame.Runtime.Linux.Vulkan\MonoGame.Runtime.Linux.Vulkan.csproj" />
+      <PackageReference Include="MonoGame.Framework.Native" Version="3.8.5" />
+      <PackageReference Include="MonoGame.Runtime.Windows.Vulkan" Version="3.8.5" />
+      <PackageReference Include="MonoGame.Runtime.Mac.Vulkan" Version="3.8.5" />
+      <PackageReference Include="MonoGame.Runtime.Linux.Vulkan" Version="3.8.5" />
+    </ItemGroup>
+    <ItemGroup>
       <ProjectReference Include="..\Dreambit.Content\Dreambit.Content.csproj" ReferenceOutputAssembly="false" />
       <ProjectReference Include="..\Dreambit.Examples.Content\Dreambit.Examples.Content.csproj" ReferenceOutputAssembly="false" />
       <ProjectReference Include="..\DreambitEngine\DreambitEngine.csproj" />

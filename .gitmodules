@@ -1,6 +1,3 @@
 [submodule "LDtkMonogame"]
 	path = LDtkMonogame
 	url = https://github.com/IrishBruse/LDtkMonogame.git
-[submodule "MonoGame"]
-	path = MonoGame
-	url = https://github.com/sondirn/MonoGame.git
