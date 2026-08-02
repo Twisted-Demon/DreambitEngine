@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using Dreambit.ECS;
 using Microsoft.Xna.Framework;
 
@@ -13,6 +14,8 @@ public class PongBall : Component<PongBall>
     private Vector2 _direction;
     private float _velocity = 326.0f;
     
+    public new PongScene Scene => (PongScene)base.Scene;
+    
     public override void OnCreated()
     {
         _collider = Entity.GetComponent<BoxCollider>();
@@ -23,7 +26,7 @@ public class PongBall : Component<PongBall>
         _rectDrawer.Height = 16;
         _rectDrawer.Color = Color.White;
 
-        _direction = GetRandomDirection();
+        CoroutineService.StartCoroutine(WaitToStartBall());
     }
 
     public override void OnUpdate()
@@ -41,7 +44,7 @@ public class PongBall : Component<PongBall>
 
         if (!IsWithinHorizontalBounds())
         {
-            Scene.SetNextScene(new PongScene());
+            Dreambit.Scene.SetNextScene<PongScene>();
         }
 
         //check for collision & move back if we collided / change the direction
@@ -73,13 +76,13 @@ public class PongBall : Component<PongBall>
     {
         if (Transform.Position.X < 0)
         {
-            PongSettings.PlayerTwoScore += 1;
+            Scene.IncrementPlayerTwoScore();
             return false;
         }
 
         if (Transform.Position.X > PongSettings.GameWidth)
         {
-            PongSettings.PlayerOneScore += 1;
+            Scene.IncrementPlayerOneScore();
             return false;
         }
 
@@ -106,5 +109,11 @@ public class PongBall : Component<PongBall>
 
             return direction;
         }
+    }
+
+    private IEnumerator WaitToStartBall()
+    {
+        yield return new WaitForSeconds(2.5f);
+        _direction = GetRandomDirection();
     }
 }

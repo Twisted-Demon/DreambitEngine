@@ -1,14 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Xml;
 using Microsoft.Xna.Framework;
 
 namespace Dreambit.UI;
 
+/// <summary>
+/// Base class for every retained UI node. It provides XML-configurable
+/// geometry, two-pass layout, input and drawing hooks, and asset lifecycle.
+/// </summary>
 public abstract class UiElement
 {
+    /// <summary>Gets or sets the optional ID used for layout lookup.</summary>
     public string Id;
+    /// <summary>Gets or sets the container that owns this element.</summary>
     public UiContainer Parent;
     
     private UiLength _x = UiLength.Pixels(0);
@@ -20,7 +25,10 @@ public abstract class UiElement
     private int _zIndex = 0;
     private Rectangle _lastParentBounds;
     private bool _hasParentBounds;
+    private Point _lastMeasureAvailableSize;
+    private bool _hasMeasure;
 
+    /// <summary>Gets or sets the horizontal offset relative to the parent.</summary>
     public UiLength X
     {
         get => _x;
@@ -33,6 +41,7 @@ public abstract class UiElement
         }
     }
 
+    /// <summary>Gets or sets the vertical offset relative to the parent.</summary>
     public UiLength Y
     {
         get => _y;
@@ -45,6 +54,7 @@ public abstract class UiElement
         }
     }
 
+    /// <summary>Gets or sets the fixed, percentage, or automatic width.</summary>
     public UiLength Width
     {
         get => _width;
@@ -57,6 +67,7 @@ public abstract class UiElement
         }
     }
 
+    /// <summary>Gets or sets the fixed, percentage, or automatic height.</summary>
     public UiLength Height
     {
         get => _height;
@@ -69,6 +80,7 @@ public abstract class UiElement
         }
     }
 
+    /// <summary>Gets or sets the reference point on the parent used for positioning.</summary>
     public UiAnchor Anchor
     {
         get => _anchor;
@@ -81,6 +93,7 @@ public abstract class UiElement
         }
     }
 
+    /// <summary>Gets or sets the point on this element placed at its anchored position.</summary>
     public UiAnchor Origin
     {
         get => _origin;
@@ -93,6 +106,7 @@ public abstract class UiElement
         }
     }
 
+    /// <summary>Gets or sets the draw-order value used by the parent container.</summary>
     public int ZIndex
     {
         get => _zIndex;
@@ -105,8 +119,12 @@ public abstract class UiElement
         }
     }
 
+    /// <summary>Gets the final rectangle produced by the arrange pass.</summary>
     public Rectangle Bounds;
+    /// <summary>Gets the size requested by the most recent measure pass.</summary>
+    public Point DesiredSize { get; private set; }
 
+    /// <summary>Gets the child elements owned by this node.</summary>
     public readonly List<UiElement> Children = [];
     
 
@@ -114,14 +132,17 @@ public abstract class UiElement
     private bool DependenciesDirty { get; set; } = true;
     
 
+    /// <summary>Marks this element and its descendants for remeasurement and arrangement.</summary>
     public void InvalidateLayout()
     {
         LayoutDirty = true;
+        _hasMeasure = false;
         
         foreach(var child in Children)
             child.InvalidateLayout();
     }
 
+    /// <summary>Marks this element's asset dependencies for re-resolution.</summary>
     public void InvalidateDependencies()
     {
         DependenciesDirty = true;
@@ -129,13 +150,27 @@ public abstract class UiElement
 
     private static bool LengthsEqual(UiLength left, UiLength right)
     {
-        return left.IsPercent == right.IsPercent &&
+        return left.IsAuto == right.IsAuto &&
+               left.IsPercent == right.IsPercent &&
                Math.Abs(left.Value - right.Value) < float.Epsilon;
     }
 
-    protected void ArrangeSelf(Rectangle parentBounds)
+    /// <summary>
+    /// Measures this element when necessary and calculates its own bounds
+    /// without arranging its children.
+    /// </summary>
+    /// <param name="parentBounds">The rectangle available from the parent.</param>
+    /// <param name="force">Whether to recalculate even when the cached layout is valid.</param>
+    protected void ArrangeSelf(Rectangle parentBounds, bool force = false)
     {
-        if (!LayoutDirty &&
+        if (!_hasMeasure ||
+            _lastMeasureAvailableSize != parentBounds.Size)
+        {
+            Measure(parentBounds.Size);
+        }
+
+        if (!force &&
+            !LayoutDirty &&
             _hasParentBounds &&
             _lastParentBounds == parentBounds)
         {
@@ -148,9 +183,37 @@ public abstract class UiElement
         LayoutDirty = false;
     }
 
+    /// <summary>Calculates the size this element wants within the available space.</summary>
+    /// <param name="availableSize">The maximum width and height offered by the parent.</param>
+    public void Measure(Point availableSize)
+    {
+        availableSize = new Point(
+            Math.Max(0, availableSize.X),
+            Math.Max(0, availableSize.Y));
+
+        var resolvedWidth = Width.Resolve(availableSize.X);
+        var resolvedHeight = Height.Resolve(availableSize.Y);
+        var contentConstraint = new Point(
+            Width.IsAuto ? availableSize.X : resolvedWidth,
+            Height.IsAuto ? availableSize.Y : resolvedHeight);
+        var measuredContent = MeasureContent(contentConstraint);
+        var nextDesiredSize = new Point(
+            Width.IsAuto ? Math.Max(0, measuredContent.X) : resolvedWidth,
+            Height.IsAuto ? Math.Max(0, measuredContent.Y) : resolvedHeight);
+
+        if (DesiredSize != nextDesiredSize)
+            LayoutDirty = true;
+
+        DesiredSize = nextDesiredSize;
+        _lastMeasureAvailableSize = availableSize;
+        _hasMeasure = true;
+    }
+
+    /// <summary>Assigns final bounds to this element and arranges its children.</summary>
+    /// <param name="parentBounds">The rectangle available from the parent.</param>
     public virtual void Arrange(Rectangle parentBounds)
     {
-        ArrangeSelf(parentBounds);
+        ArrangeSelf(parentBounds, Width.IsAuto || Height.IsAuto);
         // default: arrange children within own bounds
         foreach (var child in Children)
             child.Arrange(Bounds);
@@ -158,8 +221,9 @@ public abstract class UiElement
     
     private void CalculateBounds(Rectangle parentBounds)
     {
-        int w = Width.Resolve(parentBounds.Width);
-        int h = Height.Resolve(parentBounds.Height);
+        var resolvedSize = ResolveSize(parentBounds);
+        int w = resolvedSize.X;
+        int h = resolvedSize.Y;
 
         int x = X.Resolve(parentBounds.Width);
         int y = Y.Resolve(parentBounds.Height);
@@ -248,8 +312,35 @@ public abstract class UiElement
         Bounds = new Rectangle(screenX, screenY, w, h);
     }
 
+    /// <summary>Resolves this element's configured lengths into a final size.</summary>
+    /// <param name="parentBounds">The rectangle available from the parent.</param>
+    /// <returns>The resolved size in pixels.</returns>
+    protected virtual Point ResolveSize(Rectangle parentBounds)
+    {
+        return new Point(
+            Width.IsAuto
+                ? DesiredSize.X
+                : Width.Resolve(parentBounds.Width),
+            Height.IsAuto
+                ? DesiredSize.Y
+                : Height.Resolve(parentBounds.Height));
+    }
+
+    /// <summary>
+    /// Returns the element's natural content size within the supplied
+    /// constraint. Custom UI elements only need to override this method to
+    /// support width="*" and height="*".
+    /// </summary>
+    /// <param name="availableSize">The maximum content size offered by the element.</param>
+    /// <returns>The content's desired size in pixels.</returns>
+    protected virtual Point MeasureContent(Point availableSize)
+    {
+        return Point.Zero;
+    }
+
     #region Internal Lifecycle
 
+    /// <summary>Resolves dirty asset dependencies throughout this subtree.</summary>
     internal void ResolveDependenciesRecursive()
     {
         if (DependenciesDirty)
@@ -262,6 +353,8 @@ public abstract class UiElement
             child.ResolveDependenciesRecursive();
     }
 
+    /// <summary>Updates this element and its subtree using the current input snapshot.</summary>
+    /// <param name="input">The pointer state for the current frame.</param>
     public void Update(in UiInputState input)
     {
         OnUpdate(input);
@@ -272,12 +365,15 @@ public abstract class UiElement
 
     #region Lifecycle Hooks
 
+    /// <summary>Handles per-frame behavior and updates child elements.</summary>
+    /// <param name="input">The pointer state for the current frame.</param>
     protected virtual void OnUpdate(in UiInputState input)
     {
         foreach (var child in Children)
             child.Update(input);
     }
 
+    /// <summary>Draws this element. Containers are responsible for drawing their children.</summary>
     public virtual void OnDraw()
     {
         
@@ -287,85 +383,33 @@ public abstract class UiElement
     #endregion
     
 
+    /// <summary>Parses common attributes before invoking the element-specific parser.</summary>
+    /// <param name="node">The XML element that describes this UI element.</param>
     internal void ParseInternal(XmlNode node)
     {
-        Id = ParseString(node, "id", string.Empty);
-        X = ParseLength(ParseString(node, "x", "0%"));
-        Y = ParseLength(ParseString(node, "y", "0%"));
-        Width = ParseLength(ParseString(node, "width", "100%"));
-        Height = ParseLength(ParseString(node, "height", "100%"));
-        Anchor = ParseAnchor(ParseString(node, "anchor", "TopLeft"));
-        Origin = ParseAnchor(ParseString(node, "origin", "TopLeft"));
-        ZIndex = ParseInt(node, "z", 0);
+        Id = UiXmlParser.ParseString(node, "id", string.Empty);
+        X = UiXmlParser.ParseLength(
+            UiXmlParser.ParseString(node, "x", "0%"));
+        Y = UiXmlParser.ParseLength(
+            UiXmlParser.ParseString(node, "y", "0%"));
+        Width = UiXmlParser.ParseLength(
+            UiXmlParser.ParseString(node, "width", "100%"));
+        Height = UiXmlParser.ParseLength(
+            UiXmlParser.ParseString(node, "height", "100%"));
+        Anchor = UiXmlParser.ParseAnchor(
+            UiXmlParser.ParseString(node, "anchor", "TopLeft"));
+        Origin = UiXmlParser.ParseAnchor(
+            UiXmlParser.ParseString(node, "origin", "TopLeft"));
+        ZIndex = UiXmlParser.ParseInt(node, "z", 0);
 
         Parse(node);
     }
-    
+
+    /// <summary>Parses attributes that are specific to the derived element.</summary>
+    /// <param name="node">The XML element that describes this UI element.</param>
     public virtual void Parse(XmlNode node) { }
 
+    /// <summary>Loads or refreshes external assets used by this element.</summary>
     public virtual void ResolveDependencies() { }
     
-    protected static string ParseString(XmlNode node, string name, string defaultValue)
-    {
-        if (node.Attributes == null) return string.Empty;
-        
-        var attr = node.Attributes[name];
-        return attr != null ? attr.Value : defaultValue;
-
-    }
-    
-    protected static float ParseFloat(XmlNode node, string attribute, float defaultValue = 0.0f)
-    {
-        return float.Parse(ParseString(node, attribute, defaultValue.ToString(CultureInfo.InvariantCulture)), 
-            CultureInfo.InvariantCulture);
-    }
-    
-    protected static int ParseInt(XmlNode node, string attribute, int defaultValue = 0)
-    {
-        return int.Parse(ParseString(node, attribute, defaultValue.ToString(CultureInfo.InvariantCulture)), 
-            CultureInfo.InvariantCulture);
-    }
-
-    protected static bool ParseBool(XmlNode node, string attribute, bool defaultValue = false)
-    {
-        return bool.Parse(ParseString(node, attribute, defaultValue.ToString(CultureInfo.InvariantCulture)));
-    }
-    
-    protected static Color ParseColor(XmlNode node, string attribute)
-    {
-        return ColorExt.FromHex(ParseString(node, attribute, "#ff00dc".ToLowerInvariant()));
-    }
-    
-    protected static Vector2 ParseVector2(XmlNode node, string attrX, string attrY)
-    {
-        var posX = float.Parse(ParseString(node, attrX, "0"));
-        var posY = float.Parse(ParseString(node, attrY, "0"));
-        
-        return new Vector2(posX, posY);
-    }
-    
-    protected static UiLength ParseLength(string value)
-    {
-        if (string.IsNullOrEmpty(value))
-            return UiLength.Pixels(0);
-
-        value = value.Trim();
-
-        if (value.EndsWith('%'))
-        {
-            var num = value.Substring(0, value.Length - 1);
-            var pct = float.Parse(num, CultureInfo.InvariantCulture) / 100f;
-            return UiLength.Percent(pct);
-        }
-
-        var px = float.Parse(value, CultureInfo.InvariantCulture);
-        return UiLength.Pixels(px);
-    }
-    
-    protected static UiAnchor ParseAnchor(string value)
-    {
-        return Enum.TryParse<UiAnchor>(value, true, out var anchor)
-            ? anchor
-            : UiAnchor.TopLeft;
-    }
 }

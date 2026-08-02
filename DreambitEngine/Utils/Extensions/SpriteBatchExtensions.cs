@@ -544,8 +544,11 @@ public static class SpriteBatchExtensions
         RectangleF rectangle,
         Color color)
     {
-        //EnsurePixelTextureExists(spriteBatch.GraphicsDevice);
-       // spriteBatch.Draw(PixelTexture, rectangle, color);
+        spriteBatch.DrawSolidRectangle(
+            new Vector2(rectangle.X, rectangle.Y),
+            new Vector2(rectangle.Width, rectangle.Height),
+            color,
+            origin: Vector2.Zero);
     }
 
     public static void DrawHollowRectangle(

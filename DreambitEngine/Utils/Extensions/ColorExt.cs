@@ -66,6 +66,15 @@ public static class ColorExt
         return p;
     }
 
+    /// <summary>
+    /// Parses <c>#RRGGBB</c> or <c>#RRGGBBAA</c> text into a color whose RGB
+    /// channels are premultiplied by its alpha channel.
+    /// </summary>
+    /// <param name="hexString">The hexadecimal color text to parse.</param>
+    /// <returns>
+    /// The parsed premultiplied color, or opaque magenta when the text has an
+    /// unsupported length.
+    /// </returns>
     public static Color FromHex(string hexString)
     {
         if (hexString.StartsWith("#"))
@@ -82,18 +91,18 @@ public static class ColorExt
             g = byte.Parse(hexString.Substring(2, 2), NumberStyles.HexNumber);
             b = byte.Parse(hexString.Substring(4, 2), NumberStyles.HexNumber);
         }
-        else if (hexString.Length == 8) // AARRGGBB format
+        else if (hexString.Length == 8) // RRGGBBAA format
         {
-            a = byte.Parse(hexString.Substring(0, 2), NumberStyles.HexNumber);
-            r = byte.Parse(hexString.Substring(2, 2), NumberStyles.HexNumber);
-            g = byte.Parse(hexString.Substring(4, 2), NumberStyles.HexNumber);
-            b = byte.Parse(hexString.Substring(6, 2), NumberStyles.HexNumber);
+            r = byte.Parse(hexString.Substring(0, 2), NumberStyles.HexNumber);
+            g = byte.Parse(hexString.Substring(2, 2), NumberStyles.HexNumber);
+            b = byte.Parse(hexString.Substring(4, 2), NumberStyles.HexNumber);
+            a = byte.Parse(hexString.Substring(6, 2), NumberStyles.HexNumber);
         }
         else
         {
             return new Color(255, 0, 220, 255);
         }
 
-        return new Color(r, g, b, a);
+        return Color.FromNonPremultiplied(r, g, b, a);
     }
 }

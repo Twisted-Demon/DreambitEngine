@@ -5,8 +5,10 @@ using Microsoft.Xna.Framework;
 
 namespace Dreambit.UI;
 
+/// <summary>Displays single-line or wrapped text using a loaded sprite font.</summary>
 public class UiText : UiElement
 {
+    /// <summary>Gets the sprite font resolved from <see cref="FontPath"/>.</summary>
     public SpriteFontBase Font { get; private set; }
     
     private string _fontPath = "monogram";
@@ -15,6 +17,10 @@ public class UiText : UiElement
     private float _fontSize = 12f;
     private bool _autoResizeHeight = true;
 
+    /// <summary>
+    /// Gets or sets whether parsing this element assigns automatic height so
+    /// the text block grows to fit its laid-out lines.
+    /// </summary>
     public bool AutoResizeHeight
     {
         get => _autoResizeHeight;
@@ -28,9 +34,12 @@ public class UiText : UiElement
         }
     }
 
+    /// <summary>Gets or sets the color used to draw the text.</summary>
     public Color TextColor { get; set; } = Color.White;
+    /// <summary>Gets or sets the horizontal alignment of each line within the bounds.</summary>
     public HorizontalAlignment HorizontalAlignment { get; set; } = HorizontalAlignment.Center;
     
+    /// <summary>Gets or sets the displayed text.</summary>
     public string Text
     {
         get => _text;
@@ -45,6 +54,7 @@ public class UiText : UiElement
         }
     }
     
+    /// <summary>Gets or sets whether text may wrap onto multiple lines.</summary>
     public bool MultiLine
     {
         get => _multiLine;
@@ -58,6 +68,7 @@ public class UiText : UiElement
         }
     }
 
+    /// <summary>Gets or sets the requested font size in pixels.</summary>
     public float FontSize
     {
         get => _fontSize;
@@ -74,6 +85,7 @@ public class UiText : UiElement
         }
     }
     
+    /// <summary>Gets or sets the resource path used to load the sprite font.</summary>
     public string FontPath
     {
         get => _fontPath;
@@ -96,7 +108,14 @@ public class UiText : UiElement
     private float _lineHeight;
     private float _totalHeight;
     private bool _layoutDirty = true;
+
+    /// <summary>Creates a text element whose height automatically follows its content.</summary>
+    public UiText()
+    {
+        Height = UiLength.Auto();
+    }
     
+    /// <inheritdoc />
     public override void Arrange(Rectangle parentBounds)
     {
         base.Arrange(parentBounds);
@@ -114,14 +133,41 @@ public class UiText : UiElement
             _totalHeight = _lineHeight;
         }
 
-        var measuredHeight = (int)MathF.Ceiling(_totalHeight);
-        if (AutoResizeHeight && Bounds.Height != measuredHeight)
-        {
-            Height = UiLength.Pixels(measuredHeight);
-            base.Arrange(parentBounds);
-        }
     }
 
+    /// <inheritdoc />
+    protected override Point MeasureContent(Point availableSize)
+    {
+        if (Font is null || string.IsNullOrEmpty(Text))
+            return Point.Zero;
+
+        var measuredText = Font.MeasureString(Text);
+        var lineHeight = SpriteBatchExtensions.GetLineHeight(Font);
+
+        if (!MultiLine)
+        {
+            return new Point(
+                (int)MathF.Ceiling(measuredText.X),
+                (int)MathF.Ceiling(MathF.Max(lineHeight, measuredText.Y)));
+        }
+
+        var layoutWidth = Width.IsAuto
+            ? Math.Min(
+                (int)MathF.Ceiling(measuredText.X),
+                Math.Max(0, availableSize.X))
+            : availableSize.X;
+        EnsureLayout(layoutWidth);
+
+        var measuredWidth = 0f;
+        foreach (var lineWidth in _lineWidths)
+            measuredWidth = MathF.Max(measuredWidth, lineWidth);
+
+        return new Point(
+            (int)MathF.Ceiling(measuredWidth),
+            (int)MathF.Ceiling(_totalHeight));
+    }
+
+    /// <inheritdoc />
     public override void ResolveDependencies()
     {
         Font = string.IsNullOrEmpty(_fontPath)
@@ -131,10 +177,13 @@ public class UiText : UiElement
 
     private void EnsureLayout()
     {
+        EnsureLayout(Bounds.Width);
+    }
+
+    private void EnsureLayout(int width)
+    {
         if (Font is null) return;
         if (!_multiLine) return;
-
-        var width = Bounds.Width;
 
         if (width <= 0)
         {
@@ -152,7 +201,7 @@ public class UiText : UiElement
         _lastLayoutWidth = width;
         
         _lines.Clear();
-        _lines.AddRange(SpriteBatchExtensions.SplitTextIntoLines(Font, Text, Bounds.Width));
+        _lines.AddRange(SpriteBatchExtensions.SplitTextIntoLines(Font, Text, width));
         
         _lineWidths.Clear();
         
@@ -166,6 +215,7 @@ public class UiText : UiElement
         _totalHeight = _lines.Count * _lineHeight;
     }
 
+    /// <inheritdoc />
     public override void OnDraw()
     {
         base.OnDraw();
@@ -227,8 +277,12 @@ public class UiText : UiElement
                         throw new ArgumentOutOfRangeException();
                 }
 
-                // Center each line within its own line-height band
-                float lineY = baseY + i * _lineHeight + _lineHeight * 0.5f;
+                // Draw from the top of the line-height band. DrawString's
+                // position is already its top-left, so adding half a line here
+                // made glyphs overflow into the following stacked element.
+                var measuredLineHeight = Font.MeasureString(line).Y;
+                float lineY = baseY + i * _lineHeight +
+                              MathF.Max(0f, (_lineHeight - measuredLineHeight) * 0.5f);
 
                 Graphics.SpriteBatch.DrawString(Font, line, new Vector2(lineX, lineY), TextColor);
             }
@@ -245,18 +299,26 @@ public class UiText : UiElement
         }
     }
     
+    /// <inheritdoc />
     public override void Parse(XmlNode node)
     {
-        Text = ParseString(node, "text", "");
-        FontSize = ParseFloat(node, "font-size", 12.0f);
-        FontPath = ParseString(node, "font", "monogram");
-        MultiLine = ParseBool(node, "multi-line", MultiLine);
-        AutoResizeHeight = ParseBool(
+        Text = UiXmlParser.ParseString(node, "text", "");
+        FontSize = UiXmlParser.ParseFloat(node, "font-size", 12.0f);
+        FontPath = UiXmlParser.ParseString(node, "font", "monogram");
+        MultiLine = UiXmlParser.ParseBool(node, "multi-line", MultiLine);
+        AutoResizeHeight = UiXmlParser.ParseBool(
             node,
             "auto-resize-height",
             AutoResizeHeight);
-        HorizontalAlignment = ParseHAlignment(ParseString(node, "horizontal-alignment", "Center"));
-        TextColor = ParseColor(node,  "text-color");
+        if (AutoResizeHeight)
+            Height = UiLength.Auto();
+
+        HorizontalAlignment = ParseHAlignment(
+            UiXmlParser.ParseString(
+                node,
+                "horizontal-alignment",
+                "Center"));
+        TextColor = UiXmlParser.ParseColor(node, "text-color");
     }
 
     private static HorizontalAlignment ParseHAlignment(string value)

@@ -4,61 +4,27 @@ using Microsoft.Xna.Framework;
 
 namespace Dreambit.UI;
 
-public class UiButton : UiText
+/// <summary>
+/// A single-content control that tracks pointer interaction, raises click
+/// events, and changes its background tint for hover and pressed states.
+/// </summary>
+public class UiButton : UiContentControl
 {
-    private string _spritePath;
-    private Sprite _sprite;
-    private bool _fitToTexture;
     private bool _pressStartedInside;
 
+    /// <summary>Raised after a press begins inside and is released inside the button.</summary>
     public event Action<UiButton> Clicked;
 
+    /// <summary>Gets whether the pointer is currently inside the button bounds.</summary>
     public bool IsHovered { get; private set; }
+    /// <summary>Gets whether an inside press is currently held.</summary>
     public bool IsPressed { get; private set; }
-    public Color BackgroundTint { get; set; } = Color.White;
+    /// <summary>Gets or sets the background tint used while hovered.</summary>
     public Color HoverTint { get; set; } = Color.LightGray;
+    /// <summary>Gets or sets the background tint used while pressed.</summary>
     public Color PressedTint { get; set; } = Color.Gray;
 
-    public string SpritePath
-    {
-        get => _spritePath;
-        set
-        {
-            var next = value ?? string.Empty;
-            if (_spritePath == next) return;
-
-            _spritePath = next;
-            InvalidateDependencies();
-            InvalidateLayout();
-        }
-    }
-
-    public UiButton()
-    {
-        AutoResizeHeight = false;
-        MultiLine = false;
-    }
-
-    public override void Arrange(Rectangle parentBounds)
-    {
-        if (_fitToTexture && _sprite is not null)
-        {
-            Width = UiLength.Pixels(_sprite.SourceRect.Width);
-            Height = UiLength.Pixels(_sprite.SourceRect.Height);
-        }
-
-        base.Arrange(parentBounds);
-    }
-
-    public override void ResolveDependencies()
-    {
-        base.ResolveDependencies();
-
-        _sprite = string.IsNullOrEmpty(_spritePath)
-            ? null
-            : Resources.LoadAsset<Sprite>(_spritePath);
-    }
-
+    /// <inheritdoc />
     protected override void OnUpdate(in UiInputState input)
     {
         base.OnUpdate(input);
@@ -81,40 +47,26 @@ public class UiButton : UiText
         IsPressed = false;
     }
 
-    public override void OnDraw()
+    /// <inheritdoc />
+    protected override Color GetBackgroundTint()
     {
-        if (_sprite is not null)
-        {
-            var tint = IsPressed
-                ? PressedTint
-                : IsHovered
-                    ? HoverTint
-                    : BackgroundTint;
-
-            Graphics.SpriteBatch.Draw(
-                _sprite.Texture,
-                Bounds,
-                _sprite.SourceRect,
-                tint);
-        }
-
-        base.OnDraw();
+        return IsPressed
+            ? PressedTint
+            : IsHovered
+                ? HoverTint
+                : BackgroundTint;
     }
 
+    /// <inheritdoc />
     public override void Parse(XmlNode node)
     {
         base.Parse(node);
-
-        SpritePath = ParseString(node, "sprite", string.Empty);
-        _fitToTexture = ParseBool(node, "fit-to-texture", false);
-
-        if (node.Attributes?["background-tint"] is not null)
-            BackgroundTint = ParseColor(node, "background-tint");
-
+        
         if (node.Attributes?["hover-tint"] is not null)
-            HoverTint = ParseColor(node, "hover-tint");
+            HoverTint = UiXmlParser.ParseColor(node, "hover-tint");
 
         if (node.Attributes?["pressed-tint"] is not null)
-            PressedTint = ParseColor(node, "pressed-tint");
+            PressedTint = UiXmlParser.ParseColor(node, "pressed-tint");
     }
+    
 }

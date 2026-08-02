@@ -1,96 +1,293 @@
-﻿using System;
+using System;
 using System.Xml;
 using Microsoft.Xna.Framework;
 
 namespace Dreambit.UI;
 
+/// <summary>Specifies the axis along which a stack panel places its children.</summary>
 public enum StackOrientation
 {
+    /// <summary>Places children from top to bottom.</summary>
     Vertical,
+    /// <summary>Places children from left to right.</summary>
     Horizontal
 }
 
-public class UiStackPanel : UiContainer
+/// <summary>Specifies how children align across a stack panel's non-stacking axis.</summary>
+public enum StackCrossAlignment
 {
-    public StackOrientation Orientation = StackOrientation.Vertical;
-    public int Spacing = 0;
-    public int PaddingLeft = 0;
-    public int PaddingTop = 0;
-    public int PaddingRight = 0;
-    public int PaddingBottom = 0;
+    /// <summary>Aligns children with the beginning of the cross axis.</summary>
+    Start,
+    /// <summary>Centers children on the cross axis.</summary>
+    Center,
+    /// <summary>Aligns children with the end of the cross axis.</summary>
+    End
+}
 
+/// <summary>Specifies where a stack's group of children begins within available space.</summary>
+public enum StackGrowDirection
+{
+    /// <summary>Starts at the beginning of the stacking axis.</summary>
+    Start = 0,
+    /// <summary>Starts at the top of a vertical stack.</summary>
+    Top = Start,
+    /// <summary>Starts at the left of a horizontal stack.</summary>
+    Left = Start,
+    /// <summary>Centers the complete child group on the stacking axis.</summary>
+    Center = 1,
+    /// <summary>Starts at the end of the stacking axis and grows toward it.</summary>
+    End = 2,
+    /// <summary>Aligns a vertical stack's child group with the bottom.</summary>
+    Bottom = End,
+    /// <summary>Aligns a horizontal stack's child group with the right.</summary>
+    Right = End
+}
+
+/// <summary>
+/// Base container that lays out children sequentially along one axis with
+/// configurable spacing, padding, group placement, and cross-axis alignment.
+/// </summary>
+public abstract class UiStackPanelBase : UiContainer
+{
+    /// <summary>Gets or sets how children align on the non-stacking axis.</summary>
+    public StackCrossAlignment CrossAlignment = StackCrossAlignment.Start;
+    /// <summary>Gets or sets where the complete child group is placed on the stacking axis.</summary>
+    public StackGrowDirection GrowDirection = StackGrowDirection.Start;
+    /// <summary>Gets or sets the pixel gap inserted between adjacent children.</summary>
+    public int Spacing;
+    /// <summary>Gets or sets the left inner padding in pixels.</summary>
+    public int PaddingLeft;
+    /// <summary>Gets or sets the top inner padding in pixels.</summary>
+    public int PaddingTop;
+    /// <summary>Gets or sets the right inner padding in pixels.</summary>
+    public int PaddingRight;
+    /// <summary>Gets or sets the bottom inner padding in pixels.</summary>
+    public int PaddingBottom;
+
+    /// <summary>Gets the axis used to arrange children.</summary>
+    protected abstract StackOrientation LayoutOrientation { get; }
+
+    /// <inheritdoc />
     public override void Arrange(Rectangle parentBounds)
     {
-        // A stack panel owns child placement, so arrange only this panel here.
-        ArrangeSelf(parentBounds);
+        // Auto-sized panels must remeasure even when their parent rectangle has
+        // not changed, because a child's content may have changed.
+        ArrangeSelf(parentBounds, Width.IsAuto || Height.IsAuto);
 
-        int innerX = Bounds.X + PaddingLeft;
-        int innerY = Bounds.Y + PaddingTop;
-        int maxInnerWidth = Math.Max(
-            0,
-            Bounds.Width - (PaddingLeft + PaddingRight));
-        int maxInnerHeight = Math.Max(
-            0,
-            Bounds.Height - (PaddingTop + PaddingBottom));
+        var innerBounds = GetInnerBounds(Bounds);
+        var contentLength = MeasureChildren(innerBounds);
+        var availableLength = LayoutOrientation == StackOrientation.Vertical
+            ? innerBounds.Height
+            : innerBounds.Width;
+        var cursor = GetStartOffset(availableLength, contentLength);
 
-        if (Orientation == StackOrientation.Vertical)
+        foreach (var child in Children)
         {
-            int currentY = innerY;
+            SetChildPosition(child, cursor);
+            child.Arrange(innerBounds);
 
-            foreach (var child in Children)
-            {
-                // Auto width: fill available width
-                if (!child.Width.IsPercent && child.Width.Value <= 0)
-                    child.Width = UiLength.Pixels(maxInnerWidth);
-
-                // Child spans across X, pinned to left
-                child.X = UiLength.Pixels(0);
-                child.Y = UiLength.Pixels(currentY - innerY);
-                child.Anchor = UiAnchor.TopLeft;
-                child.Origin = UiAnchor.TopLeft;
-
-                child.Arrange(new Rectangle(innerX, innerY, maxInnerWidth, maxInnerHeight));
-
-                currentY = child.Bounds.Bottom + Spacing;
-            }
-        }
-        else // Horizontal
-        {
-            int currentX = innerX;
-
-            foreach (var child in Children)
-            {
-                // Auto height: fill available height
-                if (!child.Height.IsPercent && child.Height.Value <= 0)
-                    child.Height = UiLength.Pixels(maxInnerHeight);
-
-                child.X = UiLength.Pixels(currentX - innerX);
-                child.Y = UiLength.Pixels(0);
-                child.Anchor = UiAnchor.TopLeft;
-                child.Origin = UiAnchor.TopLeft;
-
-                child.Arrange(new Rectangle(innerX, innerY, maxInnerWidth, maxInnerHeight));
-
-                currentX = child.Bounds.Right + Spacing;
-            }
+            cursor += GetMainLength(child.Bounds.Size) + Spacing;
         }
     }
 
+    /// <inheritdoc />
+    protected override Point MeasureContent(Point availableSize)
+    {
+        var measureBounds = new Rectangle(
+            0,
+            0,
+            Math.Max(0, availableSize.X - PaddingLeft - PaddingRight),
+            Math.Max(0, availableSize.Y - PaddingTop - PaddingBottom));
+
+        var contentLength = MeasureChildren(measureBounds);
+        var width = LayoutOrientation == StackOrientation.Horizontal
+            ? contentLength + PaddingLeft + PaddingRight
+            : GetMaximumChildWidth() + PaddingLeft + PaddingRight;
+        var height = LayoutOrientation == StackOrientation.Vertical
+            ? contentLength + PaddingTop + PaddingBottom
+            : GetMaximumChildHeight() + PaddingTop + PaddingBottom;
+
+        return new Point(width, height);
+    }
+
+    /// <inheritdoc />
     public override void Parse(XmlNode node)
     {
-        var orientation = ParseString(node, "orientation", "Vertical");
-        Orientation = string.Equals(orientation, "Horizontal", StringComparison.OrdinalIgnoreCase) 
-            ? StackOrientation.Horizontal : 
-            StackOrientation.Vertical;
-        
-        // optional combined padding="20" or "10,5,10,5"
-        var padding = ParseString(node, "padding", null);
+        var padding = UiXmlParser.ParseString(node, "padding", null);
         if (!string.IsNullOrEmpty(padding))
             ParsePadding(padding);
 
-        Spacing = ParseInt(node, "spacing", 0);
+        Spacing = UiXmlParser.ParseInt(node, "spacing", 0);
+
+        var alignment = UiXmlParser.ParseString(
+            node,
+            "cross-alignment",
+            "Start");
+        CrossAlignment = Enum.TryParse(
+            alignment,
+            true,
+            out StackCrossAlignment parsedAlignment)
+            ? parsedAlignment
+            : StackCrossAlignment.Start;
+
+        GrowDirection = ParseGrowDirection(
+            UiXmlParser.ParseString(node, "grow-direction", "Start"));
     }
-    
+
+    private int MeasureChildren(Rectangle innerBounds)
+    {
+        var contentLength = 0;
+
+        foreach (var child in Children)
+        {
+            ApplyAutomaticCrossSize(child, innerBounds);
+            child.Measure(innerBounds.Size);
+            contentLength += GetMainLength(child.DesiredSize);
+        }
+
+        if (Children.Count > 1)
+            contentLength += Spacing * (Children.Count - 1);
+
+        return contentLength;
+    }
+
+    private void ApplyAutomaticCrossSize(UiElement child, Rectangle innerBounds)
+    {
+        if (LayoutOrientation == StackOrientation.Vertical)
+        {
+            if (!child.Width.IsAuto &&
+                !child.Width.IsPercent &&
+                child.Width.Value <= 0)
+            {
+                child.Width = UiLength.Pixels(innerBounds.Width);
+            }
+
+            return;
+        }
+
+        if (!child.Height.IsAuto &&
+            !child.Height.IsPercent &&
+            child.Height.Value <= 0)
+        {
+            child.Height = UiLength.Pixels(innerBounds.Height);
+        }
+    }
+
+    private void SetChildPosition(UiElement child, int mainOffset)
+    {
+        child.Anchor = UiAnchor.TopLeft;
+
+        if (LayoutOrientation == StackOrientation.Vertical)
+        {
+            child.Y = UiLength.Pixels(mainOffset);
+
+            switch (CrossAlignment)
+            {
+                case StackCrossAlignment.Center:
+                    child.X = UiLength.Percent(0.5f);
+                    child.Origin = UiAnchor.TopCenter;
+                    break;
+                case StackCrossAlignment.End:
+                    child.X = UiLength.Percent(1f);
+                    child.Origin = UiAnchor.TopRight;
+                    break;
+                default:
+                    child.X = UiLength.Pixels(0);
+                    child.Origin = UiAnchor.TopLeft;
+                    break;
+            }
+
+            return;
+        }
+
+        child.X = UiLength.Pixels(mainOffset);
+
+        switch (CrossAlignment)
+        {
+            case StackCrossAlignment.Center:
+                child.Y = UiLength.Percent(0.5f);
+                child.Origin = UiAnchor.CenterLeft;
+                break;
+            case StackCrossAlignment.End:
+                child.Y = UiLength.Percent(1f);
+                child.Origin = UiAnchor.BottomLeft;
+                break;
+            default:
+                child.Y = UiLength.Pixels(0);
+                child.Origin = UiAnchor.TopLeft;
+                break;
+        }
+    }
+
+    private int GetStartOffset(int availableLength, int contentLength)
+    {
+        var remainingLength = Math.Max(0, availableLength - contentLength);
+
+        return GrowDirection switch
+        {
+            StackGrowDirection.Center => remainingLength / 2,
+            StackGrowDirection.End => remainingLength,
+            _ => 0
+        };
+    }
+
+    private int GetMainLength(Point size)
+    {
+        return LayoutOrientation == StackOrientation.Vertical
+            ? size.Y
+            : size.X;
+    }
+
+    private int GetMaximumChildWidth()
+    {
+        var width = 0;
+        foreach (var child in Children)
+            width = Math.Max(width, child.DesiredSize.X);
+
+        return width;
+    }
+
+    private int GetMaximumChildHeight()
+    {
+        var height = 0;
+        foreach (var child in Children)
+            height = Math.Max(height, child.DesiredSize.Y);
+
+        return height;
+    }
+
+    private Rectangle GetInnerBounds(Rectangle bounds)
+    {
+        return new Rectangle(
+            bounds.X + PaddingLeft,
+            bounds.Y + PaddingTop,
+            Math.Max(0, bounds.Width - PaddingLeft - PaddingRight),
+            Math.Max(0, bounds.Height - PaddingTop - PaddingBottom));
+    }
+
+    private StackGrowDirection ParseGrowDirection(string value)
+    {
+        if (Enum.TryParse(value, true, out StackGrowDirection direction))
+        {
+            if (LayoutOrientation == StackOrientation.Vertical &&
+                (string.Equals(value, "Left", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(value, "Right", StringComparison.OrdinalIgnoreCase)))
+            {
+                return StackGrowDirection.Start;
+            }
+
+            if (LayoutOrientation == StackOrientation.Horizontal &&
+                (string.Equals(value, "Top", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(value, "Bottom", StringComparison.OrdinalIgnoreCase)))
+            {
+                return StackGrowDirection.Start;
+            }
+
+            return direction;
+        }
+
+        return StackGrowDirection.Start;
+    }
 
     private void ParsePadding(string value)
     {
@@ -98,14 +295,62 @@ public class UiStackPanel : UiContainer
 
         if (parts.Length == 1)
         {
-            int p = int.Parse(parts[0]);
-            PaddingLeft = PaddingTop = PaddingRight = PaddingBottom = p;
-        }else if (parts.Length == 4)
+            var padding = int.Parse(parts[0]);
+            PaddingLeft = PaddingTop = PaddingRight = PaddingBottom = padding;
+        }
+        else if (parts.Length == 4)
         {
             PaddingLeft = int.Parse(parts[0]);
             PaddingTop = int.Parse(parts[1]);
             PaddingRight = int.Parse(parts[2]);
             PaddingBottom = int.Parse(parts[3]);
         }
+    }
+}
+
+/// <summary>Arranges child elements sequentially from top to bottom.</summary>
+public sealed class UiVerticalStackPanel : UiStackPanelBase
+{
+    /// <inheritdoc />
+    protected override StackOrientation LayoutOrientation => StackOrientation.Vertical;
+}
+
+/// <summary>Arranges child elements sequentially from left to right.</summary>
+public sealed class UiHorizontalStackPanel : UiStackPanelBase
+{
+    /// <inheritdoc />
+    protected override StackOrientation LayoutOrientation => StackOrientation.Horizontal;
+}
+
+// Kept for existing layouts. New layouts should use VerticalStackPanel or
+// HorizontalStackPanel so their direction is explicit in the element name.
+/// <summary>
+/// Arranges children along a configurable axis. Prefer
+/// <see cref="UiVerticalStackPanel"/> or <see cref="UiHorizontalStackPanel"/>
+/// when the orientation is known by the layout author.
+/// </summary>
+public class UiStackPanel : UiStackPanelBase
+{
+    /// <summary>Gets or sets the axis used to arrange children.</summary>
+    public StackOrientation Orientation = StackOrientation.Vertical;
+
+    /// <inheritdoc />
+    protected override StackOrientation LayoutOrientation => Orientation;
+
+    /// <inheritdoc />
+    public override void Parse(XmlNode node)
+    {
+        var orientation = UiXmlParser.ParseString(
+            node,
+            "orientation",
+            "Vertical");
+        Orientation = string.Equals(
+            orientation,
+            "Horizontal",
+            StringComparison.OrdinalIgnoreCase)
+            ? StackOrientation.Horizontal
+            : StackOrientation.Vertical;
+
+        base.Parse(node);
     }
 }

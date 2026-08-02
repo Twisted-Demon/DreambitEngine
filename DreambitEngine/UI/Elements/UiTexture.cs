@@ -4,13 +4,16 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace Dreambit.UI;
 
+/// <summary>Displays a sprite resource stretched to the element's arranged bounds.</summary>
 public class UiTexture : UiElement
 {
     private string _spritePath;
     private Sprite _sprite;
     
+    /// <summary>Gets or sets the color multiplied with the rendered sprite.</summary>
     public Color Tint { get; set; } = Color.White;
 
+    /// <summary>Gets or sets the resource path of the sprite to display.</summary>
     public string SpritePath
     {
         get => _spritePath;
@@ -24,6 +27,7 @@ public class UiTexture : UiElement
         }
     }
 
+    /// <inheritdoc />
     public override void ResolveDependencies()
     {
         _sprite = string.IsNullOrEmpty(SpritePath)
@@ -31,6 +35,17 @@ public class UiTexture : UiElement
             : Resources.LoadAsset<Sprite>(SpritePath);
     }
 
+    /// <inheritdoc />
+    protected override Point MeasureContent(Point availableSize)
+    {
+        return _sprite is null
+            ? Point.Zero
+            : new Point(
+                _sprite.SourceRect.Width,
+                _sprite.SourceRect.Height);
+    }
+
+    /// <inheritdoc />
     public override void OnDraw()
     {
         if (_sprite is null) return;
@@ -38,9 +53,10 @@ public class UiTexture : UiElement
         Graphics.SpriteBatch.Draw(_sprite.Texture, Bounds, _sprite.SourceRect, Tint);
     }
 
+    /// <inheritdoc />
     public override void Parse(XmlNode node)
     {
-        SpritePath = ParseString(node, "sprite", string.Empty);
-        Tint = ParseColor(node, "tint");
+        SpritePath = UiXmlParser.ParseString(node, "sprite", string.Empty);
+        Tint = UiXmlParser.ParseColor(node, "tint");
     }
 }

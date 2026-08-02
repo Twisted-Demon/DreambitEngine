@@ -1,4 +1,7 @@
 using Dreambit.ECS;
+using Dreambit.Examples.Particles;
+using Dreambit.Examples.Pong;
+using Dreambit.Examples.SpaceGame;
 using Dreambit.UI;
 
 namespace Dreambit.Examples.UiExample;
@@ -15,10 +18,21 @@ public class UiExampleScene : Scene<UiExampleScene>
         var menu = CreateEntity("menu")
             .AttachComponent<UiFrame>();
 
+        menu.LayoutPath = "Ui/menu.xml";
+
         menu.Layout
-            .GetRequired<UiButton>("play-button")
-            .Clicked += OnPlayClicked;
+            .GetRequired<UiButton>("play-particles-button")
+            .Clicked += OnPlayParticlesClicked;
+
+        menu.Layout
+            .GetRequired<UiButton>("play-pong-button")
+            .Clicked += OnPlayPongClicked;
+
+        menu.Layout
+            .GetRequired<UiButton>("play-spacegame-button")
+            .Clicked += OnPlaySpaceGameClicked;
     }
+
 
     private void InitializeSettings()
     {
@@ -31,8 +45,18 @@ public class UiExampleScene : Scene<UiExampleScene>
         UiCamera.SetTargetVerticalResolution(WindowHeight);
     }
 
-    private void OnPlayClicked(UiButton button)
+    private void OnPlayParticlesClicked(UiButton button)
     {
-        Logger.Info("Play clicked");
+        Scene.SetNextScene<ParticlesScene>();
+    }
+    
+    private void OnPlayPongClicked(UiButton button)
+    {
+        Scene.SetNextScene<PongScene>();
+    }
+    
+    private void OnPlaySpaceGameClicked(UiButton button)
+    {
+        Scene.SetNextScene<SpaceGameScene>();
     }
 }

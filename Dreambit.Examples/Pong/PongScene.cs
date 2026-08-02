@@ -1,4 +1,5 @@
 ﻿using Dreambit.ECS;
+using Dreambit.UI;
 using Microsoft.Xna.Framework;
 
 namespace Dreambit.Examples.Pong;
@@ -6,6 +7,10 @@ namespace Dreambit.Examples.Pong;
 public class PongScene : Scene
 {
     private float _paddleMargin = 32f;
+
+    private UiFrame _scoreBoardFrame;
+    private UiText _playerOneScoreText;
+    private UiText _playerTwoScoreText;
     
     protected override void OnInitialize()
     {
@@ -17,13 +22,36 @@ public class PongScene : Scene
         SetUpController();
         SetUpPaddles();
         SetUpBall();
-        SetUpScoreKeeper();
+        SetUpUi();
     }
 
     private void SetUpController()
     {
         var controller = CreateEntity("player_controller", tags: ["controller"])
             .AttachComponent<PongController>();
+    }
+
+    public void IncrementPlayerOneScore()
+    {
+        PongSettings.PlayerOneScore++;
+    }
+
+    public void IncrementPlayerTwoScore()
+    {
+        PongSettings.PlayerTwoScore++;
+    }
+
+    private void SetUpUi()
+    {
+        _scoreBoardFrame = CreateEntity("score_board")
+            .AttachComponent<UiFrame>();
+        
+        _scoreBoardFrame.LayoutPath = "Ui/pong_scoreboard.xml";
+        
+        _scoreBoardFrame.Layout
+            .GetRequired<UiText>("player-one-score").Text = PongSettings.PlayerOneScore.ToString();
+        _scoreBoardFrame.Layout
+            .GetRequired<UiText>("player-two-score").Text = PongSettings.PlayerTwoScore.ToString();
     }
 
     private void SetUpPaddles()
@@ -54,8 +82,5 @@ public class PongScene : Scene
         var paddle = CreateEntity("pong-ball", tags:["ball"], createAt: position.ToVector3())
             .AttachComponent<PongBall>();
     }
-
-    private void SetUpScoreKeeper()
-    {
-    }
+    
 }

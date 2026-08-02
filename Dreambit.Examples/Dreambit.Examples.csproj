@@ -54,6 +54,10 @@
       <Content Include="Content\Ui\menu.xml">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
+      <None Remove="Content\Ui\pong_scoreboard.xml" />
+      <Content Include="Content\Ui\pong_scoreboard.xml">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
     </ItemGroup>
     <ItemGroup>
       <ProjectReference Include="..\DreambitEngine\DreambitEngine.csproj" />

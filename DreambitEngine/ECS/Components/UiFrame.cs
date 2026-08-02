@@ -8,13 +8,23 @@ namespace Dreambit.ECS;
 [BlueprintType(nameof(UiFrame))]
 public class UiFrame : DrawableComponent<UiFrame>
 {
-    public string LayoutPath { get; set; } = "Ui/menu.xml";
-    public UiLayout Layout { get; private set; }
+    private string _layoutPath;
 
-    public override void OnCreated()
+    public string LayoutPath
     {
-        LoadLayout(LayoutPath);
+        get => _layoutPath;
+        set
+        {
+            ArgumentException.ThrowIfNullOrEmpty(value);
+
+            if (_layoutPath == value)
+                return;
+            
+            _layoutPath = value;
+            LoadLayout(_layoutPath);
+        }
     }
+    public UiLayout Layout { get; private set; }
 
     public void LoadLayout(string layoutPath)
     {
