@@ -1,0 +1,150 @@
+site_name: Dreambit Engine Documentation
+site_description: Learn to build games with the Dreambit engine.
+docs_dir: docs
+site_dir: site
+theme:
+  name: readthedocs
+  highlightjs: true
+plugins:
+  - search
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+nav:
+  - Home: index.md
+  - Getting started:
+      - Overview: getting-started/index.md
+      - Install and reference Dreambit: getting-started/installation.md
+      - Your first game: getting-started/first-game.md
+      - Project and content layout: getting-started/project-structure.md
+  - Core:
+      - Overview: core/index.md
+      - Core and the game loop: core/core.md
+      - Scenes: core/scenes.md
+      - Window: core/window.md
+      - Time: core/time.md
+      - Coroutines: core/coroutines.md
+      - Logging and debugging: core/logging.md
+  - ECS:
+      - Overview: ecs/index.md
+      - Entities: ecs/entities.md
+      - Writing components: ecs/writing-components.md
+      - Component lifecycle: ecs/component-lifecycle.md
+      - Transform: ecs/transform.md
+      - Requirements and injection: ecs/requirements.md
+      - Entity blueprints: ecs/blueprints.md
+      - Components:
+          - Camera2D: ecs/components/camera2d.md
+          - UiFrame: ecs/components/ui-frame.md
+          - Collider: ecs/components/collider.md
+          - BoxCollider: ecs/components/box-collider.md
+          - PolyShapeCollider: ecs/components/poly-shape-collider.md
+          - RigidBody2D: ecs/components/rigid-body-2d.md
+          - Mover: ecs/components/mover.md
+          - SpriteDrawer: ecs/components/sprite-drawer.md
+          - SpriteAnimator: ecs/components/sprite-animator.md
+          - RectDrawer: ecs/components/rect-drawer.md
+          - CircleDrawer: ecs/components/circle-drawer.md
+          - ParticleSystemDrawer: ecs/components/particle-system-drawer.md
+          - Light2D: ecs/components/light2d.md
+          - AmbientLight2D: ecs/components/ambient-light-2d.md
+          - PointLight2D: ecs/components/point-light-2d.md
+          - SoundEffectEmitter: ecs/components/sound-effect-emitter.md
+          - SoundEmitter2d (obsolete): ecs/components/sound-emitter-2d.md
+          - SoundListener2d (obsolete): ecs/components/sound-listener-2d.md
+          - AStarGrid: ecs/components/astar-grid.md
+          - AStarPathfinder: ecs/components/astar-pathfinder.md
+          - AStarPathFollower: ecs/components/astar-path-follower.md
+          - FSM: ecs/components/fsm.md
+          - LDtkRenderer: ecs/components/ldtk-renderer.md
+          - LDtkIid: ecs/components/ldtk-iid.md
+          - TileMover: ecs/components/tile-mover.md
+  - User interface:
+      - Overview: ui/index.md
+      - XML layouts: ui/xml-layouts.md
+      - Layout, sizing, and positioning: ui/layout.md
+      - Input, focus, and events: ui/input-and-focus.md
+      - Reusable UI components: ui/reusable-components.md
+      - Custom elements and brushes: ui/custom-ui.md
+      - Elements:
+          - UiElement: ui/elements/ui-element.md
+          - UiContainer: ui/elements/ui-container.md
+          - UiContentControl: ui/elements/ui-content-control.md
+          - UiControl: ui/elements/ui-control.md
+          - UiPanel: ui/elements/ui-panel.md
+          - UiBorder: ui/elements/ui-border.md
+          - UiButton: ui/elements/ui-button.md
+          - UiCanvas: ui/elements/ui-canvas.md
+          - UiCheckBox: ui/elements/ui-check-box.md
+          - UiComboBox: ui/elements/ui-combo-box.md
+          - UiGrid: ui/elements/ui-grid.md
+          - UiItemsControl: ui/elements/ui-items-control.md
+          - UiListBox: ui/elements/ui-list-box.md
+          - UiOverlay: ui/elements/ui-overlay.md
+          - UiPopup: ui/elements/ui-popup.md
+          - UiProgressBar: ui/elements/ui-progress-bar.md
+          - UiRadioButton: ui/elements/ui-radio-button.md
+          - UiRangeBase: ui/elements/ui-range-base.md
+          - UiScrollBar: ui/elements/ui-scroll-bar.md
+          - UiSelector: ui/elements/ui-selector.md
+          - UiSlider: ui/elements/ui-slider.md
+          - UiSpacer: ui/elements/ui-spacer.md
+          - Stack panels: ui/elements/ui-stack-panel.md
+          - UiText: ui/elements/ui-text.md
+          - UiTextBox: ui/elements/ui-text-box.md
+          - UiTexture: ui/elements/ui-texture.md
+          - UiToggleButton: ui/elements/ui-toggle-button.md
+          - UiTooltip: ui/elements/ui-tooltip.md
+          - UiUniformGrid: ui/elements/ui-uniform-grid.md
+          - UiViewbox: ui/elements/ui-viewbox.md
+          - UiWrapPanel: ui/elements/ui-wrap-panel.md
+      - Brushes:
+          - UiBrush: ui/brushes/ui-brush.md
+          - SolidColorBrush: ui/brushes/solid-color-brush.md
+          - OutlineBrush: ui/brushes/outline-brush.md
+          - SpriteBrush: ui/brushes/sprite-brush.md
+          - NineSliceBrush: ui/brushes/nine-slice-brush.md
+          - TiledSpriteBrush: ui/brushes/tiled-sprite-brush.md
+          - LayeredBrush: ui/brushes/layered-brush.md
+  - Input:
+      - Overview: input/index.md
+      - Direct input: input/direct-input.md
+      - Actions, maps, and bindings: input/actions.md
+  - Physics:
+      - Overview: physics/index.md
+      - Colliders and triggers: physics/colliders.md
+      - Queries: physics/queries.md
+      - Shapes: physics/shapes.md
+      - Movement and collision response: physics/movement.md
+  - Rendering:
+      - Overview: rendering/index.md
+      - Cameras and coordinates: rendering/cameras.md
+      - Drawing sprites and primitives: rendering/drawing.md
+      - Lighting: rendering/lighting.md
+      - Render pipeline and post-processing: rendering/pipeline.md
+  - Assets and content:
+      - Overview: assets/index.md
+      - Content projects and Asset Baker: assets/content-pipeline.md
+      - Loading resources: assets/resources.md
+      - Sprites and sprite sheets: assets/sprites.md
+      - Sprite animation: assets/animations.md
+      - Entity blueprints: assets/blueprints.md
+      - Sound cues: assets/sound-cues.md
+      - Particles: assets/particles.md
+  - Audio: audio/index.md
+  - AI:
+      - Overview: ai/index.md
+      - A* pathfinding: ai/pathfinding.md
+      - State machines and blackboards: ai/fsm.md
+  - LDtk:
+      - Overview: ldtk/index.md
+      - Loading worlds and levels: ldtk/loading-levels.md
+      - Mapping LDtk entities: ldtk/entities.md
+  - Scripting and cutscenes: scripting/index.md
+  - Utilities:
+      - Math and ranges: utilities/math.md
+      - Collections and spatial helpers: utilities/collections.md
+
