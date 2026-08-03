@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices.ComTypes;
 using Dreambit.ECS;
 using Dreambit.Examples.Particles;
 using Dreambit.Examples.Pong;
@@ -17,13 +16,27 @@ public class UiExampleScene : Scene<UiExampleScene>
         InitializeSettings();
 
         var menu = CreateEntity("menu")
-            .AttachComponent<UiFrame>();
+            .AttachComponent<UiFrame>()
+            .WithLayout("Ui/menu.xml");
 
-        menu.LayoutPath = "Ui/menu.xml";
+        // Runtime components are detached until added to a container. Their
+        // prefixed IDs then become available through the destination layout.
+        var runtimeBadge = menu.CreateComponent(
+            "Ui/Components/runtime-badge.xml",
+            "runtime.");
+        menu.Layout
+            .GetRequired<UiContainer>("runtime-component-host")
+            .AddChild(runtimeBadge);
 
-        menu.Layout.GetRequired<UiButton>("play-particles-button").Clicked += OnPlayParticlesClicked;
-        menu.Layout.GetRequired<UiButton>("play-pong-button").Clicked += OnPlayPongClicked;
-        menu.Layout.GetRequired<UiButton>("play-spacegame-button").Clicked += OnPlaySpaceGameClicked;
+        menu.Layout
+            .GetRequired<UiButton>("navigation.play-particles-button")
+            .Clicked += OnPlayParticlesClicked;
+        menu.Layout
+            .GetRequired<UiButton>("navigation.play-pong-button")
+            .Clicked += OnPlayPongClicked;
+        menu.Layout
+            .GetRequired<UiButton>("navigation.play-spacegame-button")
+            .Clicked += OnPlaySpaceGameClicked;
         WireControlGallery(menu.Layout);
     }
 
@@ -47,23 +60,21 @@ public class UiExampleScene : Scene<UiExampleScene>
         layout.GetRequired<UiRadioButton>("difficulty-normal").CheckedChanged +=
             (_, args) =>
             {
-                if (args == true)
-                {
+                if (args)
                     status.Text = "Difficulty: Normal";
-                }
             };
 
         layout.GetRequired<UiRadioButton>("difficulty-hard").CheckedChanged +=
             (_, args) =>
             {
-                if (args == true)
+                if (args)
                     status.Text = "Difficulty: Hard";
             };
 
         var popup = layout.GetRequired<UiPopup>("demo-popup");
         layout.GetRequired<UiButton>("open-popup-button").Clicked +=
             _ => popup.Open();
-        layout.GetRequired<UiButton>("close-popup-button").Clicked +=
+        layout.GetRequired<UiButton>("popup.close-button").Clicked +=
             _ => popup.Close();
 
         var overlay = layout.GetRequired<UiOverlay>("demo-overlay");

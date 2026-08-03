@@ -14,9 +14,36 @@ public class UiContainer : UiElement
     {
         ArgumentNullException.ThrowIfNull(child);
 
+        if (child.Parent is not null || Children.Contains(child))
+        {
+            throw new InvalidOperationException(
+                $"{child.GetType().Name} already belongs to a UI container. " +
+                "Remove it from its current parent before adding it again.");
+        }
+
+        if (child.Layout is not null &&
+            !ReferenceEquals(child.Layout, Layout))
+        {
+            throw new InvalidOperationException(
+                $"{child.GetType().Name} is attached to a different UI layout.");
+        }
+
+        for (var ancestor = this;
+             ancestor is not null;
+             ancestor = ancestor.Parent)
+        {
+            if (ReferenceEquals(ancestor, child))
+            {
+                throw new InvalidOperationException(
+                    "A UI element cannot be added beneath one of its descendants.");
+            }
+        }
+
+        Layout?.ValidateIdsForAttachment(child);
+
         child.Parent = this;
-        child.AttachToLayout(Layout);
         Children.Add(child);
+        child.AttachToLayout(Layout);
         InvalidateLayout();
     }
 

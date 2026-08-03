@@ -16,15 +16,26 @@ public class UiFrame : DrawableComponent<UiFrame>
         get => _layoutPath;
         set
         {
-            ArgumentException.ThrowIfNullOrEmpty(value);
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new ArgumentException(
+                    "A UI layout path is required.",
+                    nameof(value));
+            }
 
-            if (_layoutPath == value)
+            if (string.Equals(
+                    _layoutPath,
+                    value,
+                    StringComparison.Ordinal) &&
+                Layout is not null)
+            {
                 return;
-            
-            _layoutPath = value;
-            LoadLayout(_layoutPath);
+            }
+
+            LoadLayout(value);
         }
     }
+
     public UiLayout Layout { get; private set; }
 
     public void LoadLayout(string layoutPath)
@@ -34,31 +45,101 @@ public class UiFrame : DrawableComponent<UiFrame>
                 "A UI layout path is required.",
                 nameof(layoutPath));
 
-        LayoutPath = layoutPath;
-
-        var contentRoot = Path.Combine(
-            AppContext.BaseDirectory,
-            Core.Instance.Content.RootDirectory);
-
-        var fullPath = Path.GetFullPath(
-            Path.Combine(contentRoot, LayoutPath));
+        var contentRoot = GetContentRoot();
+        var fullPath = ResolveContentPath(contentRoot, layoutPath);
 
         if (!File.Exists(fullPath))
         {
             throw new FileNotFoundException(
-                $"UI layout '{LayoutPath}' was not found.",
+                $"UI layout '{layoutPath}' was not found.",
                 fullPath);
         }
 
-        Layout = UiLoader.LoadFromXml(
-            File.ReadAllText(fullPath));
+        // Do not replace a working layout when a reload fails to compose.
+        var newLayout = UiLoader.LoadFromFile(fullPath, contentRoot);
+
+        _layoutPath = layoutPath;
+        Layout = newLayout;
     }
 
     public UiFrame WithLayout(string layoutPath)
     {
         LoadLayout(layoutPath);
-
         return this;
+    }
+
+    /// <summary>
+    /// Creates a detached file-backed component that can be added to a
+    /// container in this frame's current layout.
+    /// </summary>
+    /// <param name="componentPath">A path relative to the content root.</param>
+    /// <param name="idPrefix">Optional text prepended to every authored component ID.</param>
+    /// <returns>The detached component root.</returns>
+    public UiElement CreateComponent(
+        string componentPath,
+        string idPrefix = null)
+    {
+        if (string.IsNullOrWhiteSpace(componentPath))
+        {
+            throw new ArgumentException(
+                "A UI component path is required.",
+                nameof(componentPath));
+        }
+
+        var contentRoot = GetContentRoot();
+        var fullPath = ResolveContentPath(contentRoot, componentPath);
+        return UiLoader.LoadComponentFromFile(
+            fullPath,
+            contentRoot,
+            idPrefix);
+    }
+
+    private static string GetContentRoot()
+    {
+        return Path.GetFullPath(
+            Path.Combine(
+                AppContext.BaseDirectory,
+                Core.Instance.Content.RootDirectory));
+    }
+
+    private static string ResolveContentPath(
+        string contentRoot,
+        string relativePath)
+    {
+        if (Path.IsPathRooted(relativePath))
+        {
+            throw new ArgumentException(
+                "UI content paths must be relative to the content root.",
+                nameof(relativePath));
+        }
+
+        var fullPath = Path.GetFullPath(
+            Path.Combine(contentRoot, relativePath));
+        var resolvedRelativePath = Path.GetRelativePath(contentRoot, fullPath);
+        if (EscapesContentRoot(resolvedRelativePath))
+        {
+            throw new ArgumentException(
+                $"UI path '{relativePath}' resolves outside the content root.",
+                nameof(relativePath));
+        }
+
+        return fullPath;
+    }
+
+    private static bool EscapesContentRoot(string relativePath)
+    {
+        if (Path.IsPathRooted(relativePath) ||
+            string.Equals(relativePath, "..", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return relativePath.StartsWith(
+                   $"..{Path.DirectorySeparatorChar}",
+                   StringComparison.Ordinal) ||
+               relativePath.StartsWith(
+                   $"..{Path.AltDirectorySeparatorChar}",
+                   StringComparison.Ordinal);
     }
 
     internal UiInputCapture RouteInput(UiInputCapture availableInput)

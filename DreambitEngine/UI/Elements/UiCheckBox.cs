@@ -14,14 +14,28 @@ public class UiCheckBox : UiToggleButton
     public IUiBrush IndicatorBrush
     {
         get => _indicatorBrush;
-        set => _indicatorBrush = value;
+        set
+        {
+            if (ReferenceEquals(_indicatorBrush, value))
+                return;
+
+            _indicatorBrush = value;
+            InvalidateDependencies();
+        }
     }
 
     /// <summary>Gets or sets the brush used for the checked mark.</summary>
     public IUiBrush MarkBrush
     {
         get => _markBrush;
-        set => _markBrush = value;
+        set
+        {
+            if (ReferenceEquals(_markBrush, value))
+                return;
+
+            _markBrush = value;
+            InvalidateDependencies();
+        }
     }
 
     /// <summary>Gets or sets the square indicator size.</summary>

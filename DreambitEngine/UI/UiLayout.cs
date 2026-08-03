@@ -227,6 +227,14 @@ public class UiLayout
         }
     }
 
+    internal void ValidateIdsForAttachment(UiElement subtree)
+    {
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        CollectIds(Root, ids, false);
+        CollectIds(PopupLayer, ids, false);
+        CollectIds(subtree, ids, true);
+    }
+
     internal bool IsPointInsideElement(UiElement element, Point point)
     {
         if (!IsInteractive(element) || !element.Bounds.Contains(point))
@@ -791,6 +799,26 @@ public class UiLayout
         }
 
         return null;
+    }
+
+    private static void CollectIds(
+        UiElement element,
+        ISet<string> ids,
+        bool throwOnDuplicate)
+    {
+        if (element is null)
+            return;
+
+        if (!string.IsNullOrWhiteSpace(element.Id) && !ids.Add(element.Id) &&
+            throwOnDuplicate)
+        {
+            throw new InvalidOperationException(
+                $"Cannot attach UI subtree because element id '{element.Id}' " +
+                "already exists in the layout.");
+        }
+
+        foreach (var child in element.Children)
+            CollectIds(child, ids, throwOnDuplicate);
     }
 
     private enum PointerEventKind

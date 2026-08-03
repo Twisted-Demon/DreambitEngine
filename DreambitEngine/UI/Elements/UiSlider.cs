@@ -8,6 +8,9 @@ namespace Dreambit.UI;
 public class UiSlider : UiRangeBase
 {
     private bool _isDragging;
+    private IUiBrush _trackBrush = new SolidColorBrush();
+    private IUiBrush _fillBrush = new SolidColorBrush();
+    private IUiBrush _thumbBrush = new SolidColorBrush();
 
     /// <summary>Creates a focusable slider with solid default visuals.</summary>
     public UiSlider()
@@ -19,11 +22,38 @@ public class UiSlider : UiRangeBase
     /// <summary>Gets or sets the slider axis.</summary>
     public StackOrientation Orientation { get; set; } = StackOrientation.Horizontal;
     /// <summary>Gets or sets the track brush.</summary>
-    public IUiBrush TrackBrush { get; set; } = new SolidColorBrush();
+    public IUiBrush TrackBrush
+    {
+        get => _trackBrush;
+        set
+        {
+            if (ReferenceEquals(_trackBrush, value)) return;
+            _trackBrush = value;
+            InvalidateDependencies();
+        }
+    }
     /// <summary>Gets or sets the completed-range brush.</summary>
-    public IUiBrush FillBrush { get; set; } = new SolidColorBrush();
+    public IUiBrush FillBrush
+    {
+        get => _fillBrush;
+        set
+        {
+            if (ReferenceEquals(_fillBrush, value)) return;
+            _fillBrush = value;
+            InvalidateDependencies();
+        }
+    }
     /// <summary>Gets or sets the draggable thumb brush.</summary>
-    public IUiBrush ThumbBrush { get; set; } = new SolidColorBrush();
+    public IUiBrush ThumbBrush
+    {
+        get => _thumbBrush;
+        set
+        {
+            if (ReferenceEquals(_thumbBrush, value)) return;
+            _thumbBrush = value;
+            InvalidateDependencies();
+        }
+    }
     /// <summary>Gets or sets the track thickness.</summary>
     public int TrackThickness { get; set; } = 4;
     /// <summary>Gets or sets the thumb's main-axis length.</summary>

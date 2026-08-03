@@ -1,0 +1,27 @@
+<UiComponent>
+    <Popup id="root"
+           width="260" height="*"
+           is-open="false"
+           placement-target="open-popup-button"
+           placement="Bottom"
+           vertical-offset="6"
+           padding="3"
+           background-tint="#12161E">
+        <Popup.Background><SolidColorBrush /></Popup.Background>
+        <VerticalStackPanel width="100%" height="*"
+                            padding="12" spacing="10"
+                            cross-alignment="Center">
+            <Text width="100%" height="*"
+                  text="Popup content was included from another XML file."
+                  font="monogram" font-size="18"
+                  text-color="#FFFFFF" />
+            <Button id="close-button"
+                    width="100%" height="30"
+                    background-tint="#486783" hover-tint="#5D83A5">
+                <Button.Background><SolidColorBrush /></Button.Background>
+                <Text width="100%" height="*" text="Close popup"
+                      font="monogram" font-size="18" text-color="#FFFFFF" />
+            </Button>
+        </VerticalStackPanel>
+    </Popup>
+</UiComponent>

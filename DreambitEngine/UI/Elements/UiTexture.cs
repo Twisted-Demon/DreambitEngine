@@ -57,6 +57,7 @@ public class UiTexture : UiElement
     public override void Parse(XmlNode node)
     {
         SpritePath = UiXmlParser.ParseString(node, "sprite", string.Empty);
-        Tint = UiXmlParser.ParseColor(node, "tint");
+        if (node.Attributes?["tint"] is not null)
+            Tint = UiXmlParser.ParseColor(node, "tint");
     }
 }

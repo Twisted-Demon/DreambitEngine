@@ -318,7 +318,8 @@ public class UiText : UiElement
                 node,
                 "horizontal-alignment",
                 "Center"));
-        TextColor = UiXmlParser.ParseColor(node, "text-color");
+        if (node.Attributes?["text-color"] is not null)
+            TextColor = UiXmlParser.ParseColor(node, "text-color");
     }
 
     private static HorizontalAlignment ParseHAlignment(string value)

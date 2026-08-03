@@ -1,0 +1,18 @@
+<UiComponent>
+    <Border id="badge"
+            width="176" height="30"
+            padding="8,3,8,3"
+            background-tint="#315071">
+        <Border.Background>
+            <LayeredBrush>
+                <SolidColorBrush />
+                <OutlineBrush thickness="1" />
+            </LayeredBrush>
+        </Border.Background>
+        <Text id="label"
+              width="100%" height="*"
+              text="Loaded at runtime"
+              font="monogram" font-size="16"
+              text-color="#CDE6FF" />
+    </Border>
+</UiComponent>

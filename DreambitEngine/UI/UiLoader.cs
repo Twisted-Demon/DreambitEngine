@@ -46,7 +46,7 @@ public static class UiLoader
                 continue;
 
             rootPanel.AddChild(
-                ParseElement(child, rootPanel, typeCatalog));
+                ParseElement(child, typeCatalog));
         }
 
         ValidateUniqueIds(rootPanel, []);
@@ -57,13 +57,61 @@ public static class UiLoader
         };
     }
 
+    /// <summary>
+    /// Loads a file-backed UI document and expands its component references
+    /// before creating the retained visual tree.
+    /// </summary>
+    /// <param name="filePath">
+    /// An absolute path inside <paramref name="contentRoot"/>, or a path
+    /// relative to that root.
+    /// </param>
+    /// <param name="contentRoot">The directory component files may be loaded from.</param>
+    /// <returns>The parsed layout.</returns>
+    public static UiLayout LoadFromFile(string filePath, string contentRoot)
+    {
+        var composedXml = UiXmlComposer.ComposeLayout(filePath, contentRoot);
+        return LoadFromXml(composedXml);
+    }
+
+    /// <summary>
+    /// Creates one detached file-backed UI component. The returned element can
+    /// be attached to an existing layout with <see cref="UiContainer.AddChild"/>.
+    /// </summary>
+    /// <param name="filePath">
+    /// An absolute path inside <paramref name="contentRoot"/>, or a path
+    /// relative to that root.
+    /// </param>
+    /// <param name="contentRoot">The directory component files may be loaded from.</param>
+    /// <param name="idPrefix">Optional text prepended to every authored component ID.</param>
+    /// <returns>The detached component root.</returns>
+    public static UiElement LoadComponentFromFile(
+        string filePath,
+        string contentRoot,
+        string idPrefix = null)
+    {
+        var composedXml = UiXmlComposer.ComposeComponentAsLayout(
+            filePath,
+            contentRoot,
+            idPrefix);
+        var temporaryLayout = LoadFromXml(composedXml);
+
+        if (temporaryLayout.Root.Children.Count != 1)
+        {
+            throw new XmlException(
+                $"UI component '{filePath}' did not produce exactly one " +
+                "visual root element.");
+        }
+
+        var component = temporaryLayout.Root.Children[0];
+        temporaryLayout.Root.RemoveChild(component);
+        return component;
+    }
+
     private static UiElement ParseElement(
         XmlNode node,
-        UiContainer parent,
         UiTypeCatalog typeCatalog)
     {
         var element = typeCatalog.CreateElement(node.Name);
-        element.Parent = parent;
         element.ParseInternal(node);
 
         if (element is UiContainer container)
@@ -85,7 +133,7 @@ public static class UiLoader
                 }
 
                 container.AddChild(
-                    ParseElement(childNode, container, typeCatalog));
+                    ParseElement(childNode, typeCatalog));
             }
         }
 
@@ -128,7 +176,7 @@ public static class UiLoader
         else if (typeof(UiElement).IsAssignableFrom(property.PropertyType))
         {
             var valueNode = GetSinglePropertyValueNode(propertyNode);
-            value = ParseElement(valueNode, null, typeCatalog);
+            value = ParseElement(valueNode, typeCatalog);
             if (!property.PropertyType.IsInstanceOfType(value))
             {
                 throw new XmlException(

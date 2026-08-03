@@ -20,6 +20,7 @@ public sealed class UiTextBox : UiControl
     private float _caretElapsed;
     private float _scrollOffset;
     private bool _selecting;
+    private int _maxLength;
 
     /// <summary>Creates a focusable keyboard-capturing text box.</summary>
     public UiTextBox()
@@ -90,7 +91,20 @@ public sealed class UiTextBox : UiControl
     }
 
     /// <summary>Gets or sets the maximum character count, or zero for unlimited.</summary>
-    public int MaxLength { get; set; }
+    public int MaxLength
+    {
+        get => _maxLength;
+        set
+        {
+            var next = Math.Max(0, value);
+            if (_maxLength == next)
+                return;
+
+            _maxLength = next;
+            if (_maxLength > 0 && Text.Length > _maxLength)
+                Text = Text[.._maxLength];
+        }
+    }
     /// <summary>Gets or sets the character used to conceal text, or null for normal display.</summary>
     public char? PasswordCharacter { get; set; }
     /// <summary>Gets the current caret insertion index.</summary>
