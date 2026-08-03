@@ -62,6 +62,9 @@ public class RenderPipeline(Scene scene) : IDisposable
     {
         foreach (var renderer in _renderers)
         {
+            if (renderer is UIRenderPass)
+                continue;
+
             renderer.OnDraw();
         }
 
@@ -79,6 +82,14 @@ public class RenderPipeline(Scene scene) : IDisposable
             Color.White);
 
         Core.SpriteBatch.End();
+
+        // UI is composed after the scene has been presented so it is neither
+        // post-processed nor sampled through the scene render target.
+        foreach (var renderer in _renderers)
+        {
+            if (renderer is UIRenderPass)
+                renderer.OnDraw();
+        }
     }
 
     public static RenderTarget2D CreateRenderTarget()

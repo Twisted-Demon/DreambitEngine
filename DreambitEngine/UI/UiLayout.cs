@@ -18,6 +18,16 @@ public class UiLayout
     private bool _hasPointerPosition;
     private bool _pointerGestureConsumed;
 
+    /// <summary>Creates a layout with a dedicated topmost popup surface.</summary>
+    public UiLayout()
+    {
+        PopupLayer = new UiPopupLayer();
+        PopupLayer.AttachToLayout(this);
+    }
+
+    /// <summary>Gets the topmost surface used by popups, combo boxes, and tooltips.</summary>
+    public UiPopupLayer PopupLayer { get; }
+
     /// <summary>Gets the root container that spans the UI viewport.</summary>
     public UiContainer Root
     {
@@ -31,6 +41,7 @@ public class UiLayout
             _root?.AttachToLayout(null);
             _root = value;
             _root?.AttachToLayout(this);
+            PopupLayer.ActivateRequestedPopups(_root);
             ValidateInteractionState();
         }
     }
@@ -56,7 +67,7 @@ public class UiLayout
         if (string.IsNullOrWhiteSpace(id))
             return null;
 
-        return FindRecursive(Root, id);
+        return FindRecursive(PopupLayer, id) ?? FindRecursive(Root, id);
     }
 
     /// <summary>Gets an element by ID and verifies its expected type.</summary>
@@ -94,6 +105,11 @@ public class UiLayout
         Root.Arrange(viewport);
         Root.Update(input);
 
+        PopupLayer.ResolveDependenciesRecursive();
+        PopupLayer.Measure(viewport.Size);
+        PopupLayer.Arrange(viewport);
+        PopupLayer.Update(input);
+
         ValidateInteractionState();
 
         return RoutePointer(input) | RouteKeyboardAndNavigation(input);
@@ -116,6 +132,7 @@ public class UiLayout
             Graphics.SpriteBatch.GraphicsDevice,
             transform);
         Root.DrawRecursive(context);
+        PopupLayer.DrawRecursive(context);
     }
 
     /// <summary>Moves focus to an eligible element owned by this layout.</summary>
@@ -226,9 +243,21 @@ public class UiLayout
 
     private UiInputCapture RoutePointer(in UiInputState input)
     {
-        var hit = input.PointerInWindow
-            ? HitTest(Root, input.PointerPosition.ToPoint(), null)
+        var point = input.PointerPosition.ToPoint();
+        var popupHit = input.PointerInWindow
+            ? HitTest(PopupLayer, point, null)
             : null;
+        if (input.PrimaryPressed)
+        {
+            PopupLayer.DismissForPointerTarget(popupHit);
+            popupHit = input.PointerInWindow
+                ? HitTest(PopupLayer, point, null)
+                : null;
+        }
+
+        var hit = popupHit ?? (input.PointerInWindow
+            ? HitTest(Root, point, null)
+            : null);
         UpdatePointerOverRoute(hit);
 
         var captureOwnerAtStart = PointerCapturedElement;
@@ -301,7 +330,18 @@ public class UiLayout
 
     private UiInputCapture RouteKeyboardAndNavigation(in UiInputState input)
     {
-        var capture = FocusedElement?.CapturesKeyboardInput == true
+        var blockingOverlay = GetTopmostBlockingOverlay();
+        if (blockingOverlay is not null &&
+            !IsDescendantOf(FocusedElement, blockingOverlay))
+        {
+            var focusTarget = EnumerateDepthFirst(blockingOverlay)
+                .FirstOrDefault(IsFocusCandidate) ?? blockingOverlay;
+            Focus(focusTarget);
+        }
+
+        var capture = blockingOverlay is not null
+            ? UiInputCapture.Keyboard | UiInputCapture.GamePad
+            : FocusedElement?.CapturesKeyboardInput == true
             ? UiInputCapture.Keyboard
             : UiInputCapture.None;
         if (FocusedElement is not null && input.KeyboardNavigationHeld)
@@ -314,7 +354,12 @@ public class UiLayout
         {
             foreach (var key in input.PressedKeys ?? [])
             {
-                if (RouteKeyEvent(FocusedElement, key, true))
+                if (RouteKeyEvent(
+                        FocusedElement,
+                        key,
+                        true,
+                        input.ShiftDown,
+                        input.ControlDown))
                 {
                     handledKeys.Add(key);
                     capture |= UiInputCapture.Keyboard;
@@ -323,7 +368,12 @@ public class UiLayout
 
             foreach (var key in input.ReleasedKeys ?? [])
             {
-                if (RouteKeyEvent(FocusedElement, key, false))
+                if (RouteKeyEvent(
+                        FocusedElement,
+                        key,
+                        false,
+                        input.ShiftDown,
+                        input.ControlDown))
                     capture |= UiInputCapture.Keyboard;
             }
         }
@@ -484,9 +534,18 @@ public class UiLayout
         });
     }
 
-    private static bool RouteKeyEvent(UiElement source, Keys key, bool pressed)
+    private static bool RouteKeyEvent(
+        UiElement source,
+        Keys key,
+        bool pressed,
+        bool shiftDown,
+        bool controlDown)
     {
-        var args = new UiKeyEventArgs(source, key);
+        var args = new UiKeyEventArgs(
+            source,
+            key,
+            shiftDown,
+            controlDown);
         RouteToAncestors(source, element =>
         {
             args.CurrentTarget = element;
@@ -609,7 +668,16 @@ public class UiLayout
 
     private List<UiElement> GetFocusCandidates()
     {
-        return EnumerateDepthFirst(Root)
+        var blockingOverlay = GetTopmostBlockingOverlay();
+        if (blockingOverlay is not null)
+        {
+            return EnumerateDepthFirst(blockingOverlay)
+                .Where(IsFocusCandidate)
+                .ToList();
+        }
+
+        return EnumerateDepthFirst(PopupLayer)
+            .Concat(EnumerateDepthFirst(Root))
             .Where(IsFocusCandidate)
             .ToList();
     }
@@ -671,6 +739,30 @@ public class UiLayout
         }
 
         return null;
+    }
+
+    private UiOverlay GetTopmostBlockingOverlay()
+    {
+        return EnumerateDepthFirst(PopupLayer)
+            .Concat(EnumerateDepthFirst(Root))
+            .OfType<UiOverlay>()
+            .Where(overlay =>
+                overlay.BlocksInput &&
+                overlay.IsEffectivelyVisible &&
+                overlay.IsEffectivelyEnabled)
+            .OrderBy(overlay => overlay.ZIndex)
+            .LastOrDefault();
+    }
+
+    private static bool IsDescendantOf(UiElement element, UiElement ancestor)
+    {
+        for (var current = element; current is not null; current = current.Parent)
+        {
+            if (ReferenceEquals(current, ancestor))
+                return true;
+        }
+
+        return false;
     }
 
     private static UiInputCapture CaptureForDevice(UiInputDevice device)

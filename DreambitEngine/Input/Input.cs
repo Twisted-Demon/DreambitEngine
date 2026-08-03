@@ -54,6 +54,9 @@ public static class Input
     // --- Game pad ---
     private static GamePadState _prevGp;
     private static GamePadState _currGp;
+    private static readonly System.Collections.Generic.List<char> _pendingTextInput = [];
+    private static char[] _textInput = [];
+    private static bool _textInputSubscribed;
 
     #endregion
 
@@ -67,6 +70,12 @@ public static class Input
         _prevKb = _currKb = Keyboard.GetState();
         _prevMs = _currMs = Mouse.GetState();
         _prevGp = _currGp = GamePad.GetState(PlayerIndex.One);
+
+        if (!_textInputSubscribed && Core.Instance?.Window is not null)
+        {
+            Core.Instance.Window.TextInput += OnTextInput;
+            _textInputSubscribed = true;
+        }
     }
 
     /// <summary>
@@ -78,6 +87,8 @@ public static class Input
         _currKb = Keyboard.GetState();
         _currMs = Mouse.GetState();
         _currGp = GamePad.GetState(PlayerIndex.One);
+        _textInput = _pendingTextInput.ToArray();
+        _pendingTextInput.Clear();
     }
 
     /// <summary>
@@ -158,6 +169,22 @@ public static class Input
     {
         return _currKb.IsKeyDown(Keys.LeftShift) ||
                _currKb.IsKeyDown(Keys.RightShift);
+    }
+
+    internal static bool IsRawControlDown()
+    {
+        return _currKb.IsKeyDown(Keys.LeftControl) ||
+               _currKb.IsKeyDown(Keys.RightControl);
+    }
+
+    internal static char[] GetRawTextInput()
+    {
+        return _textInput;
+    }
+
+    private static void OnTextInput(object sender, TextInputEventArgs args)
+    {
+        _pendingTextInput.Add(args.Character);
     }
 
     internal static Keys[] GetRawPressedKeys()

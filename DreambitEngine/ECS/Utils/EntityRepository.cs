@@ -26,6 +26,8 @@ public class EntityRepository
     private readonly Scene _scene;
     private readonly Dictionary<Guid, Entity> _toCreateById = new(64);
 
+    public int Count => _entities.Count + _entitiesToCreate.Count;
+
     public EntityRepository(Scene scene)
     {
         _scene = scene;

@@ -1,73 +1,464 @@
 <Ui>
-    <VerticalStackPanel id="main-menu"
-                        anchor="Center"
-                        origin="Center"
-                        width="30%"
-                        height="*"
-                        spacing="8"
-                        grow-direction="Center"
-                        cross-alignment="Center">
-        <Text id="menu-title"
-              width="*"
+    <Grid id="showcase"
+          width="100%"
+          height="100%"
+          rows="54,*,58"
+          columns="*"
+          padding="18">
+        <Text grid-row="0"
+              width="100%"
               height="*"
-              text="Dreambit UI Examples"
+              text="Dreambit UI Control Gallery"
               font="monogram"
               font-size="32"
               text-color="#FFFFFF"
               horizontal-alignment="Center" />
 
-        <Button id="play-particles-button"
-                width="45%"
-                height="32"
-                background-tint="#FFFFFF"
-                hover-tint="#D8E8FF"
-                focused-tint="#D8E8FF"
-                pressed-tint="#9FB9D4">
+        <Grid grid-row="1"
+              width="100%"
+              height="100%"
+              rows="*"
+              columns="1*,1*,1*"
+              padding="0,0,0,12">
+            <Border grid-column="0"
+                    width="96%"
+                    height="100%"
+                    padding="14"
+                    background-tint="#242832">
+                <Border.Background>
+                    <LayeredBrush>
+                        <SolidColorBrush />
+                        <OutlineBrush thickness="1" />
+                    </LayeredBrush>
+                </Border.Background>
 
-            <Text width="*"
-                  height="*"
-                  text="Particles Example"
-                  font="monogram"
-                  font-size="18"
+                <VerticalStackPanel width="100%"
+                                    height="100%"
+                                    spacing="8"
+                                    cross-alignment="Start">
+                    <Text width="100%" height="*"
+                          text="Input &amp; toggles"
+                          font="monogram" font-size="24"
+                          text-color="#8FC7FF"
+                          horizontal-alignment="Left" />
+
+                    <TextBox id="player-name-textbox"
+                             width="100%" height="34"
+                             text="Dreamer"
+                             placeholder="Player name"
+                             font="monogram" font-size="18"
+                             text-color="#FFFFFF"
+                             placeholder-color="#89909E"
+                             background-tint="#11141A"
+                             focused-tint="#253A52">
+                        <TextBox.Background>
+                            <SolidColorBrush />
+                        </TextBox.Background>
+                    </TextBox>
+
+                    <CheckBox id="sound-checkbox"
+                              width="100%" height="28"
+                              is-checked="true"
+                              checked-tint="#4F9B70"
+                              indicator-tint="#586170"
+                              mark-tint="#FFFFFF">
+                        <Text width="100%" height="*"
+                              text="Enable sound"
+                              font="monogram" font-size="18"
+                              text-color="#FFFFFF"
+                              horizontal-alignment="Left" />
+                    </CheckBox>
+
+                    <Text width="100%" height="*"
+                          text="Difficulty"
+                          font="monogram" font-size="18"
+                          text-color="#BFC7D5"
+                          horizontal-alignment="Left" />
+
+                    <RadioButton id="difficulty-normal"
+                                 group="difficulty"
+                                 width="100%" height="26"
+                                 is-checked="true"
+                                 indicator-tint="#586170"
+                                 mark-tint="#8FC7FF">
+                        <Text width="100%" height="*"
+                              text="Normal"
+                              font="monogram" font-size="18"
+                              text-color="#FFFFFF"
+                              horizontal-alignment="Left" />
+                    </RadioButton>
+
+                    <RadioButton id="difficulty-hard"
+                                 group="difficulty"
+                                 width="100%" height="26"
+                                 indicator-tint="#586170"
+                                 mark-tint="#FF9D88">
+                        <Text width="100%" height="*"
+                              text="Hard"
+                              font="monogram" font-size="18"
+                              text-color="#FFFFFF"
+                              horizontal-alignment="Left" />
+                    </RadioButton>
+
+                    <Text width="100%" height="*"
+                          text="Resolution"
+                          font="monogram" font-size="18"
+                          text-color="#BFC7D5"
+                          horizontal-alignment="Left" />
+
+                    <ComboBox id="resolution-combo"
+                              width="100%" height="34"
+                              items="1280x720,1600x900,1920x1080"
+                              selected-index="0"
+                              font="monogram" font-size="18"
+                              background-tint="#11141A"
+                              hover-tint="#29384A"
+                              open-tint="#315071">
+                        <ComboBox.Background>
+                            <SolidColorBrush />
+                        </ComboBox.Background>
+                    </ComboBox>
+
+                    <Text id="interaction-status"
+                          width="100%" height="*"
+                          text="Try keyboard, mouse, or controller navigation."
+                          font="monogram" font-size="16"
+                          text-color="#AAB3C2"
+                          horizontal-alignment="Left" />
+                </VerticalStackPanel>
+            </Border>
+
+            <Border grid-column="1"
+                    width="96%"
+                    height="100%"
+                    padding="14"
+                    background-tint="#242832">
+                <Border.Background>
+                    <LayeredBrush>
+                        <SolidColorBrush />
+                        <OutlineBrush thickness="1" />
+                    </LayeredBrush>
+                </Border.Background>
+
+                <VerticalStackPanel width="100%"
+                                    height="100%"
+                                    spacing="8"
+                                    cross-alignment="Start">
+                    <Text width="100%" height="*"
+                          text="Ranges &amp; selection"
+                          font="monogram" font-size="24"
+                          text-color="#8FC7FF"
+                          horizontal-alignment="Left" />
+
+                    <Text width="100%" height="*"
+                          text="Volume slider"
+                          font="monogram" font-size="18"
+                          text-color="#BFC7D5"
+                          horizontal-alignment="Left" />
+
+                    <Slider id="volume-slider"
+                            width="100%" height="24"
+                            minimum="0" maximum="100"
+                            value="65" step="5"
+                            track-tint="#424A58"
+                            fill-tint="#55A5EE"
+                            thumb-tint="#FFFFFF">
+                        <Slider.TrackBrush><SolidColorBrush /></Slider.TrackBrush>
+                        <Slider.FillBrush><SolidColorBrush /></Slider.FillBrush>
+                        <Slider.ThumbBrush><SolidColorBrush /></Slider.ThumbBrush>
+                    </Slider>
+
+                    <ProgressBar id="volume-progress"
+                                 width="100%" height="16"
+                                 minimum="0" maximum="100"
+                                 value="65"
+                                 track-tint="#303641"
+                                 fill-tint="#55A5EE">
+                        <ProgressBar.TrackBrush><SolidColorBrush /></ProgressBar.TrackBrush>
+                        <ProgressBar.FillBrush><SolidColorBrush /></ProgressBar.FillBrush>
+                    </ProgressBar>
+
+                    <Text width="100%" height="*"
+                          text="Scrollbar foundation"
+                          font="monogram" font-size="18"
+                          text-color="#BFC7D5"
+                          horizontal-alignment="Left" />
+
+                    <ScrollBar id="demo-scrollbar"
+                               width="100%" height="20"
+                               minimum="0" maximum="100"
+                               value="25" step="5"
+                               viewport-size="30"
+                               track-tint="#424A58"
+                               fill-tint="#7C8DA5"
+                               thumb-tint="#DDE5EF" />
+
+                    <Text width="100%" height="*"
+                          text="ListBox"
+                          font="monogram" font-size="18"
+                          text-color="#BFC7D5"
+                          horizontal-alignment="Left" />
+
+                    <ListBox id="loadout-list"
+                             width="100%" height="132"
+                             spacing="2"
+                             selected-index="0"
+                             background-tint="#11141A">
+                        <ListBox.Background><SolidColorBrush /></ListBox.Background>
+                        <Button width="100%" height="30"
+                                background-tint="#242C38"
+                                hover-tint="#34465A"
+                                selected-tint="#376A99">
+                            <Button.Background><SolidColorBrush /></Button.Background>
+                            <Text width="100%" height="*" text="Explorer"
+                                  font="monogram" font-size="18"
+                                  text-color="#FFFFFF"
+                                  horizontal-alignment="Left" />
+                        </Button>
+                        <Button width="100%" height="30"
+                                background-tint="#242C38"
+                                hover-tint="#34465A"
+                                selected-tint="#376A99">
+                            <Button.Background><SolidColorBrush /></Button.Background>
+                            <Text width="100%" height="*" text="Engineer"
+                                  font="monogram" font-size="18"
+                                  text-color="#FFFFFF"
+                                  horizontal-alignment="Left" />
+                        </Button>
+                        <Button width="100%" height="30"
+                                background-tint="#242C38"
+                                hover-tint="#34465A"
+                                selected-tint="#376A99">
+                            <Button.Background><SolidColorBrush /></Button.Background>
+                            <Text width="100%" height="*" text="Pilot"
+                                  font="monogram" font-size="18"
+                                  text-color="#FFFFFF"
+                                  horizontal-alignment="Left" />
+                        </Button>
+                    </ListBox>
+                </VerticalStackPanel>
+            </Border>
+
+            <Border grid-column="2"
+                    width="96%"
+                    height="100%"
+                    padding="14"
+                    background-tint="#242832">
+                <Border.Background>
+                    <LayeredBrush>
+                        <SolidColorBrush />
+                        <OutlineBrush thickness="1" />
+                    </LayeredBrush>
+                </Border.Background>
+
+                <VerticalStackPanel width="100%"
+                                    height="100%"
+                                    spacing="8"
+                                    cross-alignment="Start">
+                    <Text width="100%" height="*"
+                          text="Layout &amp; popup surfaces"
+                          font="monogram" font-size="24"
+                          text-color="#8FC7FF"
+                          horizontal-alignment="Left" />
+
+                    <Text width="100%" height="*"
+                          text="Canvas"
+                          font="monogram" font-size="18"
+                          text-color="#BFC7D5"
+                          horizontal-alignment="Left" />
+
+                    <Canvas width="100%" height="82">
+                        <Border x="0" y="0" width="92" height="30"
+                                background-tint="#3B5872">
+                            <Border.Background><SolidColorBrush /></Border.Background>
+                            <Text width="100%" height="*" text="x: 0"
+                                  font="monogram" font-size="16"
+                                  text-color="#FFFFFF" />
+                        </Border>
+                        <Border x="105" y="38" width="118" height="34"
+                                background-tint="#674C72">
+                            <Border.Background><SolidColorBrush /></Border.Background>
+                            <Text width="100%" height="*" text="x: 105, y: 38"
+                                  font="monogram" font-size="16"
+                                  text-color="#FFFFFF" />
+                        </Border>
+                    </Canvas>
+
+                    <Text width="100%" height="*"
+                          text="UniformGrid"
+                          font="monogram" font-size="18"
+                          text-color="#BFC7D5"
+                          horizontal-alignment="Left" />
+
+                    <UniformGrid width="100%" height="76"
+                                 columns="3" spacing="5">
+                        <Button background-tint="#3B5872" hover-tint="#52799B">
+                            <Button.Background><SolidColorBrush /></Button.Background>
+                            <Text width="100%" height="*" text="1"
+                                  font="monogram" font-size="18" text-color="#FFFFFF" />
+                        </Button>
+                        <Button background-tint="#3B5872" hover-tint="#52799B">
+                            <Button.Background><SolidColorBrush /></Button.Background>
+                            <Text width="100%" height="*" text="2"
+                                  font="monogram" font-size="18" text-color="#FFFFFF" />
+                        </Button>
+                        <Button background-tint="#3B5872" hover-tint="#52799B">
+                            <Button.Background><SolidColorBrush /></Button.Background>
+                            <Text width="100%" height="*" text="3"
+                                  font="monogram" font-size="18" text-color="#FFFFFF" />
+                        </Button>
+                        <Button background-tint="#3B5872" hover-tint="#52799B">
+                            <Button.Background><SolidColorBrush /></Button.Background>
+                            <Text width="100%" height="*" text="4"
+                                  font="monogram" font-size="18" text-color="#FFFFFF" />
+                        </Button>
+                        <Button background-tint="#3B5872" hover-tint="#52799B">
+                            <Button.Background><SolidColorBrush /></Button.Background>
+                            <Text width="100%" height="*" text="5"
+                                  font="monogram" font-size="18" text-color="#FFFFFF" />
+                        </Button>
+                        <Button background-tint="#3B5872" hover-tint="#52799B">
+                            <Button.Background><SolidColorBrush /></Button.Background>
+                            <Text width="100%" height="*" text="6"
+                                  font="monogram" font-size="18" text-color="#FFFFFF" />
+                        </Button>
+                    </UniformGrid>
+
+                    <Text width="100%" height="*"
+                          text="Viewbox"
+                          font="monogram" font-size="18"
+                          text-color="#BFC7D5"
+                          horizontal-alignment="Left" />
+
+                    <Viewbox width="100%" height="66" stretch="Uniform">
+                        <Border width="120" height="40"
+                                background-tint="#4F8063">
+                            <Border.Background><SolidColorBrush /></Border.Background>
+                            <Text width="100%" height="*" text="120 x 40 content"
+                                  font="monogram" font-size="16"
+                                  text-color="#FFFFFF" />
+                        </Border>
+                    </Viewbox>
+
+                    <HorizontalStackPanel width="100%" height="36"
+                                          spacing="8" cross-alignment="Center">
+                        <Button id="open-popup-button"
+                                width="48%" height="34"
+                                background-tint="#486783"
+                                hover-tint="#5D83A5">
+                            <Button.Background><SolidColorBrush /></Button.Background>
+                            <Text width="100%" height="*" text="Open popup"
+                                  font="monogram" font-size="18" text-color="#FFFFFF" />
+                            <Button.Tooltip>
+                                <Tooltip width="240" height="*" delay="0.25"
+                                         background-tint="#11141A">
+                                    <Tooltip.Background><SolidColorBrush /></Tooltip.Background>
+                                    <Text width="100%" height="*"
+                                          text="Tooltips use the same topmost popup layer."
+                                          font="monogram" font-size="16"
+                                          text-color="#FFFFFF"
+                                          horizontal-alignment="Left" />
+                                </Tooltip>
+                            </Button.Tooltip>
+                        </Button>
+                        <Button id="show-overlay-button"
+                                width="48%" height="34"
+                                background-tint="#6E557A"
+                                hover-tint="#8A6A98">
+                            <Button.Background><SolidColorBrush /></Button.Background>
+                            <Text width="100%" height="*" text="Show overlay"
+                                  font="monogram" font-size="18" text-color="#FFFFFF" />
+                        </Button>
+                    </HorizontalStackPanel>
+                </VerticalStackPanel>
+            </Border>
+        </Grid>
+
+        <UniformGrid grid-row="2"
+                     width="100%" height="42"
+                     columns="3" spacing="10">
+            <Button id="play-particles-button"
+                    background-tint="#8D3F49" hover-tint="#B05260"
+                    pressed-tint="#6D3038">
+                <Button.Background><SolidColorBrush /></Button.Background>
+                <Text width="100%" height="*" text="Particles Example"
+                      font="monogram" font-size="18" text-color="#FFFFFF" />
+            </Button>
+            <Button id="play-spacegame-button"
+                    background-tint="#8D3F49" hover-tint="#B05260"
+                    pressed-tint="#6D3038">
+                <Button.Background><SolidColorBrush /></Button.Background>
+                <Text width="100%" height="*" text="Space Game Example"
+                      font="monogram" font-size="18" text-color="#FFFFFF" />
+            </Button>
+            <Button id="play-pong-button"
+                    background-tint="#8D3F49" hover-tint="#B05260"
+                    pressed-tint="#6D3038">
+                <Button.Background><SolidColorBrush /></Button.Background>
+                <Text width="100%" height="*" text="Pong Example"
+                      font="monogram" font-size="18" text-color="#FFFFFF" />
+            </Button>
+        </UniformGrid>
+    </Grid>
+
+    <Popup id="demo-popup"
+           width="260" height="*"
+           is-open="false"
+           placement-target="open-popup-button"
+           placement="Bottom"
+           vertical-offset="6"
+           padding="3"
+           background-tint="#12161E">
+        <Popup.Background><SolidColorBrush /></Popup.Background>
+        <VerticalStackPanel width="100%" height="*"
+                            padding="12" spacing="10"
+                            cross-alignment="Center">
+            <Text width="100%" height="*"
+                  text="Popup content can be any UI tree."
+                  font="monogram" font-size="18"
                   text-color="#FFFFFF" />
-        </Button>
+            <Button id="close-popup-button"
+                    width="100%" height="30"
+                    background-tint="#486783" hover-tint="#5D83A5">
+                <Button.Background><SolidColorBrush /></Button.Background>
+                <Text width="100%" height="*" text="Close popup"
+                      font="monogram" font-size="18" text-color="#FFFFFF" />
+            </Button>
+        </VerticalStackPanel>
+    </Popup>
 
-        <Button id="play-spacegame-button"
-                width="45%"
-                height="32"
-                background-tint="#FFFFFF"
-                hover-tint="#D8E8FF"
-                focused-tint="#D8E8FF"
-                pressed-tint="#9FB9D4">
-            <Button.Background>
-                <SpriteBrush sprite="Ui/red-button.sprite" />
-            </Button.Background>
-
-            <Text width="*"
-                  height="*"
-                  text="Space Game Example"
-                  font="monogram"
-                  font-size="18"
-                  text-color="#FFFFFF" />
-        </Button>
-
-        <Button id="play-pong-button"
-                width="45%"
-                height="32"
-                background-tint="#FFFFFF"
-                hover-tint="#D8E8FF"
-                focused-tint="#D8E8FF"
-                pressed-tint="#9FB9D4">
-            <Button.Background>
-                <SpriteBrush sprite="Ui/red-button.sprite" />
-            </Button.Background>
-
-            <Text width="*"
-                  height="*"
-                  text="Pong Example"
-                  font="monogram"
-                  font-size="18"
-                  text-color="#FFFFFF" />
-        </Button>
-    </VerticalStackPanel>
+    <Overlay id="demo-overlay"
+             width="100%" height="100%"
+             z="1000"
+             is-visible="false"
+             blocks-input="true"
+             background-tint="#000000B8">
+        <Overlay.Background><SolidColorBrush /></Overlay.Background>
+        <Border width="360" height="190"
+                padding="18"
+                background-tint="#242832">
+            <Border.Background>
+                <LayeredBrush>
+                    <SolidColorBrush />
+                    <OutlineBrush thickness="2" />
+                </LayeredBrush>
+            </Border.Background>
+            <VerticalStackPanel width="100%" height="100%"
+                                spacing="12" cross-alignment="Center"
+                                grow-direction="Center">
+                <Text width="100%" height="*" text="Modal overlay"
+                      font="monogram" font-size="28" text-color="#FFFFFF" />
+                <Text width="100%" height="*"
+                      text="Pointer and keyboard input cannot pass through this surface."
+                      font="monogram" font-size="18" text-color="#BFC7D5" />
+                <Button id="close-overlay-button"
+                        width="70%" height="34"
+                        background-tint="#8D3F49" hover-tint="#B05260">
+                    <Button.Background><SolidColorBrush /></Button.Background>
+                    <Text width="100%" height="*" text="Close overlay"
+                          font="monogram" font-size="18" text-color="#FFFFFF" />
+                </Button>
+            </VerticalStackPanel>
+        </Border>
+    </Overlay>
 </Ui>

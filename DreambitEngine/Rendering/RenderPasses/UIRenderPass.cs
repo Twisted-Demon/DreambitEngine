@@ -8,7 +8,9 @@ namespace Dreambit;
 [SuppressMessage("ReSharper", "InconsistentNaming")]
 public class UIRenderPass : RenderPass
 {
+    private static UIRenderPass _activePass;
     private RasterizerState _scissorRasterizerState;
+    private bool _batchActive;
 
     public override void Initialize()
     {
@@ -26,28 +28,66 @@ public class UIRenderPass : RenderPass
         var drawLayers = Scene.Drawables.GetDrawLayers();
         var layerOrder = drawLayers.Keys.OrderBy(x => x).ToList();
 
-        Device.SetRenderTarget(RenderPipeline.SceneRenderTarget);
+        Device.SetRenderTarget(null);
         
         for (var i = 0; i < layerOrder.Count; i++)
         {
-            Core.SpriteBatch.Begin(
-                transformMatrix: Scene.UiCamera.TopLeftTransformMatrix,
-                sortMode: SpriteSortMode.Immediate,
-                samplerState: Scene.RenderingOptions.UISamplerState,
-                blendState: BlendState.AlphaBlend,
-                rasterizerState: _scissorRasterizerState,
-                effect: DefaultEffect);
-
-            foreach (var drawable  in drawLayers[layerOrder[i]])
+            _activePass = this;
+            BeginBatch();
+            try
             {
-                if (!drawable.Enabled || !drawable.Entity.Enabled)
-                    continue;
+                foreach (var drawable in drawLayers[layerOrder[i]])
+                {
+                    if (!drawable.Enabled || !drawable.Entity.Enabled)
+                        continue;
 
-                drawable.OnDrawUi();
+                    drawable.OnDrawUi();
+                }
             }
-            
-            Core.SpriteBatch.End();
+            finally
+            {
+                EndBatch();
+                _activePass = null;
+            }
         }
+    }
+
+    /// <summary>
+    /// Flushes queued UI sprites before a draw context changes GPU scissor
+    /// state. A new deferred batch is opened immediately with identical state.
+    /// </summary>
+    internal static void FlushForScissorChange()
+    {
+        _activePass?.RestartBatch();
+    }
+
+    private void BeginBatch()
+    {
+        Core.SpriteBatch.Begin(
+            transformMatrix: Scene.UiCamera.TopLeftTransformMatrix,
+            sortMode: SpriteSortMode.Deferred,
+            samplerState: Scene.RenderingOptions.UISamplerState,
+            blendState: BlendState.AlphaBlend,
+            rasterizerState: _scissorRasterizerState);
+        _batchActive = true;
+    }
+
+    private void EndBatch()
+    {
+        if (!_batchActive)
+            return;
+
+        Core.SpriteBatch.End();
+        _batchActive = false;
+    }
+
+    private void RestartBatch()
+    {
+        if (!_batchActive)
+            return;
+
+        EndBatch();
+        BeginBatch();
     }
 
     public override void OnDraw()

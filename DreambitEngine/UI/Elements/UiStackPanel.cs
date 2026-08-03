@@ -124,7 +124,13 @@ public abstract class UiStackPanelBase : UiContainer
     {
         var padding = UiXmlParser.ParseString(node, "padding", null);
         if (!string.IsNullOrEmpty(padding))
-            ParsePadding(padding);
+        {
+            var parsedPadding = UiXmlParser.ParseThickness(padding, "Padding");
+            PaddingLeft = parsedPadding.Left;
+            PaddingTop = parsedPadding.Top;
+            PaddingRight = parsedPadding.Right;
+            PaddingBottom = parsedPadding.Bottom;
+        }
 
         Spacing = UiXmlParser.ParseInt(node, "spacing", 0);
 
@@ -313,23 +319,6 @@ public abstract class UiStackPanelBase : UiContainer
         return StackGrowDirection.Start;
     }
 
-    private void ParsePadding(string value)
-    {
-        var parts = value.Split(',');
-
-        if (parts.Length == 1)
-        {
-            var padding = int.Parse(parts[0]);
-            PaddingLeft = PaddingTop = PaddingRight = PaddingBottom = padding;
-        }
-        else if (parts.Length == 4)
-        {
-            PaddingLeft = int.Parse(parts[0]);
-            PaddingTop = int.Parse(parts[1]);
-            PaddingRight = int.Parse(parts[2]);
-            PaddingBottom = int.Parse(parts[3]);
-        }
-    }
 }
 
 /// <summary>Arranges child elements sequentially from top to bottom.</summary>

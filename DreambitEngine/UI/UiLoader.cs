@@ -68,6 +68,7 @@ public static class UiLoader
 
         if (element is UiContainer container)
         {
+            var parsedProperties = new HashSet<string>(StringComparer.Ordinal);
             foreach (XmlNode childNode in node.ChildNodes)
             {
                 if (childNode.NodeType != XmlNodeType.Element)
@@ -77,7 +78,8 @@ public static class UiLoader
                         element,
                         node.Name,
                         childNode,
-                        typeCatalog))
+                        typeCatalog,
+                        parsedProperties))
                 {
                     continue;
                 }
@@ -94,74 +96,136 @@ public static class UiLoader
         UiElement element,
         string elementName,
         XmlNode propertyNode,
-        UiTypeCatalog typeCatalog)
+        UiTypeCatalog typeCatalog,
+        ISet<string> parsedProperties)
     {
-        var backgroundPropertyName = $"{elementName}.Background";
-        if (propertyNode.Name != backgroundPropertyName)
+        var prefix = $"{elementName}.";
+        if (!propertyNode.Name.StartsWith(prefix, StringComparison.Ordinal))
             return false;
 
-        if (element is not UiContentControl contentControl)
+        var propertyName = propertyNode.Name[prefix.Length..];
+        var property = element.GetType().GetProperty(
+            propertyName,
+            BindingFlags.Instance | BindingFlags.Public);
+        if (property is null || property.SetMethod is null)
         {
             throw new XmlException(
-                $"<{backgroundPropertyName}> is only valid on a content control.");
+                $"<{propertyNode.Name}> does not name a writable public property " +
+                $"on {element.GetType().Name}.");
         }
 
-        if (contentControl.Background is not null)
+        if (!parsedProperties.Add(propertyName))
         {
             throw new XmlException(
-                $"<{backgroundPropertyName}> can only be specified once.");
+                $"<{propertyNode.Name}> can only be specified once.");
         }
 
-        contentControl.Background = ParseBrush(propertyNode, typeCatalog);
+        object value;
+        if (typeof(IUiBrush).IsAssignableFrom(property.PropertyType))
+        {
+            value = ParseBrushProperty(propertyNode, typeCatalog);
+        }
+        else if (typeof(UiElement).IsAssignableFrom(property.PropertyType))
+        {
+            var valueNode = GetSinglePropertyValueNode(propertyNode);
+            value = ParseElement(valueNode, null, typeCatalog);
+            if (!property.PropertyType.IsInstanceOfType(value))
+            {
+                throw new XmlException(
+                    $"<{propertyNode.Name}> requires a " +
+                    $"{property.PropertyType.Name} value.");
+            }
+        }
+        else
+        {
+            throw new XmlException(
+                $"<{propertyNode.Name}> uses unsupported property type " +
+                $"{property.PropertyType.Name}.");
+        }
+
+        property.SetValue(element, value);
         return true;
     }
 
-    private static IUiBrush ParseBrush(
+    private static IUiBrush ParseBrushProperty(
         XmlNode propertyNode,
         UiTypeCatalog typeCatalog)
     {
-        XmlNode brushNode = null;
+        var brushNode = GetSinglePropertyValueNode(propertyNode);
+        return ParseBrush(brushNode, typeCatalog);
+    }
 
+    private static XmlNode GetSinglePropertyValueNode(XmlNode propertyNode)
+    {
+        XmlNode valueNode = null;
         foreach (XmlNode childNode in propertyNode.ChildNodes)
         {
             if (childNode.NodeType != XmlNodeType.Element)
                 continue;
 
-            if (brushNode is not null)
+            if (valueNode is not null)
             {
                 throw new XmlException(
-                    $"<{propertyNode.Name}> must contain exactly one brush.");
+                    $"<{propertyNode.Name}> must contain exactly one value.");
             }
 
-            brushNode = childNode;
+            valueNode = childNode;
         }
 
-        if (brushNode is null)
+        if (valueNode is null)
         {
             throw new XmlException(
-                $"<{propertyNode.Name}> must contain exactly one brush.");
+                $"<{propertyNode.Name}> must contain exactly one value.");
         }
 
+        return valueNode;
+    }
+
+    /// <summary>
+    /// Creates and parses one brush element using brush types discovered from
+    /// all loaded assemblies.
+    /// </summary>
+    /// <param name="brushNode">The concrete brush XML element.</param>
+    /// <returns>The parsed brush.</returns>
+    public static IUiBrush ParseBrush(XmlNode brushNode)
+    {
+        ArgumentNullException.ThrowIfNull(brushNode);
+        return ParseBrush(brushNode, new UiTypeCatalog());
+    }
+
+    /// <summary>
+    /// Creates every brush element directly contained by an XML node. This is
+    /// used by composite brushes and is also available to custom brushes.
+    /// </summary>
+    /// <param name="parentNode">The node containing concrete brush elements.</param>
+    /// <returns>The brushes in their XML order.</returns>
+    public static IList<IUiBrush> ParseBrushes(XmlNode parentNode)
+    {
+        ArgumentNullException.ThrowIfNull(parentNode);
+        return ParseBrushes(parentNode, new UiTypeCatalog());
+    }
+
+    private static IUiBrush ParseBrush(
+        XmlNode brushNode,
+        UiTypeCatalog typeCatalog)
+    {
         var brush = typeCatalog.CreateBrush(brushNode.Name);
         brush.Parse(brushNode);
         return brush;
     }
 
     private static IList<IUiBrush> ParseBrushes(
-        XmlNode propertyNode,
+        XmlNode parentNode,
         UiTypeCatalog typeCatalog)
     {
         IList<IUiBrush> result = [];
-        
-        foreach (XmlNode childNode in propertyNode.ChildNodes)
+
+        foreach (XmlNode childNode in parentNode.ChildNodes)
         {
             if (childNode.NodeType != XmlNodeType.Element)
                 continue;
-            
-            var brush = typeCatalog.CreateBrush(childNode.Name);
-            brush.Parse(childNode);
 
-            result.Add(brush);
+            result.Add(ParseBrush(childNode, typeCatalog));
         }
 
         return result;

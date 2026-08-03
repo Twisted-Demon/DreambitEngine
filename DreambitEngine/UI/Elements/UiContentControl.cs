@@ -1,5 +1,4 @@
 using System;
-using System.Globalization;
 using System.Xml;
 using Microsoft.Xna.Framework;
 
@@ -12,6 +11,7 @@ namespace Dreambit.UI;
 public class UiContentControl : UiContainer
 {
     private IUiBrush _background;
+    private Color _backgroundTint = Color.White;
 
     /// <summary>Creates a single-content control that participates in hit testing.</summary>
     public UiContentControl()
@@ -29,7 +29,11 @@ public class UiContentControl : UiContainer
     /// <summary>Gets or sets the anchor used to align content within the padded bounds.</summary>
     public UiAnchor ContentAlignment { get; set; } = UiAnchor.Center;
     /// <summary>Gets or sets the default tint passed to the background brush.</summary>
-    public Color BackgroundTint { get; set; } = Color.White;
+    public virtual Color BackgroundTint
+    {
+        get => _backgroundTint;
+        set => _backgroundTint = value;
+    }
 
     /// <summary>Gets or sets the visual drawn behind the content.</summary>
     public IUiBrush Background
@@ -165,8 +169,9 @@ public class UiContentControl : UiContainer
                 $"<{node.Name}.Background> with a brush element.");
         }
 
-        Padding = ParseThickness(
-            UiXmlParser.ParseString(node, "padding", "0"));
+        Padding = UiXmlParser.ParseThickness(
+            UiXmlParser.ParseString(node, "padding", "0"),
+            "Padding");
         ContentAlignment = UiXmlParser.ParseAnchor(
             UiXmlParser.ParseString(
                 node,
@@ -179,28 +184,4 @@ public class UiContentControl : UiContainer
                 "background-tint");
     }
 
-    private static UiThickness ParseThickness(string value)
-    {
-        var parts = value.Split(',');
-
-        if (parts.Length == 1)
-            return UiThickness.Uniform(ParsePart(parts[0]));
-
-        if (parts.Length == 4)
-        {
-            return new UiThickness(
-                ParsePart(parts[0]),
-                ParsePart(parts[1]),
-                ParsePart(parts[2]),
-                ParsePart(parts[3]));
-        }
-
-        throw new XmlException(
-            "Padding must be one value or four comma-separated values.");
-    }
-
-    private static int ParsePart(string value)
-    {
-        return int.Parse(value.Trim(), CultureInfo.InvariantCulture);
-    }
 }

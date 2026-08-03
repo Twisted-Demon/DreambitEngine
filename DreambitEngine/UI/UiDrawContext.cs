@@ -20,6 +20,7 @@ internal sealed class UiDrawContext : IDisposable
 
         var viewport = device.Viewport.Bounds;
         _clips.Push(viewport);
+        UIRenderPass.FlushForScissorChange();
         _device.ScissorRectangle = viewport;
     }
 
@@ -30,7 +31,15 @@ internal sealed class UiDrawContext : IDisposable
         var transformed = TransformBounds(bounds);
         var clipped = Rectangle.Intersect(_clips.Peek(), transformed);
         _clips.Push(clipped);
-        _device.ScissorRectangle = clipped;
+
+        // A zero-sized scissor rectangle is invalid on some graphics backends.
+        // The draw traversal skips empty clips, so retain the last valid GPU
+        // scissor until the empty clip is popped instead of submitting it.
+        if (!clipped.IsEmpty)
+        {
+            UIRenderPass.FlushForScissorChange();
+            _device.ScissorRectangle = clipped;
+        }
     }
 
     public void PopClip()
@@ -39,11 +48,17 @@ internal sealed class UiDrawContext : IDisposable
             return;
 
         _clips.Pop();
-        _device.ScissorRectangle = _clips.Peek();
+        var clip = _clips.Peek();
+        if (!clip.IsEmpty)
+        {
+            UIRenderPass.FlushForScissorChange();
+            _device.ScissorRectangle = clip;
+        }
     }
 
     public void Dispose()
     {
+        UIRenderPass.FlushForScissorChange();
         _device.ScissorRectangle = _previousScissor;
     }
 

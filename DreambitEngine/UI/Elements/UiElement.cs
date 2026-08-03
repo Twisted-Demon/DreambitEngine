@@ -23,6 +23,7 @@ public abstract class UiElement
     private bool _isFocusable;
     private bool _capturesKeyboardInput;
     private bool _clipToBounds;
+    private UiTooltip _tooltip;
 
     internal UiLayout Layout { get; private set; }
     
@@ -33,10 +34,15 @@ public abstract class UiElement
     private UiAnchor _anchor = UiAnchor.TopLeft;
     private UiAnchor _origin = UiAnchor.TopLeft;
     private int _zIndex = 0;
+    private int _gridRow;
+    private int _gridColumn;
+    private int _gridRowSpan = 1;
+    private int _gridColumnSpan = 1;
     private Rectangle _lastParentBounds;
     private bool _hasParentBounds;
     private Point _lastMeasureAvailableSize;
     private bool _hasMeasure;
+    private bool _forceArrange;
 
     /// <summary>
     /// Gets or sets whether this element and its subtree participate in layout,
@@ -66,6 +72,7 @@ public abstract class UiElement
                 return;
 
             _isEnabled = value;
+            OnEnabledChanged(value);
             Layout?.ValidateInteractionState();
         }
     }
@@ -109,6 +116,23 @@ public abstract class UiElement
     {
         get => _clipToBounds;
         set => _clipToBounds = value;
+    }
+
+    /// <summary>Gets or sets the delayed popup displayed while this element is hovered.</summary>
+    public UiTooltip Tooltip
+    {
+        get => _tooltip;
+        set
+        {
+            if (ReferenceEquals(_tooltip, value))
+                return;
+
+            _tooltip?.Close();
+            _tooltip?.AttachToLayout(null);
+            _tooltip = value;
+            _tooltip?.SetTarget(this);
+            _tooltip?.AttachToLayout(Layout);
+        }
     }
 
     /// <summary>Gets whether this element currently owns keyboard/controller focus.</summary>
@@ -270,6 +294,58 @@ public abstract class UiElement
         DependenciesDirty = true;
     }
 
+    /// <summary>Gets or sets the zero-based row used when the parent is a <see cref="UiGrid"/>.</summary>
+    public int GridRow
+    {
+        get => _gridRow;
+        set
+        {
+            var resolved = Math.Max(0, value);
+            if (_gridRow == resolved) return;
+            _gridRow = resolved;
+            Parent?.InvalidateLayout();
+        }
+    }
+
+    /// <summary>Gets or sets the zero-based column used when the parent is a <see cref="UiGrid"/>.</summary>
+    public int GridColumn
+    {
+        get => _gridColumn;
+        set
+        {
+            var resolved = Math.Max(0, value);
+            if (_gridColumn == resolved) return;
+            _gridColumn = resolved;
+            Parent?.InvalidateLayout();
+        }
+    }
+
+    /// <summary>Gets or sets how many grid rows this element occupies.</summary>
+    public int GridRowSpan
+    {
+        get => _gridRowSpan;
+        set
+        {
+            var resolved = Math.Max(1, value);
+            if (_gridRowSpan == resolved) return;
+            _gridRowSpan = resolved;
+            Parent?.InvalidateLayout();
+        }
+    }
+
+    /// <summary>Gets or sets how many grid columns this element occupies.</summary>
+    public int GridColumnSpan
+    {
+        get => _gridColumnSpan;
+        set
+        {
+            var resolved = Math.Max(1, value);
+            if (_gridColumnSpan == resolved) return;
+            _gridColumnSpan = resolved;
+            Parent?.InvalidateLayout();
+        }
+    }
+
     /// <summary>Gets whether this element and all of its ancestors are visible.</summary>
     public bool IsEffectivelyVisible =>
         IsVisible && (Parent?.IsEffectivelyVisible ?? true);
@@ -303,8 +379,13 @@ public abstract class UiElement
         var previousLayout = Layout;
         Layout = layout;
 
+        Tooltip?.AttachToLayout(layout);
+
         foreach (var child in Children)
             child.AttachToLayout(layout);
+
+        if (!ReferenceEquals(previousLayout, layout))
+            OnAttachedToLayout(previousLayout, layout);
 
         if (!ReferenceEquals(previousLayout, layout))
             previousLayout?.ValidateInteractionState();
@@ -325,6 +406,7 @@ public abstract class UiElement
     /// <param name="force">Whether to recalculate even when the cached layout is valid.</param>
     protected void ArrangeSelf(Rectangle parentBounds, bool force = false)
     {
+        force |= _forceArrange;
         if (!_hasMeasure ||
             _lastMeasureAvailableSize != parentBounds.Size)
         {
@@ -343,6 +425,42 @@ public abstract class UiElement
         _lastParentBounds = parentBounds;
         _hasParentBounds = true;
         LayoutDirty = false;
+    }
+
+    /// <summary>
+    /// Arranges this element to fill an exact slot without permanently
+    /// replacing its authored position or size values.
+    /// </summary>
+    internal void ArrangeStretched(Rectangle slot)
+    {
+        var oldX = _x;
+        var oldY = _y;
+        var oldWidth = _width;
+        var oldHeight = _height;
+        var oldAnchor = _anchor;
+        var oldOrigin = _origin;
+        var oldForceArrange = _forceArrange;
+        try
+        {
+            _x = UiLength.Pixels(0);
+            _y = UiLength.Pixels(0);
+            _width = UiLength.Percent(1f);
+            _height = UiLength.Percent(1f);
+            _anchor = UiAnchor.TopLeft;
+            _origin = UiAnchor.TopLeft;
+            _forceArrange = true;
+            Arrange(slot);
+        }
+        finally
+        {
+            _x = oldX;
+            _y = oldY;
+            _width = oldWidth;
+            _height = oldHeight;
+            _anchor = oldAnchor;
+            _origin = oldOrigin;
+            _forceArrange = oldForceArrange;
+        }
     }
 
     /// <summary>Calculates the size this element wants within the available space.</summary>
@@ -548,6 +666,8 @@ public abstract class UiElement
     /// <param name="input">The pointer state for the current frame.</param>
     protected virtual void OnUpdate(in UiInputState input)
     {
+        Tooltip?.UpdateForTarget(this);
+
         foreach (var child in Children)
             child.Update(input);
     }
@@ -691,6 +811,14 @@ public abstract class UiElement
     /// <summary>Responds when this element gains or loses focus.</summary>
     protected virtual void OnFocusChanged(bool isFocused) { }
 
+    /// <summary>Responds when this element's enabled state changes.</summary>
+    protected virtual void OnEnabledChanged(bool isEnabled) { }
+
+    /// <summary>Responds when this element is attached to or detached from a layout.</summary>
+    protected virtual void OnAttachedToLayout(
+        UiLayout previousLayout,
+        UiLayout currentLayout) { }
+
     /// <summary>Responds when the pointer enters or leaves this element's route.</summary>
     protected virtual void OnPointerOverChanged(bool isPointerOver) { }
 
@@ -719,6 +847,10 @@ public abstract class UiElement
         Origin = UiXmlParser.ParseAnchor(
             UiXmlParser.ParseString(node, "origin", "TopLeft"));
         ZIndex = UiXmlParser.ParseInt(node, "z", 0);
+        GridRow = UiXmlParser.ParseInt(node, "grid-row", 0);
+        GridColumn = UiXmlParser.ParseInt(node, "grid-column", 0);
+        GridRowSpan = UiXmlParser.ParseInt(node, "grid-row-span", 1);
+        GridColumnSpan = UiXmlParser.ParseInt(node, "grid-column-span", 1);
         IsVisible = UiXmlParser.ParseBool(node, "is-visible", true);
         IsEnabled = UiXmlParser.ParseBool(node, "is-enabled", true);
         IsHitTestVisible = UiXmlParser.ParseBool(

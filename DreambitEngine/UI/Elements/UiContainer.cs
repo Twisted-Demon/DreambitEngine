@@ -20,6 +20,38 @@ public class UiContainer : UiElement
         InvalidateLayout();
     }
 
+    /// <summary>Removes an owned child and detaches it from this layout.</summary>
+    /// <param name="child">The child to remove.</param>
+    /// <returns><see langword="true"/> when the child belonged to this container.</returns>
+    public virtual bool RemoveChild(UiElement child)
+    {
+        if (child is null || !Children.Remove(child))
+            return false;
+
+        child.Parent = null;
+        child.AttachToLayout(null);
+        InvalidateLayout();
+        Layout?.ValidateInteractionState();
+        return true;
+    }
+
+    /// <summary>Removes and detaches every child owned by this container.</summary>
+    public virtual void ClearChildren()
+    {
+        if (Children.Count == 0)
+            return;
+
+        foreach (var child in Children)
+        {
+            child.Parent = null;
+            child.AttachToLayout(null);
+        }
+
+        Children.Clear();
+        InvalidateLayout();
+        Layout?.ValidateInteractionState();
+    }
+
     /// <inheritdoc />
     protected override Point MeasureContent(Point availableSize)
     {

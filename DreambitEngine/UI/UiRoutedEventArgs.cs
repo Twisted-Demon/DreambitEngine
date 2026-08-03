@@ -65,14 +65,26 @@ public sealed class UiPointerEventArgs : UiRoutedEventArgs
 /// <summary>Contains a key transition routed to the focused element.</summary>
 public sealed class UiKeyEventArgs : UiRoutedEventArgs
 {
-    internal UiKeyEventArgs(UiElement source, Keys key)
+    internal UiKeyEventArgs(
+        UiElement source,
+        Keys key,
+        bool shiftDown,
+        bool controlDown)
     {
         Source = source;
         Key = key;
+        ShiftDown = shiftDown;
+        ControlDown = controlDown;
     }
 
     /// <summary>Gets the key associated with this event.</summary>
     public Keys Key { get; }
+
+    /// <summary>Gets whether either Shift key was held for this transition.</summary>
+    public bool ShiftDown { get; }
+
+    /// <summary>Gets whether either Control key was held for this transition.</summary>
+    public bool ControlDown { get; }
 }
 
 /// <summary>Contains a directional navigation request.</summary>

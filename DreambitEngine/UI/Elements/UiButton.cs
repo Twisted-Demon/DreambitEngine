@@ -8,7 +8,7 @@ namespace Dreambit.UI;
 /// A single-content control that tracks pointer interaction, raises click
 /// events, and changes its background tint for hover and pressed states.
 /// </summary>
-public class UiButton : UiContentControl
+public class UiButton : UiControl
 {
     private bool _pressStartedInside;
 
@@ -25,12 +25,8 @@ public class UiButton : UiContentControl
     public bool IsHovered { get; private set; }
     /// <summary>Gets whether an inside press is currently held.</summary>
     public bool IsPressed { get; private set; }
-    /// <summary>Gets or sets the background tint used while hovered.</summary>
-    public Color HoverTint { get; set; } = Color.LightGray;
-    /// <summary>Gets or sets the background tint used while pressed.</summary>
-    public Color PressedTint { get; set; } = Color.Gray;
-    /// <summary>Gets or sets the background tint used while keyboard/controller focused.</summary>
-    public Color FocusedTint { get; set; } = Color.LightGray;
+    /// <inheritdoc />
+    protected override bool IsPressedForVisualState => IsPressed;
 
     /// <inheritdoc />
     protected override void OnPointerPressed(UiPointerEventArgs args)
@@ -48,7 +44,7 @@ public class UiButton : UiContentControl
     protected override void OnPointerReleased(UiPointerEventArgs args)
     {
         if (_pressStartedInside && IsPointerOver)
-            Clicked?.Invoke(this);
+            OnClick();
 
         _pressStartedInside = false;
         IsPressed = false;
@@ -65,7 +61,7 @@ public class UiButton : UiContentControl
     /// <inheritdoc />
     protected override void OnActivated(UiCommandEventArgs args)
     {
-        Clicked?.Invoke(this);
+        OnClick();
         args.Handled = true;
     }
 
@@ -76,31 +72,16 @@ public class UiButton : UiContentControl
         IsPressed = false;
     }
 
-    /// <inheritdoc />
-    protected override Color GetBackgroundTint()
+    /// <summary>Raises the click event and provides an override point for derived controls.</summary>
+    protected virtual void OnClick()
     {
-        return IsPressed
-            ? PressedTint
-            : IsHovered
-                ? HoverTint
-                : IsFocused
-                    ? FocusedTint
-                    : BackgroundTint;
+        Clicked?.Invoke(this);
     }
 
     /// <inheritdoc />
     public override void Parse(XmlNode node)
     {
         base.Parse(node);
-        
-        if (node.Attributes?["hover-tint"] is not null)
-            HoverTint = UiXmlParser.ParseColor(node, "hover-tint");
-
-        if (node.Attributes?["pressed-tint"] is not null)
-            PressedTint = UiXmlParser.ParseColor(node, "pressed-tint");
-
-        if (node.Attributes?["focused-tint"] is not null)
-            FocusedTint = UiXmlParser.ParseColor(node, "focused-tint");
     }
     
 }

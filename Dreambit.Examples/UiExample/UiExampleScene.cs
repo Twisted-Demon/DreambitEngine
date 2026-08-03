@@ -20,17 +20,46 @@ public class UiExampleScene : Scene<UiExampleScene>
 
         menu.LayoutPath = "Ui/menu.xml";
 
-        menu.Layout
-            .GetRequired<UiButton>("play-particles-button")
-            .Clicked += OnPlayParticlesClicked;
+        menu.Layout.GetRequired<UiButton>("play-particles-button").Clicked += OnPlayParticlesClicked;
+        menu.Layout.GetRequired<UiButton>("play-pong-button").Clicked += OnPlayPongClicked;
+        menu.Layout.GetRequired<UiButton>("play-spacegame-button").Clicked += OnPlaySpaceGameClicked;
+        WireControlGallery(menu.Layout);
+    }
 
-        menu.Layout
-            .GetRequired<UiButton>("play-pong-button")
-            .Clicked += OnPlayPongClicked;
+    private static void WireControlGallery(UiLayout layout)
+    {
+        var slider = layout.GetRequired<UiSlider>("volume-slider");
+        var progress = layout.GetRequired<UiProgressBar>("volume-progress");
+        var status = layout.GetRequired<UiText>("interaction-status");
+        slider.ValueChanged += (_, value) =>
+        {
+            progress.Value = value;
+            status.Text = $"Volume: {value:0}";
+        };
 
-        menu.Layout
-            .GetRequired<UiButton>("play-spacegame-button")
-            .Clicked += OnPlaySpaceGameClicked;
+        layout.GetRequired<UiListBox>("loadout-list").SelectionChanged +=
+            (_, args) => status.Text = $"Loadout index: {args.NewIndex}";
+
+        layout.GetRequired<UiComboBox>("resolution-combo").SelectionChanged +=
+            (_, _, value) => status.Text = $"Resolution: {value}";
+
+        var popup = layout.GetRequired<UiPopup>("demo-popup");
+        layout.GetRequired<UiButton>("open-popup-button").Clicked +=
+            _ => popup.Open();
+        layout.GetRequired<UiButton>("close-popup-button").Clicked +=
+            _ => popup.Close();
+
+        var overlay = layout.GetRequired<UiOverlay>("demo-overlay");
+        layout.GetRequired<UiButton>("show-overlay-button").Clicked += _ =>
+        {
+            overlay.IsVisible = true;
+            layout.GetRequired<UiButton>("close-overlay-button").Focus();
+        };
+        layout.GetRequired<UiButton>("close-overlay-button").Clicked += _ =>
+        {
+            overlay.IsVisible = false;
+            layout.GetRequired<UiButton>("show-overlay-button").Focus();
+        };
     }
 
 

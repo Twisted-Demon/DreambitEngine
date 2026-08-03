@@ -145,21 +145,36 @@ public class Core : Game
     }
 
 #if DEBUG || RELEASE
-    private float _debugElapsedTime;
+    private const float TitleUpdateInterval = 1f;
+
+    private float _titleElapsedTime;
+    private int _titleFrameCount;
     private void UpdateTitle()
     {
-        _debugElapsedTime += Time.DeltaTime;
-
-        if (_debugElapsedTime < 1f)
+        _titleElapsedTime += Time.UnscaledDeltaTime;
+        _titleFrameCount++;
+        
+        if (_titleElapsedTime < TitleUpdateInterval)
             return;
-        _debugElapsedTime = 0f;
-        var memory = Process.GetCurrentProcess().PrivateMemorySize64;
-        var megabytes = (double)memory / (1024 * 1024);
-        megabytes = Math.Round(megabytes, 2);
 
-        var entities = CurrentScene.Entities.GetAllEntities().Count;
+        var framesPerSecond =
+            (int)MathF.Round(_titleFrameCount / _titleElapsedTime);
 
-        Dreambit.Window.SetTitle($"{GameName} {Time.FrameRate}fps | memory: {megabytes}MB | entities: {entities}");
+        using var process = Process.GetCurrentProcess();
+
+        var memoryMegabytes =
+            process.PrivateMemorySize64 / (1024d * 1024d);
+
+        var entityCount =
+            CurrentScene?.Entities.Count ?? 0;
+        
+        Dreambit.Window.SetTitle(
+            $"{GameName} {framesPerSecond}fps | " +
+            $"memory: {memoryMegabytes:F2}MB | " +
+            $"entities: {entityCount}");
+
+        _titleElapsedTime = 0f;
+        _titleFrameCount = 0;
     }
 #endif
 }

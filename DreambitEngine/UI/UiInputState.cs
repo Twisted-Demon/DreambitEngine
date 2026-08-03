@@ -15,6 +15,9 @@ namespace Dreambit.UI;
 /// <param name="ScrollDelta">The pointer-wheel movement for this update.</param>
 /// <param name="PressedKeys">Keys pressed during this update.</param>
 /// <param name="ReleasedKeys">Keys released during this update.</param>
+/// <param name="TextInput">Text characters entered during this update.</param>
+/// <param name="ShiftDown">Whether either Shift key is currently held.</param>
+/// <param name="ControlDown">Whether either Control key is currently held.</param>
 /// <param name="NavigationDirection">The requested spatial focus direction.</param>
 /// <param name="NavigationDevice">The device that requested spatial navigation.</param>
 /// <param name="FocusNext">Whether sequential focus should move forward.</param>
@@ -34,6 +37,9 @@ public readonly record struct UiInputState(
     int ScrollDelta,
     Keys[] PressedKeys,
     Keys[] ReleasedKeys,
+    char[] TextInput,
+    bool ShiftDown,
+    bool ControlDown,
     UiNavigationDirection? NavigationDirection,
     UiInputDevice NavigationDevice,
     bool FocusNext,
