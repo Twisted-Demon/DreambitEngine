@@ -5,7 +5,7 @@ using Microsoft.Xna.Framework;
 namespace Dreambit.Examples.SpaceGame;
 
 [Require(typeof(Mover))]
-public class SpaceGameProjectile : Component<SpaceGameProjectile>
+public class SpaceGameProjectile : Component
 {
     public float Velocity;
     public Vector3 Direction;

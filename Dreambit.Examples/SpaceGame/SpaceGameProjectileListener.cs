@@ -3,7 +3,7 @@ using Dreambit.ECS;
 
 namespace Dreambit.Examples.SpaceGame;
 
-public class SpaceGameProjectileListener : Component<SpaceGameProjectileListener>
+public class SpaceGameProjectileListener : Component
 {
     public Action OnProjectileHit;
     

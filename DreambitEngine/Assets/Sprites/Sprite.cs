@@ -12,7 +12,6 @@ public class Sprite : DreambitAsset
     public Texture2D Texture { get; internal set; }
 
     [JsonProperty("source")]
-    [JsonConverter(typeof(RectangleConverter))]
     public Rectangle SourceRect { get; init; }
 
     [JsonProperty("texture")]

@@ -5,7 +5,7 @@ using Microsoft.Xna.Framework;
 namespace Dreambit.ECS;
 
 [BlueprintType(nameof(RigidBody2D))]
-public class RigidBody2D : Component<RigidBody2D>
+public class RigidBody2D : Component
 {
     #region Private Members / Fields
 

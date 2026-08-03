@@ -5,7 +5,7 @@ using Vector2 = System.Numerics.Vector2;
 namespace Dreambit.Examples.Pong;
 
 [Require(typeof(RectDrawer), typeof(BoxCollider))]
-public class PongPaddle : Component<PongPaddle>
+public class PongPaddle : Component
 {
     public PlayerNumber PlayerNumber { get; set; } = PlayerNumber.One;
 

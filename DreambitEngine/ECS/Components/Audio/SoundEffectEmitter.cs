@@ -5,7 +5,7 @@ using Microsoft.Xna.Framework.Audio;
 namespace Dreambit.ECS.Audio;
 
 [BlueprintType("SoundEffectEmitter")]
-public class SoundEffectEmitter : Component<SoundEffectEmitter>
+public class SoundEffectEmitter : Component
 {
     private SoundEffectInstance[] _pool = new SoundEffectInstance[5];
     private int _poolIdx;

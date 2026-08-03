@@ -3,16 +3,29 @@ using Microsoft.Xna.Framework.Media;
 
 namespace Dreambit;
 
-public class SongLoader : AssetLoaderBase
+public sealed class SongLoader : AssetLoaderBase
 {
     public override string Extension { get; } = ".audb";
-    public override bool AddToDisposableList { get; } = true;
-    public override Type TargetType { get; } = typeof(Song);
 
-    public override object Load(string assetName, string pakName, bool usePak, string contentDirectory)
+    public override bool AddToDisposableList { get; } = true;
+
+    public override Type TargetType { get; } =
+        typeof(Song);
+
+    public override object Load(
+        string assetName,
+        string pakName,
+        bool usePak,
+        string contentDirectory)
     {
-        using var s = GetStream(assetName, pakName, usePak, contentDirectory);
-        var song = AudbLoader.LoadSong(s);
-        return song;
+        using var stream = GetStream(
+            GetPath(assetName),
+            pakName,
+            usePak,
+            contentDirectory);
+
+        return AudbLoader.LoadSongAsset(
+            stream,
+            assetName);
     }
 }

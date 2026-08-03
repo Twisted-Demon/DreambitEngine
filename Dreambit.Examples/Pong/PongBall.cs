@@ -6,7 +6,7 @@ using Microsoft.Xna.Framework;
 namespace Dreambit.Examples.Pong;
 
 [Require(typeof(BoxCollider), typeof(RectDrawer))]
-public class PongBall : Component<PongBall>
+public class PongBall : Component
 {
     private BoxCollider _collider;
     private RectDrawer _rectDrawer;

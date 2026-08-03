@@ -2,7 +2,7 @@
 
 namespace Dreambit.Examples.SpaceGame;
 
-public class SpaceGameSpawner : Component<SpaceGameSpawner>
+public class SpaceGameSpawner : Component
 {
     
 }

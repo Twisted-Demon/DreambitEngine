@@ -1,71 +1,89 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System;
+using System.Runtime.CompilerServices;
 
 namespace Dreambit;
 
-public class Logger<T> : ILogger where T : class
+public class Logger<T>() : Logger(typeof(T));
+
+public class Logger : ILogger
 {
-    private readonly string _prefix = typeof(T).Name;
+    public Logger()
+    {
+        
+    }
+
+    public Logger(string prefix)
+    {
+        Prefix = prefix;
+    }
+
+    public Logger(Type prefixType)
+    {
+        Prefix = prefixType.Name;
+    }
+
+    protected readonly string Prefix = string.Empty;
 
     public LogLevel Level { get; set; } = LogLevel.None;
 
     public void Trace(string format, params object[] args)
     {
         if (!Enabled(LogLevel.Trace)) return;
-        LogSink.Enqueue(new LogEntry(LogLevel.Trace, _prefix, format, args));
+        LogSink.Enqueue(new LogEntry(LogLevel.Trace, Prefix, format, args));
     }
 
     public void Trace(string message)
     {
         if (!Enabled(LogLevel.Trace)) return;
-        LogSink.Enqueue(new LogEntry(LogLevel.Trace, _prefix, message, null));
+        LogSink.Enqueue(new LogEntry(LogLevel.Trace, Prefix, message, null));
     }
 
     public void Info(string format, params object[] args)
     {
         if (!Enabled(LogLevel.Info)) return;
-        LogSink.Enqueue(new LogEntry(LogLevel.Info, _prefix, format, args));
+        LogSink.Enqueue(new LogEntry(LogLevel.Info, Prefix, format, args));
     }
 
     public void Info(string message)
     {
         if (!Enabled(LogLevel.Info)) return;
-        LogSink.Enqueue(new LogEntry(LogLevel.Info, _prefix, message, null));
+        LogSink.Enqueue(new LogEntry(LogLevel.Info, Prefix, message, null));
     }
 
     public void Debug(string format, params object[] args)
     {
         if (!Enabled(LogLevel.Debug)) return;
-        LogSink.Enqueue(new LogEntry(LogLevel.Debug, _prefix, format, args));
+        LogSink.Enqueue(new LogEntry(LogLevel.Debug, Prefix, format, args));
     }
 
     public void Debug(string message)
     {
         if (!Enabled(LogLevel.Debug)) return;
-        LogSink.Enqueue(new LogEntry(LogLevel.Debug, _prefix, message, null));
+        LogSink.Enqueue(new LogEntry(LogLevel.Debug, Prefix, message, null));
     }
 
     public void Warn(string format, params object[] args)
     {
         if (!Enabled(LogLevel.Warn)) return;
-        LogSink.Enqueue(new LogEntry(LogLevel.Warn, _prefix, format, args));
+        LogSink.Enqueue(new LogEntry(LogLevel.Warn, Prefix, format, args));
     }
 
     public void Warn(string message)
     {
         if (!Enabled(LogLevel.Warn)) return;
-        LogSink.Enqueue(new LogEntry(LogLevel.Warn, _prefix, message, null));
+        LogSink.Enqueue(new LogEntry(LogLevel.Warn, Prefix, message, null));
     }
 
     public void Error(string format, params object[] args)
     {
         if (!Enabled(LogLevel.Error)) return;
-        LogSink.Enqueue(new LogEntry(LogLevel.Error, _prefix, format, args));
+        LogSink.Enqueue(new LogEntry(LogLevel.Error, Prefix, format, args));
     }
 
     public void Error(string message)
     {
         if (!Enabled(LogLevel.Error)) return;
-        LogSink.Enqueue(new LogEntry(LogLevel.Error, _prefix, message, null));
+        LogSink.Enqueue(new LogEntry(LogLevel.Error, Prefix, message, null));
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

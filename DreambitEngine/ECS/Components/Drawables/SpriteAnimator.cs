@@ -5,7 +5,7 @@ namespace Dreambit.ECS;
 
 [BlueprintType(nameof(SpriteAnimator))]
 [Require(typeof(SpriteDrawer))]
-public class SpriteAnimator : Component<SpriteAnimator>
+public class SpriteAnimator : Component
 {
     private readonly Dictionary<string, Action> _eventActions = [];
 

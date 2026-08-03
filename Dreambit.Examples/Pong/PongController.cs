@@ -5,7 +5,7 @@ using Microsoft.Xna.Framework.Input;
 
 namespace Dreambit.Examples.Pong;
 
-public class PongController : Component<PongController>
+public class PongController : Component
 {
     private PongPaddle _playerOnePaddle;
     private PongPaddle _playerTwoPaddle;

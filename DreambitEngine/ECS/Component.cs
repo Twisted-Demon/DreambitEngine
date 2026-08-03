@@ -5,14 +5,9 @@ using YamlDotNet.Serialization.Schemas;
 
 namespace Dreambit.ECS;
 
-public abstract class Component<T> : Component where T : Component
-{
-    protected new static readonly ILogger Logger = new Logger<T>();
-}
-
 public abstract class Component : IDisposable
 {
-    private static readonly ILogger Logger = new Logger<Component>();
+    protected readonly ILogger Logger;
     private bool _enabled = true;
     private bool _isDisposed;
     internal bool IsDestroyed;
@@ -25,6 +20,12 @@ public abstract class Component : IDisposable
     public Entity Entity { get; internal set; }
     public Scene Scene => Entity?.Scene;
 
+    public Component()
+    {
+        Logger = new Logger(GetType());
+    }
+    
+    
     public bool Enabled
     {
         get => _enabled;
@@ -68,7 +69,7 @@ public abstract class Component : IDisposable
     {
         if (!type.IsSubclassOf(typeof(Component)))
         {
-            Logger.Warn("{0} is not a valid component type on deserialization", type.FullName);
+            Core.Logger.Warn("{0} is not a valid component type on deserialization", type.FullName);
             return null;
         }
 
@@ -456,7 +457,7 @@ public abstract class Component : IDisposable
     }
 }
 
-public class SingletonComponent<T> : Component<T> where T : SingletonComponent<T>
+public class SingletonComponent<T> : Component where T : SingletonComponent<T>
 {
     public static T Instance { get; private set; }
 

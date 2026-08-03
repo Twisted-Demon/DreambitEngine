@@ -4,13 +4,20 @@ using Microsoft.Xna.Framework.Audio;
 
 namespace Dreambit;
 
-public class SoundEffectLoader : AssetLoaderBase
+public sealed class SoundEffectLoader : AssetLoaderBase
 {
     public override string Extension { get; } = ".audb";
-    public override bool AddToDisposableList { get; } = true;
-    public override Type TargetType { get; } = typeof(SoundEffect);
 
-    public override object Load(string assetName, string pakName, bool usePak, string contentDirectory)
+    public override bool AddToDisposableList { get; } = true;
+
+    public override Type TargetType { get; } =
+        typeof(SoundEffect);
+
+    public override object Load(
+        string assetName,
+        string pakName,
+        bool usePak,
+        string contentDirectory)
     {
         using var audbStream = GetStream(
             GetPath(assetName),
@@ -18,15 +25,42 @@ public class SoundEffectLoader : AssetLoaderBase
             usePak,
             contentDirectory);
 
-        var (header, payload) = AudbLoader.ReadAudb(audbStream);
+        var (header, payload) =
+            AudbLoader.ReadAudb(audbStream);
 
-        if (header.SubType != AudbLoader.AudioSubType.Wav)
+        try
         {
-            throw new NotSupportedException(
-                $"SoundEffectLoader only supports WAV audio. " +
-                $"Asset: '{assetName}', subtype: {header.SubType}.");
-        }
+            var soundEffect = header.SubType switch
+            {
+                AudbLoader.AudioSubType.Wav =>
+                    LoadWav(assetName, payload),
 
+                AudbLoader.AudioSubType.Ogg or
+                AudbLoader.AudioSubType.Mp3 =>
+                    LoadCompressed(assetName, header, payload),
+
+                _ => throw new NotSupportedException(
+                    $"Unsupported AUDB subtype '{header.SubType}'.")
+            };
+
+            soundEffect.Name = assetName;
+            return soundEffect;
+        }
+        catch (Exception exception)
+        {
+            throw new InvalidDataException(
+                $"Failed to load audio asset '{assetName}' as a SoundEffect. " +
+                $"Subtype: {header.SubType}. " +
+                $"AUDB payload size: {payload.Length:N0} bytes. " +
+                $"First bytes: {GetHexPreview(payload)}",
+                exception);
+        }
+    }
+
+    private static SoundEffect LoadWav(
+        string assetName,
+        byte[] payload)
+    {
         ValidateWavPayload(assetName, payload);
 
         using var wavStream = new MemoryStream(
@@ -36,24 +70,64 @@ public class SoundEffectLoader : AssetLoaderBase
             writable: false,
             publiclyVisible: true);
 
-        wavStream.Position = 0;
+        return SoundEffect.FromStream(wavStream);
+    }
 
-        try
+    private static SoundEffect LoadCompressed(
+        string assetName,
+        AudbLoader.AudbHeader header,
+        byte[] payload)
+    {
+        var decoded = AudioDecoder.Decode(
+            header.SubType,
+            payload);
+
+        ValidateBakedMetadata(
+            assetName,
+            header,
+            decoded);
+
+        return new SoundEffect(
+            decoded.Data,
+            decoded.SampleRate,
+            decoded.Channels);
+    }
+
+    private static void ValidateBakedMetadata(
+        string assetName,
+        AudbLoader.AudbHeader header,
+        AudioDecoder.DecodedPcm16 decoded)
+    {
+        var decodedChannelCount = decoded.Channels switch
         {
-            var soundEffect = SoundEffect.FromStream(wavStream);
-            soundEffect.Name = assetName;
-            return soundEffect;
-        }
-        catch (Exception exception)
+            AudioChannels.Mono => 1u,
+            AudioChannels.Stereo => 2u,
+
+            _ => throw new InvalidDataException(
+                $"Decoded asset '{assetName}' has an unknown channel layout.")
+        };
+
+        // Metadata was zero in older AUDB files. Allow those files
+        // to continue loading.
+        if (header.Channels != 0 &&
+            header.Channels != decodedChannelCount)
         {
             throw new InvalidDataException(
-                $"MonoGame failed to load WAV asset '{assetName}'. " +
-                $"AUDB payload size: {payload.Length:N0} bytes. " +
-                $"First bytes: {GetHexPreview(payload)}",
-                exception);
+                $"Audio asset '{assetName}' channel metadata does not match " +
+                $"the decoded stream. Header: {header.Channels}, " +
+                $"decoded: {decodedChannelCount}.");
+        }
+
+        if (header.SampleRate != 0 &&
+            header.SampleRate != decoded.SampleRate)
+        {
+            throw new InvalidDataException(
+                $"Audio asset '{assetName}' sample-rate metadata does not " +
+                $"match the decoded stream. Header: {header.SampleRate}, " +
+                $"decoded: {decoded.SampleRate}.");
         }
     }
-    
+
     private static void ValidateWavPayload(
         string assetName,
         ReadOnlySpan<byte> payload)
@@ -65,13 +139,13 @@ public class SoundEffectLoader : AssetLoaderBase
                 $"Expected at least 12 bytes, received {payload.Length}.");
         }
 
-        bool hasRiff =
+        var hasRiff =
             payload[0] == (byte)'R' &&
             payload[1] == (byte)'I' &&
             payload[2] == (byte)'F' &&
             payload[3] == (byte)'F';
 
-        bool hasWave =
+        var hasWave =
             payload[8] == (byte)'W' &&
             payload[9] == (byte)'A' &&
             payload[10] == (byte)'V' &&
@@ -86,9 +160,10 @@ public class SoundEffectLoader : AssetLoaderBase
         }
     }
 
-    private static string GetHexPreview(ReadOnlySpan<byte> data)
+    private static string GetHexPreview(
+        ReadOnlySpan<byte> data)
     {
-        int count = Math.Min(data.Length, 16);
+        var count = Math.Min(data.Length, 16);
         return Convert.ToHexString(data[..count]);
     }
 }

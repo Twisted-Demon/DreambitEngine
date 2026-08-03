@@ -4,7 +4,7 @@ using Microsoft.Xna.Framework;
 namespace Dreambit.Examples.SpaceGame;
 
 [Require(typeof(SpriteAnimator), typeof(Mover))]
-public class SpaceGameEnemy : Component<SpaceGameEnemy>
+public class SpaceGameEnemy : Component
 {
     [FromRequired]
     private SpriteAnimator Animator { get; set; }

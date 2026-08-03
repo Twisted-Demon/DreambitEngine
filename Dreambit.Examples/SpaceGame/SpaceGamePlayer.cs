@@ -7,7 +7,7 @@ namespace Dreambit.Examples.SpaceGame;
 
 
 [Require(typeof(BoxCollider), typeof(SpriteDrawer), typeof(SpaceGameProjectileListener))]
-public class SpaceGamePlayer : Component<SpaceGamePlayer>
+public class SpaceGamePlayer : Component
 {
     [FromRequired]
     private SpriteDrawer _drawer;

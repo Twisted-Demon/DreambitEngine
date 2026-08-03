@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices.ComTypes;
 using Dreambit.ECS;
 using Dreambit.Examples.Particles;
 using Dreambit.Examples.Pong;
@@ -42,6 +43,22 @@ public class UiExampleScene : Scene<UiExampleScene>
 
         layout.GetRequired<UiComboBox>("resolution-combo").SelectionChanged +=
             (_, _, value) => status.Text = $"Resolution: {value}";
+        
+        layout.GetRequired<UiRadioButton>("difficulty-normal").CheckedChanged +=
+            (_, args) =>
+            {
+                if (args == true)
+                {
+                    status.Text = "Difficulty: Normal";
+                }
+            };
+
+        layout.GetRequired<UiRadioButton>("difficulty-hard").CheckedChanged +=
+            (_, args) =>
+            {
+                if (args == true)
+                    status.Text = "Difficulty: Hard";
+            };
 
         var popup = layout.GetRequired<UiPopup>("demo-popup");
         layout.GetRequired<UiButton>("open-popup-button").Clicked +=

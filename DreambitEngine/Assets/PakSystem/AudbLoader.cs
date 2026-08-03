@@ -1,12 +1,15 @@
 ﻿using System;
 using System.Buffers.Binary;
 using System.IO;
+using System.Security.Cryptography;
 using Microsoft.Xna.Framework.Media;
 
 namespace Dreambit;
 
 public static class AudbLoader
 {
+    private const ushort CurrentVersion = 1;
+
     public enum AudioSubType : ushort
     {
         Wav = 0,
@@ -14,57 +17,206 @@ public static class AudbLoader
         Mp3 = 2
     }
 
-    public static (AudbHeader hdr, byte[] payload) ReadAudb(Stream s)
+    public static (
+        AudbHeader Header,
+        byte[] Payload) ReadAudb(Stream stream)
     {
-        Span<byte> h = stackalloc byte[16];
+        ArgumentNullException.ThrowIfNull(stream);
 
-        s.ReadExactly(h[..4]);
-        if (h[0] != (byte)'A' || h[1] != (byte)'U' || h[2] != (byte)'D' || h[3] != (byte)'B')
-            throw new InvalidDataException("Not AUDB");
+        if (!stream.CanRead)
+        {
+            throw new ArgumentException(
+                "AUDB stream must be readable.",
+                nameof(stream));
+        }
 
-        s.ReadExactly(h[..2]);
-        var ver = BinaryPrimitives.ReadUInt16LittleEndian(h[..2]);
+        Span<byte> magic = stackalloc byte[4];
+        stream.ReadExactly(magic);
 
-        if (ver != 1) throw new NotSupportedException("Wrong AUDB version");
+        if (magic[0] != (byte)'A' ||
+            magic[1] != (byte)'U' ||
+            magic[2] != (byte)'D' ||
+            magic[3] != (byte)'B')
+        {
+            throw new InvalidDataException(
+                "Stream does not contain an AUDB header.");
+        }
 
-        s.ReadExactly(h[..2]);
-        var sub = (AudioSubType)BinaryPrimitives.ReadUInt16LittleEndian(h[..2]);
-        s.ReadExactly(h[..2]);
-        var ch = BinaryPrimitives.ReadUInt16LittleEndian(h[..2]);
-        s.ReadExactly(h[..4]);
-        var sr = BinaryPrimitives.ReadUInt32LittleEndian(h[..4]);
-        s.ReadExactly(h[..4]);
-        var flg = BinaryPrimitives.ReadUInt32LittleEndian(h[..4]);
-        s.ReadExactly(h[..4]);
-        var sz = (int)BinaryPrimitives.ReadUInt32LittleEndian(h[..4]);
+        var version = ReadUInt16(stream);
 
-        var data = GC.AllocateUninitializedArray<byte>(sz);
-        s.ReadExactly(data);
+        if (version != CurrentVersion)
+        {
+            throw new NotSupportedException(
+                $"Unsupported AUDB version {version}. " +
+                $"Expected version {CurrentVersion}.");
+        }
 
-        return (new AudbHeader(ver, sub, ch, sr, flg, sz), data);
+        var subType =
+            (AudioSubType)ReadUInt16(stream);
+
+        if (!Enum.IsDefined(typeof(AudioSubType), subType))
+        {
+            throw new InvalidDataException(
+                $"AUDB contains unknown audio subtype {(ushort)subType}.");
+        }
+
+        var channels = ReadUInt16(stream);
+        var sampleRate = ReadUInt32(stream);
+        var flags = ReadUInt32(stream);
+        var payloadSize = ReadUInt32(stream);
+
+        if (payloadSize > int.MaxValue)
+        {
+            throw new InvalidDataException(
+                $"AUDB payload is too large: {payloadSize:N0} bytes.");
+        }
+
+        if (stream.CanSeek)
+        {
+            var remainingBytes =
+                stream.Length - stream.Position;
+
+            if (remainingBytes < payloadSize)
+            {
+                throw new EndOfStreamException(
+                    $"AUDB declares a {payloadSize:N0}-byte payload, " +
+                    $"but only {remainingBytes:N0} bytes remain.");
+            }
+        }
+
+        var payload =
+            GC.AllocateUninitializedArray<byte>(
+                checked((int)payloadSize));
+
+        stream.ReadExactly(payload);
+
+        var header = new AudbHeader(
+            version,
+            subType,
+            channels,
+            sampleRate,
+            flags,
+            payload.Length);
+
+        return (header, payload);
     }
 
-    public static Song LoadSong(Stream s, string tempRoot = null)
+    // Preserves the old public API.
+    public static Song LoadSong(
+        Stream stream,
+        string tempRoot = null)
     {
-        var (hdr, payload) = ReadAudb(s);
+        return LoadSongAsset(
+            stream,
+            "song",
+            tempRoot);
+    }
 
-        var ext = hdr.SubType switch
+    public static Song LoadSongAsset(
+        Stream stream,
+        string assetName,
+        string tempRoot = null)
+    {
+        if (string.IsNullOrWhiteSpace(assetName))
+        {
+            throw new ArgumentException(
+                "Song asset name cannot be empty.",
+                nameof(assetName));
+        }
+
+        var (header, payload) = ReadAudb(stream);
+
+        var extension = header.SubType switch
         {
             AudioSubType.Wav => ".wav",
             AudioSubType.Ogg => ".ogg",
             AudioSubType.Mp3 => ".mp3",
-            _ => ".dat"
+
+            _ => throw new NotSupportedException(
+                $"Unsupported Song subtype '{header.SubType}'.")
         };
 
-        var root = tempRoot ?? Path.Combine(Path.GetTempPath(), "GameAudioCache");
-        Directory.CreateDirectory(root);
-        // Unique temp file 
-        var file = Path.Combine(root, Guid.NewGuid().ToString("N") + ext);
-        File.WriteAllBytes(file, payload);
+        var cacheRoot = string.IsNullOrWhiteSpace(tempRoot)
+            ? Path.Combine(
+                Path.GetTempPath(),
+                "Dreambit",
+                "AudioCache")
+            : Path.GetFullPath(tempRoot);
 
-        // Song.FromUri works with file:// URIs
-        var uri = new Uri(file);
-        return Song.FromUri(Path.GetFileNameWithoutExtension(file), uri);
+        Directory.CreateDirectory(cacheRoot);
+
+        // The file name depends on its contents. Loading the same song
+        // repeatedly therefore reuses the same extracted file.
+        var hash = SHA256.HashData(payload);
+
+        var cachedFileName =
+            Convert.ToHexString(hash).ToLowerInvariant() +
+            extension;
+
+        var cachedPath = Path.Combine(
+            cacheRoot,
+            cachedFileName);
+
+        EnsureCachedFile(
+            cachedPath,
+            payload);
+
+        return Song.FromUri(
+            assetName,
+            new Uri(Path.GetFullPath(cachedPath)));
+    }
+
+    private static void EnsureCachedFile(
+        string destinationPath,
+        byte[] payload)
+    {
+        if (File.Exists(destinationPath))
+            return;
+
+        var temporaryPath =
+            destinationPath +
+            "." +
+            Guid.NewGuid().ToString("N") +
+            ".tmp";
+
+        try
+        {
+            File.WriteAllBytes(
+                temporaryPath,
+                payload);
+
+            try
+            {
+                File.Move(
+                    temporaryPath,
+                    destinationPath);
+            }
+            catch (IOException) when (File.Exists(destinationPath))
+            {
+                // Another thread or process completed the same extraction.
+            }
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+                File.Delete(temporaryPath);
+        }
+    }
+
+    private static ushort ReadUInt16(Stream stream)
+    {
+        Span<byte> data = stackalloc byte[sizeof(ushort)];
+        stream.ReadExactly(data);
+
+        return BinaryPrimitives.ReadUInt16LittleEndian(data);
+    }
+
+    private static uint ReadUInt32(Stream stream)
+    {
+        Span<byte> data = stackalloc byte[sizeof(uint)];
+        stream.ReadExactly(data);
+
+        return BinaryPrimitives.ReadUInt32LittleEndian(data);
     }
 
     public sealed record AudbHeader(
