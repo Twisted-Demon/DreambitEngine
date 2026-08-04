@@ -11,7 +11,6 @@ public sealed class DrawableRepository
 
     // ---------- Backing storage ----------
     private readonly List<DrawableComponent> _all = new(MaxComponents);
-    private readonly List<UiFrame> _uiFrames = new(MaxComponents);
     private readonly Dictionary<DrawableComponent, int> _allIdx = new(MaxComponents);
 
     // Per-layer buckets 
@@ -20,6 +19,7 @@ public sealed class DrawableRepository
 
     // per-type buckets
     private readonly Dictionary<Type, IList> _byType = new(MaxComponents);
+    private readonly List<UiFrame> _uiFrames = new(MaxComponents);
 
     // ---------- Public surface (same as your original + fast paths) ----------
     internal int Count => _all.Count;
@@ -34,10 +34,7 @@ public sealed class DrawableRepository
         _allIdx[drawable] = _all.Count;
         _all.Add(drawable);
 
-        if (drawable is UiFrame uiFrame)
-        {
-            _uiFrames.Add(uiFrame);
-        }
+        if (drawable is UiFrame uiFrame) _uiFrames.Add(uiFrame);
 
         // Add to layer buckets
         AddToLayer(drawable, drawable.DrawLayer);
@@ -57,10 +54,7 @@ public sealed class DrawableRepository
         // Remove from "all"
         SwapRemove(_all, _allIdx, drawable);
 
-        if (drawable is UiFrame uiFrame)
-        {
-            _uiFrames.Remove(uiFrame);
-        }
+        if (drawable is UiFrame uiFrame) _uiFrames.Remove(uiFrame);
 
         // Remove from layer buckets
         RemoveFromLayer(drawable, drawable.DrawLayer);

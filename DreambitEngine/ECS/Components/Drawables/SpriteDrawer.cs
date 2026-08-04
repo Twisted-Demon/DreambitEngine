@@ -145,20 +145,18 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
             Transform.WorldRotation2D,
             originToUse,
             Transform.WorldScale2D,
-            spriteEffect,
-            0f);
+            spriteEffect);
     }
 
     public override void OnDebugDraw()
     {
         if (Sprite is null)
             return;
-        
+
         Core.SpriteBatch.DrawHollowRectangle(
             Bounds, Color.Yellow, Scene.MainCamera.WorldUnitsPerTexturePixel);
-        
     }
-    
+
     private Vector2 GetOriginToUse()
     {
         var origin = Pivot;

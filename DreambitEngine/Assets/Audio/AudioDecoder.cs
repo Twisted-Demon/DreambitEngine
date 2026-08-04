@@ -10,11 +10,6 @@ namespace Dreambit;
 
 internal static class AudioDecoder
 {
-    internal readonly record struct DecodedPcm16(
-        byte[] Data,
-        int SampleRate,
-        AudioChannels Channels);
-
     public static DecodedPcm16 Decode(
         AudbLoader.AudioSubType subType,
         byte[] payload)
@@ -38,7 +33,7 @@ internal static class AudioDecoder
 
         using var vorbisReader = new VorbisReader(
             stream,
-            closeOnDispose: false);
+            false);
 
         return DecodeFloatSamples(
             vorbisReader.SampleRate,
@@ -94,16 +89,12 @@ internal static class AudioDecoder
                     break;
 
                 if (samplesRead < 0)
-                {
                     throw new InvalidDataException(
                         "Audio decoder returned a negative sample count.");
-                }
 
                 if (samplesRead % channelCount != 0)
-                {
                     throw new InvalidDataException(
                         "Audio decoder returned an incomplete sample frame.");
-                }
 
                 var bytesToWrite =
                     checked(samplesRead * sizeof(short));
@@ -138,10 +129,8 @@ internal static class AudioDecoder
             }
 
             if (decodedStream.Length == 0)
-            {
                 throw new InvalidDataException(
                     "The compressed audio stream decoded to zero samples.");
-            }
 
             return new DecodedPcm16(
                 decodedStream.ToArray(),
@@ -162,11 +151,9 @@ internal static class AudioDecoder
         // MonoGame SoundEffect accepts sample rates from
         // 8,000 Hz through 48,000 Hz.
         if (sampleRate is < 8000 or > 48000)
-        {
             throw new NotSupportedException(
                 $"SoundEffect sample rate {sampleRate:N0} Hz is unsupported. " +
                 "MonoGame requires a rate between 8,000 and 48,000 Hz.");
-        }
 
         return channelCount switch
         {
@@ -183,9 +170,14 @@ internal static class AudioDecoder
     {
         return new MemoryStream(
             data,
-            index: 0,
-            count: data.Length,
-            writable: false,
-            publiclyVisible: true);
+            0,
+            data.Length,
+            false,
+            true);
     }
+
+    internal readonly record struct DecodedPcm16(
+        byte[] Data,
+        int SampleRate,
+        AudioChannels Channels);
 }

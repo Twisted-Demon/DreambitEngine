@@ -90,7 +90,7 @@ public class Resources : Singleton<Resources>
         catch (Exception exception)
         {
             var logger = Instance.Logger;
-            
+
             logger.Error(
                 "Asset loading failed.\n" +
                 $"Asset path: {assetName}\n" +

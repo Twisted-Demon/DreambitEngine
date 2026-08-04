@@ -21,7 +21,7 @@ public class SoundCue : DreambitAsset
 
     [JsonProperty("pan")] public float Pan;
     [JsonProperty("pitch")] public float Pitch;
-    [JsonProperty("pitch_jitter")] public Vector2 PitchJitter =  Vector2.Zero;
+    [JsonProperty("pitch_jitter")] public Vector2 PitchJitter = Vector2.Zero;
 
     /// <summary>
     ///     Where volume == 1 before falloff

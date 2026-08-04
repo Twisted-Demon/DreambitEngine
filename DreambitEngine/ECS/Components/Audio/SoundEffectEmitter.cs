@@ -7,6 +7,7 @@ namespace Dreambit.ECS.Audio;
 [BlueprintType("SoundEffectEmitter")]
 public class SoundEffectEmitter : Component
 {
+    private float _masterVolume = 1.0f;
     private SoundEffectInstance[] _pool = new SoundEffectInstance[5];
     private int _poolIdx;
 
@@ -16,7 +17,6 @@ public class SoundEffectEmitter : Component
     private string _soundCuePath;
     public bool CullWhenOffscreen { get; set; } = false;
 
-    private float _masterVolume = 1.0f;
     public float MasterVolume
     {
         get => _masterVolume;
@@ -100,7 +100,7 @@ public class SoundEffectEmitter : Component
         var currentVolume = cue.Volume * MasterVolume;
         var currentJitter = cue.VolumeJitter * MasterVolume;
         sfxInstance.Volume = GetValueWithJitter(currentVolume, currentJitter);
-        
+
         sfxInstance.Pitch = GetValueWithJitter(cue.Pitch, cue.PitchJitter);
         sfxInstance.Pan = cue.Pan;
 
@@ -139,12 +139,12 @@ public class SoundEffectEmitter : Component
 
         return c;
     }
-    
+
     private float GetValueWithJitter(float baseValue, Vector2 jitter)
     {
         var min = baseValue - jitter.X;
         var max = baseValue + jitter.Y;
-        
+
         var value = Random.Shared.NextFloat(min, max);
 
         return value;

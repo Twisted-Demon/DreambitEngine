@@ -32,17 +32,13 @@ internal sealed class DreambitAssetReferenceConverter : JsonConverter
             var asset = Resources.LoadDreambitAsset(assetName, objectType);
 
             if (asset is null)
-            {
                 throw new JsonSerializationException(
                     $"Could not load asset '{assetName}' as '{objectType.FullName}'.");
-            }
 
             if (!objectType.IsInstanceOfType(asset))
-            {
                 throw new JsonSerializationException(
                     $"Asset '{assetName}' resolved to '{asset.GetType().FullName}', " +
                     $"not '{objectType.FullName}'.");
-            }
 
             return asset;
         }
@@ -53,10 +49,8 @@ internal sealed class DreambitAssetReferenceConverter : JsonConverter
             var inlineAsset = jsonObject.ToObject(objectType, serializer);
 
             if (inlineAsset is null)
-            {
                 throw new JsonSerializationException(
                     $"Could not deserialize inline asset '{objectType.FullName}'.");
-            }
 
             return inlineAsset;
         }

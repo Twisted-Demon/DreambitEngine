@@ -7,9 +7,9 @@ namespace Dreambit.ECS;
 public class TileMover : Component
 {
     private readonly Logger<TileMover> _logger = new();
-    private AStarGrid _astarGrid;
 
     public Vector3 Velocity;
+    private AStarGrid _astarGrid;
 
     public override void OnAddedToEntity()
     {
@@ -18,10 +18,7 @@ public class TileMover : Component
 
     public override void OnUpdate()
     {
-        if (_astarGrid == null)
-        {
-            throw new ArgumentNullException(nameof(_astarGrid));
-        }
+        if (_astarGrid == null) throw new ArgumentNullException(nameof(_astarGrid));
 
         var desiredMovement = Velocity * Time.DeltaTime;
 

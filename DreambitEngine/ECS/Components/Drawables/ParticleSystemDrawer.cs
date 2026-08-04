@@ -74,7 +74,7 @@ public class ParticleSystemDrawer : DrawableComponent<ParticleSystemDrawer>
             var rot = parts.ROT[phys];
 
             var color = parts.COLOR[phys];
-            
+
             Core.SpriteBatch.DrawWorldSprite(
                 Scene.MainCamera,
                 Texture,
@@ -83,9 +83,7 @@ public class ParticleSystemDrawer : DrawableComponent<ParticleSystemDrawer>
                 color,
                 rot,
                 Origin,
-                new Vector2(sx, sy),
-                SpriteEffects.None,
-                0f);
+                new Vector2(sx, sy));
         }
     }
 

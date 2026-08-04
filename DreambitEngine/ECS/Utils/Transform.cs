@@ -7,11 +7,9 @@ public class Transform
 {
     private const float Epsilon = 0.000001f;
 
-    private Vector3 _position = Vector3.Zero;
-    private Quaternion _rotation = Quaternion.Identity;
-    private Vector3 _scale = Vector3.One;
-    
     internal Vector3 LastWorldPosition = Vector3.Zero;
+
+    private Quaternion _rotation = Quaternion.Identity;
 
     internal Transform(Entity owningEntity)
     {
@@ -22,19 +20,28 @@ public class Transform
 
     public Transform Parent => Entity.Parent?.Transform;
 
+    #region Debug drawing
+
+    internal void DebugDraw()
+    {
+        Core.SpriteBatch.DrawPoint(
+            WorldPosition2D,
+            Color.Red,
+            3f * Scene.Instance.MainCamera
+                .WorldUnitsPerTexturePixel);
+    }
+
+    #endregion
+
     #region Local state
 
     /// <summary>
-    /// Position relative to the parent transform.
+    ///     Position relative to the parent transform.
     /// </summary>
-    public Vector3 Position
-    {
-        get => _position;
-        set => _position = value;
-    }
+    public Vector3 Position { get; set; } = Vector3.Zero;
 
     /// <summary>
-    /// Rotation relative to the parent transform.
+    ///     Rotation relative to the parent transform.
     /// </summary>
     public Quaternion Rotation
     {
@@ -43,13 +50,9 @@ public class Transform
     }
 
     /// <summary>
-    /// Scale relative to the parent transform.
+    ///     Scale relative to the parent transform.
     /// </summary>
-    public Vector3 Scale
-    {
-        get => _scale;
-        set => _scale = value;
-    }
+    public Vector3 Scale { get; set; } = Vector3.One;
 
     #endregion
 
@@ -75,7 +78,7 @@ public class Transform
                 return;
             }
 
-            Matrix inverseParent = InvertMatrix(
+            var inverseParent = InvertMatrix(
                 Parent.WorldMatrix,
                 "Cannot set world position because the parent transform is not invertible.");
 
@@ -98,7 +101,7 @@ public class Transform
              * Build the rotation in the same order so that quaternion
              * multiplication conventions cannot introduce ambiguity.
              */
-            Matrix worldRotationMatrix =
+            var worldRotationMatrix =
                 Matrix.CreateFromQuaternion(Rotation) *
                 Matrix.CreateFromQuaternion(Parent.WorldRotation);
 
@@ -108,7 +111,7 @@ public class Transform
 
         set
         {
-            Quaternion desiredWorldRotation =
+            var desiredWorldRotation =
                 NormalizeQuaternion(value);
 
             if (Parent == null)
@@ -117,10 +120,10 @@ public class Transform
                 return;
             }
 
-            Matrix desiredWorldMatrix =
+            var desiredWorldMatrix =
                 Matrix.CreateFromQuaternion(desiredWorldRotation);
 
-            Matrix parentRotationMatrix =
+            var parentRotationMatrix =
                 Matrix.CreateFromQuaternion(Parent.WorldRotation);
 
             /*
@@ -130,7 +133,7 @@ public class Transform
              * local * parent = world
              * local = world * inverse(parent)
              */
-            Matrix localRotationMatrix =
+            var localRotationMatrix =
                 desiredWorldMatrix *
                 Matrix.Transpose(parentRotationMatrix);
 
@@ -214,8 +217,8 @@ public class Transform
     #region 2D state
 
     /// <summary>
-    /// Local position projected onto the XY plane.
-    /// Setting it preserves the current local Z position.
+    ///     Local position projected onto the XY plane.
+    ///     Setting it preserves the current local Z position.
     /// </summary>
     public Vector2 Position2D
     {
@@ -228,8 +231,8 @@ public class Transform
     }
 
     /// <summary>
-    /// World position projected onto the XY plane.
-    /// Setting it preserves the current world Z position.
+    ///     World position projected onto the XY plane.
+    ///     Setting it preserves the current world Z position.
     /// </summary>
     public Vector2 WorldPosition2D
     {
@@ -242,8 +245,8 @@ public class Transform
     }
 
     /// <summary>
-    /// Local scale on the XY plane.
-    /// Setting it preserves local Z scale.
+    ///     Local scale on the XY plane.
+    ///     Setting it preserves local Z scale.
     /// </summary>
     public Vector2 Scale2D
     {
@@ -256,8 +259,8 @@ public class Transform
     }
 
     /// <summary>
-    /// World scale on the XY plane.
-    /// Setting it preserves world Z scale.
+    ///     World scale on the XY plane.
+    ///     Setting it preserves world Z scale.
     /// </summary>
     public Vector2 WorldScale2D
     {
@@ -270,10 +273,9 @@ public class Transform
     }
 
     /// <summary>
-    /// Local rotation around the Z axis, in radians.
-    ///
-    /// Setting this replaces the local rotation with a pure 2D
-    /// rotation around Z.
+    ///     Local rotation around the Z axis, in radians.
+    ///     Setting this replaces the local rotation with a pure 2D
+    ///     rotation around Z.
     /// </summary>
     public float Rotation2D
     {
@@ -285,10 +287,9 @@ public class Transform
     }
 
     /// <summary>
-    /// World rotation around the Z axis, in radians.
-    ///
-    /// Setting this replaces the world rotation with a pure 2D
-    /// rotation around Z.
+    ///     World rotation around the Z axis, in radians.
+    ///     Setting this replaces the world rotation with a pure 2D
+    ///     rotation around Z.
     /// </summary>
     public float WorldRotation2D
     {
@@ -327,11 +328,10 @@ public class Transform
     #region Rotation helpers
 
     /// <summary>
-    /// Sets local Euler rotation in radians.
-    ///
-    /// X = pitch
-    /// Y = yaw
-    /// Z = roll
+    ///     Sets local Euler rotation in radians.
+    ///     X = pitch
+    ///     Y = yaw
+    ///     Z = roll
     /// </summary>
     public void SetEulerRotation(Vector3 radians)
     {
@@ -342,7 +342,7 @@ public class Transform
     }
 
     /// <summary>
-    /// Sets local Euler rotation in radians.
+    ///     Sets local Euler rotation in radians.
     /// </summary>
     public void SetEulerRotation(
         float pitch,
@@ -356,7 +356,7 @@ public class Transform
     }
 
     /// <summary>
-    /// Sets world Euler rotation in radians.
+    ///     Sets world Euler rotation in radians.
     /// </summary>
     public void SetWorldEulerRotation(Vector3 radians)
     {
@@ -367,7 +367,7 @@ public class Transform
     }
 
     /// <summary>
-    /// Sets world Euler rotation in radians.
+    ///     Sets world Euler rotation in radians.
     /// </summary>
     public void SetWorldEulerRotation(
         float pitch,
@@ -381,8 +381,8 @@ public class Transform
     }
 
     /// <summary>
-    /// Rotates around the local Z axis.
-    /// Intended for 2D entities.
+    ///     Rotates around the local Z axis.
+    ///     Intended for 2D entities.
     /// </summary>
     public void Rotate2D(float radians)
     {
@@ -390,33 +390,33 @@ public class Transform
     }
 
     /// <summary>
-    /// Rotates around the world Z axis.
-    /// Intended for 2D entities.
+    ///     Rotates around the world Z axis.
+    ///     Intended for 2D entities.
     /// </summary>
     public void RotateWorld2D(float radians)
     {
         WorldRotation2D += radians;
     }
-    
+
     public void RotateTowards2D(
         float targetWorldAngle,
         float maxRadiansDelta)
     {
-        float currentAngle = WorldRotation2D;
+        var currentAngle = WorldRotation2D;
 
         // Returns the shortest signed angle from current to target,
         // wrapped between -Pi and +Pi.
-        float angleDifference = MathHelper.WrapAngle(
+        var angleDifference = MathHelper.WrapAngle(
             targetWorldAngle - currentAngle);
 
-        float rotationAmount = MathHelper.Clamp(
+        var rotationAmount = MathHelper.Clamp(
             angleDifference,
             -maxRadiansDelta,
             maxRadiansDelta);
 
         WorldRotation2D = currentAngle + rotationAmount;
     }
-    
+
     public void RotateTowards2D(
         Vector2 worldDirection,
         float maxRadiansDelta)
@@ -424,7 +424,7 @@ public class Transform
         if (worldDirection.LengthSquared() <= 0.000001f)
             return;
 
-        float targetAngle = MathF.Atan2(
+        var targetAngle = MathF.Atan2(
             worldDirection.Y,
             worldDirection.X);
 
@@ -432,12 +432,12 @@ public class Transform
             targetAngle,
             maxRadiansDelta);
     }
-    
+
     public void RotateTowardsPoint2D(
         Vector2 worldTarget,
         float maxRadiansDelta)
     {
-        Vector2 direction =
+        var direction =
             worldTarget - WorldPosition2D;
 
         RotateTowards2D(
@@ -450,14 +450,14 @@ public class Transform
     #region Look-at methods
 
     /// <summary>
-    /// Points local +X toward a world-space target.
-    /// Local +Z is kept as close as possible to worldUp.
+    ///     Points local +X toward a world-space target.
+    ///     Local +Z is kept as close as possible to worldUp.
     /// </summary>
     public void LookAt(
         Vector3 worldTarget,
         Vector3? worldUp = null)
     {
-        Vector3 direction =
+        var direction =
             worldTarget - WorldPosition;
 
         LookInDirection(
@@ -466,7 +466,7 @@ public class Transform
     }
 
     /// <summary>
-    /// Points local +X in a world-space direction.
+    ///     Points local +X in a world-space direction.
     /// </summary>
     public void LookInDirection(
         Vector3 worldDirection,
@@ -475,10 +475,10 @@ public class Transform
         if (worldDirection.LengthSquared() <= Epsilon)
             return;
 
-        Vector3 forward =
+        var forward =
             Vector3.Normalize(worldDirection);
 
-        Vector3 upReference =
+        var upReference =
             worldUp ?? Vector3.UnitZ;
 
         if (upReference.LengthSquared() <= Epsilon)
@@ -491,12 +491,10 @@ public class Transform
          * their cross product cannot produce a stable right vector.
          */
         if (MathF.Abs(Vector3.Dot(forward, upReference)) > 0.999f)
-        {
             upReference =
                 MathF.Abs(Vector3.Dot(forward, Vector3.UnitZ)) < 0.999f
                     ? Vector3.UnitZ
                     : Vector3.UnitY;
-        }
 
         /*
          * Axis convention:
@@ -507,10 +505,10 @@ public class Transform
          *
          * right = up x forward
          */
-        Vector3 right = Vector3.Normalize(
+        var right = Vector3.Normalize(
             Vector3.Cross(upReference, forward));
 
-        Vector3 correctedUp = Vector3.Normalize(
+        var correctedUp = Vector3.Normalize(
             Vector3.Cross(forward, right));
 
         /*
@@ -522,10 +520,10 @@ public class Transform
          * UnitZ -> Up
          */
         Matrix rotationMatrix = new(
-            forward.X,     forward.Y,     forward.Z,     0f,
-            right.X,       right.Y,       right.Z,       0f,
+            forward.X, forward.Y, forward.Z, 0f,
+            right.X, right.Y, right.Z, 0f,
             correctedUp.X, correctedUp.Y, correctedUp.Z, 0f,
-            0f,            0f,            0f,            1f);
+            0f, 0f, 0f, 1f);
 
         WorldRotation = Quaternion.CreateFromRotationMatrix(
             rotationMatrix);
@@ -552,7 +550,7 @@ public class Transform
     #region Translation methods
 
     /// <summary>
-    /// Adds a translation in the transform's parent coordinate space.
+    ///     Adds a translation in the transform's parent coordinate space.
     /// </summary>
     public void Translate(Vector3 translation)
     {
@@ -560,7 +558,7 @@ public class Transform
     }
 
     /// <summary>
-    /// Adds an XY translation in the transform's parent coordinate space.
+    ///     Adds an XY translation in the transform's parent coordinate space.
     /// </summary>
     public void Translate2D(Vector2 translation)
     {
@@ -615,8 +613,8 @@ public class Transform
     #region Point conversion
 
     /// <summary>
-    /// Converts a local-space point into world space.
-    /// Includes position, rotation, and scale.
+    ///     Converts a local-space point into world space.
+    ///     Includes position, rotation, and scale.
     /// </summary>
     public Vector3 TransformPoint(Vector3 localPoint)
     {
@@ -626,12 +624,12 @@ public class Transform
     }
 
     /// <summary>
-    /// Converts a world-space point into local space.
-    /// Includes position, rotation, and scale.
+    ///     Converts a world-space point into local space.
+    ///     Includes position, rotation, and scale.
     /// </summary>
     public Vector3 InverseTransformPoint(Vector3 worldPoint)
     {
-        Matrix inverseWorld = InvertMatrix(
+        var inverseWorld = InvertMatrix(
             WorldMatrix,
             "Cannot inverse-transform the point because the world transform is not invertible.");
 
@@ -642,7 +640,7 @@ public class Transform
 
     public Vector2 TransformPoint2D(Vector2 localPoint)
     {
-        Vector3 result = TransformPoint(
+        var result = TransformPoint(
             new Vector3(localPoint, 0f));
 
         return new Vector2(
@@ -651,8 +649,8 @@ public class Transform
     }
 
     /// <summary>
-    /// Converts an XY world position into local XY coordinates.
-    /// Assumes the world point lies on the transform's current world-Z plane.
+    ///     Converts an XY world position into local XY coordinates.
+    ///     Assumes the world point lies on the transform's current world-Z plane.
     /// </summary>
     public Vector2 InverseTransformPoint2D(Vector2 worldPoint)
     {
@@ -665,7 +663,7 @@ public class Transform
         Vector2 worldPoint,
         float worldZ)
     {
-        Vector3 result = InverseTransformPoint(
+        var result = InverseTransformPoint(
             new Vector3(
                 worldPoint.X,
                 worldPoint.Y,
@@ -681,8 +679,8 @@ public class Transform
     #region Direction conversion
 
     /// <summary>
-    /// Converts a local direction into world space.
-    /// Ignores position and scale.
+    ///     Converts a local direction into world space.
+    ///     Ignores position and scale.
     /// </summary>
     public Vector3 TransformDirection(Vector3 localDirection)
     {
@@ -692,8 +690,8 @@ public class Transform
     }
 
     /// <summary>
-    /// Converts a world direction into local space.
-    /// Ignores position and scale.
+    ///     Converts a world direction into local space.
+    ///     Ignores position and scale.
     /// </summary>
     public Vector3 InverseTransformDirection(Vector3 worldDirection)
     {
@@ -704,7 +702,7 @@ public class Transform
 
     public Vector2 TransformDirection2D(Vector2 localDirection)
     {
-        Vector3 result = TransformDirection(
+        var result = TransformDirection(
             new Vector3(localDirection, 0f));
 
         return new Vector2(
@@ -714,7 +712,7 @@ public class Transform
 
     public Vector2 InverseTransformDirection2D(Vector2 worldDirection)
     {
-        Vector3 result = InverseTransformDirection(
+        var result = InverseTransformDirection(
             new Vector3(worldDirection, 0f));
 
         return new Vector2(
@@ -727,10 +725,9 @@ public class Transform
     #region Physics snapshot
 
     /// <summary>
-    /// Captures the current world position for physics interpolation,
-    /// swept collision checks, or velocity calculations.
-    ///
-    /// Call this before changing transforms for the current physics step.
+    ///     Captures the current world position for physics interpolation,
+    ///     swept collision checks, or velocity calculations.
+    ///     Call this before changing transforms for the current physics step.
     /// </summary>
     internal void CaptureLastWorldPosition()
     {
@@ -738,25 +735,12 @@ public class Transform
     }
 
     /// <summary>
-    /// Prevents a newly created or teleported object from appearing
-    /// to have moved from an old position.
+    ///     Prevents a newly created or teleported object from appearing
+    ///     to have moved from an old position.
     /// </summary>
     internal void ResetLastWorldPosition()
     {
         LastWorldPosition = WorldPosition;
-    }
-
-    #endregion
-
-    #region Debug drawing
-
-    internal void DebugDraw()
-    {
-        Core.SpriteBatch.DrawPoint(
-            WorldPosition2D,
-            Color.Red,
-            3f * Scene.Instance.MainCamera
-                .WorldUnitsPerTexturePixel);
     }
 
     #endregion
@@ -804,11 +788,9 @@ public class Transform
             DivideScaleComponent(
                 desiredWorldScale.X,
                 parentWorldScale.X),
-
             DivideScaleComponent(
                 desiredWorldScale.Y,
                 parentWorldScale.Y),
-
             DivideScaleComponent(
                 desiredWorldScale.Z,
                 parentWorldScale.Z));
@@ -819,10 +801,8 @@ public class Transform
         float parentScale)
     {
         if (MathF.Abs(parentScale) <= Epsilon)
-        {
             throw new InvalidOperationException(
                 "Cannot calculate local scale because a parent scale component is zero.");
-        }
 
         return desiredScale / parentScale;
     }

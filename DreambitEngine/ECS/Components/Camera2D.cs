@@ -13,26 +13,26 @@ public class Camera2D : Component
 
     public bool IsFollowing = true;
     public Transform TransformToFollow;
+    private Matrix _inverseTopLeftTransformMatrix;
 
-    private float _resolutionZoom = 1f;
-    private float _zoom = 1f;
-    private float _pixelsPerUnit = 1f;
-
-    private bool _matricesDirty = true;
+    private Matrix _inverseTransformMatrix;
+    private Matrix _inverseUnscaledTransformMatrix;
 
     private Vector3 _lastCameraPosition;
     private float _lastCameraRotation;
     private Vector2 _lastViewportSize;
 
-    private Matrix _inverseTransformMatrix;
-    private Matrix _inverseUnscaledTransformMatrix;
-    private Matrix _inverseTopLeftTransformMatrix;
+    private bool _matricesDirty = true;
+    private float _pixelsPerUnit = 1f;
+
+    private float _resolutionZoom = 1f;
+    private float _zoom = 1f;
 
     public float LerpSpeed { get; set; } = 5f;
 
     /// <summary>
-    /// Camera magnification.
-    /// Must be greater than zero.
+    ///     Camera magnification.
+    ///     Must be greater than zero.
     /// </summary>
     public float Zoom
     {
@@ -50,8 +50,8 @@ public class Camera2D : Component
     }
 
     /// <summary>
-    /// Number of physical screen pixels used by one world unit before zoom.
-    /// For example, 16 means one world unit occupies 16 pixels at Zoom 1.
+    ///     Number of physical screen pixels used by one world unit before zoom.
+    ///     For example, 16 means one world unit occupies 16 pixels at Zoom 1.
     /// </summary>
     public float PixelsPerUnit
     {
@@ -84,24 +84,23 @@ public class Camera2D : Component
     }
 
     /// <summary>
-    /// Camera zoom after resolution scaling.
-    /// Does not include PixelsPerUnit.
+    ///     Camera zoom after resolution scaling.
+    ///     Does not include PixelsPerUnit.
     /// </summary>
     public float TotalZoom => Zoom * ResolutionZoom;
 
     /// <summary>
-    /// Final number of screen pixels occupied by one world unit.
+    ///     Final number of screen pixels occupied by one world unit.
     /// </summary>
     public float Scale => PixelsPerUnit * TotalZoom;
-    
+
     public float WorldUnitsWidth => Window.BackBufferWidth / PixelsPerUnit;
     public float WorldUnitsHeight => Window.BackBufferHeight / PixelsPerUnit;
 
     /// <summary>
-    /// size of one texture pixel expressed in world units
-    ///
-    /// At 16 pixels per unit, one texture pixel occupies 1 / 16th of a world unit
-    /// aka 1 world unit has a width and height of 16 pixels
+    ///     size of one texture pixel expressed in world units
+    ///     At 16 pixels per unit, one texture pixel occupies 1 / 16th of a world unit
+    ///     aka 1 world unit has a width and height of 16 pixels
     /// </summary>
     public float WorldUnitsPerTexturePixel => 1f / PixelsPerUnit;
 
@@ -120,21 +119,21 @@ public class Camera2D : Component
         Math.Max(1, Window.Height);
 
     /// <summary>
-    /// Normal camera matrix. The camera position appears at screen center.
-    /// Includes PixelsPerUnit, Zoom, and ResolutionZoom.
+    ///     Normal camera matrix. The camera position appears at screen center.
+    ///     Includes PixelsPerUnit, Zoom, and ResolutionZoom.
     /// </summary>
     public Matrix TransformMatrix { get; private set; } = Matrix.Identity;
 
     /// <summary>
-    /// Camera matrix without the user-controlled Zoom value.
-    /// PixelsPerUnit and ResolutionZoom are still applied.
+    ///     Camera matrix without the user-controlled Zoom value.
+    ///     PixelsPerUnit and ResolutionZoom are still applied.
     /// </summary>
     public Matrix UnscaledTransformMatrix { get; private set; } =
         Matrix.Identity;
 
     /// <summary>
-    /// Camera-relative matrix where the camera position maps to pixel 0,0.
-    /// This is not the normal world-to-screen matrix.
+    ///     Camera-relative matrix where the camera position maps to pixel 0,0.
+    ///     This is not the normal world-to-screen matrix.
     /// </summary>
     public Matrix TopLeftTransformMatrix { get; private set; } =
         Matrix.Identity;
@@ -154,11 +153,10 @@ public class Camera2D : Component
     }
 
     /// <summary>
-    /// Width and height of the visible area in world units.
-    /// This does not include the camera's world position.
-    ///
-    /// For a rotated camera, use BoundsF when you need an axis-aligned
-    /// world-space culling rectangle.
+    ///     Width and height of the visible area in world units.
+    ///     This does not include the camera's world position.
+    ///     For a rotated camera, use BoundsF when you need an axis-aligned
+    ///     world-space culling rectangle.
     /// </summary>
     public Rectangle BoundsNoPosition
     {
@@ -180,8 +178,8 @@ public class Camera2D : Component
     }
 
     /// <summary>
-    /// Axis-aligned world-space bounds enclosing the visible viewport.
-    /// Correctly accounts for camera rotation.
+    ///     Axis-aligned world-space bounds enclosing the visible viewport.
+    ///     Correctly accounts for camera rotation.
     /// </summary>
     public RectangleF BoundsF
     {
@@ -230,10 +228,9 @@ public class Camera2D : Component
     }
 
     /// <summary>
-    /// Rebuilds matrices when any relevant camera state has changed.
-    ///
-    /// This means conversion methods remain correct even when PixelsPerUnit,
-    /// Zoom, position, rotation, or viewport size changes between updates.
+    ///     Rebuilds matrices when any relevant camera state has changed.
+    ///     This means conversion methods remain correct even when PixelsPerUnit,
+    ///     Zoom, position, rotation, or viewport size changes between updates.
     /// </summary>
     private void EnsureMatricesCurrent()
     {
@@ -251,9 +248,7 @@ public class Camera2D : Component
         if (!_matricesDirty &&
             !transformChanged &&
             !viewportChanged)
-        {
             return;
-        }
 
         RebuildMatrices(
             cameraPosition,
@@ -436,12 +431,10 @@ public class Camera2D : Component
         int targetVerticalResolution)
     {
         if (targetVerticalResolution <= 0)
-        {
             throw new ArgumentOutOfRangeException(
                 nameof(targetVerticalResolution),
                 targetVerticalResolution,
                 "Target vertical resolution must be greater than zero.");
-        }
 
         TargetVerticalResolution =
             targetVerticalResolution;
@@ -544,10 +537,9 @@ public class Camera2D : Component
     }
 
     /// <summary>
-    /// Converts a world position to actual UI/screen pixel coordinates.
-    ///
-    /// This must use the centered camera matrix. The old implementation
-    /// incorrectly used TopLeftTransformMatrix.
+    ///     Converts a world position to actual UI/screen pixel coordinates.
+    ///     This must use the centered camera matrix. The old implementation
+    ///     incorrectly used TopLeftTransformMatrix.
     /// </summary>
     public Vector2 WorldToUiScreen(Vector2 worldPosition)
     {
@@ -555,7 +547,7 @@ public class Camera2D : Component
     }
 
     /// <summary>
-    /// Converts actual UI/screen pixel coordinates back into world space.
+    ///     Converts actual UI/screen pixel coordinates back into world space.
     /// </summary>
     public Vector2 UIScreenToWorld(Vector2 screenPosition)
     {
@@ -563,11 +555,10 @@ public class Camera2D : Component
     }
 
     /// <summary>
-    /// Converts world coordinates into camera-relative pixel coordinates,
-    /// where the camera's position is pixel 0,0.
-    ///
-    /// This preserves the useful behavior of the old top-left methods,
-    /// but gives it an accurate name.
+    ///     Converts world coordinates into camera-relative pixel coordinates,
+    ///     where the camera's position is pixel 0,0.
+    ///     This preserves the useful behavior of the old top-left methods,
+    ///     but gives it an accurate name.
     /// </summary>
     public Vector2 WorldToCameraLocal(Vector2 worldPosition)
     {
@@ -588,8 +579,8 @@ public class Camera2D : Component
     }
 
     /// <summary>
-    /// convert a texture's world scale into the correct world scale
-    /// to match pixels per unit. 
+    ///     convert a texture's world scale into the correct world scale
+    ///     to match pixels per unit.
     /// </summary>
     /// <param name="worldScale"></param>
     /// <returns></returns>

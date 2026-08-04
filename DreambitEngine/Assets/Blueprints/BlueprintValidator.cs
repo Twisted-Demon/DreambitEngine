@@ -80,33 +80,31 @@ public static class BlueprintValidator
         }
 
         foreach (var (blueprint, path) in hierarchy)
+        foreach (var componentBlueprint in blueprint.Components)
         {
-            foreach (var componentBlueprint in blueprint.Components)
+            var componentType = BlueprintResolver.ResolveComponentType(componentBlueprint.Type);
+            if (componentType is null)
+                continue;
+
+            foreach (var (memberName, token) in componentBlueprint.Properties)
             {
-                var componentType = BlueprintResolver.ResolveComponentType(componentBlueprint.Type);
-                if (componentType is null)
-                    continue;
-
-                foreach (var (memberName, token) in componentBlueprint.Properties)
+                if (!BlueprintResolver.TryGetBlueprintMemberType(
+                        componentType,
+                        memberName,
+                        out var memberType))
                 {
-                    if (!BlueprintResolver.TryGetBlueprintMemberType(
-                            componentType,
-                            memberName,
-                            out var memberType))
-                    {
-                        errors.Add(
-                            $"{path}: component '{componentType.FullName}' has no public writable member '{memberName}'.");
-                        continue;
-                    }
-
-                    ValidateToken(
-                        token,
-                        memberType,
-                        $"{path}.{componentType.Name}.{memberName}",
-                        blueprintsByGuid,
-                        availableTypesByBlueprint,
-                        errors);
+                    errors.Add(
+                        $"{path}: component '{componentType.FullName}' has no public writable member '{memberName}'.");
+                    continue;
                 }
+
+                ValidateToken(
+                    token,
+                    memberType,
+                    $"{path}.{componentType.Name}.{memberName}",
+                    blueprintsByGuid,
+                    availableTypesByBlueprint,
+                    errors);
             }
         }
 
@@ -171,7 +169,6 @@ public static class BlueprintValidator
 
             var elementType = targetType.GetElementType()!;
             for (var i = 0; i < array.Count; i++)
-            {
                 ValidateToken(
                     array[i],
                     elementType,
@@ -179,7 +176,6 @@ public static class BlueprintValidator
                     blueprintsByGuid,
                     availableTypesByBlueprint,
                     errors);
-            }
 
             return;
         }
@@ -226,7 +222,6 @@ public static class BlueprintValidator
             }
 
             for (var i = 0; i < jsonArray.Count; i++)
-            {
                 ValidateToken(
                     jsonArray[i],
                     elementTypeForCollection,
@@ -234,7 +229,6 @@ public static class BlueprintValidator
                     blueprintsByGuid,
                     availableTypesByBlueprint,
                     errors);
-            }
         }
     }
 
@@ -264,11 +258,9 @@ public static class BlueprintValidator
 
         if (!availableTypesByBlueprint.TryGetValue(targetBlueprint, out var availableTypes) ||
             !availableTypes.Contains(targetType))
-        {
             errors.Add(
                 $"{path}: target entity '{targetBlueprint.Name}' does not create component " +
                 $"'{targetType.FullName}'.");
-        }
     }
 
     private static IEnumerable<(EntityBlueprint Blueprint, string Path)> Walk(

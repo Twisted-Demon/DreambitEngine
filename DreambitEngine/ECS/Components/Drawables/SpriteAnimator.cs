@@ -9,6 +9,8 @@ public class SpriteAnimator : Component
 {
     private readonly Dictionary<string, Action> _eventActions = [];
 
+    public Action OnAnimationEnded;
+
     private string _animationPath;
     private Queue<SpriteSheetAnimation> _animationQueue = [];
     private int _currentAnimationFrame;
@@ -17,8 +19,6 @@ public class SpriteAnimator : Component
     //internals
     [FromRequired] private SpriteDrawer _spriteDrawer;
     private float _timeToNextFrame;
-
-    public Action OnAnimationEnded;
     public bool IsPlaying { get; private set; }
 
     public bool PlayOnStart { get; set; } = false;

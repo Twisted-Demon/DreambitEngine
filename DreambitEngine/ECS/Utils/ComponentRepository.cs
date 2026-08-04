@@ -1,19 +1,19 @@
-﻿using System.Collections.Generic;
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Reflection;
 using Type = System.Type;
 
 namespace Dreambit.ECS;
 
-public class    ComponentRepository
+public class ComponentRepository
 {
     private static readonly ConcurrentDictionary<Type, bool> HasOnUpdateOverrideByType = [];
 
     private readonly HashSet<Component> _attachedComponents = [];
-    private readonly HashSet<Component> _updatableComponents = [];
     private readonly HashSet<Component> _componentsToAttach = [];
     private readonly HashSet<Component> _componentsToDetach = [];
     private readonly Logger<ComponentRepository> _logger = new();
+    private readonly HashSet<Component> _updatableComponents = [];
 
     private Scene _scene;
 
@@ -82,7 +82,7 @@ public class    ComponentRepository
                 _scene.Drawables.Remove(dc);
 
             c.RemoveFromEntity();
-            c.Destroy();    
+            c.Destroy();
             c.Entity = null;
             c.Dispose();
         }

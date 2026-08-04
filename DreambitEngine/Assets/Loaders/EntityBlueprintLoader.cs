@@ -14,7 +14,7 @@ public class EntityBlueprintLoader : AssetLoaderBase
 
         var entity = JsnbLoader.Deserialize<EntityBlueprint>(s);
         entity.AssetName = assetName;
-        
+
         return entity;
     }
 }

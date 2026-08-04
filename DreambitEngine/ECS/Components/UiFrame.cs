@@ -17,26 +17,24 @@ public class UiFrame : DrawableComponent<UiFrame>
         set
         {
             if (string.IsNullOrWhiteSpace(value))
-            {
                 throw new ArgumentException(
                     "A UI layout path is required.",
                     nameof(value));
-            }
 
             if (string.Equals(
                     _layoutPath,
                     value,
                     StringComparison.Ordinal) &&
                 Layout is not null)
-            {
                 return;
-            }
 
             LoadLayout(value);
         }
     }
 
     public UiLayout Layout { get; private set; }
+
+    public override RectangleF Bounds => Scene.UiCamera.BoundsF;
 
     public void LoadLayout(string layoutPath)
     {
@@ -49,11 +47,9 @@ public class UiFrame : DrawableComponent<UiFrame>
         var fullPath = ResolveContentPath(contentRoot, layoutPath);
 
         if (!File.Exists(fullPath))
-        {
             throw new FileNotFoundException(
                 $"UI layout '{layoutPath}' was not found.",
                 fullPath);
-        }
 
         // Do not replace a working layout when a reload fails to compose.
         var newLayout = UiLoader.LoadFromFile(fullPath, contentRoot);
@@ -69,8 +65,8 @@ public class UiFrame : DrawableComponent<UiFrame>
     }
 
     /// <summary>
-    /// Creates a detached file-backed component that can be added to a
-    /// container in this frame's current layout.
+    ///     Creates a detached file-backed component that can be added to a
+    ///     container in this frame's current layout.
     /// </summary>
     /// <param name="componentPath">A path relative to the content root.</param>
     /// <param name="idPrefix">Optional text prepended to every authored component ID.</param>
@@ -80,11 +76,9 @@ public class UiFrame : DrawableComponent<UiFrame>
         string idPrefix = null)
     {
         if (string.IsNullOrWhiteSpace(componentPath))
-        {
             throw new ArgumentException(
                 "A UI component path is required.",
                 nameof(componentPath));
-        }
 
         var contentRoot = GetContentRoot();
         var fullPath = ResolveContentPath(contentRoot, componentPath);
@@ -107,21 +101,17 @@ public class UiFrame : DrawableComponent<UiFrame>
         string relativePath)
     {
         if (Path.IsPathRooted(relativePath))
-        {
             throw new ArgumentException(
                 "UI content paths must be relative to the content root.",
                 nameof(relativePath));
-        }
 
         var fullPath = Path.GetFullPath(
             Path.Combine(contentRoot, relativePath));
         var resolvedRelativePath = Path.GetRelativePath(contentRoot, fullPath);
         if (EscapesContentRoot(resolvedRelativePath))
-        {
             throw new ArgumentException(
                 $"UI path '{relativePath}' resolves outside the content root.",
                 nameof(relativePath));
-        }
 
         return fullPath;
     }
@@ -130,9 +120,7 @@ public class UiFrame : DrawableComponent<UiFrame>
     {
         if (Path.IsPathRooted(relativePath) ||
             string.Equals(relativePath, "..", StringComparison.Ordinal))
-        {
             return true;
-        }
 
         return relativePath.StartsWith(
                    $"..{Path.DirectorySeparatorChar}",
@@ -206,8 +194,6 @@ public class UiFrame : DrawableComponent<UiFrame>
         Layout?.Draw(Scene.UiCamera.TopLeftTransformMatrix);
     }
 
-    public override RectangleF Bounds => Scene.UiCamera.BoundsF;
-
     private static UiNavigationDirection? GetNavigationDirection(
         bool keyboardAvailable,
         bool gamePadAvailable,
@@ -229,27 +215,19 @@ public class UiFrame : DrawableComponent<UiFrame>
         {
             if (Input.IsRawGamePadButtonPressed(Buttons.DPadLeft) ||
                 Input.IsRawLeftStickDirectionPressed(UiNavigationDirection.Left))
-            {
                 return SetDirection(UiNavigationDirection.Left, out device, true);
-            }
 
             if (Input.IsRawGamePadButtonPressed(Buttons.DPadRight) ||
                 Input.IsRawLeftStickDirectionPressed(UiNavigationDirection.Right))
-            {
                 return SetDirection(UiNavigationDirection.Right, out device, true);
-            }
 
             if (Input.IsRawGamePadButtonPressed(Buttons.DPadUp) ||
                 Input.IsRawLeftStickDirectionPressed(UiNavigationDirection.Up))
-            {
                 return SetDirection(UiNavigationDirection.Up, out device, true);
-            }
 
             if (Input.IsRawGamePadButtonPressed(Buttons.DPadDown) ||
                 Input.IsRawLeftStickDirectionPressed(UiNavigationDirection.Down))
-            {
                 return SetDirection(UiNavigationDirection.Down, out device, true);
-            }
         }
 
         device = UiInputDevice.None;

@@ -1,17 +1,21 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
-using YamlDotNet.Serialization.Schemas;
 
 namespace Dreambit.ECS;
 
 public abstract class Component : IDisposable
 {
     protected readonly ILogger Logger;
-    private bool _enabled = true;
-    private bool _isDisposed;
     internal bool IsDestroyed;
     internal IReadOnlyList<Type> RequiredComponentTypes = [];
+    private bool _enabled = true;
+    private bool _isDisposed;
+
+    public Component()
+    {
+        Logger = new Logger(GetType());
+    }
 
     protected ICoroutineService CoroutineService => Core.Instance.CurrentScene.CoroutineService;
 
@@ -20,12 +24,7 @@ public abstract class Component : IDisposable
     public Entity Entity { get; internal set; }
     public Scene Scene => Entity?.Scene;
 
-    public Component()
-    {
-        Logger = new Logger(GetType());
-    }
-    
-    
+
     public bool Enabled
     {
         get => _enabled;
@@ -370,7 +369,7 @@ public abstract class Component : IDisposable
             HandleCallbackException(nameof(OnDestroyed), exception);
         }
     }
-    
+
 
     public static bool operator ==(Component a, Component b)
     {
@@ -415,7 +414,7 @@ public abstract class Component : IDisposable
     {
         return component == null || component.IsDestroyed;
     }
-    
+
     protected bool HandleCallbackException(string callbackName, Exception exception)
     {
         if (Entity == null)
@@ -462,16 +461,14 @@ public class SingletonComponent<T> : Component where T : SingletonComponent<T>
     public static T Instance { get; private set; }
 
     public static bool HasInstance =>
-        !Component.IsNull(Instance);
+        !IsNull(Instance);
 
     internal override Component SetUpAndCreateChildren(Entity entity, bool enabled = true)
     {
-        if (!Component.IsNull(Instance) && !ReferenceEquals(Instance, this))
-        {
+        if (!IsNull(Instance) && !ReferenceEquals(Instance, this))
             throw new InvalidOperationException(
                 $"A singleton component of type '{typeof(T).FullName}' " +
                 "already exists.");
-        }
 
         Instance = (T)this;
 
@@ -482,7 +479,7 @@ public class SingletonComponent<T> : Component where T : SingletonComponent<T>
     {
         if (ReferenceEquals(Instance, this))
             Instance = null;
-        
+
         base.OnDestroyed();
     }
 
@@ -490,7 +487,7 @@ public class SingletonComponent<T> : Component where T : SingletonComponent<T>
     {
         if (ReferenceEquals(Instance, this))
             Instance = null;
-        
+
         base.OnDisposing();
     }
 }

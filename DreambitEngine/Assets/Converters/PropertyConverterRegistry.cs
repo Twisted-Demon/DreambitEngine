@@ -12,7 +12,7 @@ internal static class PropertyConverterRegistry
     {
         var settings = new JsonSerializerSettings
         {
-            ContractResolver = DreambitAssetContractResolver.Instance,
+            ContractResolver = DreambitAssetContractResolver.Instance
         };
 
         foreach (var converter in Converters.Values)
@@ -46,13 +46,9 @@ internal static class PropertyConverterRegistry
         for (var baseType = converterType;
              baseType != null && baseType != typeof(object);
              baseType = baseType.BaseType)
-        {
             if (baseType.IsGenericType &&
                 baseType.GetGenericTypeDefinition() == typeof(PropertyConverter<>))
-            {
                 return baseType.GetGenericArguments()[0];
-            }
-        }
 
         throw new ArgumentException(
             $"{converterType} does not inherit PropertyConverter<>.",

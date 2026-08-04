@@ -1,5 +1,4 @@
-﻿using System;
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Newtonsoft.Json;
 
@@ -8,11 +7,10 @@ namespace Dreambit;
 public class Sprite : DreambitAsset
 {
     private string _texturePath;
-    
+
     public Texture2D Texture { get; internal set; }
 
-    [JsonProperty("source")]
-    public Rectangle SourceRect { get; init; }
+    [JsonProperty("source")] public Rectangle SourceRect { get; init; }
 
     [JsonProperty("texture")]
     public string TexturePath
@@ -35,9 +33,9 @@ public class Sprite : DreambitAsset
         var sprite = new Sprite
         {
             Texture = texture,
-            SourceRect = new Rectangle(sourceX, sourceY, sourceWidth, sourceHeight),
+            SourceRect = new Rectangle(sourceX, sourceY, sourceWidth, sourceHeight)
         };
-        
+
         sprite.AssetName = $"sprites/{texturePath}";
         Resources.TryRegisterAsset(sprite);
         return sprite;
@@ -48,9 +46,9 @@ public class Sprite : DreambitAsset
         var sprite = new Sprite
         {
             Texture = texture,
-            SourceRect = new Rectangle(sourceX, sourceY, sourceWidth, sourceHeight),
+            SourceRect = new Rectangle(sourceX, sourceY, sourceWidth, sourceHeight)
         };
-        
+
         sprite.AssetName = $"sprites/{texture.Name}";
         Resources.TryRegisterAsset(sprite);
         return sprite;
@@ -61,9 +59,9 @@ public class Sprite : DreambitAsset
         var sprite = new Sprite
         {
             Texture = texture,
-            SourceRect = sourceRect,
+            SourceRect = sourceRect
         };
-        
+
         sprite.AssetName = $"sprites/{texture.Name}";
         Resources.TryRegisterAsset(sprite);
         return sprite;
@@ -77,9 +75,9 @@ public class Sprite : DreambitAsset
         var sprite = new Sprite
         {
             Texture = texture,
-            SourceRect = sourceRect,
+            SourceRect = sourceRect
         };
-        
+
         sprite.AssetName = $"sprites/{texturePath}";
         Resources.TryRegisterAsset(sprite);
         return sprite;
@@ -102,7 +100,7 @@ public class Sprite : DreambitAsset
         return new Sprite
         {
             Texture = texture,
-            SourceRect = new Rectangle(0, 0, texture.Width, texture.Height),
+            SourceRect = new Rectangle(0, 0, texture.Width, texture.Height)
         };
     }
 }

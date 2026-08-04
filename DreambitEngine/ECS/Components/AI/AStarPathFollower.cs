@@ -7,10 +7,10 @@ namespace Dreambit.ECS;
 [Require(typeof(AStarPathfinder), typeof(Mover))]
 public class AStarPathFollower : Component
 {
+    public bool IsSeeking;
     private Mover _mover;
     private Queue<Node> _path = [];
     private AStarPathfinder _pathfinder;
-    public bool IsSeeking;
     public float SeekSpeed { get; set; }
     public int PathLength => _path.Count;
 

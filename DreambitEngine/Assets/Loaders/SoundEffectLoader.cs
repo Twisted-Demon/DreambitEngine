@@ -36,7 +36,7 @@ public sealed class SoundEffectLoader : AssetLoaderBase
                     LoadWav(assetName, payload),
 
                 AudbLoader.AudioSubType.Ogg or
-                AudbLoader.AudioSubType.Mp3 =>
+                    AudbLoader.AudioSubType.Mp3 =>
                     LoadCompressed(assetName, header, payload),
 
                 _ => throw new NotSupportedException(
@@ -65,10 +65,10 @@ public sealed class SoundEffectLoader : AssetLoaderBase
 
         using var wavStream = new MemoryStream(
             payload,
-            index: 0,
-            count: payload.Length,
-            writable: false,
-            publiclyVisible: true);
+            0,
+            payload.Length,
+            false,
+            true);
 
         return SoundEffect.FromStream(wavStream);
     }
@@ -111,21 +111,17 @@ public sealed class SoundEffectLoader : AssetLoaderBase
         // to continue loading.
         if (header.Channels != 0 &&
             header.Channels != decodedChannelCount)
-        {
             throw new InvalidDataException(
                 $"Audio asset '{assetName}' channel metadata does not match " +
                 $"the decoded stream. Header: {header.Channels}, " +
                 $"decoded: {decodedChannelCount}.");
-        }
 
         if (header.SampleRate != 0 &&
             header.SampleRate != decoded.SampleRate)
-        {
             throw new InvalidDataException(
                 $"Audio asset '{assetName}' sample-rate metadata does not " +
                 $"match the decoded stream. Header: {header.SampleRate}, " +
                 $"decoded: {decoded.SampleRate}.");
-        }
     }
 
     private static void ValidateWavPayload(
@@ -133,11 +129,9 @@ public sealed class SoundEffectLoader : AssetLoaderBase
         ReadOnlySpan<byte> payload)
     {
         if (payload.Length < 12)
-        {
             throw new InvalidDataException(
                 $"Audio asset '{assetName}' has an invalid WAV payload. " +
                 $"Expected at least 12 bytes, received {payload.Length}.");
-        }
 
         var hasRiff =
             payload[0] == (byte)'R' &&
@@ -152,12 +146,10 @@ public sealed class SoundEffectLoader : AssetLoaderBase
             payload[11] == (byte)'E';
 
         if (!hasRiff || !hasWave)
-        {
             throw new InvalidDataException(
                 $"Audio asset '{assetName}' does not contain a complete " +
                 $"RIFF/WAVE file after its AUDB header. " +
                 $"First bytes: {GetHexPreview(payload)}");
-        }
     }
 
     private static string GetHexPreview(

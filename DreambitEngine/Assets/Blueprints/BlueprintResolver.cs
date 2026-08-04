@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
@@ -13,7 +12,9 @@ namespace Dreambit;
 
 public class BlueprintResolver : Singleton<BlueprintResolver>
 {
-    private static readonly ConcurrentDictionary<Type, IReadOnlyDictionary<string, BlueprintMember>> MemberCache = new();
+    private static readonly ConcurrentDictionary<Type, IReadOnlyDictionary<string, BlueprintMember>>
+        MemberCache = new();
+
     private static readonly Dictionary<string, Type> ComponentTypesById = new(StringComparer.OrdinalIgnoreCase);
     private static readonly object ComponentRegistryLock = new();
     private static bool _componentRegistryBuilt;
@@ -58,11 +59,9 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
         }
 
         if (errors.Count > 0)
-        {
             throw new AggregateException(
                 $"Failed to deserialize component '{componentType.FullName}'.",
                 errors);
-        }
     }
 
     internal static bool TryGetBlueprintMemberType(
@@ -134,7 +133,9 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
                 continue;
 
             lock (ComponentRegistryLock)
+            {
                 ComponentTypesById[typeName] = resolvedType;
+            }
 
             return resolvedType;
         }
@@ -161,22 +162,20 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
                 return;
 
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            foreach (var type in GetLoadableTypes(assembly))
             {
-                foreach (var type in GetLoadableTypes(assembly))
-                {
-                    if (!IsValidComponentType(type))
-                        continue;
-                    
-                    var logger = new Logger<BlueprintResolver>();
+                if (!IsValidComponentType(type))
+                    continue;
 
-                    var assemblyName = type.Assembly.GetName().Name;
-                    var componentName = type.Name;
-                    
-                    if (!string.IsNullOrWhiteSpace(componentName))
-                        RegisterComponentTypeKey($"{assemblyName}.{componentName}", type, false);
-                    
-                    logger.Trace($"registered: {assemblyName}.{componentName}");
-                }
+                var logger = new Logger<BlueprintResolver>();
+
+                var assemblyName = type.Assembly.GetName().Name;
+                var componentName = type.Name;
+
+                if (!string.IsNullOrWhiteSpace(componentName))
+                    RegisterComponentTypeKey($"{assemblyName}.{componentName}", type, false);
+
+                logger.Trace($"registered: {assemblyName}.{componentName}");
             }
 
             _componentRegistryBuilt = true;
@@ -191,11 +190,9 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
         if (ComponentTypesById.TryGetValue(key, out var existingType) && existingType != type)
         {
             if (throwOnDuplicate)
-            {
                 throw new InvalidOperationException(
                     $"Blueprint component type ID '{key}' is used by both " +
                     $"'{existingType.FullName}' and '{type.FullName}'.");
-            }
 
             return;
         }
@@ -337,9 +334,7 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
 
         if (targetType.IsGenericType &&
             targetType.GetGenericTypeDefinition() == typeof(ISet<>))
-        {
             return typeof(HashSet<>).MakeGenericType(elementType);
-        }
 
         return typeof(List<>).MakeGenericType(elementType);
     }
@@ -426,10 +421,8 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
     {
         var guidString = token.Value<string>();
         if (!Guid.TryParse(guidString, out var blueprintGuid))
-        {
             throw new FormatException(
                 $"'{guidString}' is not a valid blueprint entity GUID.");
-        }
 
         return blueprintGuid;
     }
@@ -502,19 +495,15 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
             if (genericDefinition == typeof(Dictionary<,>) ||
                 genericDefinition == typeof(IDictionary<,>) ||
                 genericDefinition == typeof(IReadOnlyDictionary<,>))
-            {
                 dictionaryType = type;
-            }
         }
 
         if (dictionaryType == null)
-        {
             dictionaryType = type.GetInterfaces()
                 .FirstOrDefault(interfaceType =>
                     interfaceType.IsGenericType &&
                     (interfaceType.GetGenericTypeDefinition() == typeof(IDictionary<,>) ||
                      interfaceType.GetGenericTypeDefinition() == typeof(IReadOnlyDictionary<,>)));
-        }
 
         if (dictionaryType != null)
         {
@@ -533,12 +522,10 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
     {
         var reference = Resources.LoadDreambitAsset(assetName, assetType);
         if (reference is null)
-        {
             Instance.Logger.Warn(
                 "Unable to deserialize {0} reference {1}",
                 assetType.Name,
                 assetName);
-        }
 
         return reference;
     }

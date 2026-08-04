@@ -1,33 +1,31 @@
-﻿using System.ComponentModel;
-
-namespace Dreambit;
+﻿namespace Dreambit;
 
 public abstract class State
 {
     /// <summary>
-    ///     back reference to the owning FSM
-    /// </summary>
-    public FSM Fsm { get; internal set; }
-    
-    protected Blackboard Blackboard => Fsm.Blackboard;
-
-    /// <summary>
     ///     Logger for the current state
     /// </summary>
-    protected readonly ILogger Logger; 
-
-    /// <summary>
-    ///     state identifier - by default it's class name
-    /// </summary>
-    public string Identifier { get; }
-    
-    protected ICoroutineService CoroutineService => Core.Instance.CurrentScene.CoroutineService;
+    protected readonly ILogger Logger;
 
     public State()
     {
         Identifier = GetType().Name;
         Logger = new Logger(GetType());
     }
+
+    /// <summary>
+    ///     back reference to the owning FSM
+    /// </summary>
+    public FSM Fsm { get; internal set; }
+
+    protected Blackboard Blackboard => Fsm.Blackboard;
+
+    /// <summary>
+    ///     state identifier - by default it's class name
+    /// </summary>
+    public string Identifier { get; }
+
+    protected ICoroutineService CoroutineService => Core.Instance.CurrentScene.CoroutineService;
 
     /// <summary>
     ///     Called once after the State instance is created and registered.

@@ -13,7 +13,7 @@ public class SpriteSheet : DreambitAsset
     [JsonProperty("rows")] public readonly int Rows = 1;
 
     [JsonProperty("texture_path")] private string _texturePath;
-    
+
 
     private SpriteSheet(int columns, int rows, string texturePath, Texture2D texture)
     {

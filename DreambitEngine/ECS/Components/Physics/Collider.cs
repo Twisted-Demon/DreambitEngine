@@ -16,7 +16,8 @@ public class Collider : Component
     /// <summary>Renders polygon outline for debugging purposes.</summary>
     public override void OnDebugDraw()
     {
-        Core.SpriteBatch.DrawPolygon(WorldPolygon2D.Vertices, Color.White, Scene.Instance.MainCamera.WorldUnitsPerTexturePixel);
+        Core.SpriteBatch.DrawPolygon(WorldPolygon2D.Vertices, Color.White,
+            Scene.Instance.MainCamera.WorldUnitsPerTexturePixel);
     }
 
     #endregion
@@ -62,7 +63,7 @@ public class Collider : Component
     }
 
     #endregion
-    
+
     #region Collision Casting Checks
 
     public virtual void ColliderCast(out CollisionResult hits)
@@ -74,7 +75,7 @@ public class Collider : Component
     {
         PhysicsSystem.Instance.ColliderCastByTag(this, out hits, tags);
     }
-    
+
     #endregion
 
     #region Broadphase / Spatial Hash Participation
@@ -94,7 +95,7 @@ public class Collider : Component
             SetAabb();
             PhysicsSystem.Instance.Touch(this);
         }
-        
+
         _lastPosition = _currentPosition;
     }
 
@@ -139,7 +140,7 @@ public class Collider : Component
 
     /// <summary>Local-space shape used for collision/trigger checks.</summary>
     public Shape2D Bounds { get; set; } = null;
-    
+
     public AABB AABB { get; set; }
 
     /// <summary>World-space polygon computed from <see cref="Bounds" /> and current transform.</summary>
@@ -163,11 +164,11 @@ public class Collider : Component
     /// <summary>Registers this collider with the physics system.</summary>
     public override void OnAddedToEntity()
     {
-        if(Bounds != null)
+        if (Bounds != null)
             SetAabb();
-        
+
         PhysicsSystem.Instance.RegisterCollider(this);
-        
+
         Transform.CaptureLastWorldPosition();
     }
 
@@ -195,11 +196,11 @@ public class Collider : Component
     /// <summary>Re-register when enabled.</summary>
     public override void OnEnabled()
     {
-        if(Bounds != null)
+        if (Bounds != null)
             SetAabb();
-        
+
         PhysicsSystem.Instance.RegisterCollider(this);
-        
+
         Transform.CaptureLastWorldPosition();
     }
 

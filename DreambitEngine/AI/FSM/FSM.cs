@@ -70,7 +70,7 @@ public class FSM : Component
     public T SetBlackboard<T>() where T : Blackboard
     {
         var typedBlackboard = (T)Activator.CreateInstance(typeof(T));
-        
+
         Blackboard = typedBlackboard;
 
         return typedBlackboard;

@@ -1,6 +1,4 @@
-﻿using Microsoft.Xna.Framework;
-
-namespace Dreambit.ECS;
+﻿namespace Dreambit.ECS;
 
 [BlueprintType($"{nameof(AmbientLight2D)}")]
 public class AmbientLight2D : Light2D

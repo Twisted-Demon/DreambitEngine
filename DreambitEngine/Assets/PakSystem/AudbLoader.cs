@@ -8,14 +8,14 @@ namespace Dreambit;
 
 public static class AudbLoader
 {
-    private const ushort CurrentVersion = 1;
-
     public enum AudioSubType : ushort
     {
         Wav = 0,
         Ogg = 1,
         Mp3 = 2
     }
+
+    private const ushort CurrentVersion = 1;
 
     public static (
         AudbHeader Header,
@@ -24,11 +24,9 @@ public static class AudbLoader
         ArgumentNullException.ThrowIfNull(stream);
 
         if (!stream.CanRead)
-        {
             throw new ArgumentException(
                 "AUDB stream must be readable.",
                 nameof(stream));
-        }
 
         Span<byte> magic = stackalloc byte[4];
         stream.ReadExactly(magic);
@@ -37,28 +35,22 @@ public static class AudbLoader
             magic[1] != (byte)'U' ||
             magic[2] != (byte)'D' ||
             magic[3] != (byte)'B')
-        {
             throw new InvalidDataException(
                 "Stream does not contain an AUDB header.");
-        }
 
         var version = ReadUInt16(stream);
 
         if (version != CurrentVersion)
-        {
             throw new NotSupportedException(
                 $"Unsupported AUDB version {version}. " +
                 $"Expected version {CurrentVersion}.");
-        }
 
         var subType =
             (AudioSubType)ReadUInt16(stream);
 
         if (!Enum.IsDefined(typeof(AudioSubType), subType))
-        {
             throw new InvalidDataException(
                 $"AUDB contains unknown audio subtype {(ushort)subType}.");
-        }
 
         var channels = ReadUInt16(stream);
         var sampleRate = ReadUInt32(stream);
@@ -66,10 +58,8 @@ public static class AudbLoader
         var payloadSize = ReadUInt32(stream);
 
         if (payloadSize > int.MaxValue)
-        {
             throw new InvalidDataException(
                 $"AUDB payload is too large: {payloadSize:N0} bytes.");
-        }
 
         if (stream.CanSeek)
         {
@@ -77,11 +67,9 @@ public static class AudbLoader
                 stream.Length - stream.Position;
 
             if (remainingBytes < payloadSize)
-            {
                 throw new EndOfStreamException(
                     $"AUDB declares a {payloadSize:N0}-byte payload, " +
                     $"but only {remainingBytes:N0} bytes remain.");
-            }
         }
 
         var payload =
@@ -118,11 +106,9 @@ public static class AudbLoader
         string tempRoot = null)
     {
         if (string.IsNullOrWhiteSpace(assetName))
-        {
             throw new ArgumentException(
                 "Song asset name cannot be empty.",
                 nameof(assetName));
-        }
 
         var (header, payload) = ReadAudb(stream);
 

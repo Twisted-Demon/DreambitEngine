@@ -26,14 +26,15 @@ public class EntityRepository
     private readonly Scene _scene;
     private readonly Dictionary<Guid, Entity> _toCreateById = new(64);
 
-    public int Count => _entities.Count + _entitiesToCreate.Count;
-
     public EntityRepository(Scene scene)
     {
         _scene = scene;
     }
 
-    internal Entity CreateEntity(string name, HashSet<string> tags, bool enabled, Vector3? createAt, Vector3? eulerRotation,
+    public int Count => _entities.Count + _entitiesToCreate.Count;
+
+    internal Entity CreateEntity(string name, HashSet<string> tags, bool enabled, Vector3? createAt,
+        Vector3? eulerRotation,
         Vector3? scale, Guid? guidOverride = null)
     {
         tags ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "default" };
@@ -323,7 +324,7 @@ public class EntityRepository
         result.AddRange(_entitiesToCreate);
         return result;
     }
-    
+
     internal void DestroyEntityImmediately(Entity entity)
     {
         if (entity == null)

@@ -30,9 +30,7 @@ internal sealed class DreambitAssetContractResolver : DefaultContractResolver
         // public SoundCue[] Sounds { get; set; }
         // public Dictionary<string, SoundCue> Sounds { get; set; }
         if (TryGetAssetItemType(property.PropertyType, out _))
-        {
             property.ItemConverter ??= DreambitAssetReferenceConverter.Instance;
-        }
 
         return property;
     }
@@ -63,9 +61,7 @@ internal sealed class DreambitAssetContractResolver : DefaultContractResolver
 
             if (definition != typeof(IDictionary<,>) &&
                 definition != typeof(IReadOnlyDictionary<,>))
-            {
                 continue;
-            }
 
             assetType = candidate.GetGenericArguments()[1];
 
@@ -77,9 +73,7 @@ internal sealed class DreambitAssetContractResolver : DefaultContractResolver
         {
             if (!candidate.IsGenericType ||
                 candidate.GetGenericTypeDefinition() != typeof(IEnumerable<>))
-            {
                 continue;
-            }
 
             assetType = candidate.GetGenericArguments()[0];
 

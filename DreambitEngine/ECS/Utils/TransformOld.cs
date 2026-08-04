@@ -1,6 +1,4 @@
-﻿using Microsoft.Xna.Framework;
-
-namespace Dreambit.ECS;
+﻿namespace Dreambit.ECS;
 
 //public class TransformOld
 //{

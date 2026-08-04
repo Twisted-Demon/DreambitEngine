@@ -1,6 +1,5 @@
 ﻿using LDtk;
 using LDtk.Renderer;
-using Microsoft.Xna.Framework;
 
 namespace Dreambit.ECS;
 
