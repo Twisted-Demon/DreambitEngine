@@ -6,14 +6,14 @@ using Microsoft.Xna.Framework.Input;
 namespace Dreambit.UI;
 
 /// <summary>
-/// Base items control with one selected child and keyboard/controller
-/// navigation. Selected child controls receive the selected visual state.
+///     Base items control with one selected child and keyboard/controller
+///     navigation. Selected child controls receive the selected visual state.
 /// </summary>
 public abstract class UiSelector : UiItemsControl
 {
-    private int _selectedIndex = -1;
-    private int _requestedSelectedIndex = -1;
     private IUiBrush _background;
+    private int _requestedSelectedIndex = -1;
+    private int _selectedIndex = -1;
 
     /// <summary>Creates a focusable selector.</summary>
     protected UiSelector()
@@ -21,9 +21,6 @@ public abstract class UiSelector : UiItemsControl
         IsFocusable = true;
         IsHitTestVisible = true;
     }
-
-    /// <summary>Raised whenever the selected child changes.</summary>
-    public event EventHandler<UiSelectionChangedEventArgs> SelectionChanged;
 
     /// <summary>Gets or sets the selected child index, or -1 for no selection.</summary>
     public int SelectedIndex
@@ -50,8 +47,11 @@ public abstract class UiSelector : UiItemsControl
         }
     }
 
-    /// <summary>Gets or sets the tint passed to <see cref="Background"/>.</summary>
+    /// <summary>Gets or sets the tint passed to <see cref="Background" />.</summary>
     public Color BackgroundTint { get; set; } = Color.White;
+
+    /// <summary>Raised whenever the selected child changes.</summary>
+    public event EventHandler<UiSelectionChangedEventArgs> SelectionChanged;
 
     /// <inheritdoc />
     public override void AddChild(UiElement child)
@@ -62,9 +62,7 @@ public abstract class UiSelector : UiItemsControl
 
         if (_requestedSelectedIndex >= 0 &&
             _requestedSelectedIndex < Children.Count)
-        {
             SelectIndex(_requestedSelectedIndex);
-        }
     }
 
     /// <inheritdoc />
@@ -93,7 +91,10 @@ public abstract class UiSelector : UiItemsControl
                     null));
         }
         else if (removedIndex >= 0 && removedIndex < _selectedIndex)
+        {
             _selectedIndex--;
+        }
+
         return true;
     }
 
@@ -101,10 +102,8 @@ public abstract class UiSelector : UiItemsControl
     public override void ClearChildren()
     {
         foreach (var child in Children)
-        {
             if (child is UiButton button)
                 button.Clicked -= OnItemButtonClicked;
-        }
 
         SetSelectedVisual(SelectedItem, false);
         _selectedIndex = -1;
@@ -135,7 +134,7 @@ public abstract class UiSelector : UiItemsControl
         if (delta == 0 || Children.Count == 0)
             return;
 
-        var start = SelectedIndex < 0 ? (delta > 0 ? -1 : 0) : SelectedIndex;
+        var start = SelectedIndex < 0 ? delta > 0 ? -1 : 0 : SelectedIndex;
         SelectIndex((start + delta + Children.Count) % Children.Count);
         args.Handled = true;
     }
@@ -215,10 +214,8 @@ public abstract class UiSelector : UiItemsControl
         for (var current = element;
              current is not null && !ReferenceEquals(current, this);
              current = current.Parent)
-        {
             if (ReferenceEquals(current.Parent, this))
                 return current;
-        }
 
         return null;
     }

@@ -1,14 +1,13 @@
 ﻿using System;
 using Dreambit.ECS;
-using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
 namespace Dreambit;
 
 public abstract class RenderPass : IDisposable
 {
-    private bool _isDisposed;
     public int Order = 0;
+    private bool _isDisposed;
 
     internal Scene Scene { get; init; }
     protected static GraphicsDevice Device => Core.Instance.GraphicsDevice;
@@ -18,7 +17,7 @@ public abstract class RenderPass : IDisposable
     public RenderPipeline RenderPipeline { get; internal init; }
 
     public bool IsActive { get; set; } = true;
-    
+
     public void Dispose()
     {
         if (_isDisposed) return;
@@ -28,7 +27,7 @@ public abstract class RenderPass : IDisposable
         OnDisposing();
 
         _isDisposed = true;
-        
+
         GC.SuppressFinalize(this);
     }
 

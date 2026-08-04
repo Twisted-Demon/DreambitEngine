@@ -6,5 +6,5 @@ public enum BindingType
     MouseButton = 1,
     Axis1D = 2,
     Composite2D = 3,
-    Chord = 4,
+    Chord = 4
 }

@@ -1,7 +1,7 @@
 namespace Dreambit.UI;
 
 /// <summary>
-/// Describes independent inset values for the four edges of a rectangle.
+///     Describes independent inset values for the four edges of a rectangle.
 /// </summary>
 /// <param name="Left">The left inset.</param>
 /// <param name="Top">The top inset.</param>

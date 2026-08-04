@@ -39,7 +39,7 @@ public static class SpriteBatchExtensions
         ArgumentNullException.ThrowIfNull(texture);
 
         var spriteBatchScale = camera.GetSpriteDrawScale(worldScale);
-        
+
         spriteBatch.Draw(
             texture,
             worldPosition,
@@ -170,7 +170,7 @@ public static class SpriteBatchExtensions
             _ => Vector2.Zero
         };
     }
-    
+
     public static Vector2 TransformPrimitivePoint(
         Vector2 localPoint,
         Vector2 position,
@@ -207,14 +207,12 @@ public static class SpriteBatchExtensions
         var transformed = new Vector2[localPoints.Count];
 
         for (var i = 0; i < localPoints.Count; i++)
-        {
             transformed[i] = TransformPrimitivePoint(
                 localPoints[i],
                 position,
                 rotation,
                 resolvedOrigin,
                 resolvedScale);
-        }
 
         return transformed;
     }
@@ -579,9 +577,9 @@ public static class SpriteBatchExtensions
         float thickness = 1f)
     {
         var minimumThickness = Scene.Instance.MainCamera.WorldUnitsPerTexturePixel;
-        if(thickness < minimumThickness)
+        if (thickness < minimumThickness)
             thickness = minimumThickness;
-        
+
         var points = CreateTransformedRectanglePoints(position, size, rotation, origin, scale);
         spriteBatch.DrawHollowPolygon(points, color, thickness);
     }

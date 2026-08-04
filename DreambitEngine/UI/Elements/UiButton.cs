@@ -1,12 +1,11 @@
 using System;
 using System.Xml;
-using Microsoft.Xna.Framework;
 
 namespace Dreambit.UI;
 
 /// <summary>
-/// A single-content control that tracks pointer interaction, raises click
-/// events, and changes its background tint for hover and pressed states.
+///     A single-content control that tracks pointer interaction, raises click
+///     events, and changes its background tint for hover and pressed states.
 /// </summary>
 public class UiButton : UiControl
 {
@@ -18,15 +17,17 @@ public class UiButton : UiControl
         IsFocusable = true;
     }
 
-    /// <summary>Raised after a press begins inside and is released inside the button.</summary>
-    public event Action<UiButton> Clicked;
-
     /// <summary>Gets whether the pointer is currently inside the button bounds.</summary>
     public bool IsHovered { get; private set; }
+
     /// <summary>Gets whether an inside press is currently held.</summary>
     public bool IsPressed { get; private set; }
+
     /// <inheritdoc />
     protected override bool IsPressedForVisualState => IsPressed;
+
+    /// <summary>Raised after a press begins inside and is released inside the button.</summary>
+    public event Action<UiButton> Clicked;
 
     /// <inheritdoc />
     protected override void OnPointerPressed(UiPointerEventArgs args)
@@ -83,5 +84,4 @@ public class UiButton : UiControl
     {
         base.Parse(node);
     }
-    
 }

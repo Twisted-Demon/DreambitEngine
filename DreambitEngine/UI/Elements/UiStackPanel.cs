@@ -9,6 +9,7 @@ public enum StackOrientation
 {
     /// <summary>Places children from top to bottom.</summary>
     Vertical,
+
     /// <summary>Places children from left to right.</summary>
     Horizontal
 }
@@ -18,8 +19,10 @@ public enum StackCrossAlignment
 {
     /// <summary>Aligns children with the beginning of the cross axis.</summary>
     Start,
+
     /// <summary>Centers children on the cross axis.</summary>
     Center,
+
     /// <summary>Aligns children with the end of the cross axis.</summary>
     End
 }
@@ -29,40 +32,52 @@ public enum StackGrowDirection
 {
     /// <summary>Starts at the beginning of the stacking axis.</summary>
     Start = 0,
+
     /// <summary>Starts at the top of a vertical stack.</summary>
     Top = Start,
+
     /// <summary>Starts at the left of a horizontal stack.</summary>
     Left = Start,
+
     /// <summary>Centers the complete child group on the stacking axis.</summary>
     Center = 1,
+
     /// <summary>Starts at the end of the stacking axis and grows toward it.</summary>
     End = 2,
+
     /// <summary>Aligns a vertical stack's child group with the bottom.</summary>
     Bottom = End,
+
     /// <summary>Aligns a horizontal stack's child group with the right.</summary>
     Right = End
 }
 
 /// <summary>
-/// Base container that lays out children sequentially along one axis with
-/// configurable spacing, padding, group placement, and cross-axis alignment.
+///     Base container that lays out children sequentially along one axis with
+///     configurable spacing, padding, group placement, and cross-axis alignment.
 /// </summary>
 public abstract class UiStackPanelBase : UiContainer
 {
     /// <summary>Gets or sets how children align on the non-stacking axis.</summary>
     public StackCrossAlignment CrossAlignment = StackCrossAlignment.Start;
+
     /// <summary>Gets or sets where the complete child group is placed on the stacking axis.</summary>
     public StackGrowDirection GrowDirection = StackGrowDirection.Start;
-    /// <summary>Gets or sets the pixel gap inserted between adjacent children.</summary>
-    public int Spacing;
-    /// <summary>Gets or sets the left inner padding in pixels.</summary>
-    public int PaddingLeft;
-    /// <summary>Gets or sets the top inner padding in pixels.</summary>
-    public int PaddingTop;
-    /// <summary>Gets or sets the right inner padding in pixels.</summary>
-    public int PaddingRight;
+
     /// <summary>Gets or sets the bottom inner padding in pixels.</summary>
     public int PaddingBottom;
+
+    /// <summary>Gets or sets the left inner padding in pixels.</summary>
+    public int PaddingLeft;
+
+    /// <summary>Gets or sets the right inner padding in pixels.</summary>
+    public int PaddingRight;
+
+    /// <summary>Gets or sets the top inner padding in pixels.</summary>
+    public int PaddingTop;
+
+    /// <summary>Gets or sets the pixel gap inserted between adjacent children.</summary>
+    public int Spacing;
 
     /// <summary>Gets the axis used to arrange children.</summary>
     protected abstract StackOrientation LayoutOrientation { get; }
@@ -132,7 +147,7 @@ public abstract class UiStackPanelBase : UiContainer
             PaddingBottom = parsedPadding.Bottom;
         }
 
-        Spacing = UiXmlParser.ParseInt(node, "spacing", 0);
+        Spacing = UiXmlParser.ParseInt(node, "spacing");
 
         var alignment = UiXmlParser.ParseString(
             node,
@@ -178,9 +193,7 @@ public abstract class UiStackPanelBase : UiContainer
             if (!child.Width.IsAuto &&
                 !child.Width.IsPercent &&
                 child.Width.Value <= 0)
-            {
                 child.Width = UiLength.Pixels(innerBounds.Width);
-            }
 
             return;
         }
@@ -188,9 +201,7 @@ public abstract class UiStackPanelBase : UiContainer
         if (!child.Height.IsAuto &&
             !child.Height.IsPercent &&
             child.Height.Value <= 0)
-        {
             child.Height = UiLength.Pixels(innerBounds.Height);
-        }
     }
 
     private void SetChildPosition(UiElement child, int mainOffset)
@@ -302,23 +313,18 @@ public abstract class UiStackPanelBase : UiContainer
             if (LayoutOrientation == StackOrientation.Vertical &&
                 (string.Equals(value, "Left", StringComparison.OrdinalIgnoreCase) ||
                  string.Equals(value, "Right", StringComparison.OrdinalIgnoreCase)))
-            {
                 return StackGrowDirection.Start;
-            }
 
             if (LayoutOrientation == StackOrientation.Horizontal &&
                 (string.Equals(value, "Top", StringComparison.OrdinalIgnoreCase) ||
                  string.Equals(value, "Bottom", StringComparison.OrdinalIgnoreCase)))
-            {
                 return StackGrowDirection.Start;
-            }
 
             return direction;
         }
 
         return StackGrowDirection.Start;
     }
-
 }
 
 /// <summary>Arranges child elements sequentially from top to bottom.</summary>
@@ -338,9 +344,9 @@ public sealed class UiHorizontalStackPanel : UiStackPanelBase
 // Kept for existing layouts. New layouts should use VerticalStackPanel or
 // HorizontalStackPanel so their direction is explicit in the element name.
 /// <summary>
-/// Arranges children along a configurable axis. Prefer
-/// <see cref="UiVerticalStackPanel"/> or <see cref="UiHorizontalStackPanel"/>
-/// when the orientation is known by the layout author.
+///     Arranges children along a configurable axis. Prefer
+///     <see cref="UiVerticalStackPanel" /> or <see cref="UiHorizontalStackPanel" />
+///     when the orientation is known by the layout author.
 /// </summary>
 public class UiStackPanel : UiStackPanelBase
 {

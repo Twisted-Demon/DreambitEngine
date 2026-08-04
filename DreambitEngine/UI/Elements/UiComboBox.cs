@@ -8,17 +8,17 @@ using Microsoft.Xna.Framework;
 namespace Dreambit.UI;
 
 /// <summary>
-/// A single-selection string control whose choices are displayed in a
-/// popup-layer list box.
+///     A single-selection string control whose choices are displayed in a
+///     popup-layer list box.
 /// </summary>
 public sealed class UiComboBox : UiControl
 {
     private readonly List<string> _items = [];
+    private bool _dropDownWasOpenOnPress;
+    private SpriteFontBase _font;
     private UiPopup _popup;
     private UiListBox _popupList;
-    private SpriteFontBase _font;
     private bool _pressed;
-    private bool _dropDownWasOpenOnPress;
     private int _selectedIndex = -1;
 
     /// <summary>Creates a focusable popup-backed combo box.</summary>
@@ -28,9 +28,6 @@ public sealed class UiComboBox : UiControl
         IsHitTestVisible = true;
         Padding = new UiThickness(7, 3, 22, 3);
     }
-
-    /// <summary>Raised when the selected string changes.</summary>
-    public event Action<UiComboBox, int, string> SelectionChanged;
 
     /// <summary>Gets the available string items.</summary>
     public IList<string> Items => _items;
@@ -61,19 +58,27 @@ public sealed class UiComboBox : UiControl
 
     /// <summary>Gets or sets the font path used by the header and generated items.</summary>
     public string FontPath { get; set; } = "monogram";
+
     /// <summary>Gets or sets the generated item font size.</summary>
     public float FontSize { get; set; } = 18f;
+
     /// <summary>Gets or sets the header text color.</summary>
     public Color TextColor { get; set; } = Color.White;
+
     /// <summary>Gets or sets each generated popup item's height.</summary>
     public int ItemHeight { get; set; } = 26;
+
     /// <summary>Gets or sets the popup background tint.</summary>
     public Color PopupTint { get; set; } = new(36, 39, 48);
 
     /// <inheritdoc />
     protected override bool IsPressedForVisualState => _pressed;
+
     /// <inheritdoc />
     protected override bool IsOpenForVisualState => IsDropDownOpen;
+
+    /// <summary>Raised when the selected string changes.</summary>
+    public event Action<UiComboBox, int, string> SelectionChanged;
 
     /// <summary>Replaces the available choices.</summary>
     public void SetItems(IEnumerable<string> items)
@@ -180,8 +185,8 @@ public sealed class UiComboBox : UiControl
             return base.MeasureContent(availableSize);
 
         var measured = _font?.MeasureString(
-            string.IsNullOrEmpty(SelectedItem) ? "Select..." : SelectedItem) ??
-            Vector2.Zero;
+                           string.IsNullOrEmpty(SelectedItem) ? "Select..." : SelectedItem) ??
+                       Vector2.Zero;
         return new Point(
             (int)MathF.Ceiling(measured.X) + Padding.Horizontal,
             (int)MathF.Ceiling(measured.Y) + Padding.Vertical);

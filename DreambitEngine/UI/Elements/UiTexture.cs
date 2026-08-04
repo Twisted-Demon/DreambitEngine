@@ -1,15 +1,14 @@
 ﻿using System.Xml;
 using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 
 namespace Dreambit.UI;
 
 /// <summary>Displays a sprite resource stretched to the element's arranged bounds.</summary>
 public class UiTexture : UiElement
 {
-    private string _spritePath;
     private Sprite _sprite;
-    
+    private string _spritePath;
+
     /// <summary>Gets or sets the color multiplied with the rendered sprite.</summary>
     public Color Tint { get; set; } = Color.White;
 
@@ -19,7 +18,7 @@ public class UiTexture : UiElement
         get => _spritePath;
         set
         {
-            if(_spritePath == value) return;
+            if (_spritePath == value) return;
 
             _spritePath = value ?? string.Empty;
             InvalidateDependencies();
@@ -35,7 +34,7 @@ public class UiTexture : UiElement
         {
             _sprite = value;
             _spritePath = value is null ? string.Empty : value.AssetName;
-            
+
             InvalidateLayout(); // no need to invalidate dependencies
         }
     }

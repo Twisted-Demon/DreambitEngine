@@ -11,7 +11,7 @@ public sealed class OutlineBrush : UiBrush
     public UiThickness Thickness { get; set; } = UiThickness.Uniform(1);
 
     /// <inheritdoc />
-    public override Point MinimumSize => new Point(
+    public override Point MinimumSize => new(
         Thickness.Horizontal,
         Thickness.Vertical);
 

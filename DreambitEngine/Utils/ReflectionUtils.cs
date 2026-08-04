@@ -218,18 +218,18 @@ public static class ReflectionUtils
 
     public static bool OverridesMethods(Type derivedType, string methodName, params Type[] parameterTypes)
     {
-        MethodInfo method = derivedType.GetMethod(
+        var method = derivedType.GetMethod(
             methodName,
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-            binder: null,
-            types: parameterTypes,
-            modifiers: null);
+            null,
+            parameterTypes,
+            null);
 
 
         if (method is null) return false;
 
-        MethodInfo baseDefinition = method.GetBaseDefinition();
-        
+        var baseDefinition = method.GetBaseDefinition();
+
         return method.DeclaringType == derivedType && baseDefinition.DeclaringType != method.DeclaringType;
     }
 

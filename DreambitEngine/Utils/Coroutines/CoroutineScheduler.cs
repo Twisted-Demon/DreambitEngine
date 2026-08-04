@@ -8,18 +8,18 @@ namespace Dreambit;
 internal sealed class CoroutineScheduler : ICoroutineService, ICanLog<CoroutineScheduler>
 {
     private readonly Dictionary<int, Node> _byId = [];
-
-    private readonly List<Node> _updateQueue = new(64);
     private readonly List<Node> _endOfFrameQueue = new(64);
     private readonly List<Node> _fixedQueue = new(64);
-    
+
     private readonly Stack<Node> _pool = [];
+
+    private readonly List<Node> _updateQueue = new(64);
 
     private Node _head;
     private int _idSeq = 1;
 
     public ILogger Logger { get; } = new Logger<CoroutineScheduler>();
-    
+
     public CoroutineHandle StartCoroutine(IEnumerator routine)
     {
         return StartCoroutineInternal(routine, null);
@@ -95,9 +95,7 @@ internal sealed class CoroutineScheduler : ICoroutineService, ICanLog<CoroutineS
         {
             if (!current.WaitingFixedUpdate &&
                 !current.WaitingEndOfFrame)
-            {
                 _updateQueue.Add(current);
-            }
 
             current = current.Next;
         }

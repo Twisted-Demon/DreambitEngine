@@ -1,12 +1,11 @@
 using System.Xml;
-using Microsoft.Xna.Framework;
 
 namespace Dreambit.UI;
 
 /// <summary>
-/// A full-surface content control used for dimmers and modal dialogs. When
-/// blocking is enabled it prevents pointer and keyboard input reaching UI or
-/// gameplay beneath it.
+///     A full-surface content control used for dimmers and modal dialogs. When
+///     blocking is enabled it prevents pointer and keyboard input reaching UI or
+///     gameplay beneath it.
 /// </summary>
 public class UiOverlay : UiContentControl
 {

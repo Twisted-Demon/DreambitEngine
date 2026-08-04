@@ -9,17 +9,20 @@ public enum UiStretch
 {
     /// <summary>Keeps the content's desired size.</summary>
     None,
+
     /// <summary>Fills both axes independently.</summary>
     Fill,
+
     /// <summary>Preserves aspect ratio and fits completely inside.</summary>
     Uniform,
+
     /// <summary>Preserves aspect ratio and completely covers the bounds.</summary>
     UniformToFill
 }
 
 /// <summary>
-/// Fits one arbitrary child into a centered aspect-preserving layout slot.
-/// Stretchable brushes and percentage-sized content fill that slot naturally.
+///     Fits one arbitrary child into a centered aspect-preserving layout slot.
+///     Stretchable brushes and percentage-sized content fill that slot naturally.
 /// </summary>
 public sealed class UiViewbox : UiContentControl
 {

@@ -3,8 +3,8 @@ using Microsoft.Xna.Framework;
 namespace Dreambit.UI;
 
 /// <summary>
-/// An invisible, non-interactive layout element used to reserve empty space in
-/// stacks, grids, wrap panels, and item controls.
+///     An invisible, non-interactive layout element used to reserve empty space in
+///     stacks, grids, wrap panels, and item controls.
 /// </summary>
 public sealed class UiSpacer : UiElement
 {

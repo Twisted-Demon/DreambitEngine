@@ -75,19 +75,13 @@ public sealed class UiRadioButton : UiCheckBox
     private void UncheckGroupPeers()
     {
         if (Layout is not null)
-        {
             foreach (var radio in Enumerate(Layout.Root))
-            {
                 if (!ReferenceEquals(radio, this) &&
                     string.Equals(
                         radio.GroupName,
                         GroupName,
                         StringComparison.Ordinal))
-                {
                     radio.IsChecked = false;
-                }
-            }
-        }
     }
 
     private static IEnumerable<UiRadioButton> Enumerate(UiElement element)
@@ -98,9 +92,7 @@ public sealed class UiRadioButton : UiCheckBox
         if (element is UiRadioButton radio)
             yield return radio;
         foreach (var child in element.Children)
-        {
-            foreach (var descendant in Enumerate(child))
-                yield return descendant;
-        }
+        foreach (var descendant in Enumerate(child))
+            yield return descendant;
     }
 }

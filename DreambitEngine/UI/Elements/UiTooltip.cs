@@ -4,13 +4,13 @@ using System.Xml;
 namespace Dreambit.UI;
 
 /// <summary>
-/// A delayed, non-interactive popup associated with another UI element through
-/// its <c>Tooltip</c> property element.
+///     A delayed, non-interactive popup associated with another UI element through
+///     its <c>Tooltip</c> property element.
 /// </summary>
 public sealed class UiTooltip : UiPopup
 {
-    private UiElement _target;
     private float _hoverElapsed;
+    private UiElement _target;
 
     /// <summary>Creates a non-interactive tooltip.</summary>
     public UiTooltip()

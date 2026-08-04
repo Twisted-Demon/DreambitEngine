@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Xml;
 using Microsoft.Xna.Framework;
@@ -5,8 +6,8 @@ using Microsoft.Xna.Framework;
 namespace Dreambit.UI;
 
 /// <summary>
-/// Draws an ordered collection of brushes into the same bounds, allowing
-/// backgrounds to be composed without creating a new control type.
+///     Draws an ordered collection of brushes into the same bounds, allowing
+///     backgrounds to be composed without creating a new control type.
 /// </summary>
 public sealed class LayeredBrush : UiBrush
 {
@@ -25,8 +26,8 @@ public sealed class LayeredBrush : UiBrush
                 if (brush is null)
                     continue;
 
-                width = System.Math.Max(width, brush.MinimumSize.X);
-                height = System.Math.Max(height, brush.MinimumSize.Y);
+                width = Math.Max(width, brush.MinimumSize.X);
+                height = Math.Max(height, brush.MinimumSize.Y);
             }
 
             return new Point(width, height);

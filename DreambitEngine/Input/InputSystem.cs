@@ -21,7 +21,10 @@ public class InputSystem : Singleton<InputSystem>
         _byName.Remove(map.Name);
     }
 
-    public InputActionMap Get(string mapName) => _byName.GetValueOrDefault(mapName);
+    public InputActionMap Get(string mapName)
+    {
+        return _byName.GetValueOrDefault(mapName);
+    }
 
     /// <summary>Samples raw device state and resets per-frame UI consumption.</summary>
     public void PreUpdate()

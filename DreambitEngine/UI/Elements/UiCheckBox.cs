@@ -40,10 +40,13 @@ public class UiCheckBox : UiToggleButton
 
     /// <summary>Gets or sets the square indicator size.</summary>
     public int IndicatorSize { get; set; } = 18;
+
     /// <summary>Gets or sets the gap between the indicator and content.</summary>
     public int IndicatorSpacing { get; set; } = 6;
+
     /// <summary>Gets or sets the unchecked indicator tint.</summary>
     public Color IndicatorTint { get; set; } = Color.Gray;
+
     /// <summary>Gets or sets the checked mark tint.</summary>
     public Color MarkTint { get; set; } = Color.White;
 

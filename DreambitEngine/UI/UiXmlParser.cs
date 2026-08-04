@@ -6,7 +6,7 @@ using Microsoft.Xna.Framework;
 namespace Dreambit.UI;
 
 /// <summary>
-/// Provides shared helpers for reading UI element and brush values from XML.
+///     Provides shared helpers for reading UI element and brush values from XML.
 /// </summary>
 public static class UiXmlParser
 {
@@ -17,7 +17,7 @@ public static class UiXmlParser
     /// <param name="node">The XML node containing the attribute.</param>
     /// <param name="name">The attribute name.</param>
     /// <param name="defaultValue">The value returned when the attribute is absent.</param>
-    /// <returns>The attribute value or <paramref name="defaultValue"/>.</returns>
+    /// <returns>The attribute value or <paramref name="defaultValue" />.</returns>
     public static string ParseString(XmlNode node, string name, string defaultValue)
     {
         if (node.Attributes == null)
@@ -81,8 +81,8 @@ public static class UiXmlParser
     }
 
     /// <summary>
-    /// Reads a <c>#RRGGBB</c> or <c>#RRGGBBAA</c> attribute as a premultiplied
-    /// color.
+    ///     Reads a <c>#RRGGBB</c> or <c>#RRGGBBAA</c> attribute as a premultiplied
+    ///     color.
     /// </summary>
     /// <param name="node">The XML node containing the attribute.</param>
     /// <param name="attribute">The attribute name.</param>
@@ -133,7 +133,7 @@ public static class UiXmlParser
         return UiLength.Pixels(pixels);
     }
 
-    /// <summary>Parses an anchor name, defaulting to <see cref="UiAnchor.TopLeft"/>.</summary>
+    /// <summary>Parses an anchor name, defaulting to <see cref="UiAnchor.TopLeft" />.</summary>
     /// <param name="value">The anchor name.</param>
     /// <returns>The parsed anchor.</returns>
     public static UiAnchor ParseAnchor(string value)
@@ -144,14 +144,14 @@ public static class UiXmlParser
     }
 
     /// <summary>
-    /// Parses either one uniform inset or four comma-separated insets in
-    /// left, top, right, bottom order.
+    ///     Parses either one uniform inset or four comma-separated insets in
+    ///     left, top, right, bottom order.
     /// </summary>
     /// <param name="value">The thickness text to parse.</param>
     /// <param name="valueName">The value name used in parse errors.</param>
     /// <returns>The parsed edge thickness.</returns>
     /// <exception cref="XmlException">
-    /// Thrown when the value does not contain one or four non-negative integers.
+    ///     Thrown when the value does not contain one or four non-negative integers.
     /// </exception>
     public static UiThickness ParseThickness(
         string value,
@@ -166,13 +166,11 @@ public static class UiXmlParser
         }
 
         if (parts.Length == 4)
-        {
             return new UiThickness(
                 ParseThicknessPart(parts[0], valueName),
                 ParseThicknessPart(parts[1], valueName),
                 ParseThicknessPart(parts[2], valueName),
                 ParseThicknessPart(parts[3], valueName));
-        }
 
         throw new XmlException(
             $"{valueName} must be one value or four comma-separated values.");
@@ -186,17 +184,15 @@ public static class UiXmlParser
                 CultureInfo.InvariantCulture,
                 out var result) ||
             result < 0)
-        {
             throw new XmlException(
                 $"{valueName} values must be non-negative integers.");
-        }
 
         return result;
     }
 
     /// <summary>
-    /// Parses a grid track expressed as pixels, a percentage, <c>Auto</c>,
-    /// <c>*</c>, or a weighted star such as <c>2*</c>.
+    ///     Parses a grid track expressed as pixels, a percentage, <c>Auto</c>,
+    ///     <c>*</c>, or a weighted star such as <c>2*</c>.
     /// </summary>
     /// <param name="value">The grid track text.</param>
     /// <returns>The parsed grid length.</returns>
@@ -232,21 +228,19 @@ public static class UiXmlParser
     }
 
     /// <summary>
-    /// Adds the configured prefix separator to a non-empty prefix when needed.
+    ///     Adds the configured prefix separator to a non-empty prefix when needed.
     /// </summary>
     /// <param name="value">The prefix to normalize.</param>
     /// <returns>
-    /// The prefix followed by <see cref="PrefixSeparator"/>, or the original
-    /// value when it is empty or already ends with the separator.
+    ///     The prefix followed by <see cref="PrefixSeparator" />, or the original
+    ///     value when it is empty or already ends with the separator.
     /// </returns>
     public static string WithSeparator(string value)
     {
         if (string.IsNullOrEmpty(value) ||
             string.IsNullOrEmpty(PrefixSeparator) ||
             value.EndsWith(PrefixSeparator, StringComparison.Ordinal))
-        {
             return value;
-        }
 
         return value + PrefixSeparator;
     }
@@ -260,9 +254,7 @@ public static class UiXmlParser
                 out var result) ||
             !float.IsFinite(result) ||
             result < 0f)
-        {
             throw new XmlException($"{valueName} must be a non-negative number.");
-        }
 
         return result;
     }

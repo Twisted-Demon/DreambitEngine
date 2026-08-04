@@ -11,5 +11,5 @@ public enum Axis2D
 {
     Mouse,
     Joystick,
-    Keys,
+    Keys
 }

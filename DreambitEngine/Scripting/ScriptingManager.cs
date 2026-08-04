@@ -11,9 +11,9 @@ public class ScriptingManager
 {
     private static readonly Dictionary<string, ScriptSequence> PreloadedGroups = [];
     private readonly Logger<ScriptingManager> _logger = new();
-    private Queue<ScriptActionGroup> _groupQueue = [];
     public Action OnScriptingEnd;
     public Action OnScriptingStart;
+    private Queue<ScriptActionGroup> _groupQueue = [];
 
     public ScriptingManager()
     {

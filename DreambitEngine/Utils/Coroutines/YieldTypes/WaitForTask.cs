@@ -10,7 +10,7 @@ public sealed class WaitForTask : IYieldInstruction
     {
         _task = task;
     }
-    
+
     public bool KeepWaiting(CoroutineClock t)
     {
         return !_task.IsCompleted;

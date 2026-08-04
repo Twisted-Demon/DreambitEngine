@@ -19,10 +19,13 @@ public sealed class UiSelectionChangedEventArgs : EventArgs
 
     /// <summary>Gets the previous selected index.</summary>
     public int OldIndex { get; }
+
     /// <summary>Gets the current selected index.</summary>
     public int NewIndex { get; }
+
     /// <summary>Gets the previously selected element.</summary>
     public UiElement OldItem { get; }
+
     /// <summary>Gets the currently selected element.</summary>
     public UiElement NewItem { get; }
 }

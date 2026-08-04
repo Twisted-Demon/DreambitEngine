@@ -4,18 +4,15 @@ using System.Xml;
 namespace Dreambit.UI;
 
 /// <summary>
-/// Base class for controls that expose a clamped numeric value between a
-/// minimum and maximum, including sliders, scrollbars, and progress bars.
+///     Base class for controls that expose a clamped numeric value between a
+///     minimum and maximum, including sliders, scrollbars, and progress bars.
 /// </summary>
 public abstract class UiRangeBase : UiControl
 {
-    private float _minimum;
     private float _maximum = 100f;
-    private float _value;
+    private float _minimum;
     private float _step = 1f;
-
-    /// <summary>Raised whenever the effective value changes.</summary>
-    public event Action<UiRangeBase, float> ValueChanged;
+    private float _value;
 
     /// <summary>Gets or sets the inclusive lower bound.</summary>
     public float Minimum
@@ -68,6 +65,9 @@ public abstract class UiRangeBase : UiControl
         ? 0f
         : (Value - Minimum) / (Maximum - Minimum);
 
+    /// <summary>Raised whenever the effective value changes.</summary>
+    public event Action<UiRangeBase, float> ValueChanged;
+
     /// <summary>Sets a value from a normalized zero-to-one position.</summary>
     public void SetNormalizedValue(float normalizedValue)
     {
@@ -82,7 +82,7 @@ public abstract class UiRangeBase : UiControl
     public override void Parse(XmlNode node)
     {
         base.Parse(node);
-        Minimum = UiXmlParser.ParseFloat(node, "minimum", 0f);
+        Minimum = UiXmlParser.ParseFloat(node, "minimum");
         Maximum = UiXmlParser.ParseFloat(node, "maximum", 100f);
         Step = UiXmlParser.ParseFloat(node, "step", 1f);
         Value = UiXmlParser.ParseFloat(node, "value", Minimum);

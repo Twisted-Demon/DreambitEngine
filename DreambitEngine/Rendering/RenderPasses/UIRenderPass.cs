@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using Dreambit.ECS;
 using Microsoft.Xna.Framework.Graphics;
 
 namespace Dreambit;
@@ -9,8 +8,8 @@ namespace Dreambit;
 public class UIRenderPass : RenderPass
 {
     private static UIRenderPass _activePass;
-    private RasterizerState _scissorRasterizerState;
     private bool _batchActive;
+    private RasterizerState _scissorRasterizerState;
 
     public override void Initialize()
     {
@@ -29,7 +28,7 @@ public class UIRenderPass : RenderPass
         var layerOrder = drawLayers.Keys.OrderBy(x => x).ToList();
 
         Device.SetRenderTarget(null);
-        
+
         for (var i = 0; i < layerOrder.Count; i++)
         {
             _activePass = this;
@@ -53,8 +52,8 @@ public class UIRenderPass : RenderPass
     }
 
     /// <summary>
-    /// Flushes queued UI sprites before a draw context changes GPU scissor
-    /// state. A new deferred batch is opened immediately with identical state.
+    ///     Flushes queued UI sprites before a draw context changes GPU scissor
+    ///     state. A new deferred batch is opened immediately with identical state.
     /// </summary>
     internal static void FlushForScissorChange()
     {

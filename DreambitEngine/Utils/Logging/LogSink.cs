@@ -69,12 +69,8 @@ public static class LogSink
             $"{body}{Markup.Escape(msg)}[/]";
 
         if (args is { Length: > 0 })
-        {
             AnsiConsole.MarkupLine(line, args);
-        }
         else
-        {
             AnsiConsole.MarkupLine(line);
-        }
     }
 }

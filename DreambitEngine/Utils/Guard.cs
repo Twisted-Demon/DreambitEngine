@@ -1,7 +1,4 @@
-﻿using System;
-using Dreambit.ECS;
-
-namespace Dreambit;
+﻿namespace Dreambit;
 
 public class Guard
 {

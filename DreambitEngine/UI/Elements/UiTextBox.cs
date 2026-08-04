@@ -7,20 +7,19 @@ using Microsoft.Xna.Framework.Input;
 namespace Dreambit.UI;
 
 /// <summary>
-/// A single-line editable text control with caret movement, drag selection,
-/// placeholder/password display, and UI clipboard shortcuts.
+///     A single-line editable text control with caret movement, drag selection,
+///     placeholder/password display, and UI clipboard shortcuts.
 /// </summary>
 public sealed class UiTextBox : UiControl
 {
-    private string _text = string.Empty;
+    private float _caretElapsed;
     private string _fontPath = "monogram";
     private float _fontSize = 18f;
-    private int _caretIndex;
-    private int _selectionAnchor;
-    private float _caretElapsed;
+    private int _maxLength;
     private float _scrollOffset;
     private bool _selecting;
-    private int _maxLength;
+    private int _selectionAnchor;
+    private string _text = string.Empty;
 
     /// <summary>Creates a focusable keyboard-capturing text box.</summary>
     public UiTextBox()
@@ -31,9 +30,6 @@ public sealed class UiTextBox : UiControl
         ClipToBounds = true;
         Padding = new UiThickness(6, 3, 6, 3);
     }
-
-    /// <summary>Raised whenever the edited text changes.</summary>
-    public event Action<UiTextBox, string> TextChanged;
 
     /// <summary>Gets the resolved font.</summary>
     public SpriteFontBase Font { get; private set; }
@@ -49,7 +45,7 @@ public sealed class UiTextBox : UiControl
                 next = next[..MaxLength];
             if (_text == next) return;
             _text = next;
-            _caretIndex = Math.Min(_caretIndex, _text.Length);
+            CaretIndex = Math.Min(CaretIndex, _text.Length);
             _selectionAnchor = Math.Min(_selectionAnchor, _text.Length);
             InvalidateLayout();
             TextChanged?.Invoke(this, _text);
@@ -58,14 +54,19 @@ public sealed class UiTextBox : UiControl
 
     /// <summary>Gets or sets the text shown while the value is empty.</summary>
     public string Placeholder { get; set; } = string.Empty;
+
     /// <summary>Gets or sets the text color.</summary>
     public Color TextColor { get; set; } = Color.White;
+
     /// <summary>Gets or sets the placeholder color.</summary>
     public Color PlaceholderColor { get; set; } = new(150, 150, 160);
+
     /// <summary>Gets or sets the selection highlight color.</summary>
     public Color SelectionColor { get; set; } = new(50, 105, 170, 180);
+
     /// <summary>Gets or sets the caret color.</summary>
     public Color CaretColor { get; set; } = Color.White;
+
     /// <summary>Gets or sets the font resource path.</summary>
     public string FontPath
     {
@@ -105,14 +106,21 @@ public sealed class UiTextBox : UiControl
                 Text = Text[.._maxLength];
         }
     }
+
     /// <summary>Gets or sets the character used to conceal text, or null for normal display.</summary>
     public char? PasswordCharacter { get; set; }
+
     /// <summary>Gets the current caret insertion index.</summary>
-    public int CaretIndex => _caretIndex;
+    public int CaretIndex { get; private set; }
+
     /// <summary>Gets the first selected character index.</summary>
-    public int SelectionStart => Math.Min(_caretIndex, _selectionAnchor);
+    public int SelectionStart => Math.Min(CaretIndex, _selectionAnchor);
+
     /// <summary>Gets the number of selected characters.</summary>
-    public int SelectionLength => Math.Abs(_caretIndex - _selectionAnchor);
+    public int SelectionLength => Math.Abs(CaretIndex - _selectionAnchor);
+
+    /// <summary>Raised whenever the edited text changes.</summary>
+    public event Action<UiTextBox, string> TextChanged;
 
     /// <summary>Selects a range of characters.</summary>
     public void Select(int start, int length)
@@ -120,7 +128,7 @@ public sealed class UiTextBox : UiControl
         start = Math.Clamp(start, 0, Text.Length);
         length = Math.Clamp(length, 0, Text.Length - start);
         _selectionAnchor = start;
-        _caretIndex = start + length;
+        CaretIndex = start + length;
         ResetCaretBlink();
     }
 
@@ -165,18 +173,16 @@ public sealed class UiTextBox : UiControl
 
         _caretElapsed += Time.UnscaledDeltaTime;
         foreach (var character in input.TextInput ?? [])
-        {
             if (!char.IsControl(character))
                 ReplaceSelection(character.ToString());
-        }
     }
 
     /// <inheritdoc />
     protected override void OnPointerPressed(UiPointerEventArgs args)
     {
         _selecting = true;
-        _caretIndex = GetCharacterIndex(args.Position.X);
-        _selectionAnchor = _caretIndex;
+        CaretIndex = GetCharacterIndex(args.Position.X);
+        _selectionAnchor = CaretIndex;
         ResetCaretBlink();
         args.CapturePointer();
         args.Handled = true;
@@ -188,7 +194,7 @@ public sealed class UiTextBox : UiControl
         if (!_selecting)
             return;
 
-        _caretIndex = GetCharacterIndex(args.Position.X);
+        CaretIndex = GetCharacterIndex(args.Position.X);
         ResetCaretBlink();
         args.Handled = true;
     }
@@ -286,17 +292,15 @@ public sealed class UiTextBox : UiControl
         }
 
         if (!string.IsNullOrEmpty(displayText))
-        {
             Graphics.SpriteBatch.DrawString(
                 Font,
                 displayText,
                 new Vector2(textX, textY),
                 showingPlaceholder ? PlaceholderColor : TextColor);
-        }
 
         if (IsFocused && _caretElapsed % 1f < 0.55f)
         {
-            var caretX = textX + MeasurePrefix(displayText, _caretIndex);
+            var caretX = textX + MeasurePrefix(displayText, CaretIndex);
             Graphics.SpriteBatch.DrawFilledRectangle(
                 new RectangleF(
                     caretX,
@@ -315,15 +319,15 @@ public sealed class UiTextBox : UiControl
         Placeholder = UiXmlParser.ParseString(node, "placeholder", string.Empty);
         FontPath = UiXmlParser.ParseString(node, "font", "monogram");
         FontSize = UiXmlParser.ParseFloat(node, "font-size", 18f);
-        MaxLength = Math.Max(0, UiXmlParser.ParseInt(node, "max-length", 0));
+        MaxLength = Math.Max(0, UiXmlParser.ParseInt(node, "max-length"));
         var password = UiXmlParser.ParseString(node, "password-character", string.Empty);
         PasswordCharacter = password.Length == 0 ? null : password[0];
         ParseColor(node, "text-color", value => TextColor = value);
         ParseColor(node, "placeholder-color", value => PlaceholderColor = value);
         ParseColor(node, "selection-color", value => SelectionColor = value);
         ParseColor(node, "caret-color", value => CaretColor = value);
-        _caretIndex = Text.Length;
-        _selectionAnchor = _caretIndex;
+        CaretIndex = Text.Length;
+        _selectionAnchor = CaretIndex;
     }
 
     private bool HandleClipboardShortcut(Keys key)
@@ -358,19 +362,19 @@ public sealed class UiTextBox : UiControl
     private void Backspace()
     {
         if (DeleteSelection()) return;
-        if (_caretIndex <= 0) return;
-        var index = _caretIndex - 1;
+        if (CaretIndex <= 0) return;
+        var index = CaretIndex - 1;
         Text = Text.Remove(index, 1);
-        _caretIndex = _selectionAnchor = index;
+        CaretIndex = _selectionAnchor = index;
         ResetCaretBlink();
     }
 
     private void Delete()
     {
         if (DeleteSelection()) return;
-        if (_caretIndex >= Text.Length) return;
-        Text = Text.Remove(_caretIndex, 1);
-        _selectionAnchor = _caretIndex;
+        if (CaretIndex >= Text.Length) return;
+        Text = Text.Remove(CaretIndex, 1);
+        _selectionAnchor = CaretIndex;
         ResetCaretBlink();
     }
 
@@ -381,7 +385,7 @@ public sealed class UiTextBox : UiControl
 
         var start = SelectionStart;
         Text = Text.Remove(start, SelectionLength);
-        _caretIndex = _selectionAnchor = start;
+        CaretIndex = _selectionAnchor = start;
         ResetCaretBlink();
         return true;
     }
@@ -394,21 +398,21 @@ public sealed class UiTextBox : UiControl
         if (MaxLength > 0 && candidate.Length > MaxLength)
             candidate = candidate[..MaxLength];
         Text = candidate;
-        _caretIndex = Math.Min(start + value.Length, Text.Length);
-        _selectionAnchor = _caretIndex;
+        CaretIndex = Math.Min(start + value.Length, Text.Length);
+        _selectionAnchor = CaretIndex;
         ResetCaretBlink();
     }
 
     private void MoveCaret(int delta, bool extendSelection)
     {
-        SetCaret(Math.Clamp(_caretIndex + delta, 0, Text.Length), extendSelection);
+        SetCaret(Math.Clamp(CaretIndex + delta, 0, Text.Length), extendSelection);
     }
 
     private void SetCaret(int index, bool extendSelection)
     {
-        _caretIndex = Math.Clamp(index, 0, Text.Length);
+        CaretIndex = Math.Clamp(index, 0, Text.Length);
         if (!extendSelection)
-            _selectionAnchor = _caretIndex;
+            _selectionAnchor = CaretIndex;
         ResetCaretBlink();
     }
 
@@ -430,7 +434,7 @@ public sealed class UiTextBox : UiControl
     private void UpdateScrollOffset(string displayText)
     {
         var visibleWidth = Math.Max(0, Bounds.Width - Padding.Horizontal);
-        var caretX = MeasurePrefix(displayText, _caretIndex);
+        var caretX = MeasurePrefix(displayText, CaretIndex);
         if (caretX - _scrollOffset > visibleWidth)
             _scrollOffset = caretX - visibleWidth;
         else if (caretX < _scrollOffset)

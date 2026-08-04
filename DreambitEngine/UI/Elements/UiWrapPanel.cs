@@ -6,8 +6,8 @@ using Microsoft.Xna.Framework;
 namespace Dreambit.UI;
 
 /// <summary>
-/// Places children sequentially and starts a new row or column when the next
-/// child would exceed the available space.
+///     Places children sequentially and starts a new row or column when the next
+///     child would exceed the available space.
 /// </summary>
 public class UiWrapPanel : UiContainer
 {
@@ -40,7 +40,7 @@ public class UiWrapPanel : UiContainer
             out StackOrientation parsedOrientation)
             ? parsedOrientation
             : StackOrientation.Horizontal;
-        Spacing = Math.Max(0, UiXmlParser.ParseInt(node, "spacing", 0));
+        Spacing = Math.Max(0, UiXmlParser.ParseInt(node, "spacing"));
         LineSpacing = Math.Max(
             0,
             UiXmlParser.ParseInt(node, "line-spacing", Spacing));

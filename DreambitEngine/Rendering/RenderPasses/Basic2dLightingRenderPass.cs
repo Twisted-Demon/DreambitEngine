@@ -9,23 +9,21 @@ namespace Dreambit;
 
 public class Basic2dLightingRenderPass : RenderPass
 {
+    private static readonly DrawableSortEntryComparer SortComparer = new();
+    private readonly List<DrawableSortEntry> _drawableSortBuffer = new(512);
+
+    private readonly List<int> _sortedLayerBuffer = new(16);
     private Effect LightingFx { get; set; }
 
     private RenderTarget2D AlbedoRt { get; set; }
 
-    private readonly List<int> _sortedLayerBuffer = new(16);
-    private readonly List<DrawableSortEntry> _drawableSortBuffer = new(512);
-
-    private static readonly DrawableSortEntryComparer SortComparer = new();
-
     public override void Initialize()
     {
         base.Initialize();
-        
-        CreateAlbedoRenderTarget();
-        
-        LightingFx = Resources.LoadAsset<Effect>("Effects/ForwardLighting2D");
 
+        CreateAlbedoRenderTarget();
+
+        LightingFx = Resources.LoadAsset<Effect>("Effects/ForwardLighting2D");
     }
 
     public override void OnDraw()
@@ -37,11 +35,11 @@ public class Basic2dLightingRenderPass : RenderPass
     private void RenderDrawables()
     {
         var drawLayers = Drawables.GetDrawLayers();
-        
+
         var camera = Scene.MainCamera;
         var cameraBounds = camera.BoundsF;
         var cameraMatrix = camera.TransformMatrix;
-        
+
         BuildSortedLayerBuffer(drawLayers);
 
         Device.SetRenderTarget(AlbedoRt);
@@ -104,98 +102,96 @@ public class Basic2dLightingRenderPass : RenderPass
 
         Core.SpriteBatch.End();
     }
-    
+
     private void BuildSortedLayerBuffer(
-    Dictionary<int, List<DrawableComponent>> drawLayers)
-{
-    _sortedLayerBuffer.Clear();
-
-    foreach (var layer in drawLayers.Keys)
+        Dictionary<int, List<DrawableComponent>> drawLayers)
     {
-        // Point lights are processed separately in RenderLighting().
-        if (layer == DrawLayers.LightLayer)
-            continue;
+        _sortedLayerBuffer.Clear();
 
-        _sortedLayerBuffer.Add(layer);
-    }
-
-    _sortedLayerBuffer.Sort();
-}
-
-private void BuildDrawableSortBuffer(List<DrawableComponent> layerDrawables, RectangleF cameraBounds)
-{
-    _drawableSortBuffer.Clear();
-
-    for (var i = 0; i < layerDrawables.Count; i++)
-    {
-        var drawable = layerDrawables[i];
-
-        if (!drawable.Enabled ||
-            !drawable.Entity.Enabled)
+        foreach (var layer in drawLayers.Keys)
         {
-            continue;
+            // Point lights are processed separately in RenderLighting().
+            if (layer == DrawLayers.LightLayer)
+                continue;
+
+            _sortedLayerBuffer.Add(layer);
         }
 
-        if (!drawable.IsVisibleFromCamera(cameraBounds))
-            continue;
-
-        var effect =
-            drawable.Effect ?? DefaultEffect;
-
-        // Snapshot WorldPosition.Y once.
-        //
-        // Without this, the comparer can evaluate WorldPosition
-        // many times during an O(n log n) sort.
-        var worldY =
-            drawable.Transform.WorldPosition.Y;
-
-        _drawableSortBuffer.Add(
-            new DrawableSortEntry(
-                drawable,
-                effect,
-                worldY));
+        _sortedLayerBuffer.Sort();
     }
-}
 
-private void RenderSortedDrawables(Matrix cameraMatrix)
-{
-    Effect currentEffect = null;
-    var batchStarted = false;
-
-    for (var i = 0;
-         i < _drawableSortBuffer.Count;
-         i++)
+    private void BuildDrawableSortBuffer(List<DrawableComponent> layerDrawables, RectangleF cameraBounds)
     {
-        var entry = _drawableSortBuffer[i];
+        _drawableSortBuffer.Clear();
 
-        if (!batchStarted ||
-            !ReferenceEquals(
-                entry.Effect,
-                currentEffect))
+        for (var i = 0; i < layerDrawables.Count; i++)
         {
-            if (batchStarted)
-                Core.SpriteBatch.End();
+            var drawable = layerDrawables[i];
 
-            Core.SpriteBatch.Begin(
-                SpriteSortMode.Deferred,
-                Scene.RenderingOptions.BlendState,
-                Scene.RenderingOptions.SamplerState,
-                DepthStencilState.None,
-                RasterizerState.CullNone,
-                entry.Effect,
-                cameraMatrix
-            );
+            if (!drawable.Enabled ||
+                !drawable.Entity.Enabled)
+                continue;
 
-            currentEffect = entry.Effect;
-            batchStarted = true;
+            if (!drawable.IsVisibleFromCamera(cameraBounds))
+                continue;
+
+            var effect =
+                drawable.Effect ?? DefaultEffect;
+
+            // Snapshot WorldPosition.Y once.
+            //
+            // Without this, the comparer can evaluate WorldPosition
+            // many times during an O(n log n) sort.
+            var worldY =
+                drawable.Transform.WorldPosition.Y;
+
+            _drawableSortBuffer.Add(
+                new DrawableSortEntry(
+                    drawable,
+                    effect,
+                    worldY));
+        }
+    }
+
+    private void RenderSortedDrawables(Matrix cameraMatrix)
+    {
+        Effect currentEffect = null;
+        var batchStarted = false;
+
+        for (var i = 0;
+             i < _drawableSortBuffer.Count;
+             i++)
+        {
+            var entry = _drawableSortBuffer[i];
+
+            if (!batchStarted ||
+                !ReferenceEquals(
+                    entry.Effect,
+                    currentEffect))
+            {
+                if (batchStarted)
+                    Core.SpriteBatch.End();
+
+                Core.SpriteBatch.Begin(
+                    SpriteSortMode.Deferred,
+                    Scene.RenderingOptions.BlendState,
+                    Scene.RenderingOptions.SamplerState,
+                    DepthStencilState.None,
+                    RasterizerState.CullNone,
+                    entry.Effect,
+                    cameraMatrix
+                );
+
+                currentEffect = entry.Effect;
+                batchStarted = true;
+            }
+
+            entry.Drawable.Draw();
         }
 
-        entry.Drawable.Draw();
+        if (batchStarted)
+            Core.SpriteBatch.End();
     }
-
-    if (batchStarted)
-        Core.SpriteBatch.End();
-}
 
     protected override void OnWindowResized(object sender, WindowResizedEventArgs args)
     {

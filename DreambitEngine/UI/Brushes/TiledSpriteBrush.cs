@@ -5,8 +5,8 @@ using Microsoft.Xna.Framework;
 namespace Dreambit.UI;
 
 /// <summary>
-/// Repeats a sprite at its native pixel size and crops the final row and column
-/// to remain inside the owning control.
+///     Repeats a sprite at its native pixel size and crops the final row and column
+///     to remain inside the owning control.
 /// </summary>
 public sealed class TiledSpriteBrush : UiBrush
 {
@@ -25,10 +25,8 @@ public sealed class TiledSpriteBrush : UiBrush
     {
         SpritePath = UiXmlParser.ParseString(node, "sprite", string.Empty);
         if (string.IsNullOrWhiteSpace(SpritePath))
-        {
             throw new XmlException(
                 "<TiledSpriteBrush> requires a non-empty sprite attribute.");
-        }
     }
 
     /// <inheritdoc />

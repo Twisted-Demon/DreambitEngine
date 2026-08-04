@@ -9,26 +9,29 @@ public enum UiPopupPlacement
 {
     /// <summary>Places the popup below its target.</summary>
     Bottom,
+
     /// <summary>Places the popup above its target.</summary>
     Top,
+
     /// <summary>Places the popup to the target's left.</summary>
     Left,
+
     /// <summary>Places the popup to the target's right.</summary>
     Right,
+
     /// <summary>Centers the popup over its target.</summary>
     Center,
+
     /// <summary>Uses the popup's own X and Y values.</summary>
     Absolute
 }
 
 /// <summary>
-/// Hosts arbitrary content on the layout's topmost popup layer. A popup can be
-/// positioned relative to another element and dismissed by outside input.
+///     Hosts arbitrary content on the layout's topmost popup layer. A popup can be
+///     positioned relative to another element and dismissed by outside input.
 /// </summary>
 public class UiPopup : UiControl
 {
-    private bool _isOpen;
-
     /// <summary>Creates an automatically-sized popup.</summary>
     public UiPopup()
     {
@@ -39,7 +42,7 @@ public class UiPopup : UiControl
     }
 
     /// <summary>Gets whether this popup is currently visible on its popup layer.</summary>
-    public bool IsOpen => _isOpen;
+    public bool IsOpen { get; private set; }
 
     /// <summary>Gets whether XML requested this popup to open after loading.</summary>
     internal bool OpenRequested { get; private set; }
@@ -136,14 +139,14 @@ public class UiPopup : UiControl
     public override void Parse(XmlNode node)
     {
         base.Parse(node);
-        OpenRequested = UiXmlParser.ParseBool(node, "is-open", false);
-        StaysOpen = UiXmlParser.ParseBool(node, "stays-open", false);
+        OpenRequested = UiXmlParser.ParseBool(node, "is-open");
+        StaysOpen = UiXmlParser.ParseBool(node, "stays-open");
         PlacementTargetId = UiXmlParser.ParseString(
             node,
             "placement-target",
             string.Empty);
-        HorizontalOffset = UiXmlParser.ParseInt(node, "horizontal-offset", 0);
-        VerticalOffset = UiXmlParser.ParseInt(node, "vertical-offset", 0);
+        HorizontalOffset = UiXmlParser.ParseInt(node, "horizontal-offset");
+        VerticalOffset = UiXmlParser.ParseInt(node, "vertical-offset");
         var placement = UiXmlParser.ParseString(node, "placement", "Bottom");
         Placement = Enum.TryParse(
             placement,
@@ -156,7 +159,7 @@ public class UiPopup : UiControl
 
     internal void SetOpen(bool open)
     {
-        _isOpen = open;
+        IsOpen = open;
         OpenRequested = open;
         IsVisible = open;
     }
@@ -165,8 +168,6 @@ public class UiPopup : UiControl
     {
         if (PlacementTarget is null &&
             !string.IsNullOrWhiteSpace(PlacementTargetId))
-        {
             PlacementTarget = Layout?.Find(PlacementTargetId);
-        }
     }
 }

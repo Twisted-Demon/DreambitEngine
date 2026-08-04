@@ -24,7 +24,7 @@ public class RenderPipeline(Scene scene) : IDisposable
         _renderers.Clear();
 
         _disposed = true;
-        
+
         GC.SuppressFinalize(this);
     }
 
@@ -70,7 +70,7 @@ public class RenderPipeline(Scene scene) : IDisposable
 
         Core.Instance.GraphicsDevice.SetRenderTarget(null);
         Core.Instance.GraphicsDevice.Clear(scene.BackgroundColor);
-        
+
         Core.SpriteBatch.Begin(
             SpriteSortMode.Deferred,
             BlendState.AlphaBlend,
@@ -86,10 +86,8 @@ public class RenderPipeline(Scene scene) : IDisposable
         // UI is composed after the scene has been presented so it is neither
         // post-processed nor sampled through the scene render target.
         foreach (var renderer in _renderers)
-        {
             if (renderer is UIRenderPass)
                 renderer.OnDraw();
-        }
     }
 
     public static RenderTarget2D CreateRenderTarget()

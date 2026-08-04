@@ -8,8 +8,10 @@ public sealed class UiScrollBar : UiSlider
 {
     /// <summary>Gets or sets the visible extent represented by the thumb.</summary>
     public float ViewportSize { get; set; }
+
     /// <summary>Gets or sets the increment used for wheel and page movement.</summary>
     public float LargeChange { get; set; } = 10f;
+
     /// <summary>Gets or sets the minimum thumb length.</summary>
     public int MinimumThumbSize { get; set; } = 10;
 
@@ -42,7 +44,7 @@ public sealed class UiScrollBar : UiSlider
         base.Parse(node);
         ViewportSize = Math.Max(
             0f,
-            UiXmlParser.ParseFloat(node, "viewport-size", 0f));
+            UiXmlParser.ParseFloat(node, "viewport-size"));
         LargeChange = Math.Max(
             0f,
             UiXmlParser.ParseFloat(node, "large-change", 10f));

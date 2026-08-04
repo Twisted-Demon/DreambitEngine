@@ -28,14 +28,9 @@ public readonly struct CellKey(int x, int y) : IEquatable<CellKey>
 
 public sealed class SpatialHash
 {
-    private readonly record struct CellRange(
-        int MinX,
-        int MinY,
-        int MaxX,
-        int MaxY);
-    
-    private readonly Dictionary<CellKey, List<Collider>> _cells = new(1024);
     private readonly float _cellSize;
+
+    private readonly Dictionary<CellKey, List<Collider>> _cells = new(1024);
     private readonly Dictionary<Collider, CellRange> _colliderCells = new(256);
     private readonly float _invCell;
 
@@ -54,11 +49,9 @@ public sealed class SpatialHash
     public void Remove(Collider collider)
     {
         if (!_colliderCells.Remove(
-            collider,
-            out var previousRange))
-        {
+                collider,
+                out var previousRange))
             return;
-        }
 
         RemoveFromCells(collider, previousRange);
     }
@@ -66,29 +59,27 @@ public sealed class SpatialHash
     private void RemoveFromCells(Collider collider, CellRange range)
     {
         for (var y = range.MinY; y <= range.MaxY; y++)
+        for (var x = range.MinX; x <= range.MaxX; x++)
         {
-            for (var x = range.MinX; x <= range.MaxX; x++)
-            {
-                var key = new CellKey(x, y);
+            var key = new CellKey(x, y);
 
-                if (!_cells.TryGetValue(key, out var list))
-                    continue;
+            if (!_cells.TryGetValue(key, out var list))
+                continue;
 
-                var index = list.IndexOf(collider);
+            var index = list.IndexOf(collider);
 
-                if (index < 0)
-                    continue;
+            if (index < 0)
+                continue;
 
-                // Swap-remove avoids shifting every later element.
-                var lastIndex = list.Count - 1;
+            // Swap-remove avoids shifting every later element.
+            var lastIndex = list.Count - 1;
 
-                list[index] = list[lastIndex];
-                list.RemoveAt(lastIndex);
+            list[index] = list[lastIndex];
+            list.RemoveAt(lastIndex);
 
-                // Do not retain thousands of permanently empty cells.
-                if (list.Count == 0)
-                    _cells.Remove(key);
-            }
+            // Do not retain thousands of permanently empty cells.
+            if (list.Count == 0)
+                _cells.Remove(key);
         }
     }
 
@@ -109,19 +100,17 @@ public sealed class SpatialHash
         }
 
         for (var y = newRange.MinY; y <= newRange.MaxY; y++)
+        for (var x = newRange.MinX; x <= newRange.MaxX; x++)
         {
-            for (var x = newRange.MinX; x <= newRange.MaxX; x++)
+            var key = new CellKey(x, y);
+
+            if (!_cells.TryGetValue(key, out var list))
             {
-                var key = new CellKey(x, y);
-
-                if (!_cells.TryGetValue(key, out var list))
-                {
-                    list = new List<Collider>(4);
-                    _cells.Add(key, list);
-                }
-
-                list.Add(collider);
+                list = new List<Collider>(4);
+                _cells.Add(key, list);
             }
+
+            list.Add(collider);
         }
 
         _colliderCells[collider] = newRange;
@@ -199,4 +188,10 @@ public sealed class SpatialHash
     {
         return (int)MathF.Floor(v * _invCell);
     }
+
+    private readonly record struct CellRange(
+        int MinX,
+        int MinY,
+        int MaxX,
+        int MaxY);
 }

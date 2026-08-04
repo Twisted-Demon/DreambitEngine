@@ -4,8 +4,8 @@ using Microsoft.Xna.Framework.Input;
 namespace Dreambit.UI;
 
 /// <summary>
-/// Contains raw pointer, keyboard, and navigation state supplied to a UI
-/// layout for one update.
+///     Contains raw pointer, keyboard, and navigation state supplied to a UI
+///     layout for one update.
 /// </summary>
 /// <param name="PointerPosition">The pointer position in UI coordinates.</param>
 /// <param name="PointerInWindow">Whether the pointer is inside the game window.</param>

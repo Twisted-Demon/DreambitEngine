@@ -504,7 +504,7 @@ public struct Polygon2D
     {
         return (p1.X - p3.X) * (p2.Y - p3.Y) - (p2.X - p3.X) * (p1.Y - p3.Y);
     }
-    
+
     private static Vector2 ClosestPointOnSegment(Vector2 p, Vector2 a, Vector2 b)
     {
         var ab = b - a;

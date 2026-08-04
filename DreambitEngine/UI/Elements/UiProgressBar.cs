@@ -7,8 +7,8 @@ namespace Dreambit.UI;
 /// <summary>Displays a non-interactive filled portion of a numeric range.</summary>
 public sealed class UiProgressBar : UiRangeBase
 {
-    private IUiBrush _trackBrush = new SolidColorBrush();
     private IUiBrush _fillBrush = new SolidColorBrush();
+    private IUiBrush _trackBrush = new SolidColorBrush();
 
     /// <summary>Creates a non-interactive progress bar.</summary>
     public UiProgressBar()
@@ -19,6 +19,7 @@ public sealed class UiProgressBar : UiRangeBase
 
     /// <summary>Gets or sets the fill direction.</summary>
     public StackOrientation Orientation { get; set; } = StackOrientation.Horizontal;
+
     /// <summary>Gets or sets the background track brush.</summary>
     public IUiBrush TrackBrush
     {
@@ -30,6 +31,7 @@ public sealed class UiProgressBar : UiRangeBase
             InvalidateDependencies();
         }
     }
+
     /// <summary>Gets or sets the completed-range brush.</summary>
     public IUiBrush FillBrush
     {
@@ -41,8 +43,10 @@ public sealed class UiProgressBar : UiRangeBase
             InvalidateDependencies();
         }
     }
+
     /// <summary>Gets or sets the track tint.</summary>
     public Color TrackTint { get; set; } = new(55, 55, 62);
+
     /// <summary>Gets or sets the completed-range tint.</summary>
     public Color FillTint { get; set; } = new(80, 190, 120);
 

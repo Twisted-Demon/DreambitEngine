@@ -7,46 +7,51 @@ using Microsoft.Xna.Framework;
 namespace Dreambit.UI;
 
 /// <summary>
-/// Base class for every retained UI node. It provides XML-configurable
-/// geometry, two-pass layout, input and drawing hooks, and asset lifecycle.
+///     Base class for every retained UI node. It provides XML-configurable
+///     geometry, two-pass layout, input and drawing hooks, and asset lifecycle.
 /// </summary>
 public abstract class UiElement
 {
+    /// <summary>Gets the child elements owned by this node.</summary>
+    public readonly List<UiElement> Children = [];
+
+    /// <summary>Gets the final rectangle produced by the arrange pass.</summary>
+    public Rectangle Bounds;
+
     /// <summary>Gets or sets the optional ID used for layout lookup.</summary>
     public string Id;
+
     /// <summary>Gets or sets the container that owns this element.</summary>
     public UiContainer Parent;
 
-    private bool _isVisible = true;
+    private UiAnchor _anchor = UiAnchor.TopLeft;
+    private bool _forceArrange;
+    private int _gridColumn;
+    private int _gridColumnSpan = 1;
+    private int _gridRow;
+    private int _gridRowSpan = 1;
+    private bool _hasMeasure;
+    private bool _hasParentBounds;
+    private UiLength _height = UiLength.Pixels(0);
     private bool _isEnabled = true;
-    private bool _isHitTestVisible;
     private bool _isFocusable;
-    private bool _capturesKeyboardInput;
-    private bool _clipToBounds;
-    private UiTooltip _tooltip;
 
-    internal UiLayout Layout { get; private set; }
-    
+    private bool _isVisible = true;
+    private Point _lastMeasureAvailableSize;
+    private Rectangle _lastParentBounds;
+    private UiAnchor _origin = UiAnchor.TopLeft;
+    private UiTooltip _tooltip;
+    private UiLength _width = UiLength.Pixels(0);
+
     private UiLength _x = UiLength.Pixels(0);
     private UiLength _y = UiLength.Pixels(0);
-    private UiLength _width = UiLength.Pixels(0);
-    private UiLength _height = UiLength.Pixels(0);
-    private UiAnchor _anchor = UiAnchor.TopLeft;
-    private UiAnchor _origin = UiAnchor.TopLeft;
-    private int _zIndex = 0;
-    private int _gridRow;
-    private int _gridColumn;
-    private int _gridRowSpan = 1;
-    private int _gridColumnSpan = 1;
-    private Rectangle _lastParentBounds;
-    private bool _hasParentBounds;
-    private Point _lastMeasureAvailableSize;
-    private bool _hasMeasure;
-    private bool _forceArrange;
+    private int _zIndex;
+
+    internal UiLayout Layout { get; private set; }
 
     /// <summary>
-    /// Gets or sets whether this element and its subtree participate in layout,
-    /// drawing, and input.
+    ///     Gets or sets whether this element and its subtree participate in layout,
+    ///     drawing, and input.
     /// </summary>
     public bool IsVisible
     {
@@ -78,14 +83,10 @@ public abstract class UiElement
     }
 
     /// <summary>
-    /// Gets or sets whether this element can be the direct target of pointer
-    /// input. Descendants retain their own hit-test settings.
+    ///     Gets or sets whether this element can be the direct target of pointer
+    ///     input. Descendants retain their own hit-test settings.
     /// </summary>
-    public bool IsHitTestVisible
-    {
-        get => _isHitTestVisible;
-        set => _isHitTestVisible = value;
-    }
+    public bool IsHitTestVisible { get; set; }
 
     /// <summary>Gets or sets whether keyboard or controller focus can move to this element.</summary>
     public bool IsFocusable
@@ -102,21 +103,13 @@ public abstract class UiElement
     }
 
     /// <summary>
-    /// Gets or sets whether this element consumes all keyboard input while it
-    /// owns focus, as required by controls such as text fields.
+    ///     Gets or sets whether this element consumes all keyboard input while it
+    ///     owns focus, as required by controls such as text fields.
     /// </summary>
-    public bool CapturesKeyboardInput
-    {
-        get => _capturesKeyboardInput;
-        set => _capturesKeyboardInput = value;
-    }
+    public bool CapturesKeyboardInput { get; set; }
 
     /// <summary>Gets or sets whether descendants are clipped to this element's bounds.</summary>
-    public bool ClipToBounds
-    {
-        get => _clipToBounds;
-        set => _clipToBounds = value;
-    }
+    public bool ClipToBounds { get; set; }
 
     /// <summary>Gets or sets the delayed popup displayed while this element is hovered.</summary>
     public UiTooltip Tooltip
@@ -140,39 +133,6 @@ public abstract class UiElement
 
     /// <summary>Gets whether the pointer is over this element or one of its descendants.</summary>
     public bool IsPointerOver { get; private set; }
-
-    /// <summary>Raised when the primary pointer button is pressed over this element.</summary>
-    public event EventHandler<UiPointerEventArgs> PointerPressed;
-
-    /// <summary>Raised when the primary pointer button is released for this element.</summary>
-    public event EventHandler<UiPointerEventArgs> PointerReleased;
-
-    /// <summary>Raised when the pointer moves over this element or while it owns capture.</summary>
-    public event EventHandler<UiPointerEventArgs> PointerMoved;
-
-    /// <summary>Raised when the pointer wheel moves over this element.</summary>
-    public event EventHandler<UiPointerEventArgs> PointerWheelChanged;
-
-    /// <summary>Raised when a key is pressed while this element is on the focus route.</summary>
-    public event EventHandler<UiKeyEventArgs> KeyPressed;
-
-    /// <summary>Raised when a key is released while this element is on the focus route.</summary>
-    public event EventHandler<UiKeyEventArgs> KeyReleased;
-
-    /// <summary>Raised when directional focus navigation is requested.</summary>
-    public event EventHandler<UiNavigationEventArgs> NavigationRequested;
-
-    /// <summary>Raised when the focused element is activated.</summary>
-    public event EventHandler<UiCommandEventArgs> Activated;
-
-    /// <summary>Raised when the focused element receives a cancel command.</summary>
-    public event EventHandler<UiCommandEventArgs> Cancelled;
-
-    /// <summary>Raised when this element receives focus.</summary>
-    public event EventHandler GotFocus;
-
-    /// <summary>Raised when this element loses focus.</summary>
-    public event EventHandler LostFocus;
 
     /// <summary>Gets or sets the horizontal offset relative to the parent.</summary>
     public UiLength X
@@ -204,7 +164,7 @@ public abstract class UiElement
     public UiLength Width
     {
         get => _width;
-        set 
+        set
         {
             if (LengthsEqual(_width, value)) return;
 
@@ -265,36 +225,14 @@ public abstract class UiElement
         }
     }
 
-    /// <summary>Gets the final rectangle produced by the arrange pass.</summary>
-    public Rectangle Bounds;
     /// <summary>Gets the size requested by the most recent measure pass.</summary>
     public Point DesiredSize { get; private set; }
 
-    /// <summary>Gets the child elements owned by this node.</summary>
-    public readonly List<UiElement> Children = [];
-    
 
     private bool LayoutDirty { get; set; } = true;
     private bool DependenciesDirty { get; set; } = true;
-    
 
-    /// <summary>Marks this element and its descendants for remeasurement and arrangement.</summary>
-    public void InvalidateLayout()
-    {
-        LayoutDirty = true;
-        _hasMeasure = false;
-        
-        foreach(var child in Children)
-            child.InvalidateLayout();
-    }
-
-    /// <summary>Marks this element's asset dependencies for re-resolution.</summary>
-    public void InvalidateDependencies()
-    {
-        DependenciesDirty = true;
-    }
-
-    /// <summary>Gets or sets the zero-based row used when the parent is a <see cref="UiGrid"/>.</summary>
+    /// <summary>Gets or sets the zero-based row used when the parent is a <see cref="UiGrid" />.</summary>
     public int GridRow
     {
         get => _gridRow;
@@ -307,7 +245,7 @@ public abstract class UiElement
         }
     }
 
-    /// <summary>Gets or sets the zero-based column used when the parent is a <see cref="UiGrid"/>.</summary>
+    /// <summary>Gets or sets the zero-based column used when the parent is a <see cref="UiGrid" />.</summary>
     public int GridColumn
     {
         get => _gridColumn;
@@ -346,9 +284,67 @@ public abstract class UiElement
         }
     }
 
+    /// <summary>Gets whether this element and all of its ancestors are visible.</summary>
+    public bool IsEffectivelyVisible =>
+        IsVisible && (Parent?.IsEffectivelyVisible ?? true);
+
+    /// <summary>Gets whether this element and all of its ancestors are enabled.</summary>
+    public bool IsEffectivelyEnabled =>
+        IsEnabled && (Parent?.IsEffectivelyEnabled ?? true);
+
+    /// <summary>Raised when the primary pointer button is pressed over this element.</summary>
+    public event EventHandler<UiPointerEventArgs> PointerPressed;
+
+    /// <summary>Raised when the primary pointer button is released for this element.</summary>
+    public event EventHandler<UiPointerEventArgs> PointerReleased;
+
+    /// <summary>Raised when the pointer moves over this element or while it owns capture.</summary>
+    public event EventHandler<UiPointerEventArgs> PointerMoved;
+
+    /// <summary>Raised when the pointer wheel moves over this element.</summary>
+    public event EventHandler<UiPointerEventArgs> PointerWheelChanged;
+
+    /// <summary>Raised when a key is pressed while this element is on the focus route.</summary>
+    public event EventHandler<UiKeyEventArgs> KeyPressed;
+
+    /// <summary>Raised when a key is released while this element is on the focus route.</summary>
+    public event EventHandler<UiKeyEventArgs> KeyReleased;
+
+    /// <summary>Raised when directional focus navigation is requested.</summary>
+    public event EventHandler<UiNavigationEventArgs> NavigationRequested;
+
+    /// <summary>Raised when the focused element is activated.</summary>
+    public event EventHandler<UiCommandEventArgs> Activated;
+
+    /// <summary>Raised when the focused element receives a cancel command.</summary>
+    public event EventHandler<UiCommandEventArgs> Cancelled;
+
+    /// <summary>Raised when this element receives focus.</summary>
+    public event EventHandler GotFocus;
+
+    /// <summary>Raised when this element loses focus.</summary>
+    public event EventHandler LostFocus;
+
+
+    /// <summary>Marks this element and its descendants for remeasurement and arrangement.</summary>
+    public void InvalidateLayout()
+    {
+        LayoutDirty = true;
+        _hasMeasure = false;
+
+        foreach (var child in Children)
+            child.InvalidateLayout();
+    }
+
+    /// <summary>Marks this element's asset dependencies for re-resolution.</summary>
+    public void InvalidateDependencies()
+    {
+        DependenciesDirty = true;
+    }
+
     /// <summary>Finds an element anywhere in the visual tree by ID.</summary>
     /// <param name="id">The case-sensitive element ID.</param>
-    /// <returns>The matching element, or <see langword="null"/> when no match exists.</returns>
+    /// <returns>The matching element, or <see langword="null" /> when no match exists.</returns>
     public UiElement Find(string id)
     {
         if (string.IsNullOrWhiteSpace(id))
@@ -360,7 +356,7 @@ public abstract class UiElement
     /// <summary>Finds an element anywhere in the visual tree by Prefix and ID.</summary>
     /// <param name="prefix">The case-sensitive element prefix</param>
     /// <param name="id">The case-sensitive element ID.</param>
-    /// <returns>The matching element, or <see langword="null"/> when no match exists.</returns>
+    /// <returns>The matching element, or <see langword="null" /> when no match exists.</returns>
     public UiElement Find(string prefix, string id)
     {
         return Find(UiXmlParser.WithSeparator(prefix) + id);
@@ -371,7 +367,7 @@ public abstract class UiElement
     /// <param name="id">The case-sensitive element ID.</param>
     /// <returns>The matching typed element.</returns>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the element is missing or has a different type.
+    ///     Thrown when the element is missing or has a different type.
     /// </exception>
     public T GetRequired<T>(string id) where T : UiElement
     {
@@ -379,13 +375,13 @@ public abstract class UiElement
 
         if (element is T typedElement)
             return typedElement;
-        
+
         throw new InvalidOperationException(
             $"UI element '{id}' was not found or was not a {typeof(T).Name}.");
     }
-    
+
     /// <summary>
-    /// Gets an element by Id and its prefix, and verifies its expected type.
+    ///     Gets an element by Id and its prefix, and verifies its expected type.
     /// </summary>
     /// <param name="prefix">The case-sensitive element prefix.</param>
     /// <param name="id">The case-sensitive element ID.</param>
@@ -396,23 +392,15 @@ public abstract class UiElement
         return GetRequired<T>(UiXmlParser.WithSeparator(prefix) + id);
     }
 
-    /// <summary>Gets whether this element and all of its ancestors are visible.</summary>
-    public bool IsEffectivelyVisible =>
-        IsVisible && (Parent?.IsEffectivelyVisible ?? true);
-
-    /// <summary>Gets whether this element and all of its ancestors are enabled.</summary>
-    public bool IsEffectivelyEnabled =>
-        IsEnabled && (Parent?.IsEffectivelyEnabled ?? true);
-
     /// <summary>Attempts to move keyboard/controller focus to this element.</summary>
-    /// <returns><see langword="true"/> when this element received focus.</returns>
+    /// <returns><see langword="true" /> when this element received focus.</returns>
     public bool Focus()
     {
         return Layout?.Focus(this) ?? false;
     }
 
     /// <summary>Attempts to capture subsequent pointer events to this element.</summary>
-    /// <returns><see langword="true"/> when this element owns pointer capture.</returns>
+    /// <returns><see langword="true" /> when this element owns pointer capture.</returns>
     public bool CapturePointer()
     {
         return Layout?.CapturePointer(this) ?? false;
@@ -449,8 +437,8 @@ public abstract class UiElement
     }
 
     /// <summary>
-    /// Measures this element when necessary and calculates its own bounds
-    /// without arranging its children.
+    ///     Measures this element when necessary and calculates its own bounds
+    ///     without arranging its children.
     /// </summary>
     /// <param name="parentBounds">The rectangle available from the parent.</param>
     /// <param name="force">Whether to recalculate even when the cached layout is valid.</param>
@@ -459,18 +447,14 @@ public abstract class UiElement
         force |= _forceArrange;
         if (!_hasMeasure ||
             _lastMeasureAvailableSize != parentBounds.Size)
-        {
             Measure(parentBounds.Size);
-        }
 
         if (!force &&
             !LayoutDirty &&
             _hasParentBounds &&
             _lastParentBounds == parentBounds)
-        {
             return;
-        }
-        
+
         CalculateBounds(parentBounds);
         _lastParentBounds = parentBounds;
         _hasParentBounds = true;
@@ -478,8 +462,8 @@ public abstract class UiElement
     }
 
     /// <summary>
-    /// Arranges this element to fill an exact slot without permanently
-    /// replacing its authored position or size values.
+    ///     Arranges this element to fill an exact slot without permanently
+    ///     replacing its authored position or size values.
     /// </summary>
     internal void ArrangeStretched(Rectangle slot)
     {
@@ -562,19 +546,19 @@ public abstract class UiElement
         foreach (var child in Children)
             child.Arrange(Bounds);
     }
-    
+
     private void CalculateBounds(Rectangle parentBounds)
     {
         var resolvedSize = ResolveSize(parentBounds);
-        int w = resolvedSize.X;
-        int h = resolvedSize.Y;
+        var w = resolvedSize.X;
+        var h = resolvedSize.Y;
 
-        int x = X.Resolve(parentBounds.Width);
-        int y = Y.Resolve(parentBounds.Height);
+        var x = X.Resolve(parentBounds.Width);
+        var y = Y.Resolve(parentBounds.Height);
 
         // anchor offset
-        int offsetX = 0;
-        int offsetY = 0;
+        var offsetX = 0;
+        var offsetY = 0;
 
         switch (Anchor)
         {
@@ -621,27 +605,27 @@ public abstract class UiElement
             case UiAnchor.TopLeft:
                 break;
             case UiAnchor.TopCenter:
-                offsetX -= (w / 2);
+                offsetX -= w / 2;
                 break;
             case UiAnchor.TopRight:
                 offsetX -= w;
                 break;
             case UiAnchor.CenterLeft:
-                offsetY -= (h / 2);
+                offsetY -= h / 2;
                 break;
             case UiAnchor.Center:
-                offsetX -= (w / 2);
-                offsetY -= (h / 2);
+                offsetX -= w / 2;
+                offsetY -= h / 2;
                 break;
             case UiAnchor.CenterRight:
                 offsetX -= w;
-                offsetY -= (h / 2);
+                offsetY -= h / 2;
                 break;
             case UiAnchor.BottomLeft:
                 offsetY -= h;
                 break;
             case UiAnchor.BottomCenter:
-                offsetX -= (w / 2);
+                offsetX -= w / 2;
                 offsetY -= h;
                 break;
             case UiAnchor.BottomRight:
@@ -650,8 +634,8 @@ public abstract class UiElement
                 break;
         }
 
-        int screenX = parentBounds.X + x + offsetX;
-        int screenY = parentBounds.Y + y + offsetY;
+        var screenX = parentBounds.X + x + offsetX;
+        var screenY = parentBounds.Y + y + offsetY;
 
         Bounds = new Rectangle(screenX, screenY, w, h);
     }
@@ -671,15 +655,70 @@ public abstract class UiElement
     }
 
     /// <summary>
-    /// Returns the element's natural content size within the supplied
-    /// constraint. Custom UI elements only need to override this method to
-    /// support width="*" and height="*".
+    ///     Returns the element's natural content size within the supplied
+    ///     constraint. Custom UI elements only need to override this method to
+    ///     support width="*" and height="*".
     /// </summary>
     /// <param name="availableSize">The maximum content size offered by the element.</param>
     /// <returns>The content's desired size in pixels.</returns>
     protected virtual Point MeasureContent(Point availableSize)
     {
         return Point.Zero;
+    }
+
+
+    /// <summary>Parses common attributes before invoking the element-specific parser.</summary>
+    /// <param name="node">The XML element that describes this UI element.</param>
+    internal void ParseInternal(XmlNode node)
+    {
+        Id = UiXmlParser.ParseString(node, "id", string.Empty);
+        X = UiXmlParser.ParseLength(
+            UiXmlParser.ParseString(node, "x", "0%"));
+        Y = UiXmlParser.ParseLength(
+            UiXmlParser.ParseString(node, "y", "0%"));
+        Width = UiXmlParser.ParseLength(
+            UiXmlParser.ParseString(node, "width", "100%"));
+        Height = UiXmlParser.ParseLength(
+            UiXmlParser.ParseString(node, "height", "100%"));
+        Anchor = UiXmlParser.ParseAnchor(
+            UiXmlParser.ParseString(node, "anchor", "TopLeft"));
+        Origin = UiXmlParser.ParseAnchor(
+            UiXmlParser.ParseString(node, "origin", "TopLeft"));
+        ZIndex = UiXmlParser.ParseInt(node, "z");
+        GridRow = UiXmlParser.ParseInt(node, "grid-row");
+        GridColumn = UiXmlParser.ParseInt(node, "grid-column");
+        GridRowSpan = UiXmlParser.ParseInt(node, "grid-row-span", 1);
+        GridColumnSpan = UiXmlParser.ParseInt(node, "grid-column-span", 1);
+        IsVisible = UiXmlParser.ParseBool(node, "is-visible", true);
+        IsEnabled = UiXmlParser.ParseBool(node, "is-enabled", true);
+        IsHitTestVisible = UiXmlParser.ParseBool(
+            node,
+            "is-hit-test-visible",
+            IsHitTestVisible);
+        IsFocusable = UiXmlParser.ParseBool(
+            node,
+            "is-focusable",
+            IsFocusable);
+        CapturesKeyboardInput = UiXmlParser.ParseBool(
+            node,
+            "captures-keyboard-input",
+            CapturesKeyboardInput);
+        ClipToBounds = UiXmlParser.ParseBool(
+            node,
+            "clip-to-bounds");
+
+        Parse(node);
+    }
+
+    /// <summary>Parses attributes that are specific to the derived element.</summary>
+    /// <param name="node">The XML element that describes this UI element.</param>
+    public virtual void Parse(XmlNode node)
+    {
+    }
+
+    /// <summary>Loads or refreshes external assets used by this element.</summary>
+    public virtual void ResolveDependencies()
+    {
     }
 
     #region Internal Lifecycle
@@ -706,8 +745,7 @@ public abstract class UiElement
 
         OnUpdate(input);
     }
-    
-    
+
     #endregion
 
     #region Lifecycle Hooks
@@ -725,7 +763,6 @@ public abstract class UiElement
     /// <summary>Draws this element before the UI system draws its children.</summary>
     public virtual void OnDraw()
     {
-        
     }
 
     internal void DrawRecursive(UiDrawContext context)
@@ -832,102 +869,76 @@ public abstract class UiElement
     }
 
     /// <summary>Handles a routed primary-pointer press.</summary>
-    protected virtual void OnPointerPressed(UiPointerEventArgs args) { }
+    protected virtual void OnPointerPressed(UiPointerEventArgs args)
+    {
+    }
 
     /// <summary>Handles a routed primary-pointer release.</summary>
-    protected virtual void OnPointerReleased(UiPointerEventArgs args) { }
+    protected virtual void OnPointerReleased(UiPointerEventArgs args)
+    {
+    }
 
     /// <summary>Handles routed pointer movement.</summary>
-    protected virtual void OnPointerMoved(UiPointerEventArgs args) { }
+    protected virtual void OnPointerMoved(UiPointerEventArgs args)
+    {
+    }
 
     /// <summary>Handles routed pointer-wheel movement.</summary>
-    protected virtual void OnPointerWheelChanged(UiPointerEventArgs args) { }
+    protected virtual void OnPointerWheelChanged(UiPointerEventArgs args)
+    {
+    }
 
     /// <summary>Handles a routed key press.</summary>
-    protected virtual void OnKeyPressed(UiKeyEventArgs args) { }
+    protected virtual void OnKeyPressed(UiKeyEventArgs args)
+    {
+    }
 
     /// <summary>Handles a routed key release.</summary>
-    protected virtual void OnKeyReleased(UiKeyEventArgs args) { }
+    protected virtual void OnKeyReleased(UiKeyEventArgs args)
+    {
+    }
 
     /// <summary>Handles directional navigation before default focus movement.</summary>
-    protected virtual void OnNavigationRequested(UiNavigationEventArgs args) { }
+    protected virtual void OnNavigationRequested(UiNavigationEventArgs args)
+    {
+    }
 
     /// <summary>Handles activation of this focused element.</summary>
-    protected virtual void OnActivated(UiCommandEventArgs args) { }
+    protected virtual void OnActivated(UiCommandEventArgs args)
+    {
+    }
 
     /// <summary>Handles cancellation on this focused element.</summary>
-    protected virtual void OnCancelled(UiCommandEventArgs args) { }
+    protected virtual void OnCancelled(UiCommandEventArgs args)
+    {
+    }
 
     /// <summary>Responds when this element gains or loses focus.</summary>
-    protected virtual void OnFocusChanged(bool isFocused) { }
+    protected virtual void OnFocusChanged(bool isFocused)
+    {
+    }
 
     /// <summary>Responds when this element's enabled state changes.</summary>
-    protected virtual void OnEnabledChanged(bool isEnabled) { }
+    protected virtual void OnEnabledChanged(bool isEnabled)
+    {
+    }
 
     /// <summary>Responds when this element is attached to or detached from a layout.</summary>
     protected virtual void OnAttachedToLayout(
         UiLayout previousLayout,
-        UiLayout currentLayout) { }
-
-    /// <summary>Responds when the pointer enters or leaves this element's route.</summary>
-    protected virtual void OnPointerOverChanged(bool isPointerOver) { }
-
-    /// <summary>Responds when pointer capture is removed from this element.</summary>
-    protected internal virtual void OnPointerCaptureLost() { }
-    
-
-    #endregion
-    
-
-    /// <summary>Parses common attributes before invoking the element-specific parser.</summary>
-    /// <param name="node">The XML element that describes this UI element.</param>
-    internal void ParseInternal(XmlNode node)
+        UiLayout currentLayout)
     {
-        Id = UiXmlParser.ParseString(node, "id", string.Empty);
-        X = UiXmlParser.ParseLength(
-            UiXmlParser.ParseString(node, "x", "0%"));
-        Y = UiXmlParser.ParseLength(
-            UiXmlParser.ParseString(node, "y", "0%"));
-        Width = UiXmlParser.ParseLength(
-            UiXmlParser.ParseString(node, "width", "100%"));
-        Height = UiXmlParser.ParseLength(
-            UiXmlParser.ParseString(node, "height", "100%"));
-        Anchor = UiXmlParser.ParseAnchor(
-            UiXmlParser.ParseString(node, "anchor", "TopLeft"));
-        Origin = UiXmlParser.ParseAnchor(
-            UiXmlParser.ParseString(node, "origin", "TopLeft"));
-        ZIndex = UiXmlParser.ParseInt(node, "z", 0);
-        GridRow = UiXmlParser.ParseInt(node, "grid-row", 0);
-        GridColumn = UiXmlParser.ParseInt(node, "grid-column", 0);
-        GridRowSpan = UiXmlParser.ParseInt(node, "grid-row-span", 1);
-        GridColumnSpan = UiXmlParser.ParseInt(node, "grid-column-span", 1);
-        IsVisible = UiXmlParser.ParseBool(node, "is-visible", true);
-        IsEnabled = UiXmlParser.ParseBool(node, "is-enabled", true);
-        IsHitTestVisible = UiXmlParser.ParseBool(
-            node,
-            "is-hit-test-visible",
-            IsHitTestVisible);
-        IsFocusable = UiXmlParser.ParseBool(
-            node,
-            "is-focusable",
-            IsFocusable);
-        CapturesKeyboardInput = UiXmlParser.ParseBool(
-            node,
-            "captures-keyboard-input",
-            CapturesKeyboardInput);
-        ClipToBounds = UiXmlParser.ParseBool(
-            node,
-            "clip-to-bounds",
-            false);
-
-        Parse(node);
     }
 
-    /// <summary>Parses attributes that are specific to the derived element.</summary>
-    /// <param name="node">The XML element that describes this UI element.</param>
-    public virtual void Parse(XmlNode node) { }
+    /// <summary>Responds when the pointer enters or leaves this element's route.</summary>
+    protected virtual void OnPointerOverChanged(bool isPointerOver)
+    {
+    }
 
-    /// <summary>Loads or refreshes external assets used by this element.</summary>
-    public virtual void ResolveDependencies() { }
-    
+    /// <summary>Responds when pointer capture is removed from this element.</summary>
+    protected internal virtual void OnPointerCaptureLost()
+    {
+    }
+
+    #endregion
 }

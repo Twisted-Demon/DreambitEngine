@@ -10,7 +10,7 @@ public class WaitWhile : IYieldInstruction
     {
         _predicate = predicate;
     }
-    
+
     public bool KeepWaiting(CoroutineClock t)
     {
         return _predicate();

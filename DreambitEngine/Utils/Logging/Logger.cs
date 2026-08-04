@@ -7,9 +7,10 @@ public class Logger<T>() : Logger(typeof(T));
 
 public class Logger : ILogger
 {
+    protected readonly string Prefix = string.Empty;
+
     public Logger()
     {
-        
     }
 
     public Logger(string prefix)
@@ -21,8 +22,6 @@ public class Logger : ILogger
     {
         Prefix = prefixType.Name;
     }
-
-    protected readonly string Prefix = string.Empty;
 
     public LogLevel Level { get; set; } = LogLevel.None;
 

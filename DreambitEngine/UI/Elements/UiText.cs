@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Xml;
 using FontStashSharp;
 using Microsoft.Xna.Framework;
@@ -8,18 +9,32 @@ namespace Dreambit.UI;
 /// <summary>Displays single-line or wrapped text using a loaded sprite font.</summary>
 public class UiText : UiElement
 {
-    /// <summary>Gets the sprite font resolved from <see cref="FontPath"/>.</summary>
-    public SpriteFontBase Font { get; private set; }
-    
-    private string _fontPath = "monogram";
-    private bool _multiLine = true;
-    private string _text = string.Empty;
-    private float _fontSize = 12f;
+    private readonly List<float> _lineWidths = [];
+    private readonly List<string> _lines = [];
     private bool _autoResizeHeight = true;
 
+    private string _fontPath = "monogram";
+    private float _fontSize = 12f;
+
+    private int _lastLayoutWidth;
+    private bool _layoutDirty = true;
+    private float _lineHeight;
+    private bool _multiLine = true;
+    private string _text = string.Empty;
+    private float _totalHeight;
+
+    /// <summary>Creates a text element whose height automatically follows its content.</summary>
+    public UiText()
+    {
+        Height = UiLength.Auto();
+    }
+
+    /// <summary>Gets the sprite font resolved from <see cref="FontPath" />.</summary>
+    public SpriteFontBase Font { get; private set; }
+
     /// <summary>
-    /// Gets or sets whether parsing this element assigns automatic height so
-    /// the text block grows to fit its laid-out lines.
+    ///     Gets or sets whether parsing this element assigns automatic height so
+    ///     the text block grows to fit its laid-out lines.
     /// </summary>
     public bool AutoResizeHeight
     {
@@ -36,9 +51,10 @@ public class UiText : UiElement
 
     /// <summary>Gets or sets the color used to draw the text.</summary>
     public Color TextColor { get; set; } = Color.White;
+
     /// <summary>Gets or sets the horizontal alignment of each line within the bounds.</summary>
     public HorizontalAlignment HorizontalAlignment { get; set; } = HorizontalAlignment.Center;
-    
+
     /// <summary>Gets or sets the displayed text.</summary>
     public string Text
     {
@@ -46,22 +62,22 @@ public class UiText : UiElement
         set
         {
             var next = value ?? string.Empty;
-            if(_text == next) return;
+            if (_text == next) return;
 
             _text = next;
             _layoutDirty = true;
             InvalidateLayout();
         }
     }
-    
+
     /// <summary>Gets or sets whether text may wrap onto multiple lines.</summary>
     public bool MultiLine
     {
         get => _multiLine;
         set
         {
-            if(_multiLine == value) return;
-            
+            if (_multiLine == value) return;
+
             _multiLine = value;
             _layoutDirty = true;
             InvalidateLayout();
@@ -76,7 +92,7 @@ public class UiText : UiElement
         {
             if (Math.Abs(_fontSize - value) < float.Epsilon)
                 return;
-            
+
             _fontSize = value;
 
             _layoutDirty = true;
@@ -84,7 +100,7 @@ public class UiText : UiElement
             InvalidateDependencies();
         }
     }
-    
+
     /// <summary>Gets or sets the resource path used to load the sprite font.</summary>
     public string FontPath
     {
@@ -101,20 +117,7 @@ public class UiText : UiElement
             InvalidateLayout();
         }
     }
-    
-    private int _lastLayoutWidth;
-    private readonly System.Collections.Generic.List<string> _lines = [];
-    private readonly System.Collections.Generic.List<float> _lineWidths = [];
-    private float _lineHeight;
-    private float _totalHeight;
-    private bool _layoutDirty = true;
 
-    /// <summary>Creates a text element whose height automatically follows its content.</summary>
-    public UiText()
-    {
-        Height = UiLength.Auto();
-    }
-    
     /// <inheritdoc />
     public override void Arrange(Rectangle parentBounds)
     {
@@ -132,7 +135,6 @@ public class UiText : UiElement
             _lineHeight = SpriteBatchExtensions.GetLineHeight(Font);
             _totalHeight = _lineHeight;
         }
-
     }
 
     /// <inheritdoc />
@@ -145,11 +147,9 @@ public class UiText : UiElement
         var lineHeight = SpriteBatchExtensions.GetLineHeight(Font);
 
         if (!MultiLine)
-        {
             return new Point(
                 (int)MathF.Ceiling(measuredText.X),
                 (int)MathF.Ceiling(MathF.Max(lineHeight, measuredText.Y)));
-        }
 
         var layoutWidth = Width.IsAuto
             ? Math.Min(
@@ -199,12 +199,12 @@ public class UiText : UiElement
 
         _layoutDirty = false;
         _lastLayoutWidth = width;
-        
+
         _lines.Clear();
         _lines.AddRange(SpriteBatchExtensions.SplitTextIntoLines(Font, Text, width));
-        
+
         _lineWidths.Clear();
-        
+
         foreach (var line in _lines)
         {
             var size = Font.MeasureString(line);
@@ -226,8 +226,8 @@ public class UiText : UiElement
         if (string.IsNullOrEmpty(_text))
             return;
 
-        int xOffset = 0;
-        int yOffset = Bounds.Height / 2;
+        var xOffset = 0;
+        var yOffset = Bounds.Height / 2;
 
         switch (HorizontalAlignment)
         {
@@ -256,12 +256,12 @@ public class UiText : UiElement
             // Vertically center block of text around anchorPos.Y
             var baseY = anchorPos.Y - _totalHeight * 0.5f;
 
-            for (int i = 0; i < _lines.Count; i++)
+            for (var i = 0; i < _lines.Count; i++)
             {
                 var line = _lines[i];
                 var lineWidth = _lineWidths[i];
 
-                float lineX = anchorPos.X;
+                var lineX = anchorPos.X;
                 switch (HorizontalAlignment)
                 {
                     case HorizontalAlignment.Left:
@@ -281,8 +281,8 @@ public class UiText : UiElement
                 // position is already its top-left, so adding half a line here
                 // made glyphs overflow into the following stacked element.
                 var measuredLineHeight = Font.MeasureString(line).Y;
-                float lineY = baseY + i * _lineHeight +
-                              MathF.Max(0f, (_lineHeight - measuredLineHeight) * 0.5f);
+                var lineY = baseY + i * _lineHeight +
+                            MathF.Max(0f, (_lineHeight - measuredLineHeight) * 0.5f);
 
                 Graphics.SpriteBatch.DrawString(Font, line, new Vector2(lineX, lineY), TextColor);
             }
@@ -298,7 +298,7 @@ public class UiText : UiElement
                 TextColor);
         }
     }
-    
+
     /// <inheritdoc />
     public override void Parse(XmlNode node)
     {

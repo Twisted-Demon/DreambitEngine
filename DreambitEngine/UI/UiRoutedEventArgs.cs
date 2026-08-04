@@ -14,7 +14,7 @@ public class UiRoutedEventArgs : EventArgs
     public UiElement CurrentTarget { get; internal set; }
 
     /// <summary>
-    /// Gets or sets whether routing should stop before reaching another ancestor.
+    ///     Gets or sets whether routing should stop before reaching another ancestor.
     /// </summary>
     public bool Handled { get; set; }
 }

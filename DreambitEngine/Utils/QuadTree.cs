@@ -51,7 +51,8 @@ public class Quadtree<T>
         var extraWidth = _bounds.Width % 2;
         var extraHeight = _bounds.Height % 2;
 
-        _nodes[0] = new Quadtree<T>(_level + 1, new RectangleF(x + subWidth, y, subWidth + extraWidth, subHeight)); // NE
+        _nodes[0] = new Quadtree<T>(_level + 1,
+            new RectangleF(x + subWidth, y, subWidth + extraWidth, subHeight)); // NE
         _nodes[1] = new Quadtree<T>(_level + 1, new RectangleF(x, y, subWidth, subHeight)); // NW
         _nodes[2] = new Quadtree<T>(_level + 1,
             new RectangleF(x, y + subHeight, subWidth, subHeight + extraHeight)); // SW

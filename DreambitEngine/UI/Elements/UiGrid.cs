@@ -7,8 +7,8 @@ using Microsoft.Xna.Framework;
 namespace Dreambit.UI;
 
 /// <summary>
-/// Arranges arbitrary child elements in fixed, percentage, content-sized, or
-/// weighted rows and columns.
+///     Arranges arbitrary child elements in fixed, percentage, content-sized, or
+///     weighted rows and columns.
 /// </summary>
 public sealed class UiGrid : UiContainer
 {
@@ -234,7 +234,6 @@ public sealed class UiGrid : UiContainer
     {
         var sizes = new int[definitions.Count];
         for (var i = 0; i < definitions.Count; i++)
-        {
             sizes[i] = definitions[i].UnitType switch
             {
                 UiGridUnitType.Pixel => (int)definitions[i].Value,
@@ -242,7 +241,6 @@ public sealed class UiGrid : UiContainer
                     (int)(Math.Max(0, available) * definitions[i].Value),
                 _ => 0
             };
-        }
 
         return sizes;
     }
@@ -255,13 +253,9 @@ public sealed class UiGrid : UiContainer
         int available)
     {
         for (var i = start; i < start + span; i++)
-        {
             if (definitions[i].UnitType is UiGridUnitType.Auto or
                 UiGridUnitType.Star)
-            {
                 return Math.Max(0, available);
-            }
-        }
 
         return Sum(sizes, start, span);
     }
@@ -280,10 +274,8 @@ public sealed class UiGrid : UiContainer
 
         var autoTracks = new List<int>();
         for (var i = start; i < start + span; i++)
-        {
             if (definitions[i].UnitType == UiGridUnitType.Auto)
                 autoTracks.Add(i);
-        }
 
         if (autoTracks.Count == 0)
             return;
@@ -305,7 +297,6 @@ public sealed class UiGrid : UiContainer
         var used = 0;
         var weight = 0f;
         for (var i = 0; i < definitions.Count; i++)
-        {
             if (definitions[i].UnitType == UiGridUnitType.Star)
             {
                 sizes[i] = 0;
@@ -315,7 +306,6 @@ public sealed class UiGrid : UiContainer
             {
                 used += sizes[i];
             }
-        }
 
         var remaining = Math.Max(0, available - used);
         var remainingWeight = weight;
@@ -381,19 +371,15 @@ public sealed class UiGrid : UiContainer
         foreach (var part in value.Split(','))
         {
             if (string.IsNullOrWhiteSpace(part))
-            {
                 throw new XmlException(
                     $"Grid {attributeName} cannot contain an empty track.");
-            }
 
             definitions.Add(UiXmlParser.ParseGridLength(part));
         }
 
         if (definitions.Count == 0)
-        {
             throw new XmlException(
                 $"Grid {attributeName} must contain at least one track.");
-        }
     }
 
     private readonly record struct GridTrackLayout(

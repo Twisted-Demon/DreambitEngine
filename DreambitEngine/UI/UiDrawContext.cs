@@ -7,10 +7,10 @@ namespace Dreambit.UI;
 
 internal sealed class UiDrawContext : IDisposable
 {
-    private readonly GraphicsDevice _device;
-    private readonly Matrix _transform;
-    private readonly Rectangle _previousScissor;
     private readonly Stack<Rectangle> _clips = [];
+    private readonly GraphicsDevice _device;
+    private readonly Rectangle _previousScissor;
+    private readonly Matrix _transform;
 
     public UiDrawContext(GraphicsDevice device, Matrix transform)
     {
@@ -25,6 +25,12 @@ internal sealed class UiDrawContext : IDisposable
     }
 
     public bool IsEmpty => _clips.Peek().IsEmpty;
+
+    public void Dispose()
+    {
+        UIRenderPass.FlushForScissorChange();
+        _device.ScissorRectangle = _previousScissor;
+    }
 
     public void PushClip(Rectangle bounds)
     {
@@ -54,12 +60,6 @@ internal sealed class UiDrawContext : IDisposable
             UIRenderPass.FlushForScissorChange();
             _device.ScissorRectangle = clip;
         }
-    }
-
-    public void Dispose()
-    {
-        UIRenderPass.FlushForScissorChange();
-        _device.ScissorRectangle = _previousScissor;
     }
 
     private Rectangle TransformBounds(Rectangle bounds)

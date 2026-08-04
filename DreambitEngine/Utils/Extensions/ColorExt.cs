@@ -67,13 +67,13 @@ public static class ColorExt
     }
 
     /// <summary>
-    /// Parses <c>#RRGGBB</c> or <c>#RRGGBBAA</c> text into a color whose RGB
-    /// channels are premultiplied by its alpha channel.
+    ///     Parses <c>#RRGGBB</c> or <c>#RRGGBBAA</c> text into a color whose RGB
+    ///     channels are premultiplied by its alpha channel.
     /// </summary>
     /// <param name="hexString">The hexadecimal color text to parse.</param>
     /// <returns>
-    /// The parsed premultiplied color, or opaque magenta when the text has an
-    /// unsupported length.
+    ///     The parsed premultiplied color, or opaque magenta when the text has an
+    ///     unsupported length.
     /// </returns>
     public static Color FromHex(string hexString)
     {

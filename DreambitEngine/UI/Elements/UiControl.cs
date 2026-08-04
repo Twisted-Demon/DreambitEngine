@@ -10,8 +10,8 @@ namespace Dreambit.UI;
 public delegate UiElement UiControlTemplate(UiControl owner);
 
 /// <summary>
-/// Base class for interactive single-content controls with composable
-/// backgrounds, reusable templates, and consistent visual states.
+///     Base class for interactive single-content controls with composable
+///     backgrounds, reusable templates, and consistent visual states.
 /// </summary>
 public class UiControl : UiContentControl
 {
@@ -109,12 +109,14 @@ public class UiControl : UiContentControl
 
     /// <summary>Gets whether the control should use its pressed state.</summary>
     protected virtual bool IsPressedForVisualState => false;
+
     /// <summary>Gets whether the control should use its checked state.</summary>
     protected virtual bool IsCheckedForVisualState => false;
+
     /// <summary>Gets whether the control should use its expanded state.</summary>
     protected virtual bool IsOpenForVisualState => false;
 
-    /// <summary>Regenerates content from <see cref="Template"/>.</summary>
+    /// <summary>Regenerates content from <see cref="Template" />.</summary>
     public void ApplyTemplate()
     {
         if (Template is null)

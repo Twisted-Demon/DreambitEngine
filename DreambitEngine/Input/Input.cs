@@ -1,6 +1,7 @@
-﻿using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Input;
+﻿using System.Collections.Generic;
 using Dreambit.UI;
+using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Input;
 
 namespace Dreambit;
 
@@ -54,7 +55,7 @@ public static class Input
     // --- Game pad ---
     private static GamePadState _prevGp;
     private static GamePadState _currGp;
-    private static readonly System.Collections.Generic.List<char> _pendingTextInput = [];
+    private static readonly List<char> _pendingTextInput = [];
     private static char[] _textInput = [];
     private static bool _textInputSubscribed;
 
@@ -190,12 +191,10 @@ public static class Input
     internal static Keys[] GetRawPressedKeys()
     {
         var heldKeys = _currKb.GetPressedKeys();
-        var pressedKeys = new System.Collections.Generic.List<Keys>(heldKeys.Length);
+        var pressedKeys = new List<Keys>(heldKeys.Length);
         foreach (var key in heldKeys)
-        {
             if (!_prevKb.IsKeyDown(key))
                 pressedKeys.Add(key);
-        }
 
         return pressedKeys.ToArray();
     }
@@ -203,12 +202,10 @@ public static class Input
     internal static Keys[] GetRawReleasedKeys()
     {
         var previousKeys = _prevKb.GetPressedKeys();
-        var releasedKeys = new System.Collections.Generic.List<Keys>(previousKeys.Length);
+        var releasedKeys = new List<Keys>(previousKeys.Length);
         foreach (var key in previousKeys)
-        {
             if (!_currKb.IsKeyDown(key))
                 releasedKeys.Add(key);
-        }
 
         return releasedKeys.ToArray();
     }

@@ -9,12 +9,16 @@ public sealed class UiUniformGrid : UiContainer
 {
     /// <summary>Gets or sets the requested row count, or zero to calculate it.</summary>
     public int Rows { get; set; }
+
     /// <summary>Gets or sets the requested column count, or zero to calculate it.</summary>
     public int Columns { get; set; }
+
     /// <summary>Gets or sets the horizontal gap between cells.</summary>
     public int ColumnSpacing { get; set; }
+
     /// <summary>Gets or sets the vertical gap between cells.</summary>
     public int RowSpacing { get; set; }
+
     /// <summary>Gets or sets the inner inset around the cells.</summary>
     public UiThickness Padding { get; set; }
 
@@ -88,9 +92,9 @@ public sealed class UiUniformGrid : UiContainer
     /// <inheritdoc />
     public override void Parse(XmlNode node)
     {
-        Rows = Math.Max(0, UiXmlParser.ParseInt(node, "rows", 0));
-        Columns = Math.Max(0, UiXmlParser.ParseInt(node, "columns", 0));
-        var spacing = Math.Max(0, UiXmlParser.ParseInt(node, "spacing", 0));
+        Rows = Math.Max(0, UiXmlParser.ParseInt(node, "rows"));
+        Columns = Math.Max(0, UiXmlParser.ParseInt(node, "columns"));
+        var spacing = Math.Max(0, UiXmlParser.ParseInt(node, "spacing"));
         ColumnSpacing = Math.Max(
             0,
             UiXmlParser.ParseInt(node, "column-spacing", spacing));
@@ -106,9 +110,8 @@ public sealed class UiUniformGrid : UiContainer
     {
         var count = 0;
         foreach (var child in Children)
-        {
-            if (child.IsVisible) count++;
-        }
+            if (child.IsVisible)
+                count++;
 
         rows = Rows;
         columns = Columns;

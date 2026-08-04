@@ -3,8 +3,8 @@
 public sealed class WaitForSeconds : IYieldInstruction
 {
     private readonly float _target;
-    private bool Started;
     private float StartTime;
+    private bool Started;
 
     public WaitForSeconds(float seconds, bool useUnscaledTime = false)
     {

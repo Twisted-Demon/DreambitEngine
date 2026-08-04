@@ -1,13 +1,11 @@
-using Microsoft.Xna.Framework;
 using System.Xml;
+using Microsoft.Xna.Framework;
 
 namespace Dreambit.UI;
 
 public sealed class SpriteBrush : UiBrush
 {
     private Sprite _sprite;
-
-    public string SpritePath { get; set; }
 
     public SpriteBrush()
         : this(string.Empty)
@@ -19,6 +17,12 @@ public sealed class SpriteBrush : UiBrush
         SpritePath = spritePath ?? string.Empty;
     }
 
+    public string SpritePath { get; set; }
+
+    public override Point MinimumSize => _sprite is null
+        ? Point.Zero
+        : _sprite.SourceRect.Size;
+
     public override void Parse(XmlNode node)
     {
         var spritePath = UiXmlParser.ParseString(
@@ -26,17 +30,11 @@ public sealed class SpriteBrush : UiBrush
             "sprite",
             string.Empty);
         if (string.IsNullOrWhiteSpace(spritePath))
-        {
             throw new XmlException(
                 "<SpriteBrush> requires a non-empty sprite attribute.");
-        }
 
         SpritePath = spritePath;
     }
-
-    public override Point MinimumSize => _sprite is null
-        ? Point.Zero
-        : _sprite.SourceRect.Size;
 
     public override void ResolveDependencies()
     {

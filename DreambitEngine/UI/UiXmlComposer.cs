@@ -7,8 +7,8 @@ using System.Xml;
 namespace Dreambit.UI;
 
 /// <summary>
-/// Expands file-backed UI includes and named components before the retained
-/// element tree is created.
+///     Expands file-backed UI includes and named components before the retained
+///     element tree is created.
 /// </summary>
 public static class UiXmlComposer
 {
@@ -18,11 +18,11 @@ public static class UiXmlComposer
     private const string ComponentDefinitionElementName = "Component";
 
     /// <summary>
-    /// Loads a complete UI file and expands all of its component references.
+    ///     Loads a complete UI file and expands all of its component references.
     /// </summary>
     /// <param name="layoutPath">
-    /// An absolute path inside <paramref name="contentRoot"/>, or a path
-    /// relative to that root.
+    ///     An absolute path inside <paramref name="contentRoot" />, or a path
+    ///     relative to that root.
     /// </param>
     /// <param name="contentRoot">The directory component files may be loaded from.</param>
     /// <returns>Ordinary UI XML containing one <c>&lt;Ui&gt;</c> root.</returns>
@@ -50,12 +50,12 @@ public static class UiXmlComposer
     }
 
     /// <summary>
-    /// Loads one component and wraps its expanded visual root in a temporary
-    /// <c>&lt;Ui&gt;</c> document.
+    ///     Loads one component and wraps its expanded visual root in a temporary
+    ///     <c>&lt;Ui&gt;</c> document.
     /// </summary>
     /// <param name="componentPath">
-    /// An absolute path inside <paramref name="contentRoot"/>, or a path
-    /// relative to that root.
+    ///     An absolute path inside <paramref name="contentRoot" />, or a path
+    ///     relative to that root.
     /// </param>
     /// <param name="contentRoot">The directory component files may be loaded from.</param>
     /// <param name="idPrefix">Optional text prepended to every authored component ID.</param>
@@ -112,10 +112,8 @@ public static class UiXmlComposer
                 continue;
 
             if (componentsSection is not null)
-            {
                 throw new XmlException(
                     $"<{documentRoot.Name}> may contain only one <{sectionName}> section.");
-            }
 
             componentsSection = child;
         }
@@ -129,11 +127,9 @@ public static class UiXmlComposer
             if (childNode is not XmlElement definitionNode)
             {
                 if (IsMeaningfulText(childNode))
-                {
                     throw new XmlException(
                         $"<{sectionName}> may only contain " +
                         $"<{ComponentDefinitionElementName}> elements.");
-                }
 
                 continue;
             }
@@ -142,11 +138,9 @@ public static class UiXmlComposer
                     definitionNode.Name,
                     ComponentDefinitionElementName,
                     StringComparison.Ordinal))
-            {
                 throw new XmlException(
                     $"<{sectionName}> does not support <{definitionNode.Name}>. " +
                     $"Expected <{ComponentDefinitionElementName}>.");
-            }
 
             ValidateComponentDefinitionAttributes(definitionNode);
             EnsureNoInstanceContent(definitionNode);
@@ -156,11 +150,9 @@ public static class UiXmlComposer
             ValidateComponentName(componentName);
 
             if (definitions.ContainsKey(componentName))
-            {
                 throw new XmlException(
                     $"UI component '{componentName}' is declared more than once " +
                     $"in '{session.GetDisplayPath(documentPath)}'.");
-            }
 
             var componentPath = session.ResolveReference(documentPath, source);
 
@@ -189,31 +181,25 @@ public static class UiXmlComposer
                         childElement.Name,
                         IncludeElementName,
                         StringComparison.Ordinal))
-                {
                     ExpandInclude(
                         parent,
                         childElement,
                         documentPath,
                         session);
-                }
                 else if (componentDefinitions.TryGetValue(
                              childElement.Name,
                              out var componentPath))
-                {
                     ExpandNamedComponent(
                         parent,
                         childElement,
                         componentPath,
                         session);
-                }
                 else
-                {
                     ExpandChildren(
                         childElement,
                         documentPath,
                         componentDefinitions,
                         session);
-                }
             }
 
             childNode = nextNode;
@@ -245,11 +231,9 @@ public static class UiXmlComposer
         UiCompositionSession session)
     {
         if (instanceNode.HasAttribute("source"))
-        {
             throw new XmlException(
                 $"Named component <{instanceNode.Name}> may not specify a source " +
                 "attribute. Its source comes from the component declaration.");
-        }
 
         var expandedElement = ExpandComponentFile(
             componentPath,
@@ -286,12 +270,10 @@ public static class UiXmlComposer
             ExpandDocumentRoot(documentRoot, componentPath, session);
             var visualChildren = GetDirectElementChildren(documentRoot);
             if (visualChildren.Count != 1)
-            {
                 throw new XmlException(
                     $"UI component '{session.GetDisplayPath(componentPath)}' must " +
                     "contain exactly one visual root element after its component " +
                     "declarations are removed.");
-            }
 
             var expandedRoot = (XmlElement)visualChildren[0].CloneNode(true);
             var idPrefix = explicitIdPrefix;
@@ -336,18 +318,14 @@ public static class UiXmlComposer
                     attribute.Name,
                     "id-prefix",
                     StringComparison.Ordinal))
-            {
                 continue;
-            }
 
             if (string.Equals(attribute.Name, "source", StringComparison.Ordinal))
             {
                 if (!isInclude)
-                {
                     throw new XmlException(
                         $"Named component <{instanceNode.Name}> may not specify " +
                         "a source attribute.");
-                }
 
                 continue;
             }
@@ -367,10 +345,8 @@ public static class UiXmlComposer
         }
 
         foreach (XmlNode childNode in element.ChildNodes)
-        {
             if (childNode is XmlElement childElement)
                 PrefixElementIds(childElement, prefix);
-        }
     }
 
     private static void ValidateComponentDefinitionAttributes(
@@ -380,9 +356,7 @@ public static class UiXmlComposer
         {
             if (string.Equals(attribute.Name, "name", StringComparison.Ordinal) ||
                 string.Equals(attribute.Name, "source", StringComparison.Ordinal))
-            {
                 continue;
-            }
 
             throw new XmlException(
                 $"<{ComponentDefinitionElementName}> does not support attribute " +
@@ -404,11 +378,9 @@ public static class UiXmlComposer
         }
 
         if (componentName.Contains('.', StringComparison.Ordinal))
-        {
             throw new XmlException(
                 $"UI component name '{componentName}' may not contain '.'. " +
                 "Names containing '.' are reserved for property elements.");
-        }
 
         if (string.Equals(componentName, LayoutRootName, StringComparison.Ordinal) ||
             string.Equals(componentName, ComponentRootName, StringComparison.Ordinal) ||
@@ -418,10 +390,8 @@ public static class UiXmlComposer
                 ComponentDefinitionElementName,
                 StringComparison.Ordinal) ||
             string.Equals(componentName, "Components", StringComparison.Ordinal))
-        {
             throw new XmlException(
                 $"UI component name '{componentName}' is reserved.");
-        }
     }
 
     private static string GetRequiredAttribute(
@@ -430,10 +400,8 @@ public static class UiXmlComposer
     {
         var value = element.GetAttribute(attributeName);
         if (string.IsNullOrWhiteSpace(value))
-        {
             throw new XmlException(
                 $"<{element.Name}> requires a non-empty '{attributeName}' attribute.");
-        }
 
         return value.Trim();
     }
@@ -441,26 +409,20 @@ public static class UiXmlComposer
     private static void EnsureNoInstanceContent(XmlElement element)
     {
         foreach (XmlNode childNode in element.ChildNodes)
-        {
             if (childNode.NodeType == XmlNodeType.Element ||
                 IsMeaningfulText(childNode))
-            {
                 throw new XmlException(
                     $"<{element.Name}> is a component reference and may not " +
                     "contain child content.");
-            }
-        }
     }
 
     private static bool IsMeaningfulText(XmlNode node)
     {
         if (node.NodeType is not (
-                XmlNodeType.Text or
-                XmlNodeType.CDATA or
-                XmlNodeType.SignificantWhitespace))
-        {
+            XmlNodeType.Text or
+            XmlNodeType.CDATA or
+            XmlNodeType.SignificantWhitespace))
             return false;
-        }
 
         return !string.IsNullOrWhiteSpace(node.Value);
     }
@@ -469,10 +431,8 @@ public static class UiXmlComposer
     {
         var result = new List<XmlElement>();
         foreach (XmlNode childNode in parent.ChildNodes)
-        {
             if (childNode is XmlElement childElement)
                 result.Add(childElement);
-        }
 
         return result;
     }
@@ -490,26 +450,23 @@ public static class UiXmlComposer
                 ? StringComparer.OrdinalIgnoreCase
                 : StringComparer.Ordinal;
 
-        private readonly Dictionary<string, XmlDocument> _templates =
-            new(PathComparer);
         private readonly HashSet<string> _activeFiles = new(PathComparer);
         private readonly List<string> _activeStack = [];
+
+        private readonly Dictionary<string, XmlDocument> _templates =
+            new(PathComparer);
 
         public UiCompositionSession(string contentRoot)
         {
             if (string.IsNullOrWhiteSpace(contentRoot))
-            {
                 throw new ArgumentException(
                     "A UI content root is required.",
                     nameof(contentRoot));
-            }
 
             ContentRoot = Path.GetFullPath(contentRoot);
             if (!Directory.Exists(ContentRoot))
-            {
                 throw new DirectoryNotFoundException(
                     $"UI content root '{ContentRoot}' does not exist.");
-            }
         }
 
         public string ContentRoot { get; }
@@ -517,11 +474,9 @@ public static class UiXmlComposer
         public string ResolveEntryPath(string path)
         {
             if (string.IsNullOrWhiteSpace(path))
-            {
                 throw new ArgumentException(
                     "A UI document path is required.",
                     nameof(path));
-            }
 
             var candidate = Path.IsPathRooted(path)
                 ? path
@@ -537,11 +492,9 @@ public static class UiXmlComposer
                 throw new XmlException("A UI component source path is required.");
 
             if (string.IsNullOrWhiteSpace(declaringDocumentPath))
-            {
                 throw new XmlException(
                     $"Cannot resolve UI component source '{source}' because the " +
                     "declaring document has no file path.");
-            }
 
             string candidate;
             if (source.StartsWith("~/", StringComparison.Ordinal) ||
@@ -552,11 +505,9 @@ public static class UiXmlComposer
             else
             {
                 if (Path.IsPathRooted(source))
-                {
                     throw new XmlException(
                         $"UI component source '{source}' must be relative. " +
                         "Use '~/' for a content-root-relative path.");
-                }
 
                 var declaringDirectory =
                     Path.GetDirectoryName(declaringDocumentPath) ?? ContentRoot;
@@ -565,12 +516,10 @@ public static class UiXmlComposer
 
             var fullPath = NormalizeInsideContentRoot(candidate, source);
             if (!File.Exists(fullPath))
-            {
                 throw new XmlException(
                     $"UI component source '{source}' referenced by " +
                     $"'{GetDisplayPath(declaringDocumentPath)}' was not found. " +
                     $"Resolved path: '{fullPath}'.");
-            }
 
             return fullPath;
         }
@@ -587,11 +536,9 @@ public static class UiXmlComposer
             }
 
             if (!File.Exists(fullPath))
-            {
                 throw new FileNotFoundException(
                     $"UI XML file '{GetDisplayPath(fullPath)}' was not found.",
                     fullPath);
-            }
 
             var document = new XmlDocument
             {
@@ -641,10 +588,8 @@ public static class UiXmlComposer
             fullPath = Path.GetFullPath(fullPath);
             if (_activeStack.Count == 0 ||
                 !PathComparer.Equals(_activeStack[^1], fullPath))
-            {
                 throw new InvalidOperationException(
                     "UI composition stack became unbalanced.");
-            }
 
             _activeStack.RemoveAt(_activeStack.Count - 1);
             _activeFiles.Remove(fullPath);
@@ -665,11 +610,9 @@ public static class UiXmlComposer
             var fullPath = Path.GetFullPath(candidate);
             var relativePath = Path.GetRelativePath(ContentRoot, fullPath);
             if (EscapesContentRoot(relativePath))
-            {
                 throw new XmlException(
                     $"UI path '{originalPath}' resolves outside the content root " +
                     $"'{ContentRoot}'.");
-            }
 
             return fullPath;
         }
@@ -678,9 +621,7 @@ public static class UiXmlComposer
         {
             if (Path.IsPathRooted(relativePath) ||
                 string.Equals(relativePath, "..", StringComparison.Ordinal))
-            {
                 return true;
-            }
 
             return relativePath.StartsWith(
                        $"..{Path.DirectorySeparatorChar}",
@@ -697,10 +638,8 @@ public static class UiXmlComposer
         {
             var root = document.DocumentElement;
             if (root is null)
-            {
                 throw new XmlException(
                     $"UI XML file '{fullPath}' has no root element.");
-            }
 
             var valid = expectedKind switch
             {

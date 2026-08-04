@@ -7,8 +7,8 @@ using System.Xml;
 namespace Dreambit.UI;
 
 /// <summary>
-/// Creates UI layouts from XML using element and brush types discovered in
-/// all currently loaded assemblies.
+///     Creates UI layouts from XML using element and brush types discovered in
+///     all currently loaded assemblies.
 /// </summary>
 public static class UiLoader
 {
@@ -16,8 +16,8 @@ public static class UiLoader
     /// <param name="xml">XML containing a single <c>&lt;Ui&gt;</c> root.</param>
     /// <returns>The parsed layout.</returns>
     /// <exception cref="XmlException">
-    /// Thrown when the document, element types, brush types, properties, or IDs
-    /// are invalid or ambiguous.
+    ///     Thrown when the document, element types, brush types, properties, or IDs
+    ///     are invalid or ambiguous.
     /// </exception>
     public static UiLayout LoadFromXml(string xml)
     {
@@ -58,12 +58,12 @@ public static class UiLoader
     }
 
     /// <summary>
-    /// Loads a file-backed UI document and expands its component references
-    /// before creating the retained visual tree.
+    ///     Loads a file-backed UI document and expands its component references
+    ///     before creating the retained visual tree.
     /// </summary>
     /// <param name="filePath">
-    /// An absolute path inside <paramref name="contentRoot"/>, or a path
-    /// relative to that root.
+    ///     An absolute path inside <paramref name="contentRoot" />, or a path
+    ///     relative to that root.
     /// </param>
     /// <param name="contentRoot">The directory component files may be loaded from.</param>
     /// <returns>The parsed layout.</returns>
@@ -74,12 +74,12 @@ public static class UiLoader
     }
 
     /// <summary>
-    /// Creates one detached file-backed UI component. The returned element can
-    /// be attached to an existing layout with <see cref="UiContainer.AddChild"/>.
+    ///     Creates one detached file-backed UI component. The returned element can
+    ///     be attached to an existing layout with <see cref="UiContainer.AddChild" />.
     /// </summary>
     /// <param name="filePath">
-    /// An absolute path inside <paramref name="contentRoot"/>, or a path
-    /// relative to that root.
+    ///     An absolute path inside <paramref name="contentRoot" />, or a path
+    ///     relative to that root.
     /// </param>
     /// <param name="contentRoot">The directory component files may be loaded from.</param>
     /// <param name="idPrefix">Optional text prepended to every authored component ID.</param>
@@ -96,11 +96,9 @@ public static class UiLoader
         var temporaryLayout = LoadFromXml(composedXml);
 
         if (temporaryLayout.Root.Children.Count != 1)
-        {
             throw new XmlException(
                 $"UI component '{filePath}' did not produce exactly one " +
                 "visual root element.");
-        }
 
         var component = temporaryLayout.Root.Children[0];
         temporaryLayout.Root.RemoveChild(component);
@@ -128,9 +126,7 @@ public static class UiLoader
                         childNode,
                         typeCatalog,
                         parsedProperties))
-                {
                     continue;
-                }
 
                 container.AddChild(
                     ParseElement(childNode, typeCatalog));
@@ -156,17 +152,13 @@ public static class UiLoader
             propertyName,
             BindingFlags.Instance | BindingFlags.Public);
         if (property is null || property.SetMethod is null)
-        {
             throw new XmlException(
                 $"<{propertyNode.Name}> does not name a writable public property " +
                 $"on {element.GetType().Name}.");
-        }
 
         if (!parsedProperties.Add(propertyName))
-        {
             throw new XmlException(
                 $"<{propertyNode.Name}> can only be specified once.");
-        }
 
         object value;
         if (typeof(IUiBrush).IsAssignableFrom(property.PropertyType))
@@ -178,11 +170,9 @@ public static class UiLoader
             var valueNode = GetSinglePropertyValueNode(propertyNode);
             value = ParseElement(valueNode, typeCatalog);
             if (!property.PropertyType.IsInstanceOfType(value))
-            {
                 throw new XmlException(
                     $"<{propertyNode.Name}> requires a " +
                     $"{property.PropertyType.Name} value.");
-            }
         }
         else
         {
@@ -212,26 +202,22 @@ public static class UiLoader
                 continue;
 
             if (valueNode is not null)
-            {
                 throw new XmlException(
                     $"<{propertyNode.Name}> must contain exactly one value.");
-            }
 
             valueNode = childNode;
         }
 
         if (valueNode is null)
-        {
             throw new XmlException(
                 $"<{propertyNode.Name}> must contain exactly one value.");
-        }
 
         return valueNode;
     }
 
     /// <summary>
-    /// Creates and parses one brush element using brush types discovered from
-    /// all loaded assemblies.
+    ///     Creates and parses one brush element using brush types discovered from
+    ///     all loaded assemblies.
     /// </summary>
     /// <param name="brushNode">The concrete brush XML element.</param>
     /// <returns>The parsed brush.</returns>
@@ -242,8 +228,8 @@ public static class UiLoader
     }
 
     /// <summary>
-    /// Creates every brush element directly contained by an XML node. This is
-    /// used by composite brushes and is also available to custom brushes.
+    ///     Creates every brush element directly contained by an XML node. This is
+    ///     used by composite brushes and is also available to custom brushes.
     /// </summary>
     /// <param name="parentNode">The node containing concrete brush elements.</param>
     /// <returns>The brushes in their XML order.</returns>
@@ -285,10 +271,8 @@ public static class UiLoader
     {
         if (!string.IsNullOrWhiteSpace(element.Id) &&
             !ids.Add(element.Id))
-        {
             throw new XmlException(
                 $"Duplicate UI element id '{element.Id}'.");
-        }
 
         foreach (var child in element.Children)
             ValidateUniqueIds(child, ids);
@@ -296,9 +280,10 @@ public static class UiLoader
 
     private sealed class UiTypeCatalog
     {
-        private readonly Dictionary<string, List<Type>> _elementTypes =
-            new(StringComparer.Ordinal);
         private readonly Dictionary<string, List<Type>> _brushTypes =
+            new(StringComparer.Ordinal);
+
+        private readonly Dictionary<string, List<Type>> _elementTypes =
             new(StringComparer.Ordinal);
 
         public UiTypeCatalog()
@@ -308,32 +293,24 @@ public static class UiLoader
                 .OrderBy(assembly => assembly.FullName, StringComparer.Ordinal);
 
             foreach (var assembly in assemblies)
+            foreach (var type in GetLoadableTypes(assembly))
             {
-                foreach (var type in GetLoadableTypes(assembly))
-                {
-                    if (type.IsAbstract ||
-                        type.IsInterface ||
-                        type.ContainsGenericParameters)
-                    {
-                        continue;
-                    }
+                if (type.IsAbstract ||
+                    type.IsInterface ||
+                    type.ContainsGenericParameters)
+                    continue;
 
-                    if (typeof(UiElement).IsAssignableFrom(type))
-                    {
-                        AddType(
-                            _elementTypes,
-                            GetElementXmlName(type),
-                            type);
-                    }
+                if (typeof(UiElement).IsAssignableFrom(type))
+                    AddType(
+                        _elementTypes,
+                        GetElementXmlName(type),
+                        type);
 
-                    if (typeof(IUiBrush).IsAssignableFrom(type))
-                    {
-                        AddType(
-                            _brushTypes,
-                            GetBrushXmlName(type),
-                            type);
-                    }
-                }
+                if (typeof(IUiBrush).IsAssignableFrom(type))
+                    AddType(
+                        _brushTypes,
+                        GetBrushXmlName(type),
+                        type);
             }
         }
 
@@ -360,11 +337,9 @@ public static class UiLoader
         {
             if (!types.TryGetValue(xmlName, out var matches) ||
                 matches.Count == 0)
-            {
                 throw new XmlException(
                     $"Unsupported UI {kind} <{xmlName}>. " +
                     "The type must be present in a loaded assembly.");
-            }
 
             if (matches.Count > 1)
             {
@@ -385,12 +360,10 @@ public static class UiLoader
         {
             var constructor = type.GetConstructor(Type.EmptyTypes);
             if (constructor is null)
-            {
                 throw new XmlException(
                     $"Could not create UI {kind} <{xmlName}> from " +
                     $"{type.FullName}. UI types require a public parameterless " +
                     "constructor.");
-            }
 
             try
             {

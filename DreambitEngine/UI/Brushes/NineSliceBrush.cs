@@ -5,8 +5,8 @@ using Microsoft.Xna.Framework;
 namespace Dreambit.UI;
 
 /// <summary>
-/// Draws a sprite as nine regions so its corners remain pixel-sized while its
-/// edges and center stretch to fill the owning control.
+///     Draws a sprite as nine regions so its corners remain pixel-sized while its
+///     edges and center stretch to fill the owning control.
 /// </summary>
 public sealed class NineSliceBrush : UiBrush
 {
@@ -24,11 +24,9 @@ public sealed class NineSliceBrush : UiBrush
         get
         {
             if (_sprite is null)
-            {
                 return new Point(
                     SliceThickness.Horizontal,
                     SliceThickness.Vertical);
-            }
 
             ResolvePair(
                 SliceThickness.Left,
@@ -51,10 +49,8 @@ public sealed class NineSliceBrush : UiBrush
     {
         SpritePath = UiXmlParser.ParseString(node, "sprite", string.Empty);
         if (string.IsNullOrWhiteSpace(SpritePath))
-        {
             throw new XmlException(
                 "<NineSliceBrush> requires a non-empty sprite attribute.");
-        }
 
         var thickness = UiXmlParser.ParseThickness(
             UiXmlParser.ParseString(node, "slice", "0"),
@@ -201,9 +197,7 @@ public sealed class NineSliceBrush : UiBrush
     {
         if (source.Width <= 0 || source.Height <= 0 ||
             destination.Width <= 0 || destination.Height <= 0)
-        {
             return;
-        }
 
         Graphics.SpriteBatch.Draw(
             _sprite.Texture,

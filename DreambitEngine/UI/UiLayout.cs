@@ -7,16 +7,16 @@ using Microsoft.Xna.Framework.Input;
 namespace Dreambit.UI;
 
 /// <summary>
-/// Owns a UI visual tree and coordinates dependency resolution, layout,
-/// input updates, lookup, and drawing.
+///     Owns a UI visual tree and coordinates dependency resolution, layout,
+///     input updates, lookup, and drawing.
 /// </summary>
 public class UiLayout
 {
     private readonly HashSet<UiElement> _pointerOverRoute = [];
-    private UiContainer _root;
-    private Vector2 _lastPointerPosition;
     private bool _hasPointerPosition;
+    private Vector2 _lastPointerPosition;
     private bool _pointerGestureConsumed;
+    private UiContainer _root;
 
     /// <summary>Creates a layout with a dedicated topmost popup surface.</summary>
     public UiLayout()
@@ -53,15 +53,15 @@ public class UiLayout
     public UiElement PointerCapturedElement { get; private set; }
 
     /// <summary>
-    /// Gets whether this layout owns an active pointer capture or a pointer
-    /// gesture that began over one of its hit-test surfaces.
+    ///     Gets whether this layout owns an active pointer capture or a pointer
+    ///     gesture that began over one of its hit-test surfaces.
     /// </summary>
     public bool IsPointerInputCaptured =>
         PointerCapturedElement is not null || _pointerGestureConsumed;
 
     /// <summary>Finds an element anywhere in the visual tree by ID.</summary>
     /// <param name="id">The case-sensitive element ID.</param>
-    /// <returns>The matching element, or <see langword="null"/> when no match exists.</returns>
+    /// <returns>The matching element, or <see langword="null" /> when no match exists.</returns>
     public UiElement Find(string id)
     {
         if (string.IsNullOrWhiteSpace(id))
@@ -75,7 +75,7 @@ public class UiLayout
     /// <param name="id">The case-sensitive element ID.</param>
     /// <returns>The matching typed element.</returns>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the element is missing or has a different type.
+    ///     Thrown when the element is missing or has a different type.
     /// </exception>
     public T GetRequired<T>(string id) where T : UiElement
     {
@@ -89,7 +89,7 @@ public class UiLayout
     }
 
     /// <summary>
-    /// Gets an element by Id and its prefix, and verifies its expected type.
+    ///     Gets an element by Id and its prefix, and verifies its expected type.
     /// </summary>
     /// <param name="prefix">The case-sensitive element prefix.</param>
     /// <param name="id">The case-sensitive element ID.</param>
@@ -101,8 +101,8 @@ public class UiLayout
     }
 
     /// <summary>
-    /// Resolves assets, lays out the visual tree, updates elements, and routes
-    /// the current raw input snapshot to one topmost target.
+    ///     Resolves assets, lays out the visual tree, updates elements, and routes
+    ///     the current raw input snapshot to one topmost target.
     /// </summary>
     /// <param name="viewport">The available UI rectangle.</param>
     /// <param name="input">The raw input snapshot for this update.</param>
@@ -149,7 +149,7 @@ public class UiLayout
 
     /// <summary>Moves focus to an eligible element owned by this layout.</summary>
     /// <param name="element">The element to focus.</param>
-    /// <returns><see langword="true"/> when focus changed or was already assigned.</returns>
+    /// <returns><see langword="true" /> when focus changed or was already assigned.</returns>
     public bool Focus(UiElement element)
     {
         if (!IsFocusCandidate(element))
@@ -192,7 +192,7 @@ public class UiLayout
 
     /// <summary>Captures subsequent pointer events to an element in this layout.</summary>
     /// <param name="element">The element requesting capture.</param>
-    /// <returns><see langword="true"/> when capture was assigned.</returns>
+    /// <returns><see langword="true" /> when capture was assigned.</returns>
     public bool CapturePointer(UiElement element)
     {
         if (!IsInteractive(element))
@@ -225,9 +225,7 @@ public class UiLayout
 
         if (PointerCapturedElement is not null &&
             !IsInteractive(PointerCapturedElement))
-        {
             ReleasePointerCapture(PointerCapturedElement);
-        }
 
         var unavailablePointerElements = _pointerOverRoute
             .Where(element => !IsInteractive(element))
@@ -253,10 +251,8 @@ public class UiLayout
             return false;
 
         for (var current = element; current is not null; current = current.Parent)
-        {
             if (current.ClipToBounds && !current.Bounds.Contains(point))
                 return false;
-        }
 
         return true;
     }
@@ -314,13 +310,11 @@ public class UiLayout
         }
 
         if (input.ScrollDelta != 0 && target is not null)
-        {
             RoutePointerEvent(
                 target,
                 input.PointerPosition,
                 PointerEventKind.Wheel,
                 input.ScrollDelta);
-        }
 
         if (input.PrimaryReleased && target is not null)
         {
@@ -362,8 +356,8 @@ public class UiLayout
         var capture = blockingOverlay is not null
             ? UiInputCapture.Keyboard | UiInputCapture.GamePad
             : FocusedElement?.CapturesKeyboardInput == true
-            ? UiInputCapture.Keyboard
-            : UiInputCapture.None;
+                ? UiInputCapture.Keyboard
+                : UiInputCapture.None;
         if (FocusedElement is not null && input.KeyboardNavigationHeld)
             capture |= UiInputCapture.Keyboard;
         if (FocusedElement is not null && input.GamePadNavigationHeld)
@@ -373,7 +367,6 @@ public class UiLayout
         if (FocusedElement is not null)
         {
             foreach (var key in input.PressedKeys ?? [])
-            {
                 if (RouteKeyEvent(
                         FocusedElement,
                         key,
@@ -384,10 +377,8 @@ public class UiLayout
                     handledKeys.Add(key);
                     capture |= UiInputCapture.Keyboard;
                 }
-            }
 
             foreach (var key in input.ReleasedKeys ?? [])
-            {
                 if (RouteKeyEvent(
                         FocusedElement,
                         key,
@@ -395,22 +386,17 @@ public class UiLayout
                         input.ShiftDown,
                         input.ControlDown))
                     capture |= UiInputCapture.Keyboard;
-            }
         }
 
         if (input.FocusNext &&
             !handledKeys.Contains(Keys.Tab) &&
             MoveSequentialFocus(1))
-        {
             capture |= UiInputCapture.Keyboard;
-        }
 
         if (input.FocusPrevious &&
             !handledKeys.Contains(Keys.Tab) &&
             MoveSequentialFocus(-1))
-        {
             capture |= UiInputCapture.Keyboard;
-        }
 
         if (input.NavigationDirection.HasValue)
         {
@@ -428,27 +414,19 @@ public class UiLayout
 
         if (input.ActivateKeyboard && FocusedElement is not null &&
             RouteCommandEvent(FocusedElement, UiInputDevice.Keyboard, true))
-        {
             capture |= UiInputCapture.Keyboard;
-        }
 
         if (input.ActivateGamePad && FocusedElement is not null &&
             RouteCommandEvent(FocusedElement, UiInputDevice.GamePad, true))
-        {
             capture |= UiInputCapture.GamePad;
-        }
 
         if (input.CancelKeyboard && FocusedElement is not null &&
             RouteCommandEvent(FocusedElement, UiInputDevice.Keyboard, false))
-        {
             capture |= UiInputCapture.Keyboard;
-        }
 
         if (input.CancelGamePad && FocusedElement is not null &&
             RouteCommandEvent(FocusedElement, UiInputDevice.GamePad, false))
-        {
             capture |= UiInputCapture.GamePad;
-        }
 
         return capture;
     }
@@ -461,17 +439,13 @@ public class UiLayout
         if (element is null ||
             !element.IsEffectivelyVisible ||
             !element.IsEffectivelyEnabled)
-        {
             return null;
-        }
 
         var clip = inheritedClip;
         if (element.ClipToBounds)
-        {
             clip = clip.HasValue
                 ? Rectangle.Intersect(clip.Value, element.Bounds)
                 : element.Bounds;
-        }
 
         if (clip.HasValue && !clip.Value.Contains(point))
             return null;
@@ -500,16 +474,12 @@ public class UiLayout
             nextRoute.Add(current);
 
         foreach (var element in _pointerOverRoute.ToList())
-        {
             if (!nextRoute.Contains(element))
                 element.SetPointerOver(false);
-        }
 
         foreach (var element in nextRoute)
-        {
             if (!_pointerOverRoute.Contains(element))
                 element.SetPointerOver(true);
-        }
 
         _pointerOverRoute.Clear();
         foreach (var element in nextRoute)
@@ -616,10 +586,8 @@ public class UiLayout
         Func<UiElement, bool> route)
     {
         for (var current = source; current is not null; current = current.Parent)
-        {
             if (route(current))
                 return;
-        }
     }
 
     private bool MoveSequentialFocus(int direction)
@@ -646,7 +614,7 @@ public class UiLayout
 
         var origin = FocusedElement.Bounds.Center;
         UiElement best = null;
-        long bestScore = long.MaxValue;
+        var bestScore = long.MaxValue;
 
         foreach (var candidate in candidates)
         {
@@ -690,11 +658,9 @@ public class UiLayout
     {
         var blockingOverlay = GetTopmostBlockingOverlay();
         if (blockingOverlay is not null)
-        {
             return EnumerateDepthFirst(blockingOverlay)
                 .Where(IsFocusCandidate)
                 .ToList();
-        }
 
         return EnumerateDepthFirst(PopupLayer)
             .Concat(EnumerateDepthFirst(Root))
@@ -709,10 +675,8 @@ public class UiLayout
 
         yield return element;
         foreach (var child in element.Children)
-        {
-            foreach (var descendant in EnumerateDepthFirst(child))
-                yield return descendant;
-        }
+        foreach (var descendant in EnumerateDepthFirst(child))
+            yield return descendant;
     }
 
     private bool IsFocusCandidate(UiElement element)
@@ -753,10 +717,8 @@ public class UiLayout
     private static UiElement FindFocusableAncestor(UiElement element)
     {
         for (var current = element; current is not null; current = current.Parent)
-        {
             if (current.IsFocusable)
                 return current;
-        }
 
         return null;
     }
@@ -777,10 +739,8 @@ public class UiLayout
     private static bool IsDescendantOf(UiElement element, UiElement ancestor)
     {
         for (var current = element; current is not null; current = current.Parent)
-        {
             if (ReferenceEquals(current, ancestor))
                 return true;
-        }
 
         return false;
     }
@@ -823,11 +783,9 @@ public class UiLayout
 
         if (!string.IsNullOrWhiteSpace(element.Id) && !ids.Add(element.Id) &&
             throwOnDuplicate)
-        {
             throw new InvalidOperationException(
                 $"Cannot attach UI subtree because element id '{element.Id}' " +
                 "already exists in the layout.");
-        }
 
         foreach (var child in element.Children)
             CollectIds(child, ids, throwOnDuplicate);

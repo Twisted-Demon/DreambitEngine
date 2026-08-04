@@ -1,12 +1,12 @@
-using Microsoft.Xna.Framework;
 using System.Xml;
+using Microsoft.Xna.Framework;
 
 namespace Dreambit.UI;
 
 /// <summary>
-/// Defines a reusable visual that draws inside bounds owned by a UI control.
-/// Brush implementations are discovered from loaded assemblies by class name
-/// or <see cref="UiXmlNameAttribute"/>.
+///     Defines a reusable visual that draws inside bounds owned by a UI control.
+///     Brush implementations are discovered from loaded assemblies by class name
+///     or <see cref="UiXmlNameAttribute" />.
 /// </summary>
 public interface IUiBrush
 {
@@ -27,9 +27,9 @@ public interface IUiBrush
 }
 
 /// <summary>
-/// Convenient base for visuals drawn inside bounds owned by a UI element.
-/// Brushes do not participate in the visual tree and can therefore be reused
-/// by borders, buttons, and future controls.
+///     Convenient base for visuals drawn inside bounds owned by a UI element.
+///     Brushes do not participate in the visual tree and can therefore be reused
+///     by borders, buttons, and future controls.
 /// </summary>
 public abstract class UiBrush : IUiBrush
 {
@@ -37,10 +37,14 @@ public abstract class UiBrush : IUiBrush
     public virtual Point MinimumSize => Point.Zero;
 
     /// <inheritdoc />
-    public virtual void Parse(XmlNode node) { }
+    public virtual void Parse(XmlNode node)
+    {
+    }
 
     /// <inheritdoc />
-    public virtual void ResolveDependencies() { }
+    public virtual void ResolveDependencies()
+    {
+    }
 
     /// <inheritdoc />
     public abstract void Draw(Rectangle bounds, Color tint);

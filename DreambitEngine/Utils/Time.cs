@@ -22,7 +22,7 @@ public static class Time
     public static ulong FrameCount { get; private set; }
 
     public static int FrameRate { get; private set; }
-    
+
     public static float ScaledTime { get; private set; }
     public static float UnscaledTime => TotalTime;
     public static float PhysicsDeltaTime { get; private set; }
@@ -41,13 +41,13 @@ public static class Time
         if (dt > MaxDeltaTime)
             dt = MaxDeltaTime;
 
-        TotalTime += dt;                        // unscaled
-        UnscaledDeltaTime = dt;                 // unscaled frame dt
+        TotalTime += dt; // unscaled
+        UnscaledDeltaTime = dt; // unscaled frame dt
 
-        DeltaTime = dt * TimeScale;             // scaled frame dt
+        DeltaTime = dt * TimeScale; // scaled frame dt
         AltDeltaTime = dt * AltTimeScale;
 
-        ScaledTime += DeltaTime;                // <<< accumulate scaled time >>>
+        ScaledTime += DeltaTime; // <<< accumulate scaled time >>>
         TimeSinceSceneLoaded += dt;
         FrameCount++;
         FrameRate = Mathf.RoundToInt(1 / DeltaTime);
@@ -55,10 +55,10 @@ public static class Time
 
     internal static void UpdatePhysicsTime(float fixedUnscaledDelta)
     {
-        UnscaledPhysicsDeltaTime = fixedUnscaledDelta;             // unscaled fixed dt
-        PhysicsDeltaTime = fixedUnscaledDelta * TimeScale;         // scaled fixed dt
+        UnscaledPhysicsDeltaTime = fixedUnscaledDelta; // unscaled fixed dt
+        PhysicsDeltaTime = fixedUnscaledDelta * TimeScale; // scaled fixed dt
 
-        UnscaledPhysicsTime += UnscaledPhysicsDeltaTime;           // advance clocks
+        UnscaledPhysicsTime += UnscaledPhysicsDeltaTime; // advance clocks
         PhysicsTime += PhysicsDeltaTime;
     }
 

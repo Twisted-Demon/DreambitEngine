@@ -1,5 +1,4 @@
-﻿using System.Xml;
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 
 namespace Dreambit.UI;
 
@@ -7,7 +6,7 @@ namespace Dreambit.UI;
 public sealed class SolidColorBrush : UiBrush
 {
     /// <inheritdoc />
-    public override Point MinimumSize => new Point(1, 1);
+    public override Point MinimumSize => new(1, 1);
 
     /// <inheritdoc />
     public override void Draw(Rectangle bounds, Color tint)

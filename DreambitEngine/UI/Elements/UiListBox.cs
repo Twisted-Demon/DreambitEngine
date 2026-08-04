@@ -1,8 +1,8 @@
 namespace Dreambit.UI;
 
 /// <summary>
-/// A clipped single-selection list supporting arbitrary item elements,
-/// pointer selection, and keyboard/controller navigation.
+///     A clipped single-selection list supporting arbitrary item elements,
+///     pointer selection, and keyboard/controller navigation.
 /// </summary>
 public sealed class UiListBox : UiSelector
 {

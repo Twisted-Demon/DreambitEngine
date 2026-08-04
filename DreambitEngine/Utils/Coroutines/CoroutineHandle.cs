@@ -6,7 +6,7 @@ public struct CoroutineHandle
 
     internal CoroutineHandle(int id)
     {
-        Id = id;    
+        Id = id;
     }
 
     public bool IsValid => Id != 0;

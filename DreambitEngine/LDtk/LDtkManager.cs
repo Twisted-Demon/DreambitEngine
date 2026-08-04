@@ -10,9 +10,9 @@ namespace Dreambit;
 
 public class LDtkManager : Singleton<LDtkManager>
 {
-    private readonly Dictionary<Guid, Entity> _entityRefs = new();
     public readonly Dictionary<Guid, LDtkLevel> LoadedLevels = new();
     public readonly Dictionary<int, SpriteSheet> SpriteSheets = new();
+    private readonly Dictionary<Guid, Entity> _entityRefs = new();
     public LDtkLevel CurrentLevel;
     public LDtkWorld CurrentWorld;
     public LDtkFile LDtkFile;

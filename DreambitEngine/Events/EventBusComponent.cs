@@ -6,9 +6,8 @@ using Dreambit.ECS;
 namespace Dreambit.Events;
 
 /// <summary>
-/// Scene-level event dispatcher.
-///
-/// Add this component to exactly one entity before using EventBus.Instance.
+///     Scene-level event dispatcher.
+///     Add this component to exactly one entity before using EventBus.Instance.
 /// </summary>
 public sealed class EventBus : SingletonComponent<EventBus>
 {
@@ -23,10 +22,10 @@ public sealed class EventBus : SingletonComponent<EventBus>
     private readonly Dictionary<Type, Delegate> _listeners = [];
 
     /// <summary>
-    /// Subscribes a typed listener to an event.
+    ///     Subscribes a typed listener to an event.
     /// </summary>
     /// <returns>
-    /// A disposable subscription that removes the listener when disposed.
+    ///     A disposable subscription that removes the listener when disposed.
     /// </returns>
     public IDisposable Subscribe<TArgs>(
         DreambitEvent<TArgs> dreambitEvent,
@@ -45,12 +44,10 @@ public sealed class EventBus : SingletonComponent<EventBus>
             if (_listeners.TryGetValue(eventType, out var existing))
             {
                 if (existing is not Action<TArgs> typedListeners)
-                {
                     throw CreateSignatureMismatchException(
                         eventType,
                         typeof(TArgs),
                         existing.GetType());
-                }
 
                 _listeners[eventType] = typedListeners + listener;
             }
@@ -60,12 +57,11 @@ public sealed class EventBus : SingletonComponent<EventBus>
             }
         }
 
-        return new EventSubscription(
-            () => Unsubscribe(dreambitEvent, listener));
+        return new EventSubscription(() => Unsubscribe(dreambitEvent, listener));
     }
 
     /// <summary>
-    /// Subscribes a parameterless listener.
+    ///     Subscribes a parameterless listener.
     /// </summary>
     public IDisposable Subscribe(
         DreambitEvent<EmptyDreambitEventArgs> dreambitEvent,
@@ -80,7 +76,7 @@ public sealed class EventBus : SingletonComponent<EventBus>
     }
 
     /// <summary>
-    /// Unsubscribes a typed listener.
+    ///     Unsubscribes a typed listener.
     /// </summary>
     public void Unsubscribe<TArgs>(
         DreambitEvent<TArgs> dreambitEvent,
@@ -98,12 +94,10 @@ public sealed class EventBus : SingletonComponent<EventBus>
                 return;
 
             if (existing is not Action<TArgs> typedListeners)
-            {
                 throw CreateSignatureMismatchException(
                     eventType,
                     typeof(TArgs),
                     existing.GetType());
-            }
 
             var remainingListeners = typedListeners - listener;
 
@@ -115,7 +109,7 @@ public sealed class EventBus : SingletonComponent<EventBus>
     }
 
     /// <summary>
-    /// Invokes an event and delivers its arguments to all listeners.
+    ///     Invokes an event and delivers its arguments to all listeners.
     /// </summary>
     public void Invoke<TArgs>(
         DreambitEvent<TArgs> dreambitEvent,
@@ -136,12 +130,10 @@ public sealed class EventBus : SingletonComponent<EventBus>
                 return;
 
             if (existing is not Action<TArgs> typedListeners)
-            {
                 throw CreateSignatureMismatchException(
                     eventType,
                     typeof(TArgs),
                     existing.GetType());
-            }
 
             /*
              * Copy the delegate before leaving the lock. This allows
@@ -154,7 +146,7 @@ public sealed class EventBus : SingletonComponent<EventBus>
     }
 
     /// <summary>
-    /// Invokes an event that carries no data.
+    ///     Invokes an event that carries no data.
     /// </summary>
     public void Invoke(
         DreambitEvent<EmptyDreambitEventArgs> dreambitEvent)
@@ -165,7 +157,7 @@ public sealed class EventBus : SingletonComponent<EventBus>
     }
 
     /// <summary>
-    /// Removes every listener for one event.
+    ///     Removes every listener for one event.
     /// </summary>
     public void Clear<TArgs>(
         DreambitEvent<TArgs> dreambitEvent)
@@ -180,7 +172,7 @@ public sealed class EventBus : SingletonComponent<EventBus>
     }
 
     /// <summary>
-    /// Removes every listener registered with this bus.
+    ///     Removes every listener registered with this bus.
     /// </summary>
     public void ClearAll()
     {
@@ -216,7 +208,6 @@ public sealed class EventBus : SingletonComponent<EventBus>
          * remaining subscribers to still receive the event.
          */
         foreach (var listenerDelegate in listeners.GetInvocationList())
-        {
             try
             {
                 ((Action<TArgs>)listenerDelegate).Invoke(eventArgs);
@@ -230,17 +221,14 @@ public sealed class EventBus : SingletonComponent<EventBus>
                     $".{listenerDelegate.Method.Name}\n" +
                     $"Exception: {exception}");
             }
-        }
     }
 
     private void ThrowIfUnavailable()
     {
         if (IsDestroyed)
-        {
             throw new ObjectDisposedException(
                 nameof(EventBus),
                 "The EventBus component has been destroyed.");
-        }
     }
 
     private static InvalidOperationException

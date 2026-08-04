@@ -8,9 +8,6 @@ public class UiToggleButton : UiButton
 {
     private bool _isChecked;
 
-    /// <summary>Raised whenever <see cref="IsChecked"/> changes.</summary>
-    public event Action<UiToggleButton, bool> CheckedChanged;
-
     /// <summary>Gets or sets whether this button is toggled on.</summary>
     public virtual bool IsChecked
     {
@@ -29,6 +26,9 @@ public class UiToggleButton : UiButton
     /// <inheritdoc />
     protected override bool IsCheckedForVisualState => IsChecked;
 
+    /// <summary>Raised whenever <see cref="IsChecked" /> changes.</summary>
+    public event Action<UiToggleButton, bool> CheckedChanged;
+
     /// <inheritdoc />
     protected override void OnClick()
     {
@@ -42,6 +42,6 @@ public class UiToggleButton : UiButton
     public override void Parse(XmlNode node)
     {
         base.Parse(node);
-        IsChecked = UiXmlParser.ParseBool(node, "is-checked", false);
+        IsChecked = UiXmlParser.ParseBool(node, "is-checked");
     }
 }

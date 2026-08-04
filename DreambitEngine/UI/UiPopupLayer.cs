@@ -5,8 +5,8 @@ using System.Linq;
 namespace Dreambit.UI;
 
 /// <summary>
-/// Owns transient popup visuals separately from the normal tree so they draw
-/// and hit-test above all ordinary UI content.
+///     Owns transient popup visuals separately from the normal tree so they draw
+///     and hit-test above all ordinary UI content.
 /// </summary>
 public sealed class UiPopupLayer : UiContainer
 {
@@ -60,10 +60,8 @@ public sealed class UiPopupLayer : UiContainer
                      .Where(popup => !popup.StaysOpen)
                      .Reverse()
                      .ToList())
-        {
             if (!IsDescendantOf(target, popup))
                 Close(popup);
-        }
     }
 
     internal void ActivateRequestedPopups(UiElement root)
@@ -79,10 +77,8 @@ public sealed class UiPopupLayer : UiContainer
     private static bool IsDescendantOf(UiElement element, UiElement ancestor)
     {
         for (var current = element; current is not null; current = current.Parent)
-        {
             if (ReferenceEquals(current, ancestor))
                 return true;
-        }
 
         return false;
     }
@@ -94,9 +90,7 @@ public sealed class UiPopupLayer : UiContainer
 
         yield return root;
         foreach (var child in root.Children.ToList())
-        {
-            foreach (var descendant in Enumerate(child))
-                yield return descendant;
-        }
+        foreach (var descendant in Enumerate(child))
+            yield return descendant;
     }
 }

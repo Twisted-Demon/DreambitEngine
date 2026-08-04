@@ -7,10 +7,10 @@ namespace Dreambit.UI;
 /// <summary>A focusable ranged control adjusted by dragging or navigation input.</summary>
 public class UiSlider : UiRangeBase
 {
-    private bool _isDragging;
-    private IUiBrush _trackBrush = new SolidColorBrush();
     private IUiBrush _fillBrush = new SolidColorBrush();
+    private bool _isDragging;
     private IUiBrush _thumbBrush = new SolidColorBrush();
+    private IUiBrush _trackBrush = new SolidColorBrush();
 
     /// <summary>Creates a focusable slider with solid default visuals.</summary>
     public UiSlider()
@@ -21,6 +21,7 @@ public class UiSlider : UiRangeBase
 
     /// <summary>Gets or sets the slider axis.</summary>
     public StackOrientation Orientation { get; set; } = StackOrientation.Horizontal;
+
     /// <summary>Gets or sets the track brush.</summary>
     public IUiBrush TrackBrush
     {
@@ -32,6 +33,7 @@ public class UiSlider : UiRangeBase
             InvalidateDependencies();
         }
     }
+
     /// <summary>Gets or sets the completed-range brush.</summary>
     public IUiBrush FillBrush
     {
@@ -43,6 +45,7 @@ public class UiSlider : UiRangeBase
             InvalidateDependencies();
         }
     }
+
     /// <summary>Gets or sets the draggable thumb brush.</summary>
     public IUiBrush ThumbBrush
     {
@@ -54,14 +57,19 @@ public class UiSlider : UiRangeBase
             InvalidateDependencies();
         }
     }
+
     /// <summary>Gets or sets the track thickness.</summary>
     public int TrackThickness { get; set; } = 4;
+
     /// <summary>Gets or sets the thumb's main-axis length.</summary>
     public int ThumbSize { get; set; } = 14;
+
     /// <summary>Gets or sets the unfilled track tint.</summary>
     public Color TrackTint { get; set; } = new(70, 70, 78);
+
     /// <summary>Gets or sets the filled track tint.</summary>
     public Color FillTint { get; set; } = new(78, 150, 235);
+
     /// <summary>Gets or sets the thumb tint.</summary>
     public Color ThumbTint { get; set; } = Color.White;
 
