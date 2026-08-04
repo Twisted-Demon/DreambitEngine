@@ -50,7 +50,6 @@ public class Core : Game
         Dreambit.Window.Init();
 
         GraphicsDevice.BlendState = BlendState.AlphaBlend;
-        Logger.Debug($"Graphics API Backend: {GraphicsDevice.GraphicsProfile}");
         Input.Init();
     }
 

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Dreambit.ECS;
+using Dreambit.Events;
 using Dreambit.Scripting;
 using Dreambit.UI;
 using Microsoft.Xna.Framework;
@@ -189,6 +190,8 @@ public class Scene : IDisposable
 
         UiCamera = Entity.Create("ui-camera").AttachComponent<Camera2D>();
         UiCamera.Entity.AlwaysUpdate = true;
+
+        Entity.Create("event-bus").AttachComponent<EventBus>();
 
         AmbientLight = Entity.Create("ambient-light").AttachComponent<AmbientLight2D>();
 
