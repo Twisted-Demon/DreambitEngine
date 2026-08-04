@@ -216,15 +216,14 @@ public class Scene : IDisposable
     /// </summary>
     private void UpdateInternals()
     {
-        
         ScriptingManager.Update();
         Entities.Tick();
         _coroutineScheduler.Update();
     }
 
     /// <summary>
-    /// Routes raw input through UI frames from front to back before gameplay
-    /// action maps and components are updated.
+    ///     Routes raw input through UI frames from front to back before gameplay
+    ///     action maps and components are updated.
     /// </summary>
     internal void RouteUiInput()
     {
@@ -236,10 +235,8 @@ public class Scene : IDisposable
             .ToList();
 
         foreach (var item in frameEntries)
-        {
             if (!item.Item1.Enabled || item.Item1.Entity?.Enabled != true)
                 item.Item1.Layout?.ClearInteractionState();
-        }
 
         var frames = frameEntries
             .Where(item =>
@@ -261,9 +258,7 @@ public class Scene : IDisposable
             var available = UiInputCapture.All & ~consumed;
             if (focusedFrame is not null &&
                 !ReferenceEquals(item.Item1, focusedFrame))
-            {
                 available &= ~(UiInputCapture.Keyboard | UiInputCapture.GamePad);
-            }
 
             var frameCapture = item.Item1.RouteInput(available);
             consumed |= frameCapture;
@@ -271,19 +266,13 @@ public class Scene : IDisposable
             if (pointerPressOwner is null &&
                 Input.IsRawMousePressed(MouseButton.Left) &&
                 frameCapture.HasFlag(UiInputCapture.Pointer))
-            {
                 pointerPressOwner = item.Item1;
-            }
         }
 
         if (pointerPressOwner is not null)
-        {
             foreach (var item in frames)
-            {
                 if (!ReferenceEquals(item.Item1, pointerPressOwner))
                     item.Item1.Layout?.ClearFocus();
-            }
-        }
 
         Input.CaptureForUi(consumed);
     }
@@ -439,7 +428,7 @@ public class Scene : IDisposable
         var entity = Entities.CreateEntity(name, tags, enabled, createAt, eulerRotation, scale, guidOverride);
         return entity;
     }
-    
+
     public Entity CreateEntity(
         EntityBlueprint blueprint,
         bool? enabled = null,
@@ -455,7 +444,7 @@ public class Scene : IDisposable
             eulerRotation,
             scale);
     }
-    
+
     public Entity CreateChildOfEntity(
         EntityBlueprint blueprint,
         Entity parent,
@@ -474,7 +463,7 @@ public class Scene : IDisposable
             eulerRotation,
             scale);
     }
-    
+
     private Entity SpawnBlueprint(
         EntityBlueprint blueprint,
         Entity parent,
@@ -501,22 +490,16 @@ public class Scene : IDisposable
                 scale);
 
             foreach (var entityBlueprint in context.Hierarchy)
-            {
                 context.GetEntity(entityBlueprint.Guid)
                     .BuildComponentsFromBlueprint(entityBlueprint);
-            }
 
             foreach (var entityBlueprint in context.Hierarchy)
-            {
                 context.GetEntity(entityBlueprint.Guid)
                     .DeserializeComponentsFromBlueprints(entityBlueprint, context);
-            }
 
             foreach (var entityBlueprint in context.Hierarchy)
-            {
                 context.GetEntity(entityBlueprint.Guid)
                     .CallComponentOnCreateAfterDeserialized();
-            }
 
             return rootEntity;
         }
@@ -567,7 +550,6 @@ public class Scene : IDisposable
         context.Register(blueprint, entity);
 
         foreach (var childBlueprint in blueprint.Children)
-        {
             CreateBlueprintHierarchy(
                 childBlueprint,
                 entity,
@@ -577,11 +559,10 @@ public class Scene : IDisposable
                 null,
                 null,
                 null);
-        }
 
         return entity;
     }
-    
+
     private void RollbackBlueprintSpawn(BlueprintSpawnContext context)
     {
         for (var i = context.Hierarchy.Count - 1; i >= 0; i--)

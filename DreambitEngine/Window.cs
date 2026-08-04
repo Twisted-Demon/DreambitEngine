@@ -39,13 +39,11 @@ public class Window
                 Core.Instance?.GraphicsDevice;
 
             if (graphicsDevice != null)
-            {
                 return Math.Max(
                     1,
                     graphicsDevice
                         .PresentationParameters
                         .BackBufferWidth);
-            }
 
             return Math.Max(
                 1,
@@ -62,13 +60,11 @@ public class Window
                 Core.Instance?.GraphicsDevice;
 
             if (graphicsDevice != null)
-            {
                 return Math.Max(
                     1,
                     graphicsDevice
                         .PresentationParameters
                         .BackBufferHeight);
-            }
 
             return Math.Max(
                 1,
@@ -124,8 +120,8 @@ public class Window
             : 1f;
 
     /// <summary>
-    /// Raised after the backbuffer has been synchronized with a settled
-    /// window-client resize.
+    ///     Raised after the backbuffer has been synchronized with a settled
+    ///     window-client resize.
     /// </summary>
     public static event EventHandler<WindowResizedEventArgs> WindowResized;
 
@@ -140,11 +136,9 @@ public class Window
                 "Core.Instance must exist before Window.Init().");
 
         if (instance.GraphicsDevice == null)
-        {
             throw new InvalidOperationException(
                 "Window.Init() requires an initialized GraphicsDevice. " +
                 "Call it from Core.Initialize(), not the Core constructor.");
-        }
 
         _previousWindowedSize =
             BackBufferSize;
@@ -170,10 +164,8 @@ public class Window
             return;
 
         if (Core.Instance?.Window != null)
-        {
             Core.Instance.Window.ClientSizeChanged -=
                 OnClientSizeChanged;
-        }
 
         _initialized = false;
         _pendingResize = false;
@@ -181,7 +173,7 @@ public class Window
     }
 
     /// <summary>
-    /// Call once per game update, before scene/component updates.
+    ///     Call once per game update, before scene/component updates.
     /// </summary>
     public static void Tick(GameTime gameTime)
     {
@@ -196,9 +188,7 @@ public class Window
 
         if (elapsedMilliseconds <
             ResizeDebounce.TotalMilliseconds)
-        {
             return;
-        }
 
         _pendingResize = false;
 
@@ -265,9 +255,7 @@ public class Window
 
         if (graphics == null ||
             Core.Instance?.GraphicsDevice == null)
-        {
             return;
-        }
 
         _applyingGraphicsChanges = true;
 
@@ -318,8 +306,8 @@ public class Window
                 ClientWidth = ClientWidth,
                 ClientHeight = ClientHeight
             });
-        
-        Logger.Debug($"Window resized: {Window.ScreenSize}");
+
+        Logger.Debug($"Window resized: {ScreenSize}");
     }
 
     public static Vector2 ClientToBackBuffer(
@@ -334,7 +322,6 @@ public class Window
         return new Vector2(
             clientPosition.X *
             backBufferSize.X / clientSize.X,
-
             clientPosition.Y *
             backBufferSize.Y / clientSize.Y);
     }
@@ -351,7 +338,6 @@ public class Window
         return new Vector2(
             backBufferPosition.X *
             clientSize.X / Math.Max(1, backBufferSize.X),
-
             backBufferPosition.Y *
             clientSize.Y / Math.Max(1, backBufferSize.Y));
     }
@@ -499,10 +485,8 @@ public class Window
         Core.Instance.Window.IsBorderless = false;
 
         if (_hasPreviousWindowedState)
-        {
             Core.Instance.Window.Position =
                 _previousWindowedPosition;
-        }
 
         RaiseResizeIfBackBufferChanged();
     }
@@ -557,10 +541,8 @@ public class Window
         ApplyGraphicsChanges();
 
         if (_hasPreviousWindowedState)
-        {
             Core.Instance.Window.Position =
                 _previousWindowedPosition;
-        }
 
         RaiseResizeIfBackBufferChanged();
     }
@@ -597,20 +579,16 @@ public class Window
             enabled;
 
         if (enabled && targetFps > 0.0)
-        {
             Core.Instance.TargetElapsedTime =
                 TimeSpan.FromSeconds(
                     1.0 / targetFps);
-        }
     }
 
     private static void RememberWindowedStateIfBordered()
     {
         if (Core.Instance.Window.IsBorderless ||
             Core.GraphicsDeviceManager.IsFullScreen)
-        {
             return;
-        }
 
         _previousWindowedSize =
             BackBufferSize;
@@ -625,12 +603,12 @@ public class Window
 public sealed class WindowResizedEventArgs : EventArgs
 {
     /// <summary>
-    /// Actual backbuffer width after GraphicsDeviceManager.ApplyChanges().
+    ///     Actual backbuffer width after GraphicsDeviceManager.ApplyChanges().
     /// </summary>
     public int Width { get; init; }
 
     /// <summary>
-    /// Actual backbuffer height after GraphicsDeviceManager.ApplyChanges().
+    ///     Actual backbuffer height after GraphicsDeviceManager.ApplyChanges().
     /// </summary>
     public int Height { get; init; }
 
