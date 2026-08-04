@@ -8,13 +8,26 @@ public abstract class State
     ///     back reference to the owning FSM
     /// </summary>
     public FSM Fsm { get; internal set; }
+    
+    protected Blackboard Blackboard => Fsm.Blackboard;
 
     /// <summary>
-    ///     fully-qualified identifier
+    ///     Logger for the current state
     /// </summary>
-    public string Identifier { get; internal set; } = null;
+    protected readonly ILogger Logger; 
+
+    /// <summary>
+    ///     state identifier - by default it's class name
+    /// </summary>
+    public string Identifier { get; }
     
     protected ICoroutineService CoroutineService => Core.Instance.CurrentScene.CoroutineService;
+
+    public State()
+    {
+        Identifier = GetType().Name;
+        Logger = new Logger(GetType());
+    }
 
     /// <summary>
     ///     Called once after the State instance is created and registered.
@@ -66,10 +79,4 @@ public abstract class State
     {
         return Identifier ?? GetType().FullName;
     }
-}
-
-public abstract class State<T> : State where T : class
-{
-    protected readonly ILogger Logger = new Logger<T>();
-    public new string Identifier = typeof(T).FullName;
 }
