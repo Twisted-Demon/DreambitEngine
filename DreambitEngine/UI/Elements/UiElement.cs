@@ -346,6 +346,56 @@ public abstract class UiElement
         }
     }
 
+    /// <summary>Finds an element anywhere in the visual tree by ID.</summary>
+    /// <param name="id">The case-sensitive element ID.</param>
+    /// <returns>The matching element, or <see langword="null"/> when no match exists.</returns>
+    public UiElement Find(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+            return null;
+
+        return UiLayout.FindRecursive(this, id);
+    }
+
+    /// <summary>Finds an element anywhere in the visual tree by Prefix and ID.</summary>
+    /// <param name="prefix">The case-sensitive element prefix</param>
+    /// <param name="id">The case-sensitive element ID.</param>
+    /// <returns>The matching element, or <see langword="null"/> when no match exists.</returns>
+    public UiElement Find(string prefix, string id)
+    {
+        return Find(UiXmlParser.WithSeparator(prefix) + id);
+    }
+
+    /// <summary>Gets an element by ID and verifies its expected type.</summary>
+    /// <typeparam name="T">The required element type.</typeparam>
+    /// <param name="id">The case-sensitive element ID.</param>
+    /// <returns>The matching typed element.</returns>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the element is missing or has a different type.
+    /// </exception>
+    public T GetRequired<T>(string id) where T : UiElement
+    {
+        var element = Find(id);
+
+        if (element is T typedElement)
+            return typedElement;
+        
+        throw new InvalidOperationException(
+            $"UI element '{id}' was not found or was not a {typeof(T).Name}.");
+    }
+    
+    /// <summary>
+    /// Gets an element by Id and its prefix, and verifies its expected type.
+    /// </summary>
+    /// <param name="prefix">The case-sensitive element prefix.</param>
+    /// <param name="id">The case-sensitive element ID.</param>
+    /// <typeparam name="T">The required element type.</typeparam>
+    /// <returns>The matching element.</returns>
+    public T GetRequired<T>(string prefix, string id) where T : UiElement
+    {
+        return GetRequired<T>(UiXmlParser.WithSeparator(prefix) + id);
+    }
+
     /// <summary>Gets whether this element and all of its ancestors are visible.</summary>
     public bool IsEffectivelyVisible =>
         IsVisible && (Parent?.IsEffectivelyVisible ?? true);

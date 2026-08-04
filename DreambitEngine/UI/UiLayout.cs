@@ -795,7 +795,7 @@ public class UiLayout
         };
     }
 
-    private static UiElement FindRecursive(UiElement element, string id)
+    internal static UiElement FindRecursive(UiElement element, string id)
     {
         if (element is null)
             return null;

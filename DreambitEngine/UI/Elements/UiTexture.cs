@@ -33,8 +33,8 @@ public class UiTexture : UiElement
         get => _sprite;
         set
         {
-            if(value is not null)
-                _sprite = value;
+            _sprite = value;
+            _spritePath = value is null ? string.Empty : value.AssetName;
             
             InvalidateLayout(); // no need to invalidate dependencies
         }
