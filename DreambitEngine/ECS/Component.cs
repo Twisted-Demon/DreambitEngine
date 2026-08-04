@@ -461,10 +461,36 @@ public class SingletonComponent<T> : Component where T : SingletonComponent<T>
 {
     public static T Instance { get; private set; }
 
-    internal override Component SetUpAndCreateChildren(Entity entity, bool enabled)
+    public static bool HasInstance =>
+        !Component.IsNull(Instance);
+
+    internal override Component SetUpAndCreateChildren(Entity entity, bool enabled = true)
     {
-        Instance = this as T;
+        if (!Component.IsNull(Instance) && !ReferenceEquals(Instance, this))
+        {
+            throw new InvalidOperationException(
+                $"A singleton component of type '{typeof(T).FullName}' " +
+                "already exists.");
+        }
+
+        Instance = (T)this;
 
         return base.SetUpAndCreateChildren(entity, enabled);
+    }
+
+    public override void OnDestroyed()
+    {
+        if (ReferenceEquals(Instance, this))
+            Instance = null;
+        
+        base.OnDestroyed();
+    }
+
+    protected override void OnDisposing()
+    {
+        if (ReferenceEquals(Instance, this))
+            Instance = null;
+        
+        base.OnDisposing();
     }
 }
