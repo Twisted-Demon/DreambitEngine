@@ -190,7 +190,7 @@ private void RenderSortedDrawables(Matrix cameraMatrix)
             batchStarted = true;
         }
 
-        entry.Drawable.OnDraw();
+        entry.Drawable.Draw();
     }
 
     if (batchStarted)

@@ -41,7 +41,7 @@ public class UIRenderPass : RenderPass
                     if (!drawable.Enabled || !drawable.Entity.Enabled)
                         continue;
 
-                    drawable.OnDrawUi();
+                    drawable.DrawUi();
                 }
             }
             finally

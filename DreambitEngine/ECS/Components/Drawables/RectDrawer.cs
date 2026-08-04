@@ -40,7 +40,7 @@ public class RectDrawer : DrawableComponent
         return bounds;
     }
 
-    public override void OnDraw()
+    protected override void OnDraw()
     {
         Core.SpriteBatch.DrawHollowRectangle(
             Bounds, Color

@@ -416,7 +416,7 @@ public abstract class Component : IDisposable
         return component == null || component.IsDestroyed;
     }
     
-    private bool HandleCallbackException(string callbackName, Exception exception)
+    protected bool HandleCallbackException(string callbackName, Exception exception)
     {
         if (Entity == null)
             return false;
@@ -437,7 +437,7 @@ public abstract class Component : IDisposable
         return false;
     }
 
-    private bool IsFaulted()
+    protected bool IsFaulted()
     {
         return Entity != null && Entity.IsFaulted;
     }

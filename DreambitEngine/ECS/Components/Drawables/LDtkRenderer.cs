@@ -26,7 +26,7 @@ public class LDtkRenderer : DrawableComponent<LDtkRenderer>
     }
 
 
-    public override void OnDraw()
+    protected override void OnDraw()
     {
         _renderer.RenderPrerenderedLevel(Level);
     }

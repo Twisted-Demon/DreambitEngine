@@ -45,7 +45,7 @@ public class ParticleSystemDrawer : DrawableComponent<ParticleSystemDrawer>
         Simulation?.Update();
     }
 
-    public override void OnDraw()
+    protected override void OnDraw()
     {
         if (Texture is null) return;
 

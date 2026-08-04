@@ -1,4 +1,6 @@
-﻿using Microsoft.Xna.Framework;
+﻿using System;
+using System.Reflection.Metadata;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
 namespace Dreambit.ECS;
@@ -18,7 +20,21 @@ public abstract class DrawableComponent : Component
         set => OnDrawLayerChanged(value);
     }
 
-    public virtual void OnDraw()
+    public void Draw()
+    {
+        if (IsFaulted() && !Enabled) return;
+
+        try
+        {
+            OnDraw();
+        }
+        catch (Exception exception)
+        {
+            HandleCallbackException(nameof(Draw), exception);
+        }
+    }
+
+    protected virtual void OnDraw()
     {
     }
 
@@ -29,8 +45,22 @@ public abstract class DrawableComponent : Component
     public virtual void OnPostDraw()
     {
     }
+    
+    public void DrawUi()
+    {
+        if (IsFaulted() && !Enabled) return;
 
-    public virtual void OnDrawUi()
+        try
+        {
+            OnDrawUi();
+        }
+        catch (Exception exception)
+        {
+            HandleCallbackException(nameof(OnDrawUi), exception);
+        }
+    }
+
+    protected virtual void OnDrawUi()
     {
         
     }

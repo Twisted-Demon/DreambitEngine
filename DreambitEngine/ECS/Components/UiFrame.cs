@@ -201,7 +201,7 @@ public class UiFrame : DrawableComponent<UiFrame>
         return Layout.Update(viewport, input);
     }
 
-    public override void OnDrawUi()
+    protected override void OnDrawUi()
     {
         Layout?.Draw(Scene.UiCamera.TopLeftTransformMatrix);
     }

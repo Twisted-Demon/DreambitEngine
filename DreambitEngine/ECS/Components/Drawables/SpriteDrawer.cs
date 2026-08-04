@@ -109,7 +109,7 @@ public class SpriteDrawer : DrawableComponent<SpriteDrawer>
         return this;
     }
 
-    public override void OnDraw()
+    protected override void OnDraw()
     {
         ArgumentNullException.ThrowIfNull(Sprite);
         ArgumentNullException.ThrowIfNull(Sprite.Texture);

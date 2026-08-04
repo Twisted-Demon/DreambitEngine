@@ -28,7 +28,7 @@ public class CircleDrawer : DrawableComponent
         return bounds;
     }
 
-    public override void OnDraw()
+    protected override void OnDraw()
     {
         var center = Transform.WorldPosition2D;
         Core.SpriteBatch.DrawCircle(center, Radius, Color, Segments, LineThickness * Scene.MainCamera.WorldUnitsPerTexturePixel);
