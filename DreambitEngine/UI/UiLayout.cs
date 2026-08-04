@@ -89,6 +89,18 @@ public class UiLayout
     }
 
     /// <summary>
+    /// Gets an element by Id and its prefix, and verifies its expected type.
+    /// </summary>
+    /// <param name="prefix">The case-sensitive element prefix.</param>
+    /// <param name="id">The case-sensitive element ID.</param>
+    /// <typeparam name="T">The required element type.</typeparam>
+    /// <returns>The matching element.</returns>
+    public T GetRequired<T>(string prefix, string id) where T : UiElement
+    {
+        return GetRequired<T>(UiXmlParser.WithSeparator(prefix) + id);
+    }
+
+    /// <summary>
     /// Resolves assets, lays out the visual tree, updates elements, and routes
     /// the current raw input snapshot to one topmost target.
     /// </summary>

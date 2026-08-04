@@ -56,7 +56,6 @@ public class FSM : Component
             if (Activator.CreateInstance(type) is State state)
             {
                 state.Fsm = this;
-                state.Identifier = type.FullName;
                 state.OnInitialize();
                 _states.Add(type, state);
             }
@@ -66,6 +65,15 @@ public class FSM : Component
     public void SetBlackboard<T>(T blackboard) where T : Blackboard
     {
         Blackboard = blackboard;
+    }
+
+    public T SetBlackboard<T>() where T : Blackboard
+    {
+        var typedBlackboard = (T)Activator.CreateInstance(typeof(T));
+        
+        Blackboard = typedBlackboard;
+
+        return typedBlackboard;
     }
 
     public T GetBlackBoard<T>() where T : Blackboard

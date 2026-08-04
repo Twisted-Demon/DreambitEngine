@@ -10,6 +10,9 @@ namespace Dreambit.UI;
 /// </summary>
 public static class UiXmlParser
 {
+    /// <summary>The separator inserted between a prefix and an authored ID.</summary>
+    public static string PrefixSeparator = ".";
+
     /// <summary>Reads a string attribute from an XML node.</summary>
     /// <param name="node">The XML node containing the attribute.</param>
     /// <param name="name">The attribute name.</param>
@@ -226,6 +229,26 @@ public static class UiXmlParser
 
         return UiGridLength.Pixels(
             ParseNonNegativeFloat(value, "Grid pixel size"));
+    }
+
+    /// <summary>
+    /// Adds the configured prefix separator to a non-empty prefix when needed.
+    /// </summary>
+    /// <param name="value">The prefix to normalize.</param>
+    /// <returns>
+    /// The prefix followed by <see cref="PrefixSeparator"/>, or the original
+    /// value when it is empty or already ends with the separator.
+    /// </returns>
+    public static string WithSeparator(string value)
+    {
+        if (string.IsNullOrEmpty(value) ||
+            string.IsNullOrEmpty(PrefixSeparator) ||
+            value.EndsWith(PrefixSeparator, StringComparison.Ordinal))
+        {
+            return value;
+        }
+
+        return value + PrefixSeparator;
     }
 
     private static float ParseNonNegativeFloat(string value, string valueName)

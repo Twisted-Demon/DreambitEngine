@@ -298,6 +298,7 @@ public static class UiXmlComposer
             if (instanceNode?.HasAttribute("id-prefix") == true)
                 idPrefix = instanceNode.GetAttribute("id-prefix");
 
+            idPrefix = UiXmlParser.WithSeparator(idPrefix);
             if (!string.IsNullOrEmpty(idPrefix))
                 PrefixElementIds(expandedRoot, idPrefix);
 

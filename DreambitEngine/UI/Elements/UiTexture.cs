@@ -27,6 +27,19 @@ public class UiTexture : UiElement
         }
     }
 
+    /// <summary> Gets or sets the sprite to display.</summary>
+    public Sprite Sprite
+    {
+        get => _sprite;
+        set
+        {
+            if(value is not null)
+                _sprite = value;
+            
+            InvalidateLayout(); // no need to invalidate dependencies
+        }
+    }
+
     /// <inheritdoc />
     public override void ResolveDependencies()
     {
