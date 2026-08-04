@@ -23,8 +23,8 @@ and ECS components you can attach today.
 
 - **Build a playable scene:** [Getting started](getting-started/index.md) →
   [ECS](ecs/index.md) → [Input](input/index.md) → [Rendering](rendering/index.md)
-- **Build menus and HUDs:** [UI overview](ui/index.md) →
-  [XML layouts](ui/xml-layouts.md) → [elements](ui/elements/ui-button.md)
+- **Build menus and HUDs:** [UI overview](UI/README.md) →
+  [base elements](UI/Elements/UiElement.md) → [buttons](UI/Elements/UiButton.md)
 - **Add collisions:** [Physics overview](physics/index.md) →
   [colliders](physics/colliders.md) → [movement](physics/movement.md)
 - **Create data-driven content:** [Assets](assets/index.md) →
@@ -34,4 +34,3 @@ and ECS components you can attach today.
     These pages describe the current repository implementation. A few APIs are
     explicitly marked experimental, obsolete, or limited where the code has an
     unfinished path. That helps examples stay predictable.
-

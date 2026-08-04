@@ -63,52 +63,51 @@ nav:
           - LDtkIid: ecs/components/ldtk-iid.md
           - TileMover: ecs/components/tile-mover.md
   - User interface:
-      - Overview: ui/index.md
-      - XML layouts: ui/xml-layouts.md
-      - Layout, sizing, and positioning: ui/layout.md
-      - Input, focus, and events: ui/input-and-focus.md
-      - Reusable UI components: ui/reusable-components.md
-      - Custom elements and brushes: ui/custom-ui.md
+      - Overview: UI/README.md
       - Elements:
-          - UiElement: ui/elements/ui-element.md
-          - UiContainer: ui/elements/ui-container.md
-          - UiContentControl: ui/elements/ui-content-control.md
-          - UiControl: ui/elements/ui-control.md
-          - UiPanel: ui/elements/ui-panel.md
-          - UiBorder: ui/elements/ui-border.md
-          - UiButton: ui/elements/ui-button.md
-          - UiCanvas: ui/elements/ui-canvas.md
-          - UiCheckBox: ui/elements/ui-check-box.md
-          - UiComboBox: ui/elements/ui-combo-box.md
-          - UiGrid: ui/elements/ui-grid.md
-          - UiItemsControl: ui/elements/ui-items-control.md
-          - UiListBox: ui/elements/ui-list-box.md
-          - UiOverlay: ui/elements/ui-overlay.md
-          - UiPopup: ui/elements/ui-popup.md
-          - UiProgressBar: ui/elements/ui-progress-bar.md
-          - UiRadioButton: ui/elements/ui-radio-button.md
-          - UiRangeBase: ui/elements/ui-range-base.md
-          - UiScrollBar: ui/elements/ui-scroll-bar.md
-          - UiSelector: ui/elements/ui-selector.md
-          - UiSlider: ui/elements/ui-slider.md
-          - UiSpacer: ui/elements/ui-spacer.md
-          - Stack panels: ui/elements/ui-stack-panel.md
-          - UiText: ui/elements/ui-text.md
-          - UiTextBox: ui/elements/ui-text-box.md
-          - UiTexture: ui/elements/ui-texture.md
-          - UiToggleButton: ui/elements/ui-toggle-button.md
-          - UiTooltip: ui/elements/ui-tooltip.md
-          - UiUniformGrid: ui/elements/ui-uniform-grid.md
-          - UiViewbox: ui/elements/ui-viewbox.md
-          - UiWrapPanel: ui/elements/ui-wrap-panel.md
+          - UiElement: UI/Elements/UiElement.md
+          - UiContainer: UI/Elements/UiContainer.md
+          - UiContentControl: UI/Elements/UiContentControl.md
+          - UiControl: UI/Elements/UiControl.md
+          - UiPanel: UI/Elements/UiPanel.md
+          - UiBorder: UI/Elements/UiBorder.md
+          - UiButton: UI/Elements/UiButton.md
+          - UiCanvas: UI/Elements/UiCanvas.md
+          - UiCheckBox: UI/Elements/UiCheckBox.md
+          - UiComboBox: UI/Elements/UiComboBox.md
+          - UiGrid: UI/Elements/UiGrid.md
+          - UiHorizontalStackPanel: UI/Elements/UiHorizontalStackPanel.md
+          - UiItemsControl: UI/Elements/UiItemsControl.md
+          - UiListBox: UI/Elements/UiListBox.md
+          - UiOverlay: UI/Elements/UiOverlay.md
+          - UiPopup: UI/Elements/UiPopup.md
+          - UiProgressBar: UI/Elements/UiProgressBar.md
+          - UiRadioButton: UI/Elements/UiRadioButton.md
+          - UiRangeBase: UI/Elements/UiRangeBase.md
+          - UiScrollBar: UI/Elements/UiScrollBar.md
+          - UiSelector: UI/Elements/UiSelector.md
+          - UiSlider: UI/Elements/UiSlider.md
+          - UiSpacer: UI/Elements/UiSpacer.md
+          - UiStackPanel: UI/Elements/UiStackPanel.md
+          - UiStackPanelBase: UI/Elements/UiStackPanelBase.md
+          - UiText: UI/Elements/UiText.md
+          - UiTextBox: UI/Elements/UiTextBox.md
+          - UiTexture: UI/Elements/UiTexture.md
+          - UiToggleButton: UI/Elements/UiToggleButton.md
+          - UiTooltip: UI/Elements/UiTooltip.md
+          - UiUniformGrid: UI/Elements/UiUniformGrid.md
+          - UiVerticalStackPanel: UI/Elements/UiVerticalStackPanel.md
+          - UiViewbox: UI/Elements/UiViewbox.md
+          - UiWrapPanel: UI/Elements/UiWrapPanel.md
       - Brushes:
-          - UiBrush: ui/brushes/ui-brush.md
-          - SolidColorBrush: ui/brushes/solid-color-brush.md
-          - OutlineBrush: ui/brushes/outline-brush.md
-          - SpriteBrush: ui/brushes/sprite-brush.md
-          - NineSliceBrush: ui/brushes/nine-slice-brush.md
-          - TiledSpriteBrush: ui/brushes/tiled-sprite-brush.md
-          - LayeredBrush: ui/brushes/layered-brush.md
+          - IUiBrush: UI/Brushes/IUiBrush.md
+          - UiBrush: UI/Brushes/UiBrush.md
+          - SolidColorBrush: UI/Brushes/SolidColorBrush.md
+          - OutlineBrush: UI/Brushes/OutlineBrush.md
+          - SpriteBrush: UI/Brushes/SpriteBrush.md
+          - NineSliceBrush: UI/Brushes/NineSliceBrush.md
+          - TiledSpriteBrush: UI/Brushes/TiledSpriteBrush.md
+          - LayeredBrush: UI/Brushes/LayeredBrush.md
   - Input:
       - Overview: input/index.md
       - Direct input: input/direct-input.md
@@ -147,4 +146,3 @@ nav:
   - Utilities:
       - Math and ranges: utilities/math.md
       - Collections and spatial helpers: utilities/collections.md
-

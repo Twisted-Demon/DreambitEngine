@@ -17,5 +17,4 @@ not only inside the pak.
 
 `CreateComponent(path, idPrefix)` loads one detached UI subtree that you can add
 to a `UiContainer` in the current layout. See
-[Reusable UI components](../../ui/reusable-components.md).
-
+[`UiContainer`](../../UI/Elements/UiContainer.md).
