@@ -1,39 +1,25 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using Microsoft.Xna.Framework;
 
 namespace Dreambit.ECS;
 
 public class Entity : IDisposable
 {
-    private readonly List<Entity> _children = [];
+    public readonly Guid Id;
     private readonly List<Component> _blueprintComponentCreateOrder = [];
+    private readonly List<Entity> _children = [];
 
     private readonly ILogger _logger = new Logger<Entity>();
-
-    public readonly Guid Id;
+    public string Name;
 
     private bool _alwaysUpdate;
     private bool _enabled;
+    private bool _isDead;
     private bool _isDestroyed;
     private bool _isDisposed;
-    private bool _isDead;
+
     private Entity _parent;
-    public string Name;
-    
-    private bool _isFaulted;
-    private Exception _faultException;
-    private Component _faultSource;
-    private string _faultCallback;
-    
-    public bool IsFaulted => _isFaulted;
-
-    public Exception FaultException => _faultException;
-
-    public Component FaultSource => _faultSource;
-
-    public string FaultCallback => _faultCallback;
 
     internal Entity(Guid id, string name, HashSet<string> tags, bool enabled, Scene scene)
     {
@@ -58,6 +44,14 @@ public class Entity : IDisposable
     private Entity()
     {
     }
+
+    public bool IsFaulted { get; private set; }
+
+    public Exception FaultException { get; private set; }
+
+    public Component FaultSource { get; private set; }
+
+    public string FaultCallback { get; private set; }
 
     private ComponentRepository ComponentRepository { get; }
     public Transform Transform { get; }
@@ -93,7 +87,7 @@ public class Entity : IDisposable
     {
         get
         {
-            if (_isFaulted)
+            if (IsFaulted)
                 return false;
 
             if (Parent == null)
@@ -190,11 +184,11 @@ public class Entity : IDisposable
     public Entity FindChild(string name)
     {
         var children = GetChildren();
-        
-        foreach(var child in children)
+
+        foreach (var child in children)
             if (child.Name == name)
                 return child;
-        
+
         return null;
     }
 
@@ -233,8 +227,11 @@ public class Entity : IDisposable
     {
         return component.Entity.Tags.Contains(tag);
     }
-    
-    public bool HasTag(string tag) => Tags.Contains(tag);
+
+    public bool HasTag(string tag)
+    {
+        return Tags.Contains(tag);
+    }
 
     public bool HasAnyTag(IReadOnlyList<string> tags)
     {
@@ -378,11 +375,9 @@ public class Entity : IDisposable
                 continue;
 
             if (!componentsByType.TryGetValue(componentType, out var component))
-            {
                 throw new InvalidOperationException(
                     $"Entity '{Name}' did not construct blueprint component " +
                     $"'{componentType.FullName}'.");
-            }
 
             component.BeforeDeserialize();
             BlueprintResolver.ResolveComponent(componentBlueprint, context, component);
@@ -529,12 +524,12 @@ public class Entity : IDisposable
 
     internal void Quarantine(Component source, string callback, Exception exception)
     {
-        if (_isFaulted) return;
-        
-        _isFaulted = true;
-        _faultSource = source;
-        _faultCallback = callback;
-        _faultException = exception;
+        if (IsFaulted) return;
+
+        IsFaulted = true;
+        FaultSource = source;
+        FaultCallback = callback;
+        FaultException = exception;
     }
 
     public static bool operator ==(Entity a, Entity b)
