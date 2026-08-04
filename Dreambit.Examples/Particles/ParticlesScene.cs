@@ -121,13 +121,13 @@ public class ParticlesScene : Scene<ParticlesScene>
         
         Window.SetSize(windowWidth, windowHeight);
 
-        MainCamera.PixelsPerUnit = 2;
-        MainCamera.SetTargetVerticalResolution(720 );
+        MainCamera.PixelsPerUnit = 8;
+        MainCamera.SetTargetVerticalResolution(720);
         MainCamera.ForcePosition(new Vector3(
             windowWidth * 0.5f,
             windowHeight * 0.5f,
             0));
-
-        UiCamera.SetTargetVerticalResolution(windowHeight);
+        
+        BackgroundColor = new Color(18, 20, 28);
     }
 }

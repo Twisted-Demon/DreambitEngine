@@ -3,6 +3,7 @@ using Dreambit.Examples.Particles;
 using Dreambit.Examples.Pong;
 using Dreambit.Examples.SpaceGame;
 using Dreambit.UI;
+using Microsoft.Xna.Framework;
 
 namespace Dreambit.Examples.UiExample;
 
@@ -37,6 +38,9 @@ public class UiExampleScene : Scene<UiExampleScene>
         menu.Layout
             .GetRequired<UiButton>("navigation.play-spacegame-button")
             .Clicked += OnPlaySpaceGameClicked;
+        menu.Layout
+            .GetRequired<UiButton>("navigation.play-basicscene-button")
+            .Clicked += OnPlayBasicSceneClicked;
         WireControlGallery(menu.Layout);
     }
 
@@ -100,11 +104,18 @@ public class UiExampleScene : Scene<UiExampleScene>
 
         UiCamera.PixelsPerUnit = 1;
         UiCamera.SetTargetVerticalResolution(WindowHeight);
+
+        BackgroundColor = new Color(18, 20, 28);
     }
 
     private void OnPlayParticlesClicked(UiButton button)
     {
         Scene.SetNextScene<ParticlesScene>();
+    }
+    
+    private void OnPlayBasicSceneClicked(UiButton buton)
+    {
+        SetNextScene<BasicScene>();
     }
     
     private void OnPlayPongClicked(UiButton button)
