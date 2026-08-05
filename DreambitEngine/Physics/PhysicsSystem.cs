@@ -375,6 +375,7 @@ public readonly struct CollisionResult()
 {
     public List<Collider> Collisions { get; } = [];
     public int Count => Collisions.Count;
+    public Collider First => Collisions[0];
 
     public Collider this[int key] => Collisions[key];
 }
