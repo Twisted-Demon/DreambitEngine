@@ -46,7 +46,7 @@ public class Core : Game
     protected override void Initialize()
     {
         base.Initialize();
-        
+
         Dreambit.Window.Init();
 
         GraphicsDevice.BlendState = BlendState.AlphaBlend;
@@ -77,7 +77,7 @@ public class Core : Game
         Dreambit.Window.Tick(gameTime);
 
         UpdateDebug();
-        
+
         InputSystem.Instance.PreUpdate();
         CurrentScene?.RouteUiInput();
         InputSystem.Instance.Update();
@@ -152,7 +152,7 @@ public class Core : Game
     {
         _titleElapsedTime += Time.UnscaledDeltaTime;
         _titleFrameCount++;
-        
+
         if (_titleElapsedTime < TitleUpdateInterval)
             return;
 
@@ -166,7 +166,7 @@ public class Core : Game
 
         var entityCount =
             CurrentScene?.Entities.Count ?? 0;
-        
+
         Dreambit.Window.SetTitle(
             $"{GameName} {framesPerSecond}fps | " +
             $"memory: {memoryMegabytes:F2}MB | " +
