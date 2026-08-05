@@ -428,6 +428,7 @@ public class Entity : IDisposable
     {
         return ComponentRepository.GetComponent<T>();
     }
+    
 
     public Component GetComponent(Type type)
     {
