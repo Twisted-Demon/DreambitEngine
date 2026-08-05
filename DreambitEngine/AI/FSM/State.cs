@@ -64,6 +64,11 @@ public abstract class State
     {
     }
 
+    public virtual void OnDestroyed()
+    {
+        
+    }
+
     /// <summary>
     ///     request a transition to the given state type
     /// </summary>
