@@ -20,4 +20,15 @@ public class Blackboard
 
         return default;
     }
+    
+    public void Cleanup()
+    {
+        OnCleanup();
+        _variables.Clear();
+    }
+
+    protected virtual void OnCleanup()
+    {
+        
+    }
 }

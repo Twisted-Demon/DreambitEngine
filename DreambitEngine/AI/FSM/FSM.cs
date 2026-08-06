@@ -658,6 +658,8 @@ public class FSM : Component
         OnTransition = null;
         OnStateEntered = null;
         OnStateExited = null;
+        
+        Blackboard.Cleanup();
     }
 
     // ---------------------------------------------------------------------
