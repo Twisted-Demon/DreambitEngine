@@ -5,11 +5,11 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace Dreambit.Examples.Particles;
 
-public class ParticlesScene : Scene<ParticlesScene>
+public class ParticlesScene : Scene
 {
     private ParticleSystemDrawer pSystem;
     private ParticleFxConfig _config;
-    
+
     protected override void OnInitialize()
     {
         InitializeSettings();
@@ -18,7 +18,7 @@ public class ParticlesScene : Scene<ParticlesScene>
             640, 360, 0)).AttachComponent<ParticleSystemDrawer>();
 
         particleSystem.TexturePath = "ParticlesScene/Textures/particle";
-        
+
         pSystem = particleSystem;
 
         Logger.Info(MainCamera.Transform.Position.ToString());
@@ -118,7 +118,7 @@ public class ParticlesScene : Scene<ParticlesScene>
     {
         var windowWidth = 1280;
         var windowHeight = 720;
-        
+
         Window.SetSize(windowWidth, windowHeight);
 
         MainCamera.PixelsPerUnit = 8;
@@ -127,7 +127,7 @@ public class ParticlesScene : Scene<ParticlesScene>
             windowWidth * 0.5f,
             windowHeight * 0.5f,
             0));
-        
+
         BackgroundColor = new Color(18, 20, 28);
     }
 }

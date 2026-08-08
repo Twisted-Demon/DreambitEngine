@@ -7,7 +7,7 @@ using Microsoft.Xna.Framework;
 
 namespace Dreambit.Examples.UiExample;
 
-public class UiExampleScene : Scene<UiExampleScene>
+public class UiExampleScene : Scene
 {
     private const int WindowWidth = 1280;
     private const int WindowHeight = 720;
@@ -60,7 +60,7 @@ public class UiExampleScene : Scene<UiExampleScene>
 
         layout.GetRequired<UiComboBox>("resolution-combo").SelectionChanged +=
             (_, _, value) => status.Text = $"Resolution: {value}";
-        
+
         layout.GetRequired<UiRadioButton>("difficulty-normal").CheckedChanged +=
             (_, args) =>
             {
@@ -112,17 +112,17 @@ public class UiExampleScene : Scene<UiExampleScene>
     {
         Scene.SetNextScene<ParticlesScene>();
     }
-    
+
     private void OnPlayBasicSceneClicked(UiButton buton)
     {
         SetNextScene<BasicScene>();
     }
-    
+
     private void OnPlayPongClicked(UiButton button)
     {
         Scene.SetNextScene<PongScene>();
     }
-    
+
     private void OnPlaySpaceGameClicked(UiButton button)
     {
         Scene.SetNextScene<SpaceGameScene>();

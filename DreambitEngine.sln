@@ -21,6 +21,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dreambit.Content", "Dreambi
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dreambit.Examples.Content", "Dreambit.Examples.Content\Dreambit.Examples.Content.csproj", "{A03E512C-6586-4B1F-B3D3-CF0406E63196}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dreambit.Tiled", "Dreambit.Tiled\Dreambit.Tiled.csproj", "{A37F007E-4F03-409D-BB06-0E083E861AD8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -127,6 +129,18 @@ Global
 		{A03E512C-6586-4B1F-B3D3-CF0406E63196}.Release|x64.Build.0 = Release|Any CPU
 		{A03E512C-6586-4B1F-B3D3-CF0406E63196}.Release|x86.ActiveCfg = Release|Any CPU
 		{A03E512C-6586-4B1F-B3D3-CF0406E63196}.Release|x86.Build.0 = Release|Any CPU
+		{A37F007E-4F03-409D-BB06-0E083E861AD8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A37F007E-4F03-409D-BB06-0E083E861AD8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A37F007E-4F03-409D-BB06-0E083E861AD8}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A37F007E-4F03-409D-BB06-0E083E861AD8}.Debug|x64.Build.0 = Debug|Any CPU
+		{A37F007E-4F03-409D-BB06-0E083E861AD8}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A37F007E-4F03-409D-BB06-0E083E861AD8}.Debug|x86.Build.0 = Debug|Any CPU
+		{A37F007E-4F03-409D-BB06-0E083E861AD8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A37F007E-4F03-409D-BB06-0E083E861AD8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A37F007E-4F03-409D-BB06-0E083E861AD8}.Release|x64.ActiveCfg = Release|Any CPU
+		{A37F007E-4F03-409D-BB06-0E083E861AD8}.Release|x64.Build.0 = Release|Any CPU
+		{A37F007E-4F03-409D-BB06-0E083E861AD8}.Release|x86.ActiveCfg = Release|Any CPU
+		{A37F007E-4F03-409D-BB06-0E083E861AD8}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
