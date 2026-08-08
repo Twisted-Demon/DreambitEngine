@@ -13,22 +13,72 @@ public static class ComponentRequirementResolver
         ArgumentNullException.ThrowIfNull(roots);
         ArgumentNullException.ThrowIfNull(hasAlready);
 
-        var order = new List<Type>(8);
-        var marks = new Dictionary<Type, Mark>(16);
-        var stack = new Stack<Type>();
+        var rootTypes =
+            roots
+                .Where(static type => type != null)
+                .Distinct()
+                .ToList();
+
+        var order =
+            new List<Type>(8);
+
+        var marks =
+            new Dictionary<Type, Mark>(16);
+
+        var stack =
+            new Stack<Type>();
+
+        Type ResolveDeclaredProvider(
+            Type requiredType)
+        {
+            // Prefer an explicitly declared exact type.
+            for (var i = 0;
+                 i < rootTypes.Count;
+                 i++)
+            {
+                if (rootTypes[i] == requiredType)
+                    return requiredType;
+            }
+
+            // Otherwise a declared derived component can satisfy
+            // the base requirement.
+            for (var i = 0;
+                 i < rootTypes.Count;
+                 i++)
+            {
+                var rootType =
+                    rootTypes[i];
+
+                if (requiredType.IsAssignableFrom(
+                        rootType))
+                {
+                    return rootType;
+                }
+            }
+
+            return requiredType;
+        }
 
         void Visit(Type type)
         {
             if (hasAlready(type))
                 return;
 
-            if (marks.TryGetValue(type, out var mark))
+            if (marks.TryGetValue(
+                    type,
+                    out var mark))
             {
                 if (mark == Mark.Visiting)
                 {
-                    var cycle = string.Join(
-                        " -> ",
-                        stack.Reverse().Append(type).Select(x => x.FullName));
+                    var cycle =
+                        string.Join(
+                            " -> ",
+                            stack
+                                .Reverse()
+                                .Append(type)
+                                .Select(
+                                    static current =>
+                                        current.FullName));
 
                     throw new InvalidOperationException(
                         $"Cycle detected in [Require]: {cycle}");
@@ -37,42 +87,71 @@ public static class ComponentRequirementResolver
                 return;
             }
 
-            marks[type] = Mark.Visiting;
+            marks[type] =
+                Mark.Visiting;
+
             stack.Push(type);
 
-            foreach (var requiredType in GetRequireTypes(type))
-                Visit(requiredType);
+            foreach (var requiredType in
+                     GetRequireTypes(type))
+            {
+                var providerType =
+                    ResolveDeclaredProvider(
+                        requiredType);
+
+                Visit(providerType);
+            }
 
             stack.Pop();
-            marks[type] = Mark.Done;
-            order.Add(type); // Dependencies were added first.
+
+            marks[type] =
+                Mark.Done;
+
+            order.Add(type);
         }
 
-        foreach (var root in roots)
-            Visit(root);
+        for (var i = 0;
+             i < rootTypes.Count;
+             i++)
+        {
+            Visit(rootTypes[i]);
+        }
 
         return order;
     }
 
-    // Preserves the old method's intended meaning: return only dependencies.
     public static IReadOnlyList<Type> ResolveOrder(
         Type root,
         Func<Type, bool> hasAlready)
     {
-        var order = ResolveCreationOrder([root], hasAlready).ToList();
+        var order =
+            ResolveCreationOrder(
+                    [root],
+                    hasAlready)
+                .ToList();
+
         order.Remove(root);
+
         return order;
     }
 
-    internal static IEnumerable<Type> GetRequireTypes(Type type)
+    internal static IEnumerable<Type> GetRequireTypes(
+        Type type)
     {
-        foreach (var attribute in type.GetCustomAttributes(true))
+        foreach (var attribute in
+                 type.GetCustomAttributes(true))
         {
-            if (attribute is not RequireAttribute requireAttribute)
+            if (attribute is not
+                RequireAttribute requireAttribute)
+            {
                 continue;
+            }
 
-            foreach (var requiredType in requireAttribute.RequiredTypes)
+            foreach (var requiredType in
+                     requireAttribute.RequiredTypes)
+            {
                 yield return requiredType;
+            }
         }
     }
 

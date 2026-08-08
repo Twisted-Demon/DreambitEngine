@@ -6,7 +6,8 @@ namespace Dreambit.ECS;
 public abstract class DrawableComponent : Component
 {
     private int _drawLayer;
-    public abstract RectangleF Bounds { get; }
+    public virtual RectangleF Bounds => Scene.MainCamera.BoundsF;
+    public virtual float SortDepth => Transform.WorldPosition.Y;
 
     public Effect Effect { get; set; } = null;
 

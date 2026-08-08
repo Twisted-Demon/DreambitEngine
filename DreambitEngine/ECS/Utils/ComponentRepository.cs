@@ -124,18 +124,36 @@ public class ComponentRepository
 
     public Component GetComponent(Type type)
     {
-        if (type == null) return null;
-
-        if (!type.IsSubclassOf(typeof(Component)))
+        if (type == null)
             return null;
 
-        foreach (var c in _attachedComponents)
-            if (c.GetType() == type)
-                return c;
+        if (!typeof(Component).IsAssignableFrom(type))
+            return null;
 
-        foreach (var c in _componentsToAttach)
-            if (c.GetType() == type)
-                return c;
+        foreach (var component in _attachedComponents)
+        {
+            if (component.GetType() == type)
+                return component;
+        }
+
+        foreach (var component in _componentsToAttach)
+        {
+            if (component.GetType() == type)
+                return component;
+        }
+
+        // Fall back to a derived component.
+        foreach (var component in _attachedComponents)
+        {
+            if (type.IsAssignableFrom(component.GetType()))
+                return component;
+        }
+
+        foreach (var component in _componentsToAttach)
+        {
+            if (type.IsAssignableFrom(component.GetType()))
+                return component;
+        }
 
         return null;
     }

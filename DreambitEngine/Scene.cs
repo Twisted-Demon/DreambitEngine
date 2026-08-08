@@ -21,6 +21,8 @@ public class Scene : IDisposable
     /// </summary>
     protected Scene()
     {
+        Logger = new Logger(GetType());
+
         Entities = new EntityRepository(this);
         Drawables = new DrawableRepository();
         ScriptingManager = new ScriptingManager();
@@ -81,9 +83,6 @@ public class Scene : IDisposable
 
     #region Fields (Internals)
 
-    /// <summary>Logger for this scene.</summary>
-    private readonly ILogger _logger = new Logger<Scene>();
-
     /// <summary>Drawables repository for render-ordered components.</summary>
     internal readonly DrawableRepository Drawables;
 
@@ -104,6 +103,9 @@ public class Scene : IDisposable
 
     /// <summary>Convenience access to the active scene from the core.</summary>
     public static Scene Instance => Core.Instance.CurrentScene;
+
+    /// <summary>Logger for this scene.</summary>
+    protected readonly ILogger Logger;
 
     /// <summary>Access to the coroutine system</summary>
     public ICoroutineService CoroutineService => _coroutineScheduler;
@@ -182,7 +184,7 @@ public class Scene : IDisposable
     /// </summary>
     internal virtual void InitializeInternals()
     {
-        _logger.Debug("Initializing Scene");
+        Logger.Debug("Initializing Scene");
 
         // Create default cameras (world + UI)
         MainCamera = Entity.Create("main-camera").AttachComponent<Camera2D>();
@@ -385,11 +387,11 @@ public class Scene : IDisposable
     {
         if (!IsValidTransition(State, next))
         {
-            _logger.Error($"Invalid state transition {State} -> {next}");
+            Logger.Error($"Invalid state transition {State} -> {next}");
             throw new InvalidOperationException($"Invalid state transition {State} -> {next}");
         }
 
-        _logger.Trace($"Scene state: {State} -> {next}");
+        Logger.Trace($"Scene state: {State} -> {next}");
         State = next;
     }
 
@@ -683,16 +685,6 @@ public class Scene : IDisposable
     }
 
     #endregion
-}
-
-/// <summary>
-///     Typed scene base that exposes a strongly typed logger for the derived scene.
-/// </summary>
-/// <typeparam name="T">The derived scene type.</typeparam>
-public abstract class Scene<T> : Scene where T : class
-{
-    /// <summary>Strongly-typed logger for the derived scene.</summary>
-    protected ILogger Logger { get; private set; } = new Logger<T>();
 }
 
 /// <summary>Lifecycle states for <see cref="Scene" />.</summary>

@@ -120,7 +120,9 @@ public class Basic2dLightingRenderPass : RenderPass
         _sortedLayerBuffer.Sort();
     }
 
-    private void BuildDrawableSortBuffer(List<DrawableComponent> layerDrawables, RectangleF cameraBounds)
+    private void BuildDrawableSortBuffer(
+        List<DrawableComponent> layerDrawables,
+        RectangleF cameraBounds)
     {
         _drawableSortBuffer.Clear();
 
@@ -138,18 +140,14 @@ public class Basic2dLightingRenderPass : RenderPass
             var effect =
                 drawable.Effect ?? DefaultEffect;
 
-            // Snapshot WorldPosition.Y once.
-            //
-            // Without this, the comparer can evaluate WorldPosition
-            // many times during an O(n log n) sort.
-            var worldY =
-                drawable.Transform.WorldPosition.Y;
+            var sortDepth =
+                drawable.SortDepth;
 
             _drawableSortBuffer.Add(
                 new DrawableSortEntry(
                     drawable,
                     effect,
-                    worldY));
+                    sortDepth));
         }
     }
 
@@ -221,60 +219,66 @@ public class Basic2dLightingRenderPass : RenderPass
 
     private readonly struct DrawableSortEntry
     {
-        public DrawableSortEntry(DrawableComponent drawable, Effect effect, float worldY)
+        public DrawableSortEntry(
+            DrawableComponent drawable,
+            Effect effect,
+            float sortDepth)
         {
             Drawable = drawable;
             Effect = effect;
-            WorldY = worldY;
+            SortDepth = sortDepth;
 
-            // Calculate this once instead of during every comparison.
-            EffectKey = RuntimeHelpers.GetHashCode(effect);
+            EffectKey =
+                RuntimeHelpers.GetHashCode(effect);
         }
 
         public DrawableComponent Drawable { get; }
 
         public Effect Effect { get; }
 
-        public float WorldY { get; }
+        public float SortDepth { get; }
 
         public int EffectKey { get; }
     }
 
-    private sealed class DrawableSortEntryComparer : IComparer<DrawableSortEntry>
+    private sealed class DrawableSortEntryComparer :
+        IComparer<DrawableSortEntry>
     {
-        public int Compare(DrawableSortEntry left, DrawableSortEntry right)
+        public int Compare(
+            DrawableSortEntry left,
+            DrawableSortEntry right)
         {
-            var yComparison = left.WorldY.CompareTo(right.WorldY);
+            var depthComparison =
+                left.SortDepth.CompareTo(
+                    right.SortDepth);
 
-            if (yComparison != 0)
-                return yComparison;
+            if (depthComparison != 0)
+                return depthComparison;
 
-            /*
-             * Only group by effect when the two drawables have the
-             * same Y position. This preserves strict Y ordering.
-             */
-            if (!ReferenceEquals(left.Effect, right.Effect))
+            if (!ReferenceEquals(
+                    left.Effect,
+                    right.Effect))
             {
-                var effectComparison = left.EffectKey.CompareTo(right.EffectKey);
+                var effectComparison =
+                    left.EffectKey.CompareTo(
+                        right.EffectKey);
 
                 if (effectComparison != 0)
                     return effectComparison;
             }
 
-            /*
-             * List.Sort is unstable, so provide a tie-breaker.
-             * This helps prevent equally positioned sprites from
-             * changing order unexpectedly.
-             */
-            var entityComparison = left.Drawable.Entity.Id.CompareTo(right.Drawable.Entity.Id);
+            var entityComparison =
+                left.Drawable.Entity.Id.CompareTo(
+                    right.Drawable.Entity.Id);
 
             if (entityComparison != 0)
                 return entityComparison;
 
-            // Handles multiple drawables belonging to the same entity.
             return RuntimeHelpers
                 .GetHashCode(left.Drawable)
-                .CompareTo(RuntimeHelpers.GetHashCode(right.Drawable));
+                .CompareTo(
+                    RuntimeHelpers.GetHashCode(
+                        right.Drawable));
         }
     }
 }

@@ -4,7 +4,7 @@ using LDtk;
 
 namespace Dreambit;
 
-public class LDtkScene : Scene<LDtkScene>
+public class LDtkScene : Scene
 {
     public LDtkLevel Level { get; set; }
 

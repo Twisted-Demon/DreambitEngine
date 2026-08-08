@@ -15,8 +15,8 @@ public sealed class DrawableComparer : IComparer<DrawableComponent>
     }
 
     public int Compare(
-        DrawableComponent? x,
-        DrawableComponent? y)
+        DrawableComponent x,
+        DrawableComponent y)
     {
         if (ReferenceEquals(x, y))
             return 0;
@@ -27,12 +27,11 @@ public sealed class DrawableComparer : IComparer<DrawableComponent>
         if (y is null)
             return 1;
 
-        var positionComparison =
-            x.Transform.WorldPosition.Y.CompareTo(
-                y.Transform.WorldPosition.Y);
+        var depthComparison =
+            x.SortDepth.CompareTo(y.SortDepth);
 
-        if (positionComparison != 0)
-            return positionComparison;
+        if (depthComparison != 0)
+            return depthComparison;
 
         var effectX = x.UsesEffect
             ? x.Effect

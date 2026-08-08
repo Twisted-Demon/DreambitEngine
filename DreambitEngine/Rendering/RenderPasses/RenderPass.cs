@@ -13,6 +13,7 @@ public abstract class RenderPass : IDisposable
     protected static GraphicsDevice Device => Core.Instance.GraphicsDevice;
     protected Effect DefaultEffect { get; private set; }
     protected DrawableRepository Drawables => Scene.Drawables;
+    public virtual bool RendersToBackBuffer => false;
 
     public RenderPipeline RenderPipeline { get; internal init; }
 

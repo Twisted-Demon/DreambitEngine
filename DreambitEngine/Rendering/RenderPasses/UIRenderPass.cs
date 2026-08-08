@@ -10,6 +10,7 @@ public class UIRenderPass : RenderPass
     private static UIRenderPass _activePass;
     private bool _batchActive;
     private RasterizerState _scissorRasterizerState;
+    public override bool RendersToBackBuffer => true;
 
     public override void Initialize()
     {

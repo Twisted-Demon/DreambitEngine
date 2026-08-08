@@ -5,7 +5,7 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace Dreambit;
 
-public class RenderPipeline(Scene scene) : IDisposable
+public sealed class RenderPipeline(Scene scene) : IDisposable
 {
     private readonly List<RenderPass> _renderers = [];
     private bool _disposed;
@@ -62,7 +62,7 @@ public class RenderPipeline(Scene scene) : IDisposable
     {
         foreach (var renderer in _renderers)
         {
-            if (renderer is UIRenderPass)
+            if (renderer.RendersToBackBuffer)
                 continue;
 
             renderer.OnDraw();
@@ -86,7 +86,7 @@ public class RenderPipeline(Scene scene) : IDisposable
         // UI is composed after the scene has been presented so it is neither
         // post-processed nor sampled through the scene render target.
         foreach (var renderer in _renderers)
-            if (renderer is UIRenderPass)
+            if (renderer.RendersToBackBuffer)
                 renderer.OnDraw();
     }
 
