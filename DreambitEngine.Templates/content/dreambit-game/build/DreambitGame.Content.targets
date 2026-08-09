@@ -2,9 +2,9 @@
   <PropertyGroup>
     <DreambitContentBuildEnabled Condition="'$(DreambitContentBuildEnabled)' == ''">true</DreambitContentBuildEnabled>
 
-    <DreambitGameContentProject>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../src/DreambitGame.Content/DreambitGame.Content.csproj'))</DreambitGameContentProject>
-    <DreambitGameContentSource>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../src/DreambitGame.Content/Assets'))</DreambitGameContentSource>
-    <DreambitGameContentIntermediate>$([System.IO.Path]::GetFullPath('$(BaseIntermediateOutputPath)DreambitGameContent'))</DreambitGameContentIntermediate>
+    <DreambitUserContentProject>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../src/DreambitGame.Content/DreambitGame.Content.csproj'))</DreambitUserContentProject>
+    <DreambitUserContentSource>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../src/DreambitGame.Content/Assets'))</DreambitUserContentSource>
+    <DreambitUserContentIntermediate>$([System.IO.Path]::GetFullPath('$(BaseIntermediateOutputPath)DreambitUserContent'))</DreambitUserContentIntermediate>
 
     <DreambitContentProject>$([System.IO.Path]::GetFullPath('$(DreambitEngineRoot)/Dreambit.Content/Dreambit.Content.csproj'))</DreambitContentProject>
     <DreambitContentSource>$([System.IO.Path]::GetFullPath('$(DreambitEngineRoot)/Dreambit.Content/Assets'))</DreambitContentSource>
@@ -14,7 +14,7 @@
 
     <DreambitRuntimeOutput>$([System.IO.Path]::GetFullPath('$(BaseOutputPath)$(Configuration)'))</DreambitRuntimeOutput>
     <DreambitRuntimeContent>$(DreambitRuntimeOutput)/Content</DreambitRuntimeContent>
-    <DreambitGamePak>$(DreambitRuntimeContent)/content.pak</DreambitGamePak>
+    <DreambitUserContentPak>$(DreambitRuntimeContent)/content.pak</DreambitUserContentPak>
     <DreambitContentBuildStamp>$([System.IO.Path]::GetFullPath('$(BaseIntermediateOutputPath)DreambitContent/build.stamp'))</DreambitContentBuildStamp>
   </PropertyGroup>
 
@@ -23,9 +23,9 @@
     <_DreambitContentBuildInput Include="$(MSBuildThisFileDirectory)../src/Directory.Build.props" />
     <_DreambitContentBuildInput Include="$(MSBuildThisFileDirectory)../src/Directory.Packages.props" />
 
-    <_DreambitContentBuildInput Include="$(DreambitGameContentProject)" />
-    <_DreambitContentBuildInput Include="$(DreambitGameContentSource)/**/*" />
-    <_DreambitContentBuildInput Include="$([System.IO.Path]::GetDirectoryName('$(DreambitGameContentProject)'))/Builder/**/*.cs" />
+    <_DreambitContentBuildInput Include="$(DreambitUserContentProject)" />
+    <_DreambitContentBuildInput Include="$(DreambitUserContentSource)/**/*" />
+    <_DreambitContentBuildInput Include="$([System.IO.Path]::GetDirectoryName('$(DreambitUserContentProject)'))/Builder/**/*.cs" />
 
     <_DreambitContentBuildInput Include="$(DreambitContentProject)" />
     <_DreambitContentBuildInput Include="$(DreambitContentSource)/**/*" />
@@ -41,20 +41,20 @@
           Condition="'$(DreambitContentBuildEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true'">
     <Error Condition="'$(MonoGamePlatform)' == ''"
            Text="MonoGamePlatform must be set by the executable project." />
-    <Error Condition="!Exists('$(DreambitGameContentProject)')"
-           Text="The game content project was not found at '$(DreambitGameContentProject)'." />
+    <Error Condition="!Exists('$(DreambitUserContentProject)')"
+           Text="The game content project was not found at '$(DreambitUserContentProject)'." />
     <Error Condition="!Exists('$(DreambitContentProject)')"
            Text="DreambitEngine content tools were not found at '$(DreambitContentProject)'. Run the generated setup-engine script." />
     <Error Condition="!Exists('$(DreambitAssetBakerProject)')"
            Text="DreambitEngine AssetBaker was not found at '$(DreambitAssetBakerProject)'. Run the generated setup-engine script." />
   </Target>
 
-  <Target Name="BuildDreambitGameContent"
+  <Target Name="BuildDreambitUserContent"
           BeforeTargets="BeforeCompile"
           DependsOnTargets="ValidateDreambitContentEnvironment"
           Condition="'$(DreambitContentBuildEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true'"
           Inputs="@(_DreambitContentBuildInput)"
-          Outputs="$(DreambitContentBuildStamp);$(DreambitGamePak)">
+          Outputs="$(DreambitContentBuildStamp);$(DreambitUserContentPak)">
     <Message Text="Building Dreambit and DreambitGame content for $(MonoGamePlatform)..." Importance="high" />
 
     <!-- These are explicit build invocations, not ProjectReferences. Their executables
@@ -64,7 +64,7 @@
              Properties="Configuration=$(Configuration)"
              RemoveProperties="TargetFramework;RuntimeIdentifier;RuntimeIdentifiers;OutputPath;BaseOutputPath;ManagePackageVersionsCentrally;CentralPackageTransitivePinningEnabled" />
 
-    <MSBuild Projects="$(DreambitGameContentProject)"
+    <MSBuild Projects="$(DreambitUserContentProject)"
              Targets="Restore;Build"
              Properties="Configuration=$(Configuration)"
              RemoveProperties="TargetFramework;RuntimeIdentifier;RuntimeIdentifiers;OutputPath;BaseOutputPath;ManagePackageVersionsCentrally;CentralPackageTransitivePinningEnabled" />
@@ -80,16 +80,16 @@
           CustomErrorRegularExpression="\[E\] .+"
           CustomWarningRegularExpression="\[W\] .+" />
 
-    <Exec Command="dotnet run --project &quot;$(DreambitGameContentProject)&quot; --configuration &quot;$(Configuration)&quot; --no-build -- build -p &quot;$(MonoGamePlatform)&quot; -s &quot;$(DreambitGameContentSource)&quot; -o &quot;$(DreambitRuntimeOutput)&quot; -i &quot;$(DreambitGameContentIntermediate)&quot;"
+    <Exec Command="dotnet run --project &quot;$(DreambitUserContentProject)&quot; --configuration &quot;$(Configuration)&quot; --no-build -- build -p &quot;$(MonoGamePlatform)&quot; -s &quot;$(DreambitUserContentSource)&quot; -o &quot;$(DreambitRuntimeOutput)&quot; -i &quot;$(DreambitUserContentIntermediate)&quot;"
           CustomErrorRegularExpression="\[E\] .+"
           CustomWarningRegularExpression="\[W\] .+" />
 
-    <Exec Command="dotnet run --project &quot;$(DreambitAssetBakerProject)&quot; --configuration &quot;$(Configuration)&quot; --no-build -- bake-pak &quot;$(DreambitGameContentSource)&quot; &quot;$(DreambitGamePak)&quot; --premul --srgb" />
+    <Exec Command="dotnet run --project &quot;$(DreambitAssetBakerProject)&quot; --configuration &quot;$(Configuration)&quot; --no-build -- bake-pak &quot;$(DreambitUserContentSource)&quot; &quot;$(DreambitUserContentPak)&quot; --premul --srgb" />
 
     <Touch Files="$(DreambitContentBuildStamp)" AlwaysCreate="true" />
   </Target>
 
-  <Target Name="CleanDreambitGameContent" AfterTargets="Clean">
+  <Target Name="CleanDreambitUserContent" AfterTargets="Clean">
     <RemoveDir Directories="$(DreambitRuntimeContent)" />
     <Delete Files="$(DreambitContentBuildStamp)" />
   </Target>
