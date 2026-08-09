@@ -39,8 +39,8 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
             if (!members.TryGetValue(memberName, out var member))
             {
                 errors.Add(new InvalidOperationException(
-                    $"Component '{componentType.FullName}' has no public writable " +
-                    $"property or field named '{memberName}'."));
+                    $"Component '{componentType.FullName}' has no writable " +
+                    $"[DreambitSerialize] property or field named '{memberName}'."));
                 continue;
             }
 
@@ -92,12 +92,18 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
                 if (!property.CanWrite || property.GetIndexParameters().Length != 0)
                     continue;
 
+                if (property.GetCustomAttribute<DreambitSerializeAttribute>() is null)
+                    continue;
+
                 members[property.Name] = new BlueprintMember(property);
             }
 
             foreach (var field in type.GetFields(flags))
             {
                 if (field.IsInitOnly || field.IsLiteral)
+                    continue;
+
+                if (field.GetCustomAttribute<DreambitSerializeAttribute>() is null)
                     continue;
 
                 // A writable property wins if a field has the same name.

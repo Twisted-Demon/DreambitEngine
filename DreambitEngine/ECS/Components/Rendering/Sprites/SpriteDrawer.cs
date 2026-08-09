@@ -10,20 +10,25 @@ public class SpriteDrawer :
 {
     private string _spritePath;
 
+    [DreambitSerialize]
     public Color Tint { get; internal set; } =
         Color.White;
 
+    [DreambitSerialize]
     public float Opacity { get; internal set; } =
         1.0f;
 
+    [DreambitSerialize]
     public Vector2 Pivot { get; internal set; } =
         Vector2.Zero;
 
+    [DreambitSerialize]
     public PivotType PivotType { get; internal set; } =
         PivotType.Center;
 
     public Sprite Sprite { get; set; }
 
+    [DreambitSerialize]
     public string SpritePath
     {
         get => _spritePath;
@@ -41,6 +46,7 @@ public class SpriteDrawer :
         }
     }
 
+    [DreambitSerialize]
     public bool FlipX { get; set; }
 
     public override RectangleF Bounds

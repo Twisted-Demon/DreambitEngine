@@ -9,6 +9,7 @@ public class ParticleSystemDrawer : DrawableComponent<ParticleSystemDrawer>
     private string _texturePath;
     private Texture2D Texture { get; set; }
 
+    [DreambitSerialize]
     public string TexturePath
     {
         get => _texturePath;

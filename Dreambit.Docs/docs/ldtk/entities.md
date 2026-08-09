@@ -1,32 +1,26 @@
-# Mapping LDtk entities
+# Reading LDtk entities
 
-`LDtkEntity<T>` is intended as a base for adapters from generated LDtk entity
-data to Dreambit entities. Its helpers can create an entity at the LDtk position,
-attach the source tile as a sprite, and build a polygon collider.
+Dreambit exposes entity instances as raw LDtk data and deliberately does not
+instantiate ECS entities.
 
 ```csharp
-public sealed class SpawnAdapter : LDtkEntity<GeneratedSpawn>
+foreach (var layer in level.LayerInstances ?? [])
 {
-    protected override void SetUp(LDtkLevel level)
+    foreach (var instance in layer.EntityInstances ?? [])
     {
-        // Convert matching GeneratedSpawn data into Dreambit entities.
+        Console.WriteLine($"{instance._Identifier}: {instance.Iid}");
+
+        foreach (var field in instance.FieldInstances ?? [])
+            Console.WriteLine($"  {field._Identifier}: {field._Value}");
     }
 }
 ```
 
-`CreateEntity(data)` assigns the LDtk IID as the entity GUID and attaches
-`LDtkIid`. `AttachTileSpriteDrawer` uses the manager's tileset sprite sheet.
-`CreatePolyCollider` converts editor points into local collider vertices.
+`FieldInstance.GetValue<T>()` deserializes a raw field value on demand.
+`ResolveFilePath()` resolves FilePath fields relative to the LDtk project.
+EntityRef fields can be followed with `ResolveEntityReference()` or parsed with
+`TryGetEntityReference` and resolved later through `LDtkFile.ResolveEntity`.
 
-!!! warning "Experimental automatic discovery"
-    Automatic mapping is not complete in the current implementation. The static
-    generic `SetUpEntities` path obtains generated data and then attempts to cast
-    each data item to the adapter type, so normal generated entities will not
-    invoke `SetUp`. Treat these helpers as an integration starting point and
-    manually enumerate `level.GetEntities<T>()` in scene code, or correct the
-    adapter dispatch before relying on discovery.
-
-The current `LDtkManager.RegisterEntity` guard also prevents a new IID from being
-added to its reference map. Do not depend on IID lookup until that registration
-path is corrected.
-
+Entity definitions remain available through `instance.Definition`; tileset
+references on definitions and layers are connected to their corresponding
+`TilesetDefinition` objects.

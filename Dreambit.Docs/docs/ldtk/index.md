@@ -1,16 +1,13 @@
 # LDtk integration
 
-Dreambit wraps the bundled LDtk library with asset loading, world/level helpers,
-tileset sprite sheets, a prerendered drawable, scene switching, and entity helper
-types.
+Dreambit owns a raw LDtk 1.5.3 JSON model and loader. It does not create game
+entities or render levels automatically. Games can interpret layer and entity
+instances in whichever way fits their architecture.
 
-The dependable current path is:
+The loader supports embedded and external levels, legacy single-world projects,
+multi-world projects, tileset and background paths, file-path fields, and LDtk
+entity references. Paths are resolved relative to the project file without
+mutating the imported JSON values.
 
-1. Bake the `.ldtk` and external `.ldtkl` JSON files plus referenced textures.
-2. Call `LDtkManager.SetUp` with the project logical path.
-3. Select a world by its IID with `LoadWorld`.
-4. Switch to a level by IID with `Scene.SetNextLDtkScene`.
-
-Some convenience paths are incomplete in current source. The following pages
-mark those limits explicitly.
-
+LDtk projects and external `.ldtkl` files are baked as normal Dreambit JSON
+assets. Referenced PNG files continue through the texture baker.

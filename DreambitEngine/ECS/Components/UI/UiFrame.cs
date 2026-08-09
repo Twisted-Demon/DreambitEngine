@@ -11,6 +11,7 @@ public class UiFrame : DrawableComponent<UiFrame>
 {
     private string _layoutPath;
 
+    [DreambitSerialize]
     public string LayoutPath
     {
         get => _layoutPath;

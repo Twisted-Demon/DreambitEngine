@@ -7,10 +7,10 @@ public class CircleDrawer : DrawableComponent
 {
     public override RectangleF Bounds => GetBounds();
 
-    public Color Color { get; set; } = Color.White;
-    public float Radius { get; set; } = 128f;
-    public int Segments { get; set; } = 64;
-    public float LineThickness { get; set; } = 1.0f;
+    [DreambitSerialize] public Color Color { get; set; } = Color.White;
+    [DreambitSerialize] public float Radius { get; set; } = 128f;
+    [DreambitSerialize] public int Segments { get; set; } = 64;
+    [DreambitSerialize] public float LineThickness { get; set; } = 1.0f;
 
     private RectangleF GetBounds()
     {

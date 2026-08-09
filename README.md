@@ -184,7 +184,7 @@ Dreambit.Content/            Shared engine effects and fonts
 Dreambit.Examples/           Runnable UI, Pong, space game, and particle examples
 Dreambit.Examples.Content/   Example source assets and loose UI layouts
 Dreambit.Docs/               MkDocs documentation project
-LDtkMonogame/                Bundled LDtk runtime, pipeline, and tooling
+DreambitEngine/LDtk/         Native LDtk schema, loading, and reference resolution
 ```
 
 ## Project status

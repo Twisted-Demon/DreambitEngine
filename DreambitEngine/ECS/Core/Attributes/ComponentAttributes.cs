@@ -12,3 +12,15 @@ public class RequireAttribute(params Type[] type) : Attribute
 public class FromRequiredAttribute : Attribute
 {
 }
+
+/// <summary>
+///     Marks a component field or property as configurable by Dreambit entity blueprints.
+///     Unmarked members are ignored by blueprint deserialization.
+/// </summary>
+[AttributeUsage(
+    AttributeTargets.Field | AttributeTargets.Property,
+    AllowMultiple = false,
+    Inherited = true)]
+public sealed class DreambitSerializeAttribute : Attribute
+{
+}

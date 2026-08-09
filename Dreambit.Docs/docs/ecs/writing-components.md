@@ -6,6 +6,7 @@ need:
 ```csharp
 public sealed class Lifetime : Component
 {
+    [DreambitSerialize]
     public float Seconds { get; set; } = 2f;
 
     public override void OnUpdate()
@@ -20,8 +21,9 @@ public sealed class Lifetime : Component
 Every component can access `Entity`, `Transform`, `Scene`, a protected `Logger`,
 and a protected `CoroutineService`.
 
-Use public properties for values that should be configurable from
-[entity blueprints](blueprints.md). When a component needs other components,
+Mark public writable fields or properties with `[DreambitSerialize]` when they
+should be configurable from [entity blueprints](blueprints.md). Unmarked members
+are not exposed to blueprint content. When a component needs other components,
 declare them with `[Require]` and optionally inject them with `[FromRequired]`.
 
 Set `Enabled = false` to stop normal component participation and invoke

@@ -94,7 +94,8 @@ public static class BlueprintValidator
                         out var memberType))
                 {
                     errors.Add(
-                        $"{path}: component '{componentType.FullName}' has no public writable member '{memberName}'.");
+                        $"{path}: component '{componentType.FullName}' has no writable " +
+                        $"[DreambitSerialize] member '{memberName}'.");
                     continue;
                 }
 

@@ -13,6 +13,7 @@ public abstract class DrawableComponent : Component
 
     public bool UsesEffect => Effect != null;
 
+    [DreambitSerialize]
     public virtual int DrawLayer
     {
         get => _drawLayer;

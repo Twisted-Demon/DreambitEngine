@@ -21,13 +21,16 @@ public class SpriteAnimator : Component
     private float _timeToNextFrame;
     public bool IsPlaying { get; private set; }
 
+    [DreambitSerialize]
     public bool PlayOnStart { get; set; } = false;
 
+    [DreambitSerialize]
     public float PlaySpeed { get; set; } = 1.0f;
 
     public SpriteSheetAnimation Animation { get; private set; }
     public SpriteSheet CurrentSpriteSheet { get; private set; }
 
+    [DreambitSerialize]
     public string AnimationPath
     {
         get => _animationPath;

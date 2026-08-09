@@ -5,15 +5,18 @@ namespace Dreambit.ECS;
 [BlueprintType($"{nameof(RectDrawer)}")]
 public class RectDrawer : DrawableComponent
 {
-    public int Height = 32;
+    [DreambitSerialize] public int Height = 32;
 
-    public int Width = 32;
+    [DreambitSerialize] public int Width = 32;
     public override RectangleF Bounds => GetBounds();
 
+    [DreambitSerialize]
     public PivotType PivotType { get; set; } = PivotType.Center;
 
+    [DreambitSerialize]
     public Vector2 Pivot { get; set; }
 
+    [DreambitSerialize]
     public Color Color { get; set; } = Color.White;
 
     private RectangleF GetBounds()

@@ -50,11 +50,13 @@ public class RigidBody2D : Component
 
     #region Public Properties / Fields
 
+    [DreambitSerialize]
     public Collider Collider { get; private set; }
 
-    public Vector2 Velocity = Vector2.Zero;
+    [DreambitSerialize] public Vector2 Velocity = Vector2.Zero;
 
-    public readonly HashSet<string> InterestedTags = [];
+    [DreambitSerialize]
+    public HashSet<string> InterestedTags { get; private set; } = [];
 
     #endregion
 

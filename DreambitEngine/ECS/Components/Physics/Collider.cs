@@ -110,16 +110,19 @@ public class Collider : Component
     #region Flags & Configuration
 
     /// <summary>When true, collider acts as a trigger (no physical response, events only).</summary>
+    [DreambitSerialize]
     public bool IsTrigger { get; set; } = false;
 
     /// <summary>When true, suppresses trigger event generation.</summary>
+    [DreambitSerialize]
     public bool IsSilent { get; set; } = false;
 
     /// <summary>When false, collider is ignored by spatial queries / broadphase.</summary>
+    [DreambitSerialize]
     public bool IsQueryable { get; set; } = true;
 
     /// <summary>Optional filter: limit trigger checks to these tags. Empty = all.</summary>
-    public List<string> InterestedIn = [];
+    [DreambitSerialize] public List<string> InterestedIn = [];
 
     #endregion
 
@@ -139,6 +142,7 @@ public class Collider : Component
     #region Bounds & Shape
 
     /// <summary>Local-space shape used for collision/trigger checks.</summary>
+    [DreambitSerialize]
     public Shape2D Bounds { get; set; } = null;
 
     public AABB AABB { get; set; }

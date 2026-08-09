@@ -33,7 +33,8 @@ var blueprint = Resources.LoadAsset<EntityBlueprint>("Blueprints/player_ship");
 var player = Entity.Create(blueprint, createAt: spawnPosition);
 ```
 
-Properties are matched case-insensitively. Built-in converters handle vectors,
+Properties are matched case-insensitively and must refer to writable component
+members marked with `[DreambitSerialize]`. Built-in converters handle vectors,
 colors, rectangles, points, box/polygon shapes, and references to Dreambit
 assets. Component `[Require]` declarations are included when creation order is
 resolved.

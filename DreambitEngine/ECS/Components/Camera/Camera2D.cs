@@ -8,10 +8,11 @@ public class Camera2D : Component
 {
     private const float MinimumScale = 0.0001f;
 
+    [DreambitSerialize]
     public CameraFollowBehavior CameraFollowBehavior =
         CameraFollowBehavior.Lerp;
 
-    public bool IsFollowing = true;
+    [DreambitSerialize] public bool IsFollowing = true;
     public Transform TransformToFollow;
     private Matrix _inverseTopLeftTransformMatrix;
 
@@ -28,12 +29,14 @@ public class Camera2D : Component
     private float _resolutionZoom = 1f;
     private float _zoom = 1f;
 
+    [DreambitSerialize]
     public float LerpSpeed { get; set; } = 5f;
 
     /// <summary>
     ///     Camera magnification.
     ///     Must be greater than zero.
     /// </summary>
+    [DreambitSerialize]
     public float Zoom
     {
         get => _zoom;
@@ -53,6 +56,7 @@ public class Camera2D : Component
     ///     Number of physical screen pixels used by one world unit before zoom.
     ///     For example, 16 means one world unit occupies 16 pixels at Zoom 1.
     /// </summary>
+    [DreambitSerialize]
     public float PixelsPerUnit
     {
         get => _pixelsPerUnit;
@@ -115,6 +119,7 @@ public class Camera2D : Component
     private Vector2 ViewportSize =>
         new(Window.Width, Window.Height);
 
+    [DreambitSerialize]
     public int TargetVerticalResolution { get; private set; } =
         Math.Max(1, Window.Height);
 

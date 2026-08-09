@@ -9,13 +9,13 @@ public class SoundEmitter2d : Component
 {
     private readonly AudioEmitter _emitter = new();
     private readonly Logger<SoundEmitter2d> _logger = new();
-    public float DopplerScale = 1.0f;
-    public float Pan = 1.0f;
-    public float Pitch = 0.0f;
+    [DreambitSerialize] public float DopplerScale = 1.0f;
+    [DreambitSerialize] public float Pan = 1.0f;
+    [DreambitSerialize] public float Pitch = 0.0f;
 
-    public bool UseDoppler = true;
+    [DreambitSerialize] public bool UseDoppler = true;
 
-    public float Volume = 1.0f;
+    [DreambitSerialize] public float Volume = 1.0f;
 
     private Mover _mover;
 
@@ -23,6 +23,7 @@ public class SoundEmitter2d : Component
 
     private string _soundEffectPath = string.Empty;
 
+    [DreambitSerialize]
     public string SoundEffectPath
     {
         get => _soundEffectPath;

@@ -59,8 +59,6 @@ nav:
           - AStarPathfinder: ecs/components/astar-pathfinder.md
           - AStarPathFollower: ecs/components/astar-path-follower.md
           - FSM: ecs/components/fsm.md
-          - LDtkRenderer: ecs/components/ldtk-renderer.md
-          - LDtkIid: ecs/components/ldtk-iid.md
           - TileMover: ecs/components/tile-mover.md
   - User interface:
       - Overview: UI/README.md

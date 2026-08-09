@@ -15,8 +15,10 @@ public class SoundEffectEmitter : Component
     private SoundCue _soundCue;
 
     private string _soundCuePath;
+    [DreambitSerialize]
     public bool CullWhenOffscreen { get; set; } = false;
 
+    [DreambitSerialize]
     public float MasterVolume
     {
         get => _masterVolume;

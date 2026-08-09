@@ -5,12 +5,16 @@ namespace Dreambit.ECS;
 public class IsometricSpriteDrawer
     : SpriteDrawer
 {
+    [DreambitSerialize]
     public Vector2 RenderOffset { get; set; } = Vector2.Zero;
 
+    [DreambitSerialize]
     public float SortOffset { get; set; }
 
+    [DreambitSerialize]
     public bool ProjectWorldRotation { get; set; } = true;
 
+    [DreambitSerialize]
     public float RotationOffset { get; set; }
 
     public Vector2 ProjectedPosition =>

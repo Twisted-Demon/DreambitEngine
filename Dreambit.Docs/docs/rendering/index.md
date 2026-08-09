@@ -8,7 +8,6 @@ Attach drawable components for normal gameplay rendering:
 - `SpriteDrawer` for sprite assets
 - `RectDrawer` and `CircleDrawer` for primitives
 - `ParticleSystemDrawer` for particles
-- `LDtkRenderer` for levels
 - `PointLight2D` and `AmbientLight2D` for lighting
 - `UiFrame` for retained UI
 

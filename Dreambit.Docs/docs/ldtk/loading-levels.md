@@ -1,34 +1,40 @@
 # Loading worlds and levels
 
-Set up the LDtk project after `Core` has initialized resources and before
-switching to an LDtk scene:
+Load a baked LDtk project through Dreambit resources:
 
 ```csharp
-LDtkManager.Instance.SetUp("Worlds/game");
-LDtkManager.Instance.LoadWorld(worldIid);
-Scene.SetNextLDtkScene(levelIid);
+using Dreambit.LDtk;
+
+var project = Resources.LoadAsset<LDtkFile>("ldtk/dreambit");
+var world = project.LoadWorld();
+var level = world.LoadLevel("Level_0");
 ```
 
-The project must use LDtk's multi-world flag and a supported JSON version.
-External levels are resolved relative to the world file and loaded through
-Dreambit resources. Tileset relative `.png` paths are converted into runtime
-sprite sheets using each tileset's grid size.
+`LoadWorld()` succeeds for a single-world project. For a project containing
+multiple worlds, it throws `LdtkWorldSelectionRequiredException`; use
+`AvailableWorlds` to present a choice and then select by identifier or IID:
 
-`LDtkScene` loads the requested level, creates an always-updating
-`LDtkRenderer`, asks the manager to set up mapped entities, and adopts the LDtk
-background color.
+```csharp
+foreach (var available in project.AvailableWorlds)
+    Console.WriteLine($"{available.Identifier}: {available.Iid}");
 
-!!! warning "Use IIDs in current builds"
-    `LDtkManager.LoadLDtkLevel(string identifier)` currently throws
-    `NotImplementedException`. Although identifier-based scene helpers exist,
-    choose the GUID/IID overload until that manager method is implemented.
+var world = project.LoadWorld(selectedWorldIid);
+var level = world.LoadLevel(selectedLevelIid);
+```
 
-The manager holds loaded levels and sprite sheets for the current project.
-Set up a new manager/project deliberately when changing LDtk projects.
+External `.ldtkl` files are loaded lazily and cached when `LoadLevel` is called.
+For tools and tests, load an unbaked project directly:
 
-!!! warning "Current renderer attachment order"
-    `LDtkRenderer.OnAddedToEntity` prerenders its `Level`, but `LDtkScene`
-    currently assigns `Level` after attaching the component. If the bundled
-    renderer does not tolerate null, assign the level before the component's
-    attachment lifecycle (or move prerendering into the `Level` setter) before
-    relying on the automatic scene path.
+```csharp
+var project = LDtkFile.FromFile("Content/World.ldtk");
+```
+
+Resolved external resources are available without altering raw LDtk paths:
+
+```csharp
+var tileset = project.GetTileset(tilesetUid);
+string? textureAsset = tileset.AssetName;       // baked resource name
+string? textureSource = tileset.SourcePath;     // resolved source path
+
+string? backgroundAsset = level.BackgroundAssetName;
+```

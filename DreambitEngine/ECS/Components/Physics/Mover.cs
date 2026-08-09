@@ -6,7 +6,7 @@ namespace Dreambit.ECS;
 public class Mover : Component
 {
     private readonly Logger<Mover> _logger = new();
-    public Vector3 Velocity;
+    [DreambitSerialize] public Vector3 Velocity;
 
     public override void OnUpdate()
     {
