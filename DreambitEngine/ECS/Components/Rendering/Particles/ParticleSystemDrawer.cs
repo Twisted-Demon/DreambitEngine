@@ -77,7 +77,6 @@ public class ParticleSystemDrawer : DrawableComponent<ParticleSystemDrawer>
             var color = parts.COLOR[phys];
 
             Core.SpriteBatch.DrawWorldSprite(
-                Scene.MainCamera,
                 Texture,
                 new Vector2(px, py),
                 null,

@@ -24,8 +24,6 @@ public class Camera2D : Component
     private Vector2 _lastViewportSize;
 
     private bool _matricesDirty = true;
-    private float _pixelsPerUnit = 1f;
-
     private float _resolutionZoom = 1f;
     private float _zoom = 1f;
 
@@ -52,26 +50,6 @@ public class Camera2D : Component
         }
     }
 
-    /// <summary>
-    ///     Number of physical screen pixels used by one world unit before zoom.
-    ///     For example, 16 means one world unit occupies 16 pixels at Zoom 1.
-    /// </summary>
-    [DreambitSerialize]
-    public float PixelsPerUnit
-    {
-        get => _pixelsPerUnit;
-        set
-        {
-            ValidatePositiveFinite(value, nameof(PixelsPerUnit));
-
-            if (_pixelsPerUnit == value)
-                return;
-
-            _pixelsPerUnit = value;
-            _matricesDirty = true;
-        }
-    }
-
     private float ResolutionZoom
     {
         get => _resolutionZoom;
@@ -89,49 +67,45 @@ public class Camera2D : Component
 
     /// <summary>
     ///     Camera zoom after resolution scaling.
-    ///     Does not include PixelsPerUnit.
+    ///     Includes the viewport scaling needed to show TargetVerticalResolution
+    ///     world units vertically.
     /// </summary>
     public float TotalZoom => Zoom * ResolutionZoom;
 
     /// <summary>
     ///     Final number of screen pixels occupied by one world unit.
     /// </summary>
-    public float Scale => PixelsPerUnit * TotalZoom;
+    public float Scale => TotalZoom;
 
-    public float WorldUnitsWidth => Window.BackBufferWidth / PixelsPerUnit;
-    public float WorldUnitsHeight => Window.BackBufferHeight / PixelsPerUnit;
+    public float WorldUnitsWidth => Window.BackBufferWidth / Scale;
+    public float WorldUnitsHeight => Window.BackBufferHeight / Scale;
 
     /// <summary>
-    ///     size of one texture pixel expressed in world units
-    ///     At 16 pixels per unit, one texture pixel occupies 1 / 16th of a world unit
-    ///     aka 1 world unit has a width and height of 16 pixels
+    ///     Size of one screen pixel expressed in world units.
     /// </summary>
-    public float WorldUnitsPerTexturePixel => 1f / PixelsPerUnit;
+    public float WorldUnitsPerScreenPixel => 1f / Scale;
 
     private float ScreenPixelsPerWorldUnit => Scale;
 
     private float NoCameraZoomPixelsPerWorldUnit =>
-        PixelsPerUnit * ResolutionZoom;
-
-    private float WorldUnitsPerScreenPixel =>
-        1f / ScreenPixelsPerWorldUnit;
+        ResolutionZoom;
 
     private Vector2 ViewportSize =>
         new(Window.Width, Window.Height);
 
     [DreambitSerialize]
-    public int TargetVerticalResolution { get; private set; } =
-        Math.Max(1, Window.Height);
+    public float TargetVerticalResolution { get; private set; } =
+        Math.Max(1f, Window.Height);
 
     /// <summary>
     ///     Normal camera matrix. The camera position appears at screen center.
-    ///     Includes PixelsPerUnit, Zoom, and ResolutionZoom.
+    ///     Includes Zoom and viewport scaling.
     /// </summary>
     public Matrix TransformMatrix { get; private set; } = Matrix.Identity;
 
     /// <summary>
     ///     Camera matrix without the user-controlled Zoom value.
-    ///     PixelsPerUnit and ResolutionZoom are still applied.
+    ///     Viewport scaling is still applied.
     /// </summary>
     public Matrix UnscaledTransformMatrix { get; private set; } =
         Matrix.Identity;
@@ -234,8 +208,8 @@ public class Camera2D : Component
 
     /// <summary>
     ///     Rebuilds matrices when any relevant camera state has changed.
-    ///     This means conversion methods remain correct even when PixelsPerUnit,
-    ///     Zoom, position, rotation, or viewport size changes between updates.
+    ///     This means conversion methods remain correct even when Zoom, position,
+    ///     rotation, or viewport size changes between updates.
     /// </summary>
     private void EnsureMatricesCurrent()
     {
@@ -276,7 +250,7 @@ public class Camera2D : Component
             Matrix.Invert(TransformMatrix);
 
         // "Unscaled" means no user-controlled camera Zoom.
-        // PixelsPerUnit and resolution scaling must still be included.
+        // Viewport scaling must still be included.
         UnscaledTransformMatrix = CalculateCenteredTransformMatrix(
             cameraPosition,
             cameraRotation,
@@ -411,13 +385,13 @@ public class Camera2D : Component
     private void SetResolutionZoom()
     {
         var targetHeight =
-            Math.Max(1, TargetVerticalResolution);
+            MathF.Max(MinimumScale, TargetVerticalResolution);
 
         var actualHeight =
             Math.Max(1, Window.Height);
 
         ResolutionZoom =
-            actualHeight / (float)targetHeight;
+            actualHeight / targetHeight;
     }
 
     public void SetViewPort()
@@ -433,13 +407,14 @@ public class Camera2D : Component
     }
 
     public void SetTargetVerticalResolution(
-        int targetVerticalResolution)
+        float targetVerticalResolution)
     {
-        if (targetVerticalResolution <= 0)
+        if (!float.IsFinite(targetVerticalResolution) ||
+            targetVerticalResolution < MinimumScale)
             throw new ArgumentOutOfRangeException(
                 nameof(targetVerticalResolution),
                 targetVerticalResolution,
-                "Target vertical resolution must be greater than zero.");
+                $"Target vertical resolution must be finite and at least {MinimumScale} world units.");
 
         TargetVerticalResolution =
             targetVerticalResolution;
@@ -583,19 +558,4 @@ public class Camera2D : Component
             _inverseTopLeftTransformMatrix);
     }
 
-    /// <summary>
-    ///     convert a texture's world scale into the correct world scale
-    ///     to match pixels per unit.
-    /// </summary>
-    /// <param name="worldScale"></param>
-    /// <returns></returns>
-    public Vector2 GetSpriteDrawScale(Vector2 worldScale)
-    {
-        return worldScale * WorldUnitsPerTexturePixel;
-    }
-
-    public Vector2 SpriteSizeToWorld(Vector2 spriteSize, Vector2 worldScale)
-    {
-        return spriteSize * GetSpriteDrawScale(worldScale);
-    }
 }

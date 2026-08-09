@@ -5,15 +5,14 @@ zoom, rotation, and following. Every scene already supplies `MainCamera` and
 `UiCamera`; attach another only for a deliberate secondary view.
 
 ```csharp
-MainCamera.PixelsPerUnit = 16;
 MainCamera.Zoom = 2f;
-MainCamera.SetTargetVerticalResolution(720);
+MainCamera.SetTargetVerticalResolution(45f);
 MainCamera.ForcePosition(new Vector3(20, 12, 0));
 ```
 
-`PixelsPerUnit` defines how many texture pixels represent one world unit before
-zoom. `SetTargetVerticalResolution` adds resolution scaling. `Scale` is the final
-pixels-per-world-unit value.
+`TargetVerticalResolution` is the number of world units visible vertically at
+Zoom 1. Sprite assets define how many texture pixels represent one world unit.
+`Scale` is the final screen-pixels-per-world-unit value.
 
 For following, assign `TransformToFollow`, select `CameraFollowBehavior`, set
 `LerpSpeed`, and leave `IsFollowing` true. `ForcePosition` is appropriate for

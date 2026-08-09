@@ -71,9 +71,7 @@ public class SpriteDrawer :
                 GetOriginToUse();
 
             var drawScale =
-                Scene.MainCamera
-                    .GetSpriteDrawScale(
-                        GetDrawScale());
+                GetSpriteDrawScale();
 
             var worldOrigin =
                 origin *
@@ -177,14 +175,13 @@ public class SpriteDrawer :
             Sprite.Texture);
 
         Core.SpriteBatch.DrawWorldSprite(
-            Scene.MainCamera,
             Sprite.Texture,
             GetDrawPosition(),
             Sprite.SourceRect,
             Tint * Opacity,
             GetDrawRotation(),
             GetOriginToUse(),
-            GetDrawScale(),
+            GetSpriteDrawScale(),
             GetSpriteEffects());
     }
 
@@ -201,6 +198,11 @@ public class SpriteDrawer :
     protected virtual Vector2 GetDrawScale()
     {
         return Transform.WorldScale2D;
+    }
+
+    protected virtual Vector2 GetSpriteDrawScale()
+    {
+        return GetDrawScale() / Sprite.PixelsPerUnit;
     }
 
     protected virtual Vector2 GetOriginToUse()
@@ -249,7 +251,7 @@ public class SpriteDrawer :
             Bounds,
             Color.Yellow,
             Scene.MainCamera
-                .WorldUnitsPerTexturePixel);
+                .WorldUnitsPerScreenPixel);
     }
 
     public override void OnDestroyed()

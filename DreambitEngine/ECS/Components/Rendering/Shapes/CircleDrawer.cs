@@ -32,6 +32,6 @@ public class CircleDrawer : DrawableComponent
     {
         var center = Transform.WorldPosition2D;
         Core.SpriteBatch.DrawCircle(center, Radius, Color, Segments,
-            LineThickness * Scene.MainCamera.WorldUnitsPerTexturePixel);
+            LineThickness * Scene.MainCamera.WorldUnitsPerScreenPixel);
     }
 }

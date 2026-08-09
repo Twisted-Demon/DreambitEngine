@@ -28,7 +28,7 @@ public class Transform
             WorldPosition2D,
             Color.Red,
             3f * Scene.Instance.MainCamera
-                .WorldUnitsPerTexturePixel);
+                .WorldUnitsPerScreenPixel);
     }
 
     #endregion
@@ -313,15 +313,10 @@ public class Transform
     public Vector2 LastWorldPosition2D =>
         new(LastWorldPosition.X, LastWorldPosition.Y);
 
-    /*
-     * Preserved for compatibility, but rotation normally should not
-     * depend on camera pixels-per-unit.
-     */
     [Obsolete(
         "Rotation is independent of camera scale. Use WorldRotation2D instead.")]
     public float ScaledZRotation =>
-        WorldRotation2D /
-        Scene.Instance.MainCamera.PixelsPerUnit;
+        WorldRotation2D;
 
     #endregion
 

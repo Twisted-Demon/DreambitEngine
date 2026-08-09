@@ -17,7 +17,7 @@ public class Collider : Component
     public override void OnDebugDraw()
     {
         Core.SpriteBatch.DrawPolygon(WorldPolygon2D.Vertices, Color.White,
-            Scene.Instance.MainCamera.WorldUnitsPerTexturePixel);
+            Scene.Instance.MainCamera.WorldUnitsPerScreenPixel);
     }
 
     #endregion

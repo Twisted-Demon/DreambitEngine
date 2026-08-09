@@ -95,12 +95,12 @@
 //        Core.SpriteBatch.DrawPoint(
 //            WorldPosToVec2, 
 //            Color.Red, 
-//            3f * Scene.Instance.MainCamera.WorldUnitsPerTexturePixel);
+//            3f * Scene.Instance.MainCamera.WorldUnitsPerScreenPixel);
 //        
 //        Core.SpriteBatch.DrawLine(
 //            WorldPosToVec2, 
 //            WorldPosToVec2 + (ForwardVec2 * 0.5f), 
 //            Color.Red,
-//            2f * Scene.Instance.MainCamera.WorldUnitsPerTexturePixel);
+//            2f * Scene.Instance.MainCamera.WorldUnitsPerScreenPixel);
 //    }
 //}

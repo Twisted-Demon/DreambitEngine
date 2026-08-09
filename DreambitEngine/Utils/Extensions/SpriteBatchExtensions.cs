@@ -23,7 +23,6 @@ public static class SpriteBatchExtensions
 
     public static void DrawWorldSprite(
         this SpriteBatch spriteBatch,
-        Camera2D camera,
         Texture2D texture,
         Vector2 worldPosition,
         Rectangle? sourceRectangle,
@@ -35,10 +34,7 @@ public static class SpriteBatchExtensions
         float layerDepth = 0f)
     {
         ArgumentNullException.ThrowIfNull(spriteBatch);
-        ArgumentNullException.ThrowIfNull(camera);
         ArgumentNullException.ThrowIfNull(texture);
-
-        var spriteBatchScale = camera.GetSpriteDrawScale(worldScale);
 
         spriteBatch.Draw(
             texture,
@@ -47,7 +43,7 @@ public static class SpriteBatchExtensions
             color,
             rotation,
             origin,
-            spriteBatchScale,
+            worldScale,
             effects,
             layerDepth);
     }
@@ -576,7 +572,7 @@ public static class SpriteBatchExtensions
         Vector2? scale = null,
         float thickness = 1f)
     {
-        var minimumThickness = Scene.Instance.MainCamera.WorldUnitsPerTexturePixel;
+        var minimumThickness = Scene.Instance.MainCamera.WorldUnitsPerScreenPixel;
         if (thickness < minimumThickness)
             thickness = minimumThickness;
 

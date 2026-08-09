@@ -1,15 +1,15 @@
 # Cameras and coordinates
 
-Dreambit separates world scale, user zoom, and resolution zoom:
+Dreambit separates world scale, user zoom, and viewport scaling:
 
 ```csharp
-MainCamera.PixelsPerUnit = 16;       // 16 pixels per world unit
 MainCamera.Zoom = 1.5f;              // player-controlled magnification
-MainCamera.SetTargetVerticalResolution(720); // resolution scaling reference
+MainCamera.SetTargetVerticalResolution(45f); // visible world units at Zoom 1
 ```
 
-`Scale = PixelsPerUnit * Zoom * ResolutionZoom`. `WorldUnitsPerTexturePixel` is
-`1 / PixelsPerUnit` and is useful for pixel-sized debug lines in world space.
+`Scale` is the final number of screen pixels per world unit. Sprite assets own
+their pixels-per-unit value, which determines how texture pixels convert to
+world units. `WorldUnitsPerScreenPixel` is useful for pixel-sized debug lines.
 
 ## Conversions
 

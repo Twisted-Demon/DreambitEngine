@@ -17,8 +17,7 @@ public sealed class MainScene : Scene<MainScene>
         Window.SetSize(1280, 720);
         BackgroundColor = new Color(18, 20, 28);
 
-        MainCamera.PixelsPerUnit = 1;
-        MainCamera.SetTargetVerticalResolution(720);
+        MainCamera.SetTargetVerticalResolution(720f);
         MainCamera.ForcePosition(new Vector3(640, 360, 0));
 
         CreateEntity("player", tags: ["player"],
