@@ -68,7 +68,6 @@ public class Core : Game
         base.LoadContent();
 
         SpriteBatch = new SpriteBatch(GraphicsDevice);
-        LDtkManager.Instance.Init();
     }
 
     protected override void Update(GameTime gameTime)
