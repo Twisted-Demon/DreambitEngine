@@ -3,25 +3,30 @@
     <TargetFramework>net9.0</TargetFramework>
 
     <PackageId>DreambitEngine.Templates</PackageId>
-    <Version>0.1.2</Version>
+    <Version>0.1.4</Version>
     <Title>Dreambit Engine Templates</Title>
     <Authors>Dreambit Engine</Authors>
     <Description>Project templates for creating games with Dreambit Engine.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>dotnet-new;templates;game-development;dreambit;monogame</PackageTags>
     <PackageType>Template</PackageType>
 
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <IncludeContentInPack>true</IncludeContentInPack>
+    <ContentTargetFolders>content</ContentTargetFolders>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <NoDefaultExcludes>true</NoDefaultExcludes>
-    <NoWarn>$(NoWarn);NU5128</NoWarn>
+    <!-- NU5110/NU5111 are false positives for PowerShell files that the template
+         copies into generated projects; they are not NuGet install scripts. -->
+    <NoWarn>$(NoWarn);NU5110;NU5111;NU5128</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <Content Include="content/**/*"
              Pack="true"
              PackagePath="content" />
-    <Compile Remove="content/**/*" />
+    <Compile Remove="**/*" />
     <None Remove="content/**/*" />
+    <None Update="README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
 </Project>

@@ -1,6 +1,6 @@
 # Dreambit Engine Templates
 
-> Version 0.1.1 adds explicit kebab-case CLI aliases such as `--game-title`, `--engine-repository`, and `--target-fps`.
+> Version 0.1.4 adds the referenced DreambitEngine projects to generated solutions. It also supports dotted project names such as `Dreambit.ExampleGame`.
 
 This repository builds the installable `dreambit-game` template.
 
@@ -13,6 +13,7 @@ This repository builds the installable `dreambit-game` template.
 - No build-tool project references in the executable project, so content-builder and AssetBaker executables are not copied into the game output.
 - Incremental content builds and IDE up-to-date inputs.
 - Setup scripts that initialize Git, add DreambitEngine as a submodule, restore, and build.
+- Generated solution entries for the DreambitEngine runtime, content builder, and AssetBaker projects.
 
 ## Pack and install locally
 
@@ -32,7 +33,8 @@ Or manually:
 
 ```powershell
 dotnet pack -c Release
-dotnet new install ./bin/Release/DreambitEngine.Templates.0.1.1.nupkg --force
+$version = ([xml](Get-Content ./DreambitEngine.Templates.csproj)).Project.PropertyGroup.Version | Select-Object -First 1
+dotnet new install "./bin/Release/DreambitEngine.Templates.$version.nupkg" --force
 dotnet new dreambit-game -n MyGame --game-title "My Game"
 ```
 
@@ -52,7 +54,7 @@ Use a valid C# identifier for `-n`, such as `MyGame` or `OrbitalDefense`. Use `-
 ./scripts/test-template.ps1
 ```
 
-The test packs the template, installs it into the local template cache, generates `TemplateSmokeTest`, verifies the important project structure, and optionally builds it when a DreambitEngine checkout is supplied.
+The test packs the template, installs it into an isolated template cache, generates `TemplateSmokeTest`, verifies the important project structure, and optionally builds it when a DreambitEngine checkout is supplied. It does not change the templates installed for your user account.
 
 ## Engine setup is required
 

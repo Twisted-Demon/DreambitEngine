@@ -27,23 +27,24 @@ dotnet run --project src/DreambitGame.VK
 ```
 
 In Rider, open `DreambitGame.sln` and select `DreambitGame.VK` as the run project.
+The solution also includes the DreambitEngine runtime, content builder, and AssetBaker projects from `external/DreambitEngine`; run setup first so those solution paths exist.
 
 ## Project layout
 
 ```text
 DreambitGame/
-├── build/
-│   └── DreambitGame.Content.targets
-├── external/
-│   └── DreambitEngine/              # Created by setup script
-├── scripts/
-├── src/
-│   ├── Directory.Build.props
-│   ├── Directory.Packages.props
-│   ├── DreambitGame/                # Game code and scenes
-│   ├── DreambitGame.Content/        # Assets and content builder
-│   └── DreambitGame.VK/             # Vulkan executable
-└── DreambitGame.sln
+|-- build/
+|   `-- DreambitGame.Content.targets
+|-- external/
+|   `-- DreambitEngine/              # Created by setup script
+|-- scripts/
+|-- src/
+|   |-- Directory.Build.props
+|   |-- Directory.Packages.props
+|   |-- DreambitGame/                # Game code and scenes
+|   |-- DreambitGame.Content/        # Assets and content builder
+|   `-- DreambitGame.VK/             # Vulkan executable
+`-- DreambitGame.sln
 ```
 
 ## Adding assets
