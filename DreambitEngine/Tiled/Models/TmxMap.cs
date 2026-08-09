@@ -7,7 +7,6 @@ namespace Dreambit.Tiled;
 
 /// <summary>
 /// Raw XML model for a Tiled TMX map.
-/// Keep parsing/decoding, asset resolution and engine-specific conversion outside these DTOs.
 /// </summary>
 [XmlRoot("map")]
 public sealed class TmxMap : DreambitAsset
