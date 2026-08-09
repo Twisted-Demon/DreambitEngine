@@ -7,5 +7,7 @@ public enum AssetType
     Font = 2,
     Mesh = 3,
     Json = 4,
-    Yaml = 5
+    Yaml = 5,
+    Text = 6,
+    Xml = 7
 }

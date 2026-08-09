@@ -14,16 +14,16 @@ public class BakePakSettings : CommandSettings
     [CommandArgument(0, "<INPUT_DIR>")]
     [Description("Folder to scan (recursively)")]
     public string InputDir { get; set; } = default!;
-    
+
     [CommandArgument(1, "<OUTPUT_PAK>")]
     [Description("Output PAK file")]
     public string OutputPak { get; set; } = default!;
-    
-    [CommandOption("--mips")] 
+
+    [CommandOption("--mips")]
     [Description("Generate mips")]
     public bool GenerateMips { get; set; }
-    
-    [CommandOption("--premul")] 
+
+    [CommandOption("--premul")]
     [Description("Premultiply alpha")]
     public bool PremultiplyAlpha { get; set; }
     [CommandOption("--max-size <N>")] public int? MaxSize { get; set; }
@@ -35,7 +35,7 @@ public class BakePakSettings : CommandSettings
             return ValidationResult.Error("INPUT_DIR does not exist.");
         if (!Path.GetExtension(OutputPak).Equals(".pak", StringComparison.OrdinalIgnoreCase))
             return ValidationResult.Error("OUTPUT_PAK must end with .pak");
-        
+
         return ValidationResult.Success();
     }
 }
@@ -56,10 +56,12 @@ public sealed class BakePakCommand : Command<BakePakSettings>
             .Register(AssetType.Texture, new TextureBaker())
             .Register(AssetType.Json, new JsonbBaker())
             .Register(AssetType.Yaml, new YamlBaker())
-            .Register(AssetType.Audio, new AudioBaker());
+            .Register(AssetType.Audio, new AudioBaker())
+            .Register(AssetType.Text, new TxtbBaker())
+            .Register(AssetType.Xml, new XmlbBaker());
 
         var pak = new PakWriter();
-        
+
         foreach (var file in files)
         {
             try
@@ -73,7 +75,7 @@ public sealed class BakePakCommand : Command<BakePakSettings>
                 var logicalRoot = inputRoot;
 
                 AnsiConsole.MarkupLine($"[green]Baking: [/] {file}");
-                
+
                 var blob = baker.BakeToBytes(new BakeContext
                 {
                     InputPath = file,
@@ -86,6 +88,7 @@ public sealed class BakePakCommand : Command<BakePakSettings>
                 });
 
                 lock (pak) pak.Add(blob);
+                AnsiConsole.MarkupLine($"[green]Baked: [/] {blob.LogicalPath + blob.Extension}");
             }
             catch (Exception e)
             {
@@ -93,10 +96,10 @@ public sealed class BakePakCommand : Command<BakePakSettings>
                 return -1;
             }
         }
-        
+
         AnsiConsole.MarkupLine($"[green]Saving [/] {settings.OutputPak}");
         pak.Save(settings.OutputPak);
-        
+
         return 0;
     }
 }

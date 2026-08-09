@@ -1,4 +1,6 @@
-﻿using System.ComponentModel;
+﻿#nullable enable
+using System.Collections.Generic;
+using System.ComponentModel;
 using System.Xml.Serialization;
 
 namespace Dreambit.Tiled;
@@ -8,7 +10,7 @@ namespace Dreambit.Tiled;
 /// Keep parsing/decoding, asset resolution and engine-specific conversion outside these DTOs.
 /// </summary>
 [XmlRoot("map")]
-public sealed class TmxMap
+public sealed class TmxMap : DreambitAsset
 {
     [XmlAttribute("version")]
     public string? Version { get; set; }
@@ -105,7 +107,7 @@ public sealed class TmxMap
 /// or a tileset reference when Source is set.
 /// </summary>
 [XmlRoot("tileset")]
-public sealed class TmxTileset
+public sealed class TmxTileset : DreambitAsset
 {
     // Present on a tileset reference inside a TMX map, absent on the external TSX root.
     [XmlAttribute("firstgid")]
