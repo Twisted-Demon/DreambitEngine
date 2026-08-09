@@ -1,0 +1,15 @@
+.idea/
+.vs/
+.vscode/
+*.user
+*.suo
+*.DotSettings.user
+
+**/bin/
+**/obj/
+**/artifacts/
+**/TestResults/
+
+*.nupkg
+*.snupkg
+TemplateTests/

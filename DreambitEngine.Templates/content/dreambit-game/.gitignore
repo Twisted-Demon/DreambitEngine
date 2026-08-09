@@ -1,0 +1,62 @@
+# IDE and per-user settings
+.idea/
+.vs/
+.vscode/
+*.suo
+*.user
+*.rsuser
+*.userosscache
+*.sln.docstates
+*.DotSettings.user
+_ReSharper*/
+*.resharper
+
+# .NET build and publish output
+**/[Bb]in/
+**/[Oo]bj/
+**/[Bb]uild/
+!build/
+!build/**
+**/[Aa]rtifacts/
+**/[Pp]ublish/
+*.nupkg
+*.snupkg
+
+# Test and coverage output
+**/[Tt]est[Rr]esults/
+**/[Bb]enchmark[Dd]ot[Nn]et.[Aa]rtifacts/
+**/[Cc]overage/
+coverage-*
+*.coverage
+*.coveragexml
+*.trx
+*.lcov
+lcov.info
+
+# Generated game content
+**/[Cc]ontent/content.pak
+
+# NuGet restore state
+.nuget/
+packages/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.bak
+*.orig
+*.rej
+*.swp
+*.swo
+*~
+
+# Operating-system metadata
+.DS_Store
+Thumbs.db
+Desktop.ini

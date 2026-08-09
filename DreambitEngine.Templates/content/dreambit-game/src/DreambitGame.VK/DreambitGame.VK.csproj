@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <RollForward>Major</RollForward>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <TieredCompilation>false</TieredCompilation>
+    <MonoGamePlatform>DesktopVK</MonoGamePlatform>
+
+    <BaseOutputPath>$(MSBuildProjectDirectory)/Build/</BaseOutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Icon.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Icon.ico" />
+    <None Remove="Icon.bmp" />
+    <EmbeddedResource Include="Icon.ico" LogicalName="Icon.ico" />
+    <EmbeddedResource Include="Icon.bmp" LogicalName="Icon.bmp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MonoGame.Framework.Native" />
+    <PackageReference Include="MonoGame.Runtime.Windows.Vulkan" />
+    <PackageReference Include="MonoGame.Runtime.Mac.Vulkan" />
+    <PackageReference Include="MonoGame.Runtime.Linux.Vulkan" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- This is the executable's only project dependency. Build-time content tools
+         are invoked by DreambitGame.Content.targets and never copied locally. -->
+    <ProjectReference Include="../DreambitGame/DreambitGame.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Rider/Visual Studio fast up-to-date checks must notice content changes. -->
+    <UpToDateCheckInput Include="../DreambitGame.Content/Assets/**/*" />
+    <UpToDateCheckInput Include="../DreambitGame.Content/Builder/**/*.cs" />
+    <UpToDateCheckInput Include="../DreambitGame.Content/DreambitGame.Content.csproj" />
+    <UpToDateCheckInput Include="../../build/DreambitGame.Content.targets" />
+    <UpToDateCheckInput Include="$(DreambitEngineRoot)/Dreambit.Content/Assets/**/*" />
+    <UpToDateCheckInput Include="$(DreambitEngineRoot)/Dreambit.Content/Builder/**/*.cs" />
+    <UpToDateCheckInput Include="$(DreambitEngineRoot)/DreambitEngine.AssetBaker/**/*.cs" />
+  </ItemGroup>
+
+  <Import Project="../../build/DreambitGame.Content.targets" />
+</Project>

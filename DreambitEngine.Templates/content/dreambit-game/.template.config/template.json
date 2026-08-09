@@ -1,0 +1,90 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Dreambit Engine",
+  "classifications": [
+    "Game",
+    "Dreambit",
+    "MonoGame"
+  ],
+  "identity": "DreambitEngine.Templates.Game",
+  "groupIdentity": "DreambitEngine.Templates.Game",
+  "name": "Dreambit Engine Game",
+  "shortName": "dreambit-game",
+  "sourceName": "DreambitGame",
+  "defaultName": "DreambitGame",
+  "preferNameDirectory": true,
+  "tags": {
+    "language": "C#",
+    "type": "solution"
+  },
+  "symbols": {
+    "gameTitle": {
+      "type": "parameter",
+      "datatype": "text",
+      "displayName": "Game title",
+      "description": "The human-readable title displayed in the game window.",
+      "defaultValue": "Dreambit Game",
+      "replaces": "Dreambit Game"
+    },
+    "engineRepository": {
+      "type": "parameter",
+      "datatype": "text",
+      "displayName": "DreambitEngine repository",
+      "description": "Git repository used by the setup scripts.",
+      "defaultValue": "https://github.com/Twisted-Demon/DreambitEngine.git",
+      "replaces": "__DREAMBIT_ENGINE_REPOSITORY__"
+    },
+    "targetFps": {
+      "type": "parameter",
+      "datatype": "int",
+      "displayName": "Target FPS",
+      "description": "Initial target frame rate used by Program.cs.",
+      "defaultValue": "240",
+      "replaces": "__DREAMBIT_TARGET_FPS__"
+    }
+  },
+  "guids": [
+    "4C5011FD-105B-42FB-B48D-0F2B3A42A001",
+    "4C5011FD-105B-42FB-B48D-0F2B3A42A002",
+    "4C5011FD-105B-42FB-B48D-0F2B3A42A003"
+  ],
+  "sources": [
+    {
+      "source": "./",
+      "target": "./",
+      "exclude": [
+        ".template.config/**/*",
+        ".git/**/*",
+        ".idea/**/*",
+        ".vs/**/*",
+        ".vscode/**/*",
+        "**/[Bb]in/**/*",
+        "**/[Oo]bj/**/*",
+        "**/[Aa]rtifacts/**/*",
+        "**/*.user",
+        "**/*.DotSettings.user",
+        "src/**/[Bb]uild/**/*"
+      ]
+    }
+  ],
+  "primaryOutputs": [
+    {
+      "path": "DreambitGame.sln"
+    },
+    {
+      "path": "src/DreambitGame.VK/DreambitGame.VK.csproj"
+    }
+  ],
+  "postActions": [
+    {
+      "description": "Initialize the DreambitEngine submodule before opening or building the solution.",
+      "manualInstructions": [
+        {
+          "text": "From the generated project directory, run .\\scripts\\setup-engine.ps1 on Windows or ./scripts/setup-engine.sh on macOS/Linux."
+        }
+      ],
+      "actionId": "AC1156F7-BB77-4DB8-B28F-24EEBCCA1E5C",
+      "continueOnError": true
+    }
+  ]
+}

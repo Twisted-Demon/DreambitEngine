@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+
+    <PackageId>DreambitEngine.Templates</PackageId>
+    <Version>0.1.2</Version>
+    <Title>Dreambit Engine Templates</Title>
+    <Authors>Dreambit Engine</Authors>
+    <Description>Project templates for creating games with Dreambit Engine.</Description>
+    <PackageTags>dotnet-new;templates;game-development;dreambit;monogame</PackageTags>
+    <PackageType>Template</PackageType>
+
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <IncludeContentInPack>true</IncludeContentInPack>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="content/**/*"
+             Pack="true"
+             PackagePath="content" />
+    <Compile Remove="content/**/*" />
+    <None Remove="content/**/*" />
+  </ItemGroup>
+</Project>
