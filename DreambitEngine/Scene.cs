@@ -622,69 +622,6 @@ public class Scene : IDisposable
 
     #endregion
 
-    #region LDtk Scene Helpers
-
-    /// <summary>
-    ///     Creates and schedules the next LDtk scene by identifier.
-    /// </summary>
-    public static LDtkScene SetNextLDtkScene(string identifier)
-    {
-        var scene = new LDtkScene
-        {
-            LevelIdentifier = identifier,
-            LoadByGuid = false
-        };
-
-        SetNextScene(scene);
-        return scene;
-    }
-
-    /// <summary>
-    ///     Creates and schedules the next LDtk scene (generic typed) by identifier.
-    /// </summary>
-    public static T SetNextLDtkScene<T>(string identifier) where T : LDtkScene, new()
-    {
-        var scene = new T
-        {
-            LevelIdentifier = identifier,
-            LoadByGuid = false
-        };
-
-        SetNextScene(scene);
-        return scene;
-    }
-
-    /// <summary>
-    ///     Creates and schedules the next LDtk scene by IID (GUID).
-    /// </summary>
-    public static LDtkScene SetNextLDtkScene(Guid iid)
-    {
-        var scene = new LDtkScene
-        {
-            LevelIid = iid,
-            LoadByGuid = true
-        };
-
-        SetNextScene(scene);
-        return scene;
-    }
-
-    /// <summary>
-    ///     Creates and schedules the next LDtk scene (generic typed) by IID (GUID).
-    /// </summary>
-    public static T SetNextLDtkScene<T>(Guid iid) where T : LDtkScene, new()
-    {
-        var scene = new T
-        {
-            LevelIid = iid,
-            LoadByGuid = true
-        };
-
-        SetNextScene(scene);
-        return scene;
-    }
-
-    #endregion
 }
 
 /// <summary>Lifecycle states for <see cref="Scene" />.</summary>

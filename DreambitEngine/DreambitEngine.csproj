@@ -36,9 +36,6 @@
       <None Remove="bin\**" />
       <None Remove="Content\obj\**" />
     </ItemGroup>
-    <ItemGroup>
-      <ProjectReference Include="..\LDtkMonogame\LDtk\LDtk.csproj" />
-    </ItemGroup>
     <PropertyGroup>
         <MonoGameExtendedPipelineReferencePath>$(MSBuildThisFileDirectory)../Includes</MonoGameExtendedPipelineReferencePath>
     </PropertyGroup>
