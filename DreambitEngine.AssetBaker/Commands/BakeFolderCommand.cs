@@ -47,7 +47,7 @@ public sealed class BakeFolderSettings : CommandSettings
 
 public class BakeFolderCommand : Command<BakeFolderSettings>
 {
-    public override int Execute(CommandContext context, BakeFolderSettings settings)
+    protected override int Execute(CommandContext context, BakeFolderSettings settings, CancellationToken cancellationToken)
     {
         var registry = new AssetBakerRegistry()
             .Register(AssetType.Texture, new TextureBaker())

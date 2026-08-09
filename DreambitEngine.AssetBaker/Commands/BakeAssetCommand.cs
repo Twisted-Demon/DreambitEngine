@@ -47,7 +47,7 @@ public sealed class BakeAssetSettings : CommandSettings
 
 public sealed class BakeAssetCommand : Command<BakeAssetSettings>
 {
-    public override int Execute(CommandContext context, BakeAssetSettings s)
+    protected override int Execute(CommandContext context, BakeAssetSettings s, CancellationToken cancellationToken)
     {
         var registry = new AssetBakerRegistry()
             .Register(AssetType.Texture, new TextureBaker())

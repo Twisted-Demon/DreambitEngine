@@ -79,6 +79,16 @@ public class Scene : IDisposable
         Core.Instance.SetNextScene(scene);
     }
 
+    public void LoadIntoSelf(SceneBlueprint blueprint)
+    {
+        var entityBlueprints = blueprint.Entities;
+
+        foreach (var entity in entityBlueprints)
+        {
+            CreateEntity(entity);
+        }
+    }
+
     #endregion
 
     #region Fields (Internals)

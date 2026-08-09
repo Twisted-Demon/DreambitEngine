@@ -52,7 +52,7 @@ public sealed class BakeDirectorySettings : CommandSettings
 
 public sealed class BakeDirectoryCommand : Command<BakeDirectorySettings>
 {
-    public override int Execute(CommandContext context, BakeDirectorySettings s)
+    protected override int Execute(CommandContext context, BakeDirectorySettings s, CancellationToken cancellationToken)
     {
         var inputRoot = Path.GetFullPath(s.InputDir);
         var outputRoot = Path.GetFullPath(s.OutputDir);

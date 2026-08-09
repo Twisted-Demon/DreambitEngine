@@ -42,7 +42,7 @@ public class BakePakSettings : CommandSettings
 
 public sealed class BakePakCommand : Command<BakePakSettings>
 {
-    public override int Execute(CommandContext context, BakePakSettings settings)
+    protected override int Execute(CommandContext context, BakePakSettings settings, CancellationToken cancellationToken)
     {
         var inputRoot = Path.GetFullPath(settings.InputDir);
         var files = Directory.EnumerateFiles(inputRoot, "*", new EnumerationOptions
