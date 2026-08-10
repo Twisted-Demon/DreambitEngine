@@ -7,6 +7,8 @@ zoom, rotation, and following. Every scene already supplies `MainCamera` and
 ```csharp
 MainCamera.Zoom = 2f;
 MainCamera.SetTargetVerticalResolution(45f);
+MainCamera.PixelPerfectPixelsPerUnit = 32f;
+MainCamera.PixelSnap = true; // Point-sampled pixel art
 MainCamera.ForcePosition(new Vector3(20, 12, 0));
 ```
 

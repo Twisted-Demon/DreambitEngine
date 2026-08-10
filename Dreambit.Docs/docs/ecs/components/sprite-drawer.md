@@ -13,8 +13,11 @@ drawer.FlipX = true;
 drawer.DrawLayer = 10;
 ```
 
-You can also assign `Sprite`, call `SetSprite`, or use a custom normalized pivot
-with `WithPivot(Vector2)`. `(0,0)` is top-left and `(1,1)` is bottom-right.
+You can also assign `Sprite`, call `SetSprite`, or use a custom pixel-space pivot
+with `WithPivot(Vector2)`. The pivot is relative to the sprite's source rectangle,
+so `WithPivot(new Vector2(15, 15))` places the origin 15 source pixels from its
+top-left corner. The sprite's `PixelsPerUnit` and world scale automatically
+convert that offset when it is drawn.
 
 `Bounds` accounts for the sprite, pivot, world scale, and camera units and is
 used for culling. `DrawLayer` orders drawable groups; within normal lit rendering

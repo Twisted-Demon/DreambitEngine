@@ -11,6 +11,21 @@ MainCamera.SetTargetVerticalResolution(45f); // visible world units at Zoom 1
 their pixels-per-unit value, which determines how texture pixels convert to
 world units. `WorldUnitsPerScreenPixel` is useful for pixel-sized debug lines.
 
+For point-sampled pixel art, set `PixelPerfectPixelsPerUnit` to the source
+pixels represented by one world unit and enable `PixelSnap`:
+
+```csharp
+MainCamera.PixelPerfectPixelsPerUnit = 32f;
+MainCamera.PixelSnap = true;
+```
+
+The first setting quantizes camera scale so every source pixel occupies an
+integer number of screen pixels after a resize. The second rounds the final
+render translation to whole screen pixels. Pixel-perfect rendering requires an
+unrotated camera; when the viewport is not an exact multiple of the target
+resolution, the visible world area changes slightly rather than using a
+fractional texel scale.
+
 ## Conversions
 
 ```csharp

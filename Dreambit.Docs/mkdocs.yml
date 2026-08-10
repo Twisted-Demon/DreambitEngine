@@ -138,7 +138,9 @@ nav:
       - State machines and blackboards: ai/fsm.md
   - LDtk:
       - Overview: ldtk/index.md
+      - Quick start: ldtk/quick-start.md
       - Loading worlds and levels: ldtk/loading-levels.md
+      - MonoGame conversions: ldtk/monogame-conversions.md
       - Mapping LDtk entities: ldtk/entities.md
   - Scripting and cutscenes: scripting/index.md
   - Utilities:
