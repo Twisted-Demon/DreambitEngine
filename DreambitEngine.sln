@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dreambit.Content", "Dreambi
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dreambit.Tiled", "Dreambit.Tiled\Dreambit.Tiled.csproj", "{A37F007E-4F03-409D-BB06-0E083E861AD8}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dreambit.AssetEditor", "Dreambit.AssetEditor\Dreambit.AssetEditor.csproj", "{39D3946C-9F28-41EF-A496-CFD98D285276}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,18 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{39D3946C-9F28-41EF-A496-CFD98D285276}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{39D3946C-9F28-41EF-A496-CFD98D285276}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{39D3946C-9F28-41EF-A496-CFD98D285276}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{39D3946C-9F28-41EF-A496-CFD98D285276}.Debug|x64.Build.0 = Debug|Any CPU
+		{39D3946C-9F28-41EF-A496-CFD98D285276}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{39D3946C-9F28-41EF-A496-CFD98D285276}.Debug|x86.Build.0 = Debug|Any CPU
+		{39D3946C-9F28-41EF-A496-CFD98D285276}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{39D3946C-9F28-41EF-A496-CFD98D285276}.Release|Any CPU.Build.0 = Release|Any CPU
+		{39D3946C-9F28-41EF-A496-CFD98D285276}.Release|x64.ActiveCfg = Release|Any CPU
+		{39D3946C-9F28-41EF-A496-CFD98D285276}.Release|x64.Build.0 = Release|Any CPU
+		{39D3946C-9F28-41EF-A496-CFD98D285276}.Release|x86.ActiveCfg = Release|Any CPU
+		{39D3946C-9F28-41EF-A496-CFD98D285276}.Release|x86.Build.0 = Release|Any CPU
 		{BC54A728-FCFC-4028-AEF1-DC0918272EE6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{BC54A728-FCFC-4028-AEF1-DC0918272EE6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BC54A728-FCFC-4028-AEF1-DC0918272EE6}.Debug|x64.ActiveCfg = Debug|Any CPU

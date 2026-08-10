@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
@@ -177,11 +177,16 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
 
                 var assemblyName = type.Assembly.GetName().Name;
                 var componentName = type.Name;
+                var blueprintType = type.GetCustomAttribute<BlueprintTypeAttribute>();
+
+                if (blueprintType is not null)
+                    RegisterComponentTypeKey(blueprintType.Id, type, true);
 
                 if (!string.IsNullOrWhiteSpace(componentName))
                     RegisterComponentTypeKey($"{assemblyName}.{componentName}", type, false);
 
-                logger.Trace($"registered: {assemblyName}.{componentName}");
+                var registeredName = blueprintType?.Id ?? $"{assemblyName}.{componentName}";
+                logger.Trace($"registered: {registeredName}");
             }
 
             _componentRegistryBuilt = true;

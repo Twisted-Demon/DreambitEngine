@@ -1,12 +1,24 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using Newtonsoft.Json;
 
 namespace Dreambit;
 
 internal static class PropertyConverterRegistry
 {
-    public static Dictionary<Type, JsonConverter> Converters { get; } = BuildConvertersDictionary();
+    private static readonly object Sync = new();
+    private static Dictionary<Type, JsonConverter> _converters = BuildConvertersDictionary();
+
+    public static Dictionary<Type, JsonConverter> Converters
+    {
+        get
+        {
+            lock (Sync)
+                return _converters;
+        }
+    }
 
     public static JsonSerializerSettings CreateSerializerSettings()
     {
@@ -15,30 +27,73 @@ internal static class PropertyConverterRegistry
             ContractResolver = DreambitAssetContractResolver.Instance
         };
 
-        foreach (var converter in Converters.Values)
-            settings.Converters.Add(converter);
+        lock (Sync)
+        {
+            foreach (var converter in _converters.Values)
+                settings.Converters.Add(converter);
+        }
 
         return settings;
+    }
+
+    public static void Rebuild()
+    {
+        lock (Sync)
+            _converters = BuildConvertersDictionary();
+    }
+
+    public static bool HasConverter(Type type)
+    {
+        lock (Sync)
+            return _converters.ContainsKey(type);
     }
 
     private static Dictionary<Type, JsonConverter> BuildConvertersDictionary()
     {
         var converters = new Dictionary<Type, JsonConverter>();
-        var converterTypes = ReflectionUtils.GetAllTypesAssignableFrom(
-            typeof(IPropertyConverterMarker),
-            true);
+        var converterTypes = AppDomain.CurrentDomain.GetAssemblies()
+            .SelectMany(GetLoadableTypes)
+            .Where(type =>
+                !type.IsAbstract &&
+                !type.IsGenericType &&
+                typeof(IPropertyConverterMarker).IsAssignableFrom(type) &&
+                type.GetConstructor(Type.EmptyTypes) is not null);
 
         foreach (var type in converterTypes)
         {
-            var instance = (JsonConverter)Activator.CreateInstance(type);
-            if (instance is null)
-                continue;
+            try
+            {
+                var instance = (JsonConverter)Activator.CreateInstance(type);
+                if (instance is null)
+                    continue;
 
-            var target = GetPropertyConverterTarget(type);
-            converters[target] = instance;
+                var target = GetPropertyConverterTarget(type);
+                converters[target] = instance;
+            }
+            catch
+            {
+                // A third-party converter should not prevent the engine from
+                // discovering every other converter in the process.
+            }
         }
 
         return converters;
+    }
+
+    private static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
+    {
+        try
+        {
+            return assembly.GetTypes();
+        }
+        catch (ReflectionTypeLoadException exception)
+        {
+            return exception.Types.OfType<Type>();
+        }
+        catch
+        {
+            return Array.Empty<Type>();
+        }
     }
 
     private static Type GetPropertyConverterTarget(Type converterType)
