@@ -18,6 +18,10 @@ public class SpriteDrawer :
     public float Opacity { get; internal set; } =
         1.0f;
 
+    /// <summary>
+    /// The custom pivot in pixels relative to the sprite's source rectangle.
+    /// It is converted to world space using the sprite draw scale.
+    /// </summary>
     [DreambitSerialize]
     public Vector2 Pivot { get; internal set; } =
         Vector2.Zero;
@@ -67,21 +71,14 @@ public class SpriteDrawer :
                     1f);
             }
 
-            var origin =
-                GetOriginToUse();
-
-            var drawScale =
-                GetSpriteDrawScale();
-
             var worldOrigin =
-                origin *
-                drawScale;
+                GetWorldOriginToUse();
 
             var worldSize =
                 new Vector2(
                     Sprite.SourceRect.Width,
                     Sprite.SourceRect.Height) *
-                drawScale;
+                GetSpriteDrawScale();
 
             position =
                 GetDrawPosition();
@@ -147,13 +144,13 @@ public class SpriteDrawer :
     }
 
     public SpriteDrawer WithPivot(
-        Vector2 pivot)
+        Vector2 pivotInPixels)
     {
         PivotType =
             PivotType.Custom;
 
         Pivot =
-            pivot;
+            pivotInPixels;
 
         return this;
     }
@@ -180,6 +177,7 @@ public class SpriteDrawer :
             Sprite.SourceRect,
             Tint * Opacity,
             GetDrawRotation(),
+            // SpriteBatch applies the draw scale to this pixel-space origin.
             GetOriginToUse(),
             GetSpriteDrawScale(),
             GetSpriteEffects());
@@ -205,6 +203,9 @@ public class SpriteDrawer :
         return GetDrawScale() / Sprite.PixelsPerUnit;
     }
 
+    /// <summary>
+    /// Gets the origin relative to the sprite's source rectangle, in pixels.
+    /// </summary>
     protected virtual Vector2 GetOriginToUse()
     {
         var origin =
@@ -233,6 +234,14 @@ public class SpriteDrawer :
         }
 
         return origin;
+    }
+
+    /// <summary>
+    /// Converts the pixel-space origin to the offset used by world-space bounds.
+    /// </summary>
+    protected virtual Vector2 GetWorldOriginToUse()
+    {
+        return GetOriginToUse() * GetSpriteDrawScale();
     }
 
     protected virtual SpriteEffects GetSpriteEffects()

@@ -22,6 +22,10 @@ public class SpriteSheetAnimation : DreambitAsset
 
     [JsonProperty("index_start")] public int IndexStart { get; set; }
     [JsonProperty("index_end")] public int IndexEnd { get; set; }
+
+    /// <summary>
+    /// The default frame pivot in pixels relative to each sprite-sheet cell.
+    /// </summary>
     [JsonProperty("pivot")] public Vector2 Pivot { get; set; }
 
     public AnimationFrame this[int key]
@@ -65,6 +69,9 @@ public class AnimationFrame
 
     [JsonProperty("frame_index")] public int FrameIndex { get; set; }
 
+    /// <summary>
+    /// The frame pivot in pixels relative to its sprite-sheet cell.
+    /// </summary>
     [JsonProperty("pivot")] public Vector2 Pivot { get; set; }
 }
 

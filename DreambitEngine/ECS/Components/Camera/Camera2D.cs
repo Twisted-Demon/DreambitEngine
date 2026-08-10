@@ -24,6 +24,8 @@ public class Camera2D : Component
     private Vector2 _lastViewportSize;
 
     private bool _matricesDirty = true;
+    private bool _pixelSnap;
+    private float _pixelPerfectPixelsPerUnit;
     private float _resolutionZoom = 1f;
     private float _zoom = 1f;
 
@@ -73,9 +75,54 @@ public class Camera2D : Component
     public float TotalZoom => Zoom * ResolutionZoom;
 
     /// <summary>
+    /// Rounds the final world-render translation to whole screen pixels. This
+    /// keeps point-sampled pixel art on stable texel centers during camera
+    /// movement and prevents tile-atlas edge sampling.
+    /// </summary>
+    [DreambitSerialize]
+    public bool PixelSnap
+    {
+        get => _pixelSnap;
+        set
+        {
+            if (_pixelSnap == value)
+                return;
+
+            _pixelSnap = value;
+            _matricesDirty = true;
+        }
+    }
+
+    /// <summary>
+    ///     Source pixels contained in one world unit when pixel-perfect scaling
+    ///     is required. A value of zero disables scale quantization. Positive
+    ///     values keep each source pixel an integer number of screen pixels,
+    ///     including after the viewport is resized.
+    /// </summary>
+    [DreambitSerialize]
+    public float PixelPerfectPixelsPerUnit
+    {
+        get => _pixelPerfectPixelsPerUnit;
+        set
+        {
+            if (!float.IsFinite(value) || value < 0f)
+                throw new ArgumentOutOfRangeException(
+                    nameof(value),
+                    value,
+                    "Pixel-perfect pixels per unit must be finite and non-negative.");
+
+            if (_pixelPerfectPixelsPerUnit == value)
+                return;
+
+            _pixelPerfectPixelsPerUnit = value;
+            _matricesDirty = true;
+        }
+    }
+
+    /// <summary>
     ///     Final number of screen pixels occupied by one world unit.
     /// </summary>
-    public float Scale => TotalZoom;
+    public float Scale => QuantizePixelPerfectScale(TotalZoom);
 
     public float WorldUnitsWidth => Window.BackBufferWidth / Scale;
     public float WorldUnitsHeight => Window.BackBufferHeight / Scale;
@@ -88,7 +135,7 @@ public class Camera2D : Component
     private float ScreenPixelsPerWorldUnit => Scale;
 
     private float NoCameraZoomPixelsPerWorldUnit =>
-        ResolutionZoom;
+        QuantizePixelPerfectScale(ResolutionZoom);
 
     private Vector2 ViewportSize =>
         new(Window.Width, Window.Height);
@@ -246,6 +293,9 @@ public class Camera2D : Component
             viewportSize,
             ScreenPixelsPerWorldUnit);
 
+        if (PixelSnap)
+            TransformMatrix = SnapTranslationToPixels(TransformMatrix);
+
         _inverseTransformMatrix =
             Matrix.Invert(TransformMatrix);
 
@@ -306,6 +356,29 @@ public class Camera2D : Component
                 pixelsPerWorldUnit,
                 pixelsPerWorldUnit,
                 1f);
+    }
+
+    private float QuantizePixelPerfectScale(float scale)
+    {
+        if (PixelPerfectPixelsPerUnit < MinimumScale)
+            return scale;
+
+        var integerTexelScale = MathF.Max(
+            1f,
+            MathF.Floor(scale / PixelPerfectPixelsPerUnit));
+
+        return integerTexelScale * PixelPerfectPixelsPerUnit;
+    }
+
+    private static Matrix SnapTranslationToPixels(Matrix matrix)
+    {
+        matrix.M41 = MathF.Round(
+            matrix.M41,
+            MidpointRounding.AwayFromZero);
+        matrix.M42 = MathF.Round(
+            matrix.M42,
+            MidpointRounding.AwayFromZero);
+        return matrix;
     }
 
     private RectangleF CalculateWorldBounds(Matrix inverseCameraMatrix)

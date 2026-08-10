@@ -230,6 +230,7 @@ public partial class LDtkFile
         foreach (var layer in level.LayerInstances ?? [])
         {
             layer.Project = this;
+            layer.Level = level;
             if (!string.IsNullOrWhiteSpace(layer._TilesetRelPath))
             {
                 layer.TilesetSourcePath = ResolveExternalPath(layer._TilesetRelPath);
@@ -239,6 +240,8 @@ public partial class LDtkFile
             foreach (var entity in layer.EntityInstances ?? [])
             {
                 entity.Project = this;
+                entity.Level = level;
+                entity.Layer = layer;
                 foreach (var field in entity.FieldInstances ?? [])
                     field.Project = this;
             }
@@ -298,6 +301,45 @@ public sealed class LDtkLoadedWorld
     {
         foreach (var iid in iids)
             yield return LoadLevel(iid);
+    }
+
+    /// <summary>
+    /// Returns the level's world-space pixel origin. Linear LDtk layouts use
+    /// array order because their exported worldX/worldY values may be -1.
+    /// </summary>
+    public LdtkPoint GetLevelWorldPosition(Guid iid)
+    {
+        var index = -1;
+        for (var candidateIndex = 0; candidateIndex < Levels.Count; candidateIndex++)
+            if (Levels[candidateIndex].Iid == iid)
+            {
+                index = candidateIndex;
+                break;
+            }
+
+        if (index < 0)
+            throw new LdtkException($"No level with IID '{iid}' exists in world '{Identifier}'.");
+
+        var level = Levels[index];
+        switch (Layout)
+        {
+            case WorldLayout.LinearHorizontal:
+            {
+                var x = 0;
+                for (var levelIndex = 0; levelIndex < index; levelIndex++)
+                    x = checked(x + Levels[levelIndex].PxWid);
+                return new LdtkPoint(x, 0);
+            }
+            case WorldLayout.LinearVertical:
+            {
+                var y = 0;
+                for (var levelIndex = 0; levelIndex < index; levelIndex++)
+                    y = checked(y + Levels[levelIndex].PxHei);
+                return new LdtkPoint(0, y);
+            }
+            default:
+                return new LdtkPoint(level.WorldX, level.WorldY);
+        }
     }
 }
 

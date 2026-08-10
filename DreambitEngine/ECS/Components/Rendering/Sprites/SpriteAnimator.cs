@@ -167,6 +167,8 @@ public class SpriteAnimator : Component
             _currentAnimationFrame = frameNumber;
             var sprite = CurrentSpriteSheet[nextFrame.FrameIndex];
             _spriteDrawer.SetSprite(sprite);
+
+            // Animation pivots use the same sprite-local pixel space as SpriteDrawer.
             _spriteDrawer.WithPivot(nextFrame.Pivot);
 
             if (nextFrame.AnimationEvent == null) return;

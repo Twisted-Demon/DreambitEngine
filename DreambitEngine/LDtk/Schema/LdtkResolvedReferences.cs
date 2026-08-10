@@ -58,6 +58,9 @@ public partial class LayerInstance
     public LDtkFile Project { get; internal set; } = null!;
 
     [JsonIgnore]
+    public LDtkLevel Level { get; internal set; } = null!;
+
+    [JsonIgnore]
     public string? TilesetSourcePath { get; internal set; }
 
     [JsonIgnore]
@@ -71,6 +74,12 @@ public partial class EntityInstance
 {
     [JsonIgnore]
     public LDtkFile Project { get; internal set; } = null!;
+
+    [JsonIgnore]
+    public LDtkLevel Level { get; internal set; } = null!;
+
+    [JsonIgnore]
+    public LayerInstance Layer { get; internal set; } = null!;
 
     [JsonIgnore]
     public EntityDefinition Definition

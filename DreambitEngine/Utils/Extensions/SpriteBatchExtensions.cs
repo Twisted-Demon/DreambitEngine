@@ -28,7 +28,7 @@ public static class SpriteBatchExtensions
         Rectangle? sourceRectangle,
         Color color,
         float rotation,
-        Vector2 origin,
+        Vector2 originInPixels,
         Vector2 worldScale,
         SpriteEffects effects = SpriteEffects.None,
         float layerDepth = 0f)
@@ -42,7 +42,7 @@ public static class SpriteBatchExtensions
             sourceRectangle,
             color,
             rotation,
-            origin,
+            originInPixels,
             worldScale,
             effects,
             layerDepth);

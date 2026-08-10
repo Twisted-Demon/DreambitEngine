@@ -98,6 +98,11 @@ public class EntityRepository
                     break;
                 }
 
+            // A streamed level may be unloaded before the next entity tick.
+            // Pending entities already own live components/drawable registrations,
+            // so cancelling the queue entry must also destroy those resources.
+            entity.Destroy();
+            entity.Dispose();
             return;
         }
 
