@@ -6,7 +6,7 @@ namespace Dreambit.ECS;
 
 public class EntityRepository
 {
-    // Optional “always update” bucket (kept as-is; semantics unchanged)
+    // Entities that continue updating even when their normal Enabled chain is false.
     private readonly List<Entity> _alwaysUpdateEntities = new(16);
 
     // Active entities
@@ -103,6 +103,7 @@ public class EntityRepository
             // so cancelling the queue entry must also destroy those resources.
             entity.Destroy();
             entity.Dispose();
+            RemoveByReference(_alwaysUpdateEntities, entity);
             return;
         }
 
@@ -116,10 +117,19 @@ public class EntityRepository
 
     internal void ClearLists()
     {
-        // Destroy everything in all buckets
-        for (var i = 0; i < _entitiesToCreate.Count; i++) _entitiesToCreate[i].Destroy();
-        for (var i = 0; i < _entitiesToDestroy.Count; i++) _entitiesToDestroy[i].Destroy();
-        for (var i = 0; i < _entities.Count; i++) _entities[i].Destroy();
+        var allEntities = new HashSet<Entity>(ReferenceEqualityComparer.Instance);
+        allEntities.UnionWith(_entitiesToCreate);
+        allEntities.UnionWith(_entitiesToDestroy);
+        allEntities.UnionWith(_entities);
+
+        foreach (var entity in _entities)
+            entity.OnRemovedFromScene();
+
+        foreach (var entity in allEntities)
+        {
+            entity.Destroy();
+            entity.Dispose();
+        }
 
         _entities.Clear();
         _entitiesSet.Clear();
@@ -134,15 +144,19 @@ public class EntityRepository
 
     private void UpdateEntities()
     {
-        // Update enabled entities
         for (var i = 0; i < _entities.Count; i++)
         {
             var e = _entities[i];
-            if (e.Enabled) e.Update();
+            if (e.Enabled && !_alwaysUpdateEntities.Contains(e))
+                e.Update();
         }
 
-        // If “always update” should override Enabled, do it here (kept same behavior: no override).
-        // for (int i = 0; i < _alwaysUpdateEntities.Count; i++) _alwaysUpdateEntities[i].Update();
+        for (var i = 0; i < _alwaysUpdateEntities.Count; i++)
+        {
+            var entity = _alwaysUpdateEntities[i];
+            if (_entitiesSet.Contains(entity))
+                entity.Update();
+        }
     }
 
     private void PhysicsUpdateEntities()
@@ -150,7 +164,15 @@ public class EntityRepository
         for (var i = 0; i < _entities.Count; i++)
         {
             var e = _entities[i];
-            if (e.Enabled) e.PhysicsUpdate();
+            if (e.Enabled && !_alwaysUpdateEntities.Contains(e))
+                e.PhysicsUpdate();
+        }
+
+        for (var i = 0; i < _alwaysUpdateEntities.Count; i++)
+        {
+            var entity = _alwaysUpdateEntities[i];
+            if (_entitiesSet.Contains(entity))
+                entity.PhysicsUpdate();
         }
     }
 
@@ -215,6 +237,7 @@ public class EntityRepository
 
             _entitiesSet.Remove(e);
             _entitiesById.Remove(e.Id);
+            RemoveByReference(_alwaysUpdateEntities, e);
 
             e.OnRemovedFromScene();
             e.Destroy();

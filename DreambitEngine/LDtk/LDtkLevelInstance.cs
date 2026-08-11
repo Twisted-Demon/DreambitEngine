@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Dreambit.ECS;
 using Microsoft.Xna.Framework;
 
@@ -58,6 +59,13 @@ public sealed class LDtkLevelInstance : IDisposable
                 $"Layer '{layer._Identifier}' does not belong to loaded level '{Identifier}'.",
                 nameof(layer));
         return drawLayer;
+    }
+
+    public bool TryGetLayerInstance(string identifier, out LayerInstance layer)
+    {
+        layer = Level.LayerInstances?.FirstOrDefault(layer => layer._Identifier == identifier);
+
+        return  layer != null;
     }
 
     /// <summary>Returns the Dreambit draw layer assigned to an entity's LDtk layer.</summary>

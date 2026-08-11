@@ -6,7 +6,7 @@ using System.Text;
 
 namespace Dreambit;
 
-public sealed class PakReader
+public sealed class PakReader : IDisposable
 {
     private readonly Dictionary<string, Entry> _entries;
 

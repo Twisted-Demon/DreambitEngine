@@ -450,6 +450,7 @@ public class Entity : IDisposable
 
             //if we don't check in children
             component = child.GetComponentInChildren<T>();
+            if (component != null) return component;
         }
 
         //only get here if no children have component

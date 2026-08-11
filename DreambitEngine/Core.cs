@@ -8,6 +8,7 @@ namespace Dreambit;
 public class Core : Game
 {
     private const float FixedPhysicsStep = 1f / 60f;
+    private const int MaxPhysicsStepsPerFrame = 8;
     public static readonly Logger<Core> Logger = new();
     private float _accumulatedPhysicsTime;
 
@@ -101,26 +102,40 @@ public class Core : Game
 
     protected override void Draw(GameTime gameTime)
     {
-        CurrentScene.OnDraw();
+        CurrentScene?.OnDraw();
         base.Draw(gameTime);
     }
 
     private void HandlePhysics()
     {
-        _accumulatedPhysicsTime += Time.DeltaTime;
-
-        if (_accumulatedPhysicsTime >= FixedPhysicsStep)
+        if (CurrentScene?.State != SceneState.Running)
         {
-            CurrentScene.PhysicsTick();
-
             _accumulatedPhysicsTime = 0f;
+            return;
         }
+
+        _accumulatedPhysicsTime += Time.UnscaledDeltaTime;
+        var steps = 0;
+
+        while (_accumulatedPhysicsTime >= FixedPhysicsStep &&
+               steps < MaxPhysicsStepsPerFrame)
+        {
+            Time.UpdatePhysicsTime(FixedPhysicsStep);
+            CurrentScene.PhysicsTick();
+            _accumulatedPhysicsTime -= FixedPhysicsStep;
+            steps++;
+        }
+
+        // Avoid an unbounded catch-up spiral after a debugger pause or stall.
+        if (_accumulatedPhysicsTime >= FixedPhysicsStep)
+            _accumulatedPhysicsTime %= FixedPhysicsStep;
     }
 
     protected override void OnExiting(object sender, ExitingEventArgs args)
     {
         CurrentScene?.Terminate();
-        SpriteBatch.Dispose();
+        Resources.Instance.CleanUp();
+        SpriteBatch?.Dispose();
         base.OnExiting(sender, args);
     }
 

@@ -84,19 +84,26 @@ public class Collider : Component
     ///     Notifies the physics system when the collider's position changes,
     ///     allowing broadphase structures (e.g., spatial hash) to stay current.
     /// </summary>
-    private void UpdateInSpatialHash()
+    internal void RefreshSpatialHash()
     {
-        if (!IsQueryable) return;
-
-        _currentPosition = Transform.Position;
-
-        if (_lastPosition != _currentPosition)
+        if (!_isAttached || !Enabled || !IsQueryable || Bounds == null)
         {
-            SetAabb();
-            PhysicsSystem.Instance.Touch(this);
+            DeregisterFromPhysics();
+            return;
         }
 
-        _lastPosition = _currentPosition;
+        var previousAabb = AABB;
+        SetAabb();
+
+        if (!_isRegistered)
+        {
+            PhysicsSystem.Instance.RegisterCollider(this);
+            _isRegistered = true;
+            return;
+        }
+
+        if (!AabbEquals(previousAabb, AABB))
+            PhysicsSystem.Instance.Touch(this);
     }
 
     //this is to be overridden by circle collider and capsule collider
@@ -119,7 +126,16 @@ public class Collider : Component
 
     /// <summary>When false, collider is ignored by spatial queries / broadphase.</summary>
     [DreambitSerialize]
-    public bool IsQueryable { get; set; } = true;
+    public bool IsQueryable
+    {
+        get => _isQueryable;
+        set
+        {
+            if (_isQueryable == value) return;
+            _isQueryable = value;
+            RefreshSpatialHash();
+        }
+    }
 
     /// <summary>Optional filter: limit trigger checks to these tags. Empty = all.</summary>
     [DreambitSerialize] public List<string> InterestedIn = [];
@@ -143,7 +159,16 @@ public class Collider : Component
 
     /// <summary>Local-space shape used for collision/trigger checks.</summary>
     [DreambitSerialize]
-    public Shape2D Bounds { get; set; } = null;
+    public Shape2D Bounds
+    {
+        get => _bounds;
+        set
+        {
+            if (ReferenceEquals(_bounds, value)) return;
+            _bounds = value;
+            RefreshSpatialHash();
+        }
+    }
 
     public AABB AABB { get; set; }
 
@@ -154,8 +179,10 @@ public class Collider : Component
 
     #region Internal State
 
-    private Vector3 _lastPosition = Vector3.Zero;
-    private Vector3 _currentPosition = Vector3.Zero;
+    private Shape2D _bounds;
+    private bool _isAttached;
+    private bool _isQueryable = true;
+    private bool _isRegistered;
 
     // Sets used to detect enter/exit vs. stay across frames
     private readonly HashSet<Collider> _overlapsPrev = [];
@@ -168,18 +195,16 @@ public class Collider : Component
     /// <summary>Registers this collider with the physics system.</summary>
     public override void OnAddedToEntity()
     {
-        if (Bounds != null)
-            SetAabb();
-
-        PhysicsSystem.Instance.RegisterCollider(this);
-
+        _isAttached = true;
+        RefreshSpatialHash();
         Transform.CaptureLastWorldPosition();
     }
 
     /// <summary>Ensures deregistration and clears callbacks on destruction.</summary>
     public override void OnDestroyed()
     {
-        PhysicsSystem.Instance.DeregisterCollider(this);
+        _isAttached = false;
+        DeregisterFromPhysics();
         OnCollisionEnter = null;
         OnCollisionStay = null;
         OnCollisionExit = null;
@@ -188,23 +213,20 @@ public class Collider : Component
     /// <summary>Deregister when removed from entity.</summary>
     public override void OnRemovedFromEntity()
     {
-        PhysicsSystem.Instance.DeregisterCollider(this);
+        _isAttached = false;
+        DeregisterFromPhysics();
     }
 
     /// <summary>Deregister while disabled.</summary>
     public override void OnDisabled()
     {
-        PhysicsSystem.Instance.DeregisterCollider(this);
+        DeregisterFromPhysics();
     }
 
     /// <summary>Re-register when enabled.</summary>
     public override void OnEnabled()
     {
-        if (Bounds != null)
-            SetAabb();
-
-        PhysicsSystem.Instance.RegisterCollider(this);
-
+        RefreshSpatialHash();
         Transform.CaptureLastWorldPosition();
     }
 
@@ -217,7 +239,7 @@ public class Collider : Component
     /// <summary>Physics-step update; maintains spatial hash participation.</summary>
     public override void OnPhysicsUpdate()
     {
-        UpdateInSpatialHash();
+        RefreshSpatialHash();
     }
 
     #endregion
@@ -227,6 +249,9 @@ public class Collider : Component
     /// <summary>Returns world-space polygon transformed from current <see cref="Bounds" />.</summary>
     public Polygon2D GetTransformedPolygon()
     {
+        if (Bounds == null)
+            return default;
+
         return Bounds.TransformPolygon(Transform);
     }
 
@@ -235,7 +260,22 @@ public class Collider : Component
     /// </summary>
     public Polygon2D GetTransformedPolyWithDesiredPos(Vector3 desiredPos)
     {
+        if (Bounds == null)
+            return default;
+
         return Bounds.TransformWithDesiredPos(Transform, desiredPos);
+    }
+
+    private void DeregisterFromPhysics()
+    {
+        if (!_isRegistered) return;
+        PhysicsSystem.Instance.DeregisterCollider(this);
+        _isRegistered = false;
+    }
+
+    private static bool AabbEquals(AABB left, AABB right)
+    {
+        return left.Min == right.Min && left.Max == right.Max;
     }
 
     #endregion

@@ -9,8 +9,7 @@ namespace Dreambit.ECS;
 /// </summary>
 public class ParticleSimulation2D : ICanLog<ParticleSimulation2D>
 {
-    private const float AabbPad = 1.0f;
-    private const float MinExtent = 0.5f;
+    private const float MinimumPixelsPerUnit = 0.0001f;
 
     // -------- Emission control ------------
     private readonly Random _rng = new();
@@ -43,6 +42,10 @@ public class ParticleSimulation2D : ICanLog<ParticleSimulation2D>
     private float[] _spin0; // base spin
 
     private float[] _sx, _sy; // current size
+
+    private int _textureWidthPixels = 1;
+    private int _textureHeightPixels = 1;
+    private float _pixelsPerUnit = 1f;
 
     // Bases for over-life curves
     private float[] _sx0, _sy0; // base start size
@@ -147,6 +150,20 @@ public class ParticleSimulation2D : ICanLog<ParticleSimulation2D>
         // These come from config each update to allow swapping configs live.
     }
 
+    public void SetRenderMetrics(int textureWidthPixels, int textureHeightPixels, float pixelsPerUnit)
+    {
+        if (textureWidthPixels <= 0)
+            throw new ArgumentOutOfRangeException(nameof(textureWidthPixels));
+        if (textureHeightPixels <= 0)
+            throw new ArgumentOutOfRangeException(nameof(textureHeightPixels));
+        if (!float.IsFinite(pixelsPerUnit) || pixelsPerUnit < MinimumPixelsPerUnit)
+            throw new ArgumentOutOfRangeException(nameof(pixelsPerUnit));
+
+        _textureWidthPixels = textureWidthPixels;
+        _textureHeightPixels = textureHeightPixels;
+        _pixelsPerUnit = pixelsPerUnit;
+    }
+
     public void Emit()
     {
         _isPlaying = true;
@@ -205,7 +222,7 @@ public class ParticleSimulation2D : ICanLog<ParticleSimulation2D>
 
     private void EmitContinuous()
     {
-        _spawnDelta += Time.GameTime.ElapsedGameTime;
+        _spawnDelta += TimeSpan.FromSeconds(Time.DeltaTime);
         while (_spawnDelta >= _targetSpawnTime)
         {
             _spawnDelta -= _targetSpawnTime;
@@ -293,7 +310,6 @@ public class ParticleSimulation2D : ICanLog<ParticleSimulation2D>
 
         // Position (spawn type + jitter)
         var pos = SpawnPointBase();
-        pos += RandRange2(_config.PositionJitter.Min, _config.PositionJitter.Max);
 
         // Velocity direction + jitter + start speed
         var speed = RandRange(_config.StartSpeed.Min, _config.StartSpeed.Max);
@@ -355,11 +371,14 @@ public class ParticleSimulation2D : ICanLog<ParticleSimulation2D>
     private void SimulateStep()
     {
         var dt = Time.DeltaTime;
-        if (dt <= 0f || _alive == 0)
+        if (_alive == 0)
         {
             Bounds = RectangleF.Empty;
             return;
         }
+
+        if (dt <= 0f)
+            return;
 
         // adopt config forces each frame (so swapping configs mid-play is OK)
         var gravity = _config.Gravity;
@@ -440,14 +459,14 @@ public class ParticleSimulation2D : ICanLog<ParticleSimulation2D>
             var aByte = (byte)Math.Clamp(_alpha0[phys] * alphaScale * 255f, 0f, 255f);
             _color[phys] = new Color(c.R, c.G, c.B, aByte);
 
-            // Expand AABB (pad by size)
-            var halfX = Math.Max(MinExtent, sx * 0.5f) + AabbPad;
-            var halfY = Math.Max(MinExtent, sy * 0.5f) + AabbPad;
-
-            if (px - halfX < minX) minX = px - halfX;
-            if (py - halfY < minY) minY = py - halfY;
-            if (px + halfX > maxX) maxX = px + halfX;
-            if (py + halfY > maxY) maxY = py + halfY;
+            ExpandBounds(
+                ref minX,
+                ref minY,
+                ref maxX,
+                ref maxY,
+                new Vector2(px, py),
+                new Vector2(sx, sy),
+                _rot[phys]);
 
             i++;
         }
@@ -458,20 +477,47 @@ public class ParticleSimulation2D : ICanLog<ParticleSimulation2D>
         }
         else
         {
-            float ox = 0f, oy = 0f;
-            if (UseLocalSpace && Transform is not null)
-            {
-                var p = Transform.WorldPosition2D;
-                ox = p.X;
-                oy = p.Y;
-            }
-
-            var x = (int)Mathf.Floor(minX + ox);
-            var y = (int)Mathf.Floor(minY + oy);
-            var w = (int)Mathf.Max(1, Mathf.Ceil(maxX - minX));
-            var h = (int)Mathf.Max(1, Mathf.Ceil(maxY - minY));
-            Bounds = new RectangleF(x, y, w, h);
+            Bounds = new RectangleF(
+                minX,
+                minY,
+                Math.Max(float.Epsilon, maxX - minX),
+                Math.Max(float.Epsilon, maxY - minY));
         }
+    }
+
+    private void ExpandBounds(
+        ref float minX,
+        ref float minY,
+        ref float maxX,
+        ref float maxY,
+        Vector2 position,
+        Vector2 particleScale,
+        float rotation)
+    {
+        var transformScale = Vector2.One;
+        if (UseLocalSpace && Transform is not null)
+        {
+            position = Transform.TransformPoint2D(position);
+            transformScale = Transform.WorldScale2D;
+            rotation += Transform.WorldRotation2D;
+        }
+
+        var drawScale = particleScale * transformScale / _pixelsPerUnit;
+        var halfWidth = _textureWidthPixels * MathF.Abs(drawScale.X) * 0.5f;
+        var halfHeight = _textureHeightPixels * MathF.Abs(drawScale.Y) * 0.5f;
+        var cosine = MathF.Abs(MathF.Cos(rotation));
+        var sine = MathF.Abs(MathF.Sin(rotation));
+        var extentX = cosine * halfWidth + sine * halfHeight;
+        var extentY = sine * halfWidth + cosine * halfHeight;
+        var pad = 1f / _pixelsPerUnit;
+
+        extentX += pad;
+        extentY += pad;
+
+        minX = Math.Min(minX, position.X - extentX);
+        minY = Math.Min(minY, position.Y - extentY);
+        maxX = Math.Max(maxX, position.X + extentX);
+        maxY = Math.Max(maxY, position.Y + extentY);
     }
 
     // ------------------- Spawn helpers -------------------
@@ -479,12 +525,14 @@ public class ParticleSimulation2D : ICanLog<ParticleSimulation2D>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private Vector2 SpawnPointBase()
     {
-        var origin = Transform?.WorldPosition.ToVector2() ?? Vector2.Zero;
+        var origin = UseLocalSpace
+            ? Vector2.Zero
+            : Transform?.WorldPosition2D ?? Vector2.Zero;
 
         switch (_config.SpawnType)
         {
             case ParticleSpawnType.Point:
-                return origin;
+                return origin + RandRange2(_config.PositionJitter.Min, _config.PositionJitter.Max);
 
             case ParticleSpawnType.Circular:
             {

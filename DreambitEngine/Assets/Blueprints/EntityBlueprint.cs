@@ -45,4 +45,9 @@ public class EntityBlueprint : DreambitAsset
                 stack.Push(entity.Children[i]);
         }
     }
+
+    public static EntityBlueprint LoadBlueprint(string path)
+    {
+        return Resources.LoadAsset<EntityBlueprint>(path);
+    }
 }

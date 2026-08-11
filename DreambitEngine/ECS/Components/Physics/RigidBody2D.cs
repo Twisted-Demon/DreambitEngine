@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
 using Microsoft.Xna.Framework;
 
 namespace Dreambit.ECS;
@@ -15,7 +14,7 @@ public class RigidBody2D : Component
 
     #region Life Cycle Overrides
 
-    public override void OnUpdate()
+    public override void OnPhysicsUpdate()
     {
         if (Collider is null)
         {
@@ -28,11 +27,15 @@ public class RigidBody2D : Component
         }
 
         Transform.CaptureLastWorldPosition();
-        Transform.Position += Velocity.ToVector3() * Time.DeltaTime;
+        Transform.TranslateWorld2D(Velocity * Time.PhysicsDeltaTime);
+        Collider.RefreshSpatialHash();
 
         if (CheckForCollision(out _))
+        {
             // reset position if we did collide
-            Transform.Position = Transform.LastWorldPosition;
+            Transform.WorldPosition = Transform.LastWorldPosition;
+            Collider.RefreshSpatialHash();
+        }
     }
 
     #endregion
@@ -43,7 +46,7 @@ public class RigidBody2D : Component
     {
         return InterestedTags.Count == 0
             ? PhysicsSystem.Instance.ColliderCast(Collider, out result)
-            : PhysicsSystem.Instance.ColliderCastByTag(Collider, out result, InterestedTags.ToArray());
+            : PhysicsSystem.Instance.ColliderCastByTag(Collider, out result, [.. InterestedTags]);
     }
 
     #endregion

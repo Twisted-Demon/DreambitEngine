@@ -39,6 +39,58 @@ public class ParticleFxConfig : DreambitAsset
 
     public void Validate()
     {
+        if (EmissionRate < 0)
+            throw new System.InvalidOperationException("Particle emission rate cannot be negative.");
+
+        ValidateRange(LifeTime, nameof(LifeTime), true);
+        ValidateRange(StartSpeed, nameof(StartSpeed));
+        ValidateRange(StartRotationDeg, nameof(StartRotationDeg));
+        ValidateRange(StartSpin, nameof(StartSpin));
+        ValidateRange(StartSize, nameof(StartSize), true);
+        ValidateRange(VelocityJitter, nameof(VelocityJitter));
+        ValidateRange(PositionJitter, nameof(PositionJitter));
+        ValidateRange(StartAcceleration, nameof(StartAcceleration));
+
+        if (!float.IsFinite(LinearDamping) || LinearDamping < 0f)
+            throw new System.InvalidOperationException("Particle linear damping must be finite and non-negative.");
+
+        if (!IsFinite(Gravity))
+            throw new System.InvalidOperationException("Particle gravity must be finite.");
+
+        if (Bursts == null)
+            throw new System.InvalidOperationException("Particle burst collection cannot be null.");
+
+        foreach (var burst in Bursts)
+        {
+            if (burst == null || burst.Count < 0 || burst.Cycles < 0 ||
+                !float.IsFinite(burst.Interval) || burst.Interval < 0f ||
+                !float.IsFinite(burst.Time) || burst.Time < 0f)
+                throw new System.InvalidOperationException("Particle burst values must be finite and non-negative.");
+        }
+
+        if (AlphaOverLife == null || SizeOverLife == null ||
+            SpeedOverLife == null || SpinOverLife == null)
+            throw new System.InvalidOperationException("Particle over-life curves cannot be null.");
+    }
+
+    private static void ValidateRange(RangeF range, string name, bool positive = false)
+    {
+        if (!float.IsFinite(range.Min) || !float.IsFinite(range.Max) ||
+            range.Max < range.Min || positive && range.Min <= 0f)
+            throw new System.InvalidOperationException($"Particle {name} range is invalid.");
+    }
+
+    private static void ValidateRange(Range2 range, string name, bool nonNegative = false)
+    {
+        if (!IsFinite(range.Min) || !IsFinite(range.Max) ||
+            range.Max.X < range.Min.X || range.Max.Y < range.Min.Y ||
+            nonNegative && (range.Min.X < 0f || range.Min.Y < 0f))
+            throw new System.InvalidOperationException($"Particle {name} range is invalid.");
+    }
+
+    private static bool IsFinite(Vector2 value)
+    {
+        return float.IsFinite(value.X) && float.IsFinite(value.Y);
     }
 }
 

@@ -49,20 +49,33 @@ public sealed class BakeAssetCommand : Command<BakeAssetSettings>
 {
     protected override int Execute(CommandContext context, BakeAssetSettings s, CancellationToken cancellationToken)
     {
-        var registry = new AssetBakerRegistry()
-            .Register(AssetType.Texture, new TextureBaker())
-            .Register(AssetType.Json, new JsonbBaker());
+        var registry = AssetBakerRegistry.CreateDefault();
         
         var ext = Path.GetExtension(s.Input).ToLowerInvariant();
 
         var baker = registry.GetByExt(ext);
+        if (baker is null)
+        {
+            AnsiConsole.MarkupLine($"[red]Unsupported asset extension:[/] {Markup.Escape(ext)}");
+            return -1;
+        }
 
-        AnsiConsole.MarkupLine($"[grey]Baking[/] [bold]{baker.AssetTypeName}[/] from [blue]{s.Input}[/] → [green]{s.Output}[/]");
+        var outputPath = Path.GetFullPath(s.Output);
+        if (string.IsNullOrWhiteSpace(Path.GetExtension(outputPath)))
+            outputPath += baker.OutputExtension;
+
+        var outputDirectory = Path.GetDirectoryName(outputPath);
+        if (outputDirectory is not null)
+            Directory.CreateDirectory(outputDirectory);
+
+        AnsiConsole.MarkupLine(
+            $"[grey]Baking[/] [bold]{Markup.Escape(baker.AssetTypeName)}[/] from " +
+            $"[blue]{Markup.Escape(s.Input)}[/] → [green]{Markup.Escape(outputPath)}[/]");
 
         var ctx = new BakeContext
         {
             InputPath = s.Input,
-            OutputPath = s.Output,
+            OutputPath = outputPath,
             GenerateMips = s.GenerateMips,
             PremultiplyAlpha = s.PremultiplyAlpha,
             MaxDimension = s.MaxSize,

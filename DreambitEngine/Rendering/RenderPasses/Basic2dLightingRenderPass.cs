@@ -72,9 +72,11 @@ public class Basic2dLightingRenderPass : RenderPass
 
         var ambientLight = Drawables.GetAllDrawablesByType<AmbientLight2D>().FirstOrDefault();
 
-        var ambientColor = ambientLight != null ? ambientLight.Color : Color.Black;
+        var ambientColor = ambientLight != null
+            ? ambientLight.Color.ToVector3() * ambientLight.Intensity
+            : Vector3.Zero;
 
-        LightingUniforms.Apply(LightingFx, lights, Scene.MainCamera, ambientColor.ToVector3());
+        LightingUniforms.Apply(LightingFx, lights, Scene.MainCamera, ambientColor);
 
         Device.SetRenderTarget(RenderPipeline.SceneRenderTarget);
         Device.Clear(Color.Transparent);

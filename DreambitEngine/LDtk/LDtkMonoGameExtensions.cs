@@ -264,4 +264,15 @@ public static class LDtkMonoGameExtensions
         if (!float.IsFinite(value) || value <= 0f)
             throw new ArgumentOutOfRangeException(parameterName, "Value must be positive and finite.");
     }
+
+    public static Vector2 NormalizedPivot(this Rectangle rectangle, Vector2 pivot)
+    {
+        var width = rectangle.Width;
+        var height = rectangle.Height;
+
+        var normalizedX = pivot.X * width;
+        var normalizedY = pivot.Y * height;
+
+        return new Vector2(normalizedX, normalizedY);
+    }
 }

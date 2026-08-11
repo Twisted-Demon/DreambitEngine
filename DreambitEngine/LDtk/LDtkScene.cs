@@ -155,7 +155,7 @@ public class LDtkScene : Scene
                 continue;
 
             ResetSpawnedHierarchyTransforms(entity);
-            level.ApplyDrawLayer(entity, entityInstance);
+            level.ApplyDrawLayer(entity, ldtkEntity.Instance);
             level.TrackEntity(entity);
         }
     }

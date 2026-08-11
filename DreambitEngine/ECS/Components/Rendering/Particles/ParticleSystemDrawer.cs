@@ -6,7 +6,12 @@ namespace Dreambit.ECS;
 [BlueprintType($"{nameof(ParticleSystemDrawer)}")]
 public class ParticleSystemDrawer : DrawableComponent<ParticleSystemDrawer>
 {
+    private const float MinimumPixelsPerUnit = 0.0001f;
+
+    private ParticleFxConfig _particleFx;
+    private float _pixelsPerUnit = 1f;
     private string _texturePath;
+    private bool _useLocalSpace;
     private Texture2D Texture { get; set; }
 
     [DreambitSerialize]
@@ -19,7 +24,50 @@ public class ParticleSystemDrawer : DrawableComponent<ParticleSystemDrawer>
                 return;
 
             _texturePath = value;
-            Texture = Resources.LoadAsset<Texture2D>(value);
+            Texture = string.IsNullOrWhiteSpace(value)
+                ? null
+                : Resources.LoadAsset<Texture2D>(value);
+            UpdateRenderMetrics();
+        }
+    }
+
+    [DreambitSerialize]
+    public float PixelsPerUnit
+    {
+        get => _pixelsPerUnit;
+        set
+        {
+            if (!float.IsFinite(value) || value < MinimumPixelsPerUnit)
+                throw new System.ArgumentOutOfRangeException(
+                    nameof(value),
+                    value,
+                    $"Pixels per unit must be finite and at least {MinimumPixelsPerUnit}.");
+
+            _pixelsPerUnit = value;
+            UpdateRenderMetrics();
+        }
+    }
+
+    [DreambitSerialize]
+    public bool UseLocalSpace
+    {
+        get => _useLocalSpace;
+        set
+        {
+            _useLocalSpace = value;
+            if (Simulation != null)
+                Simulation.UseLocalSpace = value;
+        }
+    }
+
+    [DreambitSerialize]
+    public ParticleFxConfig ParticleFx
+    {
+        get => _particleFx;
+        set
+        {
+            _particleFx = value;
+            ApplyParticleFx();
         }
     }
 
@@ -33,12 +81,14 @@ public class ParticleSystemDrawer : DrawableComponent<ParticleSystemDrawer>
     }
 
     public ParticleSimulation2D Simulation { get; private set; }
-    public override RectangleF Bounds => Simulation.Bounds;
+    public override RectangleF Bounds => Simulation?.Bounds ?? RectangleF.Empty;
 
     public override void OnCreated()
     {
         Simulation = new ParticleSimulation2D(Transform);
-        Simulation.UseLocalSpace = false;
+        Simulation.UseLocalSpace = _useLocalSpace;
+        UpdateRenderMetrics();
+        ApplyParticleFx();
     }
 
     public override void OnUpdate()
@@ -51,39 +101,32 @@ public class ParticleSystemDrawer : DrawableComponent<ParticleSystemDrawer>
         if (Texture is null) return;
 
         var parts = Simulation.GetParticles();
-        float ox = 0f, oy = 0f;
-        if (Simulation.UseLocalSpace)
-        {
-            var wp = Transform.WorldPosition2D;
-            ox = wp.X;
-            oy = wp.Y;
-        }
-
         for (var i = 0; i < parts.Alive; i++)
         {
             var phys = parts.INDICES[i];
 
-            //position
-            var px = parts.PX[phys] + ox;
-            var py = parts.PY[phys] + oy;
+            var position = new Vector2(parts.PX[phys], parts.PY[phys]);
+            var transformScale = Vector2.One;
 
-            // size
             var sx = Mathf.Max(0.0001f, parts.SX[phys]);
             var sy = Mathf.Max(0.0001f, parts.SY[phys]);
-
-            // rotation
             var rot = parts.ROT[phys];
 
-            var color = parts.COLOR[phys];
+            if (Simulation.UseLocalSpace)
+            {
+                position = Transform.TransformPoint2D(position);
+                transformScale = Transform.WorldScale2D;
+                rot += Transform.WorldRotation2D;
+            }
 
             Core.SpriteBatch.DrawWorldSprite(
                 Texture,
-                new Vector2(px, py),
+                position,
                 null,
-                color,
+                parts.COLOR[phys],
                 rot,
                 Origin,
-                new Vector2(sx, sy));
+                new Vector2(sx, sy) * transformScale / PixelsPerUnit);
         }
     }
 
@@ -100,11 +143,41 @@ public class ParticleSystemDrawer : DrawableComponent<ParticleSystemDrawer>
 
     private void EnsureSimulation()
     {
-        if (Simulation == null) Simulation = new ParticleSimulation2D(Transform) { UseLocalSpace = true };
+        if (Simulation != null) return;
+
+        Simulation = new ParticleSimulation2D(Transform) { UseLocalSpace = _useLocalSpace };
+        UpdateRenderMetrics();
+        ApplyParticleFx();
     }
 
     public override bool IsVisibleFromCamera(RectangleF cameraBounds)
     {
-        return true;
+        return cameraBounds.Intersects(Bounds);
+    }
+
+    public void SetParticleFxConfig(ParticleFxConfig config)
+    {
+        ParticleFx = config;
+    }
+
+    private void ApplyParticleFx()
+    {
+        if (Simulation == null || _particleFx == null)
+            return;
+
+        Simulation.SetParticleFxConfig(_particleFx);
+        if (!string.IsNullOrWhiteSpace(_particleFx.Texture))
+            TexturePath = _particleFx.Texture;
+    }
+
+    private void UpdateRenderMetrics()
+    {
+        if (Simulation == null)
+            return;
+
+        Simulation.SetRenderMetrics(
+            Texture?.Width ?? 1,
+            Texture?.Height ?? 1,
+            PixelsPerUnit);
     }
 }

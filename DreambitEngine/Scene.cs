@@ -44,10 +44,38 @@ public class Scene : IDisposable
     /// </summary>
     public void Dispose()
     {
-        if (_isDisposed) return;
-        Transition(SceneState.Disposed);
-        Cleanup();
-        _isDisposed = true;
+        if (_isDisposed || _isDisposing) return;
+        _isDisposing = true;
+
+        if (State != SceneState.Ending)
+            Transition(SceneState.Ending);
+
+        try
+        {
+            if (_hasBegun && !_hasEnded)
+            {
+                _hasEnded = true;
+                OnEnd();
+            }
+        }
+        catch (Exception exception)
+        {
+            Logger.Error($"Scene OnEnd failed: {exception}");
+        }
+        finally
+        {
+            Transition(SceneState.Disposed);
+            try
+            {
+                Cleanup();
+            }
+            finally
+            {
+                _isDisposed = true;
+                _isDisposing = false;
+                GC.SuppressFinalize(this);
+            }
+        }
     }
 
     #endregion
@@ -55,11 +83,19 @@ public class Scene : IDisposable
     #region Cutscene Helpers
 
     /// <summary>
-    ///     Helper to start a cutscene by name using the scene's ScriptingManager.
+    ///     Loads and starts a cutscene asset by name using the scene's ScriptingManager.
     /// </summary>
-    public static void StartCutscene(string cutsceneName, string fileExtension = ".yaml")
+    public static bool StartCutscene(string assetName)
     {
-        Core.Instance.CurrentScene.ScriptingManager.StartCutscene(cutsceneName, fileExtension);
+        return Core.Instance.CurrentScene.ScriptingManager.StartCutscene(assetName);
+    }
+
+    /// <summary>
+    ///     Starts an already-loaded cutscene asset.
+    /// </summary>
+    public static bool StartCutscene(Cutscene cutscene)
+    {
+        return Core.Instance.CurrentScene.ScriptingManager.StartCutscene(cutscene);
     }
 
     #endregion
@@ -104,6 +140,10 @@ public class Scene : IDisposable
 
     /// <summary>Tracks disposal state to avoid double-dispose.</summary>
     private bool _isDisposed;
+    private bool _isDisposing;
+
+    private bool _hasBegun;
+    private bool _hasEnded;
 
     private readonly CoroutineScheduler _coroutineScheduler;
 
@@ -299,6 +339,8 @@ public class Scene : IDisposable
     /// </summary>
     private void Cleanup()
     {
+        _coroutineScheduler.StopAllCoroutines();
+        ScriptingManager.CleanUp();
         Entities.ClearLists();
         Drawables.ClearLists();
 
@@ -316,10 +358,6 @@ public class Scene : IDisposable
     internal void Terminate()
     {
         if (_isDisposed || State == SceneState.Disposed) return;
-        if (State == SceneState.Ending) return;
-
-        Transition(SceneState.Ending);
-        OnEnd();
         Dispose();
     }
 
@@ -337,6 +375,7 @@ public class Scene : IDisposable
                 InitializeInternals();
                 OnInitialize();
                 Transition(SceneState.Starting);
+                _hasBegun = true;
                 OnBegin();
                 Transition(SceneState.Running);
                 break;
@@ -413,8 +452,11 @@ public class Scene : IDisposable
         return (from, to) switch
         {
             (SceneState.Created, SceneState.Initializing) => true,
+            (SceneState.Created, SceneState.Ending) => true,
             (SceneState.Initializing, SceneState.Starting) => true,
+            (SceneState.Initializing, SceneState.Ending) => true,
             (SceneState.Starting, SceneState.Running) => true,
+            (SceneState.Starting, SceneState.Ending) => true,
             (SceneState.Running, SceneState.Ending) => true,
             (SceneState.Ending, SceneState.Disposed) => true,
             _ => false

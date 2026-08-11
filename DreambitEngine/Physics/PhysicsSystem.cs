@@ -17,6 +17,9 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
 
     public void RegisterCollider(Collider c)
     {
+        if (c?.Bounds == null || !c.IsQueryable)
+            return;
+
         if (!_colliders.Contains(c)) _colliders.Add(c);
 
         var tags = c.Entity.Tags;
@@ -53,6 +56,9 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
     /// <param name="c"></param>
     public void Touch(Collider c)
     {
+        if (c?.Bounds == null || !c.IsQueryable)
+            return;
+
         _grid.InsertOrUpdate(c, c.AABB);
     }
 
@@ -67,6 +73,7 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
     {
         result = new CollisionResult();
         if (@this == null) return false;
+        if (!IsColliderValid(@this)) return false;
 
 
         _candidateSet.Clear();
@@ -293,6 +300,7 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         if (radius <= 0f) return false;
 
         _candidateList.Clear();
+        _candidateSet.Clear();
         _resultSet.Clear();
 
         if (aabb is null)
@@ -367,7 +375,10 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
     {
         if (collider == null) return false;
 
-        return collider.Enabled && collider.Entity.Enabled;
+        return collider.Bounds != null &&
+               collider.IsQueryable &&
+               collider.Enabled &&
+               collider.Entity?.Enabled == true;
     }
 }
 

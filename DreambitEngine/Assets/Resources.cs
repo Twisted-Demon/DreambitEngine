@@ -2,48 +2,31 @@
 using System.Collections.Generic;
 using System.IO;
 using FontStashSharp;
-using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
-using Microsoft.Xna.Framework.Graphics;
 
 namespace Dreambit;
 
 public class Resources : Singleton<Resources>
 {
     private static readonly Dictionary<Type, IAssetLoader> Loaders = [];
-    private List<IDisposable> _disposableAssets;
+    private readonly Dictionary<string, PakReader> _pakReaders =
+        new(StringComparer.OrdinalIgnoreCase);
+    private DreambitXnbReader _xnbReader;
 
-    private Dictionary<string, object> _loadedAssets;
-    private ContentManager Content { get; } = Core.Instance.Content;
-    private static string ContentDirectory => Path.Combine(AppContext.BaseDirectory, Instance.Content.RootDirectory);
+    private static string ContentDirectory =>
+        Path.Combine(AppContext.BaseDirectory, Core.Instance.Content.RootDirectory);
     public static bool UsePak { get; set; } = true;
     public static string PakName { get; set; } = "content.pak";
 
-    private List<IDisposable> DisposableAssets
-    {
-        get
-        {
-            if (_disposableAssets != null) return _disposableAssets;
-
-            var fieldInfo = ReflectionUtils.GetFieldInfo(typeof(ContentManager), "disposableAssets");
-            _disposableAssets = fieldInfo.GetValue(Core.Instance.Content) as List<IDisposable>;
-            return _disposableAssets;
-        }
-    }
-
-    private Dictionary<string, object> LoadedAssets
-    {
-        get
-        {
-            if (_loadedAssets != null) return _loadedAssets;
-            var fieldInfo = ReflectionUtils.GetFieldInfo(typeof(ContentManager), "loadedAssets");
-            _loadedAssets = fieldInfo.GetValue(Core.Instance.Content) as Dictionary<string, object>;
-            return _loadedAssets;
-        }
-    }
+    public DreambitContentCollection ContentCollection { get; } = new();
 
     public void Init()
     {
+        Loaders.Clear();
+        _xnbReader ??= new DreambitXnbReader(
+            Core.Instance.Services,
+            Core.Instance.Content.RootDirectory);
+
         var loaderTypes = ReflectionUtils.GetAllTypesAssignableFrom(
             typeof(IAssetLoader),
             true);
@@ -65,27 +48,43 @@ public class Resources : Singleton<Resources>
     /// <returns></returns>
     public static T LoadAsset<T>(string assetName) where T : class
     {
-        //if we already have the asset we will return it
-        if (Instance.LoadedAssets.TryGetValue(assetName, out var rawAsset))
-            if (rawAsset is T asset)
-                return asset;
+        ArgumentException.ThrowIfNullOrWhiteSpace(assetName);
+
+        if (Instance.ContentCollection.TryGet<T>(assetName, out var cachedAsset))
+            return cachedAsset;
 
         try
         {
             Instance.Logger.Trace("Loading {0} - {1}", typeof(T).Name, assetName);
 
             object asset;
+            var ownsAsset = false;
+            IReadOnlyList<IDisposable> ownedDisposables = null;
+
             if (Loaders.TryGetValue(typeof(T), out var loader))
+            {
                 asset = loader.Load(assetName, PakName, UsePak, ContentDirectory);
+                ownsAsset = loader.AddToDisposableList;
+            }
             else
-                asset = Instance.Content.Load<T>(assetName);
+            {
+                var disposables = new List<IDisposable>();
+                asset = Instance._xnbReader.Read<T>(assetName, disposables.Add);
+                ownedDisposables = disposables;
+            }
 
-            Instance.LoadedAssets[assetName] = (T)asset;
+            if (asset is not T typedAsset)
+                throw new ContentLoadException(
+                    $"The loader for '{assetName}' did not return {typeof(T).FullName}.");
 
-            if (asset is IDisposable disposable)
-                Instance.DisposableAssets.Add(disposable);
+            Instance.ContentCollection.TryAdd(
+                assetName,
+                typeof(T),
+                typedAsset,
+                ownsAsset,
+                ownedDisposables);
 
-            return (T)asset;
+            return typedAsset;
         }
         catch (Exception exception)
         {
@@ -106,22 +105,26 @@ public class Resources : Singleton<Resources>
         if (!type.IsSubclassOf(typeof(DreambitAsset)))
             return null;
 
-        //if we already have the asset we will return it
-        if (Instance.LoadedAssets.TryGetValue(assetName, out var rawAsset))
-            return rawAsset;
+        if (Instance.ContentCollection.TryGet(assetName, type, out var cachedAsset))
+            return cachedAsset;
 
         try
         {
             Instance.Logger.Trace("Loading {0} - {1}", type.Name, assetName);
 
-            object asset = null;
-            if (Loaders.TryGetValue(type, out var loader))
-                asset = loader.Load(assetName, PakName, UsePak, ContentDirectory);
+            if (!Loaders.TryGetValue(type, out var loader))
+                throw new ContentLoadException($"No Dreambit loader is registered for {type.FullName}.");
 
-            Instance.LoadedAssets[assetName] = asset;
+            var asset = loader.Load(assetName, PakName, UsePak, ContentDirectory);
+            if (asset is null || !type.IsInstanceOfType(asset))
+                throw new ContentLoadException(
+                    $"The loader for '{assetName}' did not return {type.FullName}.");
 
-            if (asset is IDisposable disposable)
-                Instance.DisposableAssets.Add(disposable);
+            Instance.ContentCollection.TryAdd(
+                assetName,
+                type,
+                asset,
+                loader.AddToDisposableList);
 
             return asset;
         }
@@ -136,24 +139,30 @@ public class Resources : Singleton<Resources>
 
     public static void UnloadAsset(string assetName)
     {
-        Instance.Content.UnloadAsset(assetName);
+        var entries = Instance.ContentCollection.Remove(assetName);
+        Instance.ReleaseEntries(entries);
     }
 
     public static bool TryRegisterAsset(DreambitAsset asset)
     {
-        return Instance.LoadedAssets.TryAdd(asset.AssetName, asset);
+        ArgumentNullException.ThrowIfNull(asset);
+
+        return Instance.ContentCollection.TryAdd(
+            asset.AssetName,
+            asset.GetType(),
+            asset,
+            false);
     }
 
     public static SpriteFontBase LoadSpriteFont(string assetName, float fontSize = 12f)
     {
-        //if we already have the asset we will return it
-        if (Instance.LoadedAssets.TryGetValue(assetName + fontSize, out var rawAsset))
-            if (rawAsset is SpriteFontBase font)
-                return font;
+        var cacheName = GetFontCacheName(assetName, fontSize);
+        if (Instance.ContentCollection.TryGet<SpriteFontBase>(cacheName, out var cachedFont))
+            return cachedFont;
 
         try
         {
-            Instance.Logger.Trace("Loading SpriteFontBase - {0}", assetName + fontSize);
+            Instance.Logger.Trace("Loading SpriteFontBase - {0}", cacheName);
 
             SpriteFontBase font;
             if (Loaders.TryGetValue(typeof(SpriteFontBase), out var loader))
@@ -168,11 +177,11 @@ public class Resources : Singleton<Resources>
                 return null;
             }
 
-            Instance.LoadedAssets[assetName + fontSize] = font;
-
-            var disposable = font as IDisposable;
-            if (disposable != null)
-                Instance.DisposableAssets.Add(disposable);
+            Instance.ContentCollection.TryAdd(
+                cacheName,
+                typeof(SpriteFontBase),
+                font,
+                true);
 
             return font;
         }
@@ -184,20 +193,57 @@ public class Resources : Singleton<Resources>
     }
 
 
-    private static Texture2D PremultiplyTexture(Texture2D texture)
+    internal static Stream OpenAssetStream(
+        string assetName,
+        string pakName,
+        bool usePak,
+        string contentDirectory)
     {
-        var data = new Color[texture.Width * texture.Height];
-        texture.GetData(data);
+        if (!usePak)
+            return File.OpenRead(Path.Combine(contentDirectory, assetName));
 
-        for (var i = 0; i < data.Length; i++)
+        var pakPath = Path.GetFullPath(Path.Combine(contentDirectory, pakName));
+        if (!Instance._pakReaders.TryGetValue(pakPath, out var reader))
         {
-            var c = data[i];
-            var alpha = c.A / 255f;
-            data[i] = new Color((byte)(c.R * alpha), (byte)(c.G * alpha), (byte)(c.B * alpha), c.A);
+            reader = new PakReader(pakPath);
+            Instance._pakReaders.Add(pakPath, reader);
         }
 
-        var result = new Texture2D(texture.GraphicsDevice, texture.Width, texture.Height);
-        result.SetData(data);
-        return result;
+        return reader.Open(assetName);
+    }
+
+    internal void CleanUp()
+    {
+        ReleaseEntries(ContentCollection.Drain());
+        _xnbReader?.Dispose();
+        _xnbReader = null;
+
+        foreach (var reader in _pakReaders.Values)
+            reader.Dispose();
+
+        _pakReaders.Clear();
+    }
+
+    private static string GetFontCacheName(string assetName, float fontSize)
+    {
+        return $"{assetName}#font-size={fontSize:R}";
+    }
+
+    private void ReleaseEntries(IReadOnlyList<DreambitContentCollection.Entry> entries)
+    {
+        var disposed = new HashSet<object>(ReferenceEqualityComparer.Instance);
+
+        foreach (var entry in entries)
+        {
+            if (entry.OwnedDisposables != null)
+                foreach (var ownedDisposable in entry.OwnedDisposables)
+                    if (ownedDisposable != null && disposed.Add(ownedDisposable))
+                        ownedDisposable.Dispose();
+
+            if (entry.OwnsAsset &&
+                entry.Asset is IDisposable disposable &&
+                disposed.Add(entry.Asset))
+                disposable.Dispose();
+        }
     }
 }

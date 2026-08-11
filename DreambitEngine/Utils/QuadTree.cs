@@ -145,7 +145,8 @@ public class Quadtree<T>
             removed = _nodes[index].Remove(entity, position);
         else
             for (var i = 0; i < _entities.Count; i++)
-                if (_entities[i].Entity.Equals(entity) && _entities[i].Position.Equals(position))
+                if (EqualityComparer<T>.Default.Equals(_entities[i].Entity, entity) &&
+                    _entities[i].Position.Equals(position))
                 {
                     _entities.RemoveAt(i);
                     removed = true;
@@ -158,19 +159,36 @@ public class Quadtree<T>
             var totalObjects = _entities.Count;
             foreach (var node in _nodes)
                 if (node != null)
-                    totalObjects += node._entities.Count;
+                    totalObjects += node.CountObjects();
 
             if (totalObjects < MaxObjects)
-                // Merge all child nodes into this node
+                // Merge all descendants into this node.
                 for (var i = 0; i < 4; i++)
                     if (_nodes[i] != null)
                     {
-                        _entities.AddRange(_nodes[i]._entities);
+                        _nodes[i].CollectEntities(_entities);
                         _nodes[i] = null;
                     }
         }
 
         return removed;
+    }
+
+    private int CountObjects()
+    {
+        var count = _entities.Count;
+        foreach (var node in _nodes)
+            if (node != null)
+                count += node.CountObjects();
+
+        return count;
+    }
+
+    private void CollectEntities(List<(T Entity, Vector2 Position)> destination)
+    {
+        destination.AddRange(_entities);
+        foreach (var node in _nodes)
+            node?.CollectEntities(destination);
     }
 
     /// <summary>

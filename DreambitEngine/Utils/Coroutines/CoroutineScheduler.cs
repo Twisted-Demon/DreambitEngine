@@ -8,12 +8,12 @@ namespace Dreambit;
 internal sealed class CoroutineScheduler : ICoroutineService, ICanLog<CoroutineScheduler>
 {
     private readonly Dictionary<int, Node> _byId = [];
-    private readonly List<Node> _endOfFrameQueue = new(64);
-    private readonly List<Node> _fixedQueue = new(64);
+    private readonly List<ScheduledNode> _endOfFrameQueue = new(64);
+    private readonly List<ScheduledNode> _fixedQueue = new(64);
 
     private readonly Stack<Node> _pool = [];
 
-    private readonly List<Node> _updateQueue = new(64);
+    private readonly List<ScheduledNode> _updateQueue = new(64);
 
     private Node _head;
     private int _idSeq = 1;
@@ -95,20 +95,20 @@ internal sealed class CoroutineScheduler : ICoroutineService, ICanLog<CoroutineS
         {
             if (!current.WaitingFixedUpdate &&
                 !current.WaitingEndOfFrame)
-                _updateQueue.Add(current);
+                _updateQueue.Add(new ScheduledNode(current, current.Id));
 
             current = current.Next;
         }
 
-        foreach (var node in _updateQueue)
+        foreach (var scheduled in _updateQueue)
         {
-            // Save this before ticking because stopping a coroutine recycles
-            // the node and resets its ID.
-            var nodeId = node.Id;
+            var node = scheduled.Node;
+            var nodeId = scheduled.Id;
 
             // Another coroutine may have stopped this one earlier in the
-            // current update.
-            if (!_byId.ContainsKey(nodeId))
+            // current update, and its pooled node may already have been reused.
+            if (!_byId.TryGetValue(nodeId, out var activeNode) ||
+                !ReferenceEquals(activeNode, node))
                 continue;
 
             var keepRunning = TickCoroutine(node, clock);
@@ -121,20 +121,6 @@ internal sealed class CoroutineScheduler : ICoroutineService, ICanLog<CoroutineS
                 Remove(node);
         }
 
-        _endOfFrameQueue.Clear();
-
-        current = _head;
-
-        while (current != null)
-        {
-            if (current.WaitingEndOfFrame)
-                _endOfFrameQueue.Add(current);
-
-            current = current.Next;
-        }
-
-        foreach (var node in _endOfFrameQueue)
-            node.WaitingEndOfFrame = false;
     }
 
     public void FixedUpdate()
@@ -145,23 +131,69 @@ internal sealed class CoroutineScheduler : ICoroutineService, ICanLog<CoroutineS
         var cur = _head;
         while (cur != null)
         {
-            if (cur.WaitingFixedUpdate) _fixedQueue.Add(cur);
+            if (cur.WaitingFixedUpdate)
+                _fixedQueue.Add(new ScheduledNode(cur, cur.Id));
             cur = cur.Next;
         }
 
-        foreach (var n in _fixedQueue)
-        {
-            n.WaitingFixedUpdate = false;
-            TickCoroutine(n, clock);
-        }
+        ResumePhase(_fixedQueue, clock, true);
     }
 
     public void EndOfFrame()
     {
-        var clock = CoroutineClock.Now(); // EoF usually shares the frame clock
+        var clock = CoroutineClock.Now();
 
-        foreach (var n in _endOfFrameQueue) TickCoroutine(n, clock);
         _endOfFrameQueue.Clear();
+        var current = _head;
+        while (current != null)
+        {
+            if (current.WaitingEndOfFrame)
+                _endOfFrameQueue.Add(new ScheduledNode(current, current.Id));
+
+            current = current.Next;
+        }
+
+        ResumePhase(_endOfFrameQueue, clock, false);
+        _endOfFrameQueue.Clear();
+    }
+
+    private void ResumePhase(
+        IReadOnlyList<ScheduledNode> queue,
+        CoroutineClock clock,
+        bool fixedUpdate)
+    {
+        foreach (var scheduled in queue)
+        {
+            var node = scheduled.Node;
+            if (!_byId.TryGetValue(scheduled.Id, out var activeNode) ||
+                !ReferenceEquals(activeNode, node))
+                continue;
+
+            if (fixedUpdate)
+            {
+                node.WaitingFixedUpdate = false;
+                if (node.CurrentYield is WaitForFixedUpdate wait)
+                    wait.pending = false;
+            }
+            else
+            {
+                node.WaitingEndOfFrame = false;
+                if (node.CurrentYield is WaitForEndOfFrame wait)
+                    wait.queued = false;
+            }
+
+            // The phase wait has now been satisfied. Continue the enumerator
+            // instead of re-queuing the same instruction.
+            node.CurrentYield = null;
+            var keepRunning = TickCoroutine(node, clock);
+
+            if (!_byId.TryGetValue(scheduled.Id, out activeNode) ||
+                !ReferenceEquals(activeNode, node))
+                continue;
+
+            if (!keepRunning)
+                Remove(node);
+        }
     }
 
     private bool TickCoroutine(Node node, CoroutineClock clock)
@@ -335,4 +367,6 @@ internal sealed class CoroutineScheduler : ICoroutineService, ICanLog<CoroutineS
             Next = null;
         }
     }
+
+    private readonly record struct ScheduledNode(Node Node, int Id);
 }

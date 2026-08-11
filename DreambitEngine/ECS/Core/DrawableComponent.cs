@@ -22,7 +22,7 @@ public abstract class DrawableComponent : Component
 
     public void Draw()
     {
-        if (IsFaulted() && !Enabled) return;
+        if (IsFaulted() || !Enabled) return;
 
         try
         {
@@ -48,7 +48,7 @@ public abstract class DrawableComponent : Component
 
     public void DrawUi()
     {
-        if (IsFaulted() && !Enabled) return;
+        if (IsFaulted() || !Enabled) return;
 
         try
         {

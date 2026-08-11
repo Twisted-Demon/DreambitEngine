@@ -288,7 +288,7 @@ public abstract class Component : IDisposable
 
     internal void Update()
     {
-        if (IsFaulted() && !Enabled) return;
+        if (IsFaulted() || !Enabled) return;
 
         try
         {
@@ -302,7 +302,7 @@ public abstract class Component : IDisposable
 
     internal void PhysicsUpdate()
     {
-        if (IsFaulted() && !Enabled) return;
+        if (IsFaulted() || !Enabled) return;
 
         try
         {

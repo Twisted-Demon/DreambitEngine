@@ -11,11 +11,13 @@ public class YamlBaker : AssetBakerBase
     private const uint FlagUtf8NoBom = 1u << 2;
     
     public override string AssetTypeName => "Yaml";
-    public override string[] SupportedInputs => [".yaml"];
+    public override string[] SupportedInputs => [".yaml", ".yml"];
     public override string OutputExtension => ".yamlb";
     public override void Bake(BakeContext ctx)
     {
         var blob = BakeToBytes(ctx);
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(ctx.OutputPath))!);
+        File.WriteAllBytes(ctx.OutputPath, blob.Data);
     }
 
     public override AssetBlob BakeToBytes(BakeContext ctx)

@@ -9,6 +9,9 @@ namespace Dreambit.LDtk;
 
 public class LDtkEntity
 {
+    /// <summary>The source LDtk entity instance represented by this runtime data.</summary>
+    public required EntityInstance Instance { get; init; }
+
     public string Identifier { get; set; } = string.Empty;
     public Guid Iid { get; set; }
     public int Uid { get; set; }
@@ -137,6 +140,7 @@ public class LDtkEntity
 
         return new LDtkEntity
         {
+            Instance = instance,
             Identifier = instance._Identifier,
             Iid = instance.Iid,
             Uid = instance.DefUid,

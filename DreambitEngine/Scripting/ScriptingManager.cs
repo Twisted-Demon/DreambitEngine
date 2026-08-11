@@ -1,15 +1,11 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using YamlDotNet.Serialization;
-using YamlDotNet.Serialization.NamingConventions;
 
 namespace Dreambit.Scripting;
 
 public class ScriptingManager
 {
-    private static readonly Dictionary<string, ScriptSequence> PreloadedGroups = [];
     private readonly Logger<ScriptingManager> _logger = new();
     public Action OnScriptingEnd;
     public Action OnScriptingStart;
@@ -23,78 +19,70 @@ public class ScriptingManager
     public static ScriptingManager Instance => Scene.Instance.ScriptingManager;
     public static bool IsCutsceneActive { get; internal set; }
 
-    public void StartCutscene(string cutsceneName, string fileExtension = ".yaml")
+    /// <summary>
+    ///     Loads and starts a cutscene asset through <see cref="Resources"/>.
+    /// </summary>
+    public bool StartCutscene(string assetName)
     {
         if (IsCutsceneActive || _groupQueue.Count != 0)
         {
-            _logger.Warn("Unable to Start Cutscene {0}, Another cutscene is already active", cutsceneName);
-            return;
+            _logger.Warn("Unable to start cutscene {0}; another cutscene is already active", assetName);
+            return false;
+        }
+
+        var cutscene = Resources.LoadAsset<Cutscene>(assetName);
+        if (cutscene is not null)
+            return StartCutscene(cutscene);
+
+        _logger.Warn("Unable to load cutscene asset {0}", assetName);
+        return false;
+    }
+
+    /// <summary>
+    ///     Starts an already-loaded cutscene asset.
+    /// </summary>
+    public bool StartCutscene(Cutscene cutscene)
+    {
+        ArgumentNullException.ThrowIfNull(cutscene);
+
+        var cutsceneName = string.IsNullOrWhiteSpace(cutscene.AssetName)
+            ? "<unregistered cutscene>"
+            : cutscene.AssetName;
+
+        if (IsCutsceneActive || _groupQueue.Count != 0)
+        {
+            _logger.Warn("Unable to start cutscene {0}; another cutscene is already active", cutsceneName);
+            return false;
         }
 
         try
         {
-            // check if we have the scene pre-loaded
-            if (PreloadedGroups.ContainsKey(cutsceneName + fileExtension))
-            {
-                var preloadedSequence = PreloadedGroups[cutsceneName + fileExtension];
-                _groupQueue = preloadedSequence.GetScriptGroupQueue();
-            }
-            else
-            {
-                var sequence = LoadSequenceFromFile(cutsceneName, fileExtension);
-                _groupQueue = sequence.GetScriptGroupQueue();
-            }
-
+            _groupQueue = CreateRuntimeQueue(cutscene);
             IsCutsceneActive = true;
             OnScriptingStart?.Invoke();
+            return true;
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            _logger.Warn("Unable to Start Cutscene {0}", cutsceneName);
-            _logger.Error(e.Message);
+            _groupQueue.Clear();
+            _logger.Warn("Unable to start cutscene {0}", cutsceneName);
+            _logger.Error(exception.ToString());
+            return false;
         }
     }
 
-    public static ScriptSequence LoadSequenceFromFile(string cutsceneName, string fileExtension = ".yaml")
+    private static Queue<ScriptActionGroup> CreateRuntimeQueue(Cutscene cutscene)
     {
-        var yamlText = File.ReadAllText("Content/" + cutsceneName + fileExtension);
-        var deserializer = new DeserializerBuilder()
-            .WithNamingConvention(CamelCaseNamingConvention.Instance)
-            .Build();
-
-        var yamlData = deserializer.Deserialize<List<dynamic>>(yamlText);
-
-        var sequence = new ScriptSequence();
-        var groups = new List<ScriptActionGroup>();
-
-        foreach (var groupData in yamlData)
+        var queue = new Queue<ScriptActionGroup>(cutscene.Groups.Count);
+        foreach (var groupDefinition in cutscene.Groups)
         {
             var group = new ScriptActionGroup();
-
-            var scriptList = groupData["scriptGroup"] as List<object>;
-
-            foreach (var scriptData in scriptList!)
-            {
-                var scriptDict = ConvertToDictionary(scriptData as Dictionary<object, object>);
-
-                if (scriptDict != null)
-                {
-                    var script = ScriptFactory.CreateScript(scriptDict);
-                    if (script == null) continue;
-                    group.Scripts.Add(script);
-                }
-            }
-
-            groups.Add(group);
+            foreach (var actionDefinition in groupDefinition.Actions)
+                group.Scripts.Add(ScriptFactory.CreateScript(actionDefinition));
+            queue.Enqueue(group);
         }
 
-        sequence.RegisterGroups(groups);
-
-        //register the sequence
-        if (!PreloadedGroups.ContainsKey(cutsceneName + fileExtension))
-            PreloadedGroups.Add(cutsceneName + fileExtension, sequence);
-
-        return sequence;
+        return queue;
     }
 
     public void Update()
@@ -122,18 +110,9 @@ public class ScriptingManager
 
     internal void CleanUp()
     {
+        _groupQueue.Clear();
+        IsCutsceneActive = false;
         OnScriptingStart = null;
         OnScriptingEnd = null;
-    }
-
-    // Helper method to convert Dictionary<object, object> to Dictionary<string, object>
-    private static Dictionary<string, object> ConvertToDictionary(Dictionary<object, object> original)
-    {
-        if (original == null) return null;
-
-        return original.ToDictionary(
-            entry => entry.Key.ToString(), // Convert keys to string
-            entry => entry.Value // Keep values as object
-        );
     }
 }

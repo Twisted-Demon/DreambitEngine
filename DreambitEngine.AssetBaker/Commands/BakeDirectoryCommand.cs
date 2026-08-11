@@ -58,8 +58,7 @@ public sealed class BakeDirectoryCommand : Command<BakeDirectorySettings>
         var outputRoot = Path.GetFullPath(s.OutputDir);
         Directory.CreateDirectory(outputRoot);
 
-        var registry = new AssetBakerRegistry()
-            .Register(AssetType.Texture, new TextureBaker());
+        var registry = AssetBakerRegistry.CreateDefault();
         
         var files = Directory.EnumerateFiles(inputRoot, "*", SearchOption.AllDirectories).ToArray();
         if (files.Length == 0)
@@ -70,14 +69,24 @@ public sealed class BakeDirectoryCommand : Command<BakeDirectorySettings>
         
         AnsiConsole.MarkupLine($"[grey]Found[/] {files.Length} file(s).");
 
-        foreach (var file in files)
+        var bakedCount = 0;
+        var options = new ParallelOptions
+        {
+            MaxDegreeOfParallelism = s.Parallel,
+            CancellationToken = cancellationToken
+        };
+
+        Parallel.ForEach(files, options, file =>
         {
             var baker = registry.GetByExt(Path.GetExtension(file));
+            if (baker is null)
+                return;
 
             var rel = Path.GetRelativePath(inputRoot, file);
-            var relNoExt = Path.Combine(Path.GetDirectoryName(rel) ?? "", Path.GetFileNameWithoutExtension(rel));
             var outDir = Path.Combine(outputRoot, Path.GetDirectoryName(rel) ?? "");
-            var outFile = Path.Combine(outDir, relNoExt + baker.OutputExtension);
+            var outFile = Path.Combine(
+                outDir,
+                Path.GetFileNameWithoutExtension(rel) + baker.OutputExtension);
             Directory.CreateDirectory(outDir);
 
             var ctxBake = new BakeContext
@@ -91,8 +100,11 @@ public sealed class BakeDirectoryCommand : Command<BakeDirectorySettings>
             };
 
             baker.Bake(ctxBake);
-        }
+            Interlocked.Increment(ref bakedCount);
+        });
 
-        return 1;
+        AnsiConsole.MarkupLine($"[green]Baked[/] {bakedCount} supported asset(s).");
+
+        return 0;
     }
 }

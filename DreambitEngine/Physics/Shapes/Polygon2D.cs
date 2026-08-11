@@ -395,7 +395,10 @@ public struct Polygon2D
             Vertices = new Vector2[Length]
         };
 
-        var translationMatrix = transform.WorldMatrix * Matrix.CreateTranslation(desiredPos);
+        var translationMatrix = transform.WorldMatrix;
+        translationMatrix.M41 = desiredPos.X;
+        translationMatrix.M42 = desiredPos.Y;
+        translationMatrix.M43 = desiredPos.Z;
 
         for (var i = 0; i < Length; i++)
         {
@@ -447,6 +450,8 @@ public struct Polygon2D
         var remainingVertices = new List<Vector2>(polygon2D.Vertices);
 
         while (remainingVertices.Count > 3)
+        {
+            var earFound = false;
             for (var i = 0; i < remainingVertices.Count; i++)
             {
                 var prev = remainingVertices[(i - 1 + remainingVertices.Count) % remainingVertices.Count];
@@ -463,9 +468,15 @@ public struct Polygon2D
                         }
                     });
                     remainingVertices.RemoveAt(i);
+                    earFound = true;
                     break;
                 }
             }
+
+            if (!earFound)
+                throw new InvalidOperationException(
+                    "Unable to triangulate polygon. Ensure it is simple and non-self-intersecting.");
+        }
 
         triangles.Add(new Polygon2D
         {

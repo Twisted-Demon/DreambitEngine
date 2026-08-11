@@ -54,6 +54,29 @@ public sealed class AssetBakerRegistry
             : null;
     }
 
+    public static AssetBakerRegistry CreateDefault()
+    {
+        return new AssetBakerRegistry()
+            .Register(
+                AssetType.Texture,
+                new Pipeline.Textures.TextureBaker())
+            .Register(
+                AssetType.Json,
+                new Pipeline.Docs.JsonbBaker())
+            .Register(
+                AssetType.Yaml,
+                new Pipeline.Docs.YamlBaker())
+            .Register(
+                AssetType.Audio,
+                new pipeline.Audio.AudioBaker())
+            .Register(
+                AssetType.Text,
+                new Pipeline.Docs.TxtbBaker())
+            .Register(
+                AssetType.Xml,
+                new Pipeline.Docs.XmlbBaker());
+    }
+
     private static string NormalizeExtension(string extension)
     {
         if (string.IsNullOrWhiteSpace(extension))

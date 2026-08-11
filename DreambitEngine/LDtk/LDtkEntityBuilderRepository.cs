@@ -10,8 +10,10 @@ public static class LDtkEntityBuilderRepository
 
     private static void EnsureRepositoryBuild()
     {
-        if(_entityBuilders == null)
-            _entityBuilders = new Dictionary<string, ILDtkEntityBuilder>();
+        if (_entityBuilders is not null)
+            return;
+
+        var entityBuilders = new Dictionary<string, ILDtkEntityBuilder>(StringComparer.Ordinal);
 
         var builderTypes = ReflectionUtils.GetAllTypesAssignableFrom(
             typeof(ILDtkEntityBuilder), true);
@@ -20,8 +22,32 @@ public static class LDtkEntityBuilderRepository
         {
             var instance = (ILDtkEntityBuilder)Activator.CreateInstance(builderType);
             if (instance is null) continue;
-            _entityBuilders[instance.EntityDefinitionIdentifier] = instance;
+
+            var identifiers = instance.EntityDefinitionIdentifiers;
+            if (identifiers is null || identifiers.Length == 0)
+                throw new InvalidOperationException(
+                    $"LDtk entity builder '{builderType.FullName}' must declare at least one identifier.");
+
+            foreach (var identifier in identifiers)
+            {
+                if (string.IsNullOrWhiteSpace(identifier))
+                    throw new InvalidOperationException(
+                        $"LDtk entity builder '{builderType.FullName}' contains an empty identifier.");
+
+                if (!entityBuilders.TryAdd(identifier, instance))
+                {
+                    var registeredType = entityBuilders[identifier].GetType();
+                    if (registeredType == builderType)
+                        continue;
+
+                    throw new InvalidOperationException(
+                        $"LDtk entity identifier '{identifier}' is registered by both " +
+                        $"'{registeredType.FullName}' and '{builderType.FullName}'.");
+                }
+            }
         }
+
+        _entityBuilders = entityBuilders;
     }
 
     public static ILDtkEntityBuilder GetEntityBuilder(string entityIdentifier)

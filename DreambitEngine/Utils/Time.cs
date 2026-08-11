@@ -50,7 +50,9 @@ public static class Time
         ScaledTime += DeltaTime; // <<< accumulate scaled time >>>
         TimeSinceSceneLoaded += dt;
         FrameCount++;
-        FrameRate = Mathf.RoundToInt(1 / DeltaTime);
+        FrameRate = UnscaledDeltaTime > 0f
+            ? Mathf.RoundToInt(1f / UnscaledDeltaTime)
+            : 0;
     }
 
     internal static void UpdatePhysicsTime(float fixedUnscaledDelta)

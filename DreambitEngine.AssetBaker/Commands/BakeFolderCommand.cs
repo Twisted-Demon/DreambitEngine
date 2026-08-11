@@ -37,7 +37,7 @@ public sealed class BakeFolderSettings : CommandSettings
 
     public override ValidationResult Validate()
     {
-        if (string.IsNullOrWhiteSpace(InputFolder) || Directory.Exists(InputFolder))
+        if (string.IsNullOrWhiteSpace(InputFolder) || !Directory.Exists(InputFolder))
             return ValidationResult.Error("Input folder does not exist.");
         if (string.IsNullOrWhiteSpace(Output))
             return ValidationResult.Error("Output is required.");
@@ -49,33 +49,37 @@ public class BakeFolderCommand : Command<BakeFolderSettings>
 {
     protected override int Execute(CommandContext context, BakeFolderSettings settings, CancellationToken cancellationToken)
     {
-        var registry = new AssetBakerRegistry()
-            .Register(AssetType.Texture, new TextureBaker())
-            .Register(AssetType.Json, new JsonbBaker());
-
-        var baseDirectory = AppContext.BaseDirectory;
-        var rel = settings.InputFolder.TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        
-        var folderPath = Path.Combine(AppContext.BaseDirectory, rel);
-        
+        var registry = AssetBakerRegistry.CreateDefault();
+        var folderPath = Path.GetFullPath(settings.InputFolder);
+        var outputRoot = Path.GetFullPath(settings.Output);
+        Directory.CreateDirectory(outputRoot);
         var filesPaths = Directory.GetFiles(folderPath, "*", SearchOption.AllDirectories);
+        var bakedCount = 0;
 
         foreach (var filePath in filesPaths)
         {
-            AnsiConsole.MarkupLine(
-                $"[grey]Baking[/] [bold]{"baker.AssetTypeName"}[/] from [blue]{filePath}[/] → " +
-                $"[green]{settings.Output}[/]");
-            
+            cancellationToken.ThrowIfCancellationRequested();
+
             var ext = Path.GetExtension(filePath).ToLowerInvariant();
-
             var baker = registry.GetByExt(ext);
+            if (baker is null)
+                continue;
 
-            var outputPath = Path.Combine(AppContext.BaseDirectory, settings.Output);
+            var relativePath = Path.GetRelativePath(folderPath, filePath);
+            var outputDirectory = Path.Combine(outputRoot, Path.GetDirectoryName(relativePath) ?? "");
+            var outputPath = Path.Combine(
+                outputDirectory,
+                Path.GetFileNameWithoutExtension(relativePath) + baker.OutputExtension);
+            Directory.CreateDirectory(outputDirectory);
+
+            AnsiConsole.MarkupLine(
+                $"[grey]Baking[/] [bold]{Markup.Escape(baker.AssetTypeName)}[/] from " +
+                $"[blue]{Markup.Escape(filePath)}[/] → [green]{Markup.Escape(outputPath)}[/]");
 
             var ctx = new BakeContext()
             {
                 InputPath = filePath,
-                OutputPath = outputPath + Path.GetFileNameWithoutExtension(filePath),
+                OutputPath = outputPath,
                 GenerateMips = settings.GenerateMips,
                 PremultiplyAlpha = settings.PremultiplyAlpha,
                 MaxDimension = settings.MaxSize,
@@ -83,9 +87,10 @@ public class BakeFolderCommand : Command<BakeFolderSettings>
             };
 
             baker.Bake(ctx);
-
-            AnsiConsole.MarkupLine("[green]Done.[/]");
+            bakedCount++;
         }
+
+        AnsiConsole.MarkupLine($"[green]Baked[/] {bakedCount} supported asset(s).");
 
         return 0;
     }

@@ -52,18 +52,13 @@ public sealed class BakePakCommand : Command<BakePakSettings>
             AttributesToSkip = FileAttributes.System
         }).ToArray();
 
-        var registry = new AssetBakerRegistry()
-            .Register(AssetType.Texture, new TextureBaker())
-            .Register(AssetType.Json, new JsonbBaker())
-            .Register(AssetType.Yaml, new YamlBaker())
-            .Register(AssetType.Audio, new AudioBaker())
-            .Register(AssetType.Text, new TxtbBaker())
-            .Register(AssetType.Xml, new XmlbBaker());
+        var registry = AssetBakerRegistry.CreateDefault();
 
         var pak = new PakWriter();
 
         foreach (var file in files)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 var ext = Path.GetExtension(file);
@@ -88,7 +83,7 @@ public sealed class BakePakCommand : Command<BakePakSettings>
                 });
 
                 lock (pak) pak.Add(blob);
-                AnsiConsole.MarkupLine($"[green]Baked: [/] {blob.LogicalPath + blob.Extension}");
+                AnsiConsole.MarkupLine($"[green]Baked: [/] {blob.LogicalPath}");
             }
             catch (Exception e)
             {

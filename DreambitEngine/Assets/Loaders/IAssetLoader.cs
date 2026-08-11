@@ -20,13 +20,7 @@ public abstract class AssetLoaderBase : IAssetLoader
 
     protected static Stream GetStream(string assetName, string pakName, bool usePak, string contentDirectory)
     {
-        if (usePak)
-        {
-            var pak = new PakReader(Path.Combine(contentDirectory, pakName));
-            return pak.Open(assetName);
-        }
-
-        return File.OpenRead(Path.Combine(contentDirectory, assetName));
+        return Resources.OpenAssetStream(assetName, pakName, usePak, contentDirectory);
     }
 
     protected string GetPath(string assetName)

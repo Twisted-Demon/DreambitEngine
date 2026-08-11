@@ -18,9 +18,37 @@ public class PriorityQueue<T> where T : IComparable<T>
 
     public void Enqueue(T item)
     {
+        if (!itemsSet.Add(item))
+            return;
+
         heap.Add(item);
-        itemsSet.Add(item);
         HeapifyUp(heap.Count - 1);
+    }
+
+    public T Peek()
+    {
+        if (heap.Count == 0)
+            throw new InvalidOperationException("Cannot peek an empty heap.");
+
+        return heap[0];
+    }
+
+    public bool TryDequeue(out T item)
+    {
+        if (heap.Count == 0)
+        {
+            item = default;
+            return false;
+        }
+
+        item = Dequeue();
+        return true;
+    }
+
+    public void Clear()
+    {
+        heap.Clear();
+        itemsSet.Clear();
     }
 
     public T Dequeue()
