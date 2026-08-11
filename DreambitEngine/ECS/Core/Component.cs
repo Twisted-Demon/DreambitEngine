@@ -11,6 +11,8 @@ public abstract class Component : IDisposable
     internal IReadOnlyList<Type> RequiredComponentTypes = [];
     private bool _enabled = true;
     private bool _isDisposed;
+    private readonly HashSet<string> _editorSerializationFailures =
+        new(StringComparer.OrdinalIgnoreCase);
 
     public Component()
     {
@@ -23,6 +25,26 @@ public abstract class Component : IDisposable
 
     public Entity Entity { get; internal set; }
     public Scene Scene => Entity?.Scene;
+
+    /// <summary>
+    /// Serialized members the editor could not materialize. Their source JSON is retained
+    /// verbatim until the member is deliberately changed.
+    /// </summary>
+    public IReadOnlySet<string> EditorSerializationFailures => _editorSerializationFailures;
+
+    /// <summary>Marks a previously invalid serialized member as deliberately replaced.</summary>
+    public void AcknowledgeEditorSerializationFailure(string memberName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(memberName);
+        _editorSerializationFailures.Remove(memberName);
+    }
+
+    internal void SetEditorSerializationFailures(IEnumerable<string> memberNames)
+    {
+        _editorSerializationFailures.Clear();
+        foreach (var memberName in memberNames)
+            _editorSerializationFailures.Add(memberName);
+    }
 
 
     public bool Enabled
@@ -170,6 +192,31 @@ public abstract class Component : IDisposable
     {
     }
 
+    /// <summary>Called once when this component is created in an editor-hosted scene.</summary>
+    public virtual void OnEditorCreated()
+    {
+    }
+
+    /// <summary>Called once per editor frame. Gameplay update callbacks remain suppressed.</summary>
+    public virtual void OnEditorUpdate()
+    {
+    }
+
+    /// <summary>Draws an always-visible editor visualization for this component.</summary>
+    public virtual void OnEditorDrawGizmos(IEditorGizmoContext context)
+    {
+    }
+
+    /// <summary>Draws editor visualization only while this component's entity is selected.</summary>
+    public virtual void OnEditorDrawGizmosSelected(IEditorGizmoContext context)
+    {
+    }
+
+    /// <summary>Called when an editor-hosted component is removed or its scene closes.</summary>
+    public virtual void OnEditorDestroyed()
+    {
+    }
+
     /// <summary>
     ///     Called when the component is destroyed. Called after it has been de-attached from the Entity
     /// </summary>
@@ -232,7 +279,7 @@ public abstract class Component : IDisposable
 
     internal void BeforeDeserialize()
     {
-        if (IsFaulted()) return;
+        if (IsFaulted() || Scene?.ExecutionMode == SceneExecutionMode.Editor) return;
 
         try
         {
@@ -246,7 +293,7 @@ public abstract class Component : IDisposable
 
     internal void AfterDeserialize()
     {
-        if (IsFaulted()) return;
+        if (IsFaulted() || Scene?.ExecutionMode == SceneExecutionMode.Editor) return;
 
         try
         {
@@ -264,11 +311,45 @@ public abstract class Component : IDisposable
 
         try
         {
-            OnCreated();
+            if (Scene?.ExecutionMode == SceneExecutionMode.Editor)
+                OnEditorCreated();
+            else
+                OnCreated();
         }
         catch (Exception exception)
         {
             HandleCallbackException(nameof(OnCreated), exception);
+        }
+    }
+
+    internal void EditorUpdate()
+    {
+        if (IsFaulted() || !Enabled) return;
+
+        try
+        {
+            OnEditorUpdate();
+        }
+        catch (Exception exception)
+        {
+            HandleCallbackException(nameof(OnEditorUpdate), exception);
+        }
+    }
+
+    internal void EditorDrawGizmos(IEditorGizmoContext context, bool selected)
+    {
+        if (IsFaulted() || !Enabled) return;
+        try
+        {
+            OnEditorDrawGizmos(context);
+            if (selected)
+                OnEditorDrawGizmosSelected(context);
+        }
+        catch (Exception exception)
+        {
+            HandleCallbackException(
+                selected ? nameof(OnEditorDrawGizmosSelected) : nameof(OnEditorDrawGizmos),
+                exception);
         }
     }
 
@@ -316,7 +397,7 @@ public abstract class Component : IDisposable
 
     internal void RemoveFromEntity()
     {
-        if (IsFaulted()) return;
+        if (IsFaulted() || Scene?.ExecutionMode == SceneExecutionMode.Editor) return;
 
         try
         {
@@ -330,7 +411,7 @@ public abstract class Component : IDisposable
 
     internal void Enable()
     {
-        if (IsFaulted()) return;
+        if (IsFaulted() || Scene?.ExecutionMode == SceneExecutionMode.Editor) return;
 
         try
         {
@@ -344,7 +425,7 @@ public abstract class Component : IDisposable
 
     internal void Disable()
     {
-        if (IsFaulted()) return;
+        if (IsFaulted() || Scene?.ExecutionMode == SceneExecutionMode.Editor) return;
 
         try
         {
@@ -362,7 +443,10 @@ public abstract class Component : IDisposable
 
         try
         {
-            OnDestroyed();
+            if (Scene?.ExecutionMode == SceneExecutionMode.Editor)
+                OnEditorDestroyed();
+            else
+                OnDestroyed();
         }
         catch (Exception exception)
         {

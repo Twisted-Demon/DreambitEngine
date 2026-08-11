@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 
 namespace Dreambit;
 
@@ -76,6 +78,18 @@ public sealed class DreambitContentCollection
         var entries = new List<Entry>(_assets.Values);
         _assets.Clear();
         return entries;
+    }
+
+    internal List<Entry> RemoveAssembly(Assembly assembly)
+    {
+        var removed = _assets.Values
+            .Where(entry =>
+                entry.Type.Assembly == assembly ||
+                entry.Asset.GetType().Assembly == assembly)
+            .ToList();
+        foreach (var entry in removed)
+            _assets.Remove(new AssetKey(entry.AssetName, entry.Type));
+        return removed;
     }
 
     private static string Normalize(string assetName)

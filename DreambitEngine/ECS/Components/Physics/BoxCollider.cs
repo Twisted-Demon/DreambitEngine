@@ -11,6 +11,11 @@ public class BoxCollider : Collider
         Bounds ??= Box2D.CreateSquare(Vector2.Zero, 5.0f);
     }
 
+    public override void OnEditorCreated()
+    {
+        Bounds ??= Box2D.CreateSquare(Vector2.Zero, 5.0f);
+    }
+
     public void SetShape(Box2D shape)
     {
         Bounds = shape;

@@ -30,15 +30,44 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(component);
 
+        ResolveComponentCore(blueprint, context, component, out var errors);
+
+        if (errors.Count > 0)
+            throw new AggregateException(
+                $"Failed to deserialize component '{component.GetType().FullName}'.",
+                errors);
+    }
+
+    internal static IReadOnlySet<string> ResolveComponentForEditor(
+        ComponentBlueprint blueprint,
+        BlueprintSpawnContext context,
+        Component component)
+    {
+        var failures = ResolveComponentCore(blueprint, context, component, out _);
+        return failures;
+    }
+
+    private static IReadOnlySet<string> ResolveComponentCore(
+        ComponentBlueprint blueprint,
+        BlueprintSpawnContext context,
+        Component component,
+        out IReadOnlyList<Exception> errors)
+    {
+        ArgumentNullException.ThrowIfNull(blueprint);
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(component);
+
         var componentType = component.GetType();
         var members = GetBlueprintMembers(componentType);
-        var errors = new List<Exception>();
+        var errorList = new List<Exception>();
+        var failures = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var (memberName, token) in blueprint.Properties)
         {
             if (!members.TryGetValue(memberName, out var member))
             {
-                errors.Add(new InvalidOperationException(
+                failures.Add(memberName);
+                errorList.Add(new InvalidOperationException(
                     $"Component '{componentType.FullName}' has no writable " +
                     $"[DreambitSerialize] property or field named '{memberName}'."));
                 continue;
@@ -51,17 +80,16 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
             }
             catch (Exception exception)
             {
-                errors.Add(new InvalidOperationException(
+                failures.Add(memberName);
+                errorList.Add(new InvalidOperationException(
                     $"Could not assign blueprint member " +
                     $"'{componentType.FullName}.{memberName}' from token '{token}'.",
                     exception));
             }
         }
 
-        if (errors.Count > 0)
-            throw new AggregateException(
-                $"Failed to deserialize component '{componentType.FullName}'.",
-                errors);
+        errors = errorList;
+        return failures;
     }
 
     internal static bool TryGetBlueprintMemberType(
@@ -158,6 +186,23 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
         }
 
         EnsureComponentTypeRegistry();
+    }
+
+    internal static void ReleaseAssembly(Assembly assembly)
+    {
+        foreach (var type in MemberCache.Keys.Where(type => type.Assembly == assembly).ToArray())
+            MemberCache.TryRemove(type, out _);
+
+        lock (ComponentRegistryLock)
+        {
+            foreach (var key in ComponentTypesById
+                         .Where(pair => pair.Value.Assembly == assembly)
+                         .Select(pair => pair.Key)
+                         .ToArray())
+            {
+                ComponentTypesById.Remove(key);
+            }
+        }
     }
 
     private static void EnsureComponentTypeRegistry()

@@ -10,12 +10,24 @@ public sealed class BlueprintSpawnContext
     private readonly Dictionary<Guid, Entity> _entitiesByBlueprintGuid = [];
 
     public BlueprintSpawnContext(EntityBlueprint rootBlueprint)
+        : this([rootBlueprint])
     {
-        RootBlueprint = rootBlueprint
-                        ?? throw new ArgumentNullException(nameof(rootBlueprint));
+    }
 
-        Hierarchy = rootBlueprint
-            .FlattenedHierarchy()
+    public BlueprintSpawnContext(IReadOnlyList<EntityBlueprint> rootBlueprints)
+    {
+        ArgumentNullException.ThrowIfNull(rootBlueprints);
+        if (rootBlueprints.Count == 0)
+            throw new ArgumentException("At least one root blueprint is required.", nameof(rootBlueprints));
+
+        foreach (var root in rootBlueprints)
+            ArgumentNullException.ThrowIfNull(root);
+
+        RootBlueprints = rootBlueprints.ToArray();
+        RootBlueprint = RootBlueprints[0];
+
+        Hierarchy = RootBlueprints
+            .SelectMany(root => root.FlattenedHierarchy())
             .ToArray();
 
         var blueprintsByGuid =
@@ -29,7 +41,7 @@ public sealed class BlueprintSpawnContext
 
             if (!blueprintsByGuid.TryAdd(blueprint.Guid, blueprint))
                 throw new InvalidOperationException(
-                    $"Blueprint '{rootBlueprint.Name}' contains duplicate " +
+                    $"Blueprint scene contains duplicate " +
                     $"entity GUID '{blueprint.Guid}'.");
         }
 
@@ -37,6 +49,8 @@ public sealed class BlueprintSpawnContext
     }
 
     public EntityBlueprint RootBlueprint { get; }
+
+    public IReadOnlyList<EntityBlueprint> RootBlueprints { get; }
 
     public IReadOnlyList<EntityBlueprint> Hierarchy { get; }
 

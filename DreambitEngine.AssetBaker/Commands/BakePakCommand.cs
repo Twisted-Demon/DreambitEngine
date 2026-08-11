@@ -1,9 +1,5 @@
 ﻿using System.ComponentModel;
-using DreambitEngine.AssetBaker.Abstractions;
-using DreambitEngine.AssetBaker.Core;
-using DreambitEngine.AssetBaker.pipeline.Audio;
-using DreambitEngine.AssetBaker.Pipeline.Docs;
-using DreambitEngine.AssetBaker.Pipeline.Textures;
+using DreambitEngine.AssetBaker.Pipeline;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
@@ -28,6 +24,15 @@ public class BakePakSettings : CommandSettings
     public bool PremultiplyAlpha { get; set; }
     [CommandOption("--max-size <N>")] public int? MaxSize { get; set; }
     [CommandOption("--srgb")] public bool SRgb { get; set; }
+    [CommandOption("--registry <PATH>")]
+    [Description("Dreambit .dreambit/assets.json registry to embed")]
+    public string? AssetRegistryPath { get; set; }
+    [CommandOption("--cache <DIRECTORY>")]
+    [Description("Incremental baked-blob cache directory")]
+    public string? CacheDirectory { get; set; }
+    [CommandOption("--rebuild")]
+    [Description("Ignore the incremental cache")]
+    public bool RebuildAll { get; set; }
 
     public override ValidationResult Validate()
     {
@@ -44,57 +49,38 @@ public sealed class BakePakCommand : Command<BakePakSettings>
 {
     protected override int Execute(CommandContext context, BakePakSettings settings, CancellationToken cancellationToken)
     {
-        var inputRoot = Path.GetFullPath(settings.InputDir);
-        var files = Directory.EnumerateFiles(inputRoot, "*", new EnumerationOptions
+        try
         {
-            RecurseSubdirectories = true,
-            IgnoreInaccessible = true,
-            AttributesToSkip = FileAttributes.System
-        }).ToArray();
-
-        var registry = AssetBakerRegistry.CreateDefault();
-
-        var pak = new PakWriter();
-
-        foreach (var file in files)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            try
-            {
-                var ext = Path.GetExtension(file);
-                var baker = registry.GetByExt(ext);
-
-                if (baker is null) continue;
-
-                var rel = Path.GetRelativePath(inputRoot, file);
-                var logicalRoot = inputRoot;
-
-                AnsiConsole.MarkupLine($"[green]Baking: [/] {file}");
-
-                var blob = baker.BakeToBytes(new BakeContext
-                {
-                    InputPath = file,
-                    OutputPath = "",
-                    GenerateMips = settings.GenerateMips,
-                    PremultiplyAlpha = settings.PremultiplyAlpha,
-                    MaxDimension = settings.MaxSize,
-                    MarkSRgb = settings.SRgb,
-                    LogicalRoot = logicalRoot,
-                });
-
-                lock (pak) pak.Add(blob);
-                AnsiConsole.MarkupLine($"[green]Baked: [/] {blob.LogicalPath}");
-            }
-            catch (Exception e)
-            {
-                AnsiConsole.WriteException(e);
-                return -1;
-            }
+            var progress = new ConsoleProgress();
+            var result = new AssetBakePipeline().BakePak(
+                new AssetBakeRequest(
+                    settings.InputDir,
+                    settings.OutputPak,
+                    settings.AssetRegistryPath,
+                    settings.CacheDirectory,
+                    settings.RebuildAll,
+                    settings.GenerateMips,
+                    settings.PremultiplyAlpha,
+                    settings.MaxSize,
+                    settings.SRgb),
+                progress,
+                cancellationToken);
+            AnsiConsole.MarkupLine(
+                $"[green]Complete:[/] {result.BakedCount} baked, " +
+                $"{result.CacheHitCount} cached, {result.UnsupportedCount} unsupported.");
+            return 0;
         }
+        catch (Exception exception)
+        {
+            AnsiConsole.WriteException(exception);
+            return -1;
+        }
+    }
 
-        AnsiConsole.MarkupLine($"[green]Saving [/] {settings.OutputPak}");
-        pak.Save(settings.OutputPak);
-
-        return 0;
+    private sealed class ConsoleProgress : IProgress<AssetBakeProgress>
+    {
+        public void Report(AssetBakeProgress value) =>
+            AnsiConsole.MarkupLine(
+                $"[green]{Markup.Escape(value.Stage)}:[/] {Markup.Escape(value.Message)}");
     }
 }

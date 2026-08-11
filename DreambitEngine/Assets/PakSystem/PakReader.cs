@@ -14,7 +14,11 @@ public sealed class PakReader : IDisposable
 
     public PakReader(string pakPath)
     {
-        _fs = File.OpenRead(pakPath);
+        _fs = new FileStream(
+            pakPath,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read | FileShare.Delete);
         _entries = ReadToc(_fs);
     }
 
@@ -90,7 +94,14 @@ public sealed class PakReader : IDisposable
             fs.ReadExactly(b[..4]);
             var crc = BinaryPrimitives.ReadUInt32LittleEndian(b[..4]);
 
-            map[Normalize(path)] = new Entry { Path = path, Type = type, Offset = off, Size = size, Crc32 = crc };
+            var normalizedPath = Normalize(path);
+            if (!map.TryAdd(
+                    normalizedPath,
+                    new Entry { Path = path, Type = type, Offset = off, Size = size, Crc32 = crc }))
+            {
+                throw new InvalidDataException(
+                    $"PAK contains duplicate case-insensitive path '{path}'.");
+            }
         }
 
         return map;

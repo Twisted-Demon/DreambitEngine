@@ -48,6 +48,18 @@ internal static class PropertyConverterRegistry
             return _converters.ContainsKey(type);
     }
 
+    internal static void ReleaseAssembly(Assembly assembly)
+    {
+        lock (Sync)
+        {
+            _converters = _converters
+                .Where(pair =>
+                    pair.Key.Assembly != assembly &&
+                    pair.Value.GetType().Assembly != assembly)
+                .ToDictionary(pair => pair.Key, pair => pair.Value);
+        }
+    }
+
     private static Dictionary<Type, JsonConverter> BuildConvertersDictionary()
     {
         var converters = new Dictionary<Type, JsonConverter>();

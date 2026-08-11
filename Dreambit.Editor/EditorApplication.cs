@@ -1,9 +1,12 @@
 using System.Numerics;
 using Dreambit.Editor.Assets;
+using Dreambit.Editor.Compilation;
 using Dreambit.Editor.Infrastructure;
+using Dreambit.Editor.Graphics;
 using Dreambit.Editor.Logging;
 using Dreambit.Editor.Persistence;
 using Dreambit.Editor.Projects;
+using Dreambit.Editor.Scenes;
 using Dreambit.Editor.UI;
 using Dreambit.Editor.UI.Panels;
 using ImGuiNET;
@@ -33,6 +36,14 @@ internal sealed class EditorApplication : IDisposable
     private string? _openProjectError;
     private bool _openProjectPopupRequested;
     private bool _showAbout;
+    private bool _newScenePopupRequested;
+    private bool _openScenePopupRequested;
+    private bool _saveSceneAsPopupRequested;
+    private bool _createFromBlueprintPopupRequested;
+    private string _newSceneName = "Untitled";
+    private string _scenePath = string.Empty;
+    private string _blueprintSearch = string.Empty;
+    private string? _sceneOperationError;
     private bool _rebuildDockLayout;
     private bool _disposed;
     private Task<ProjectCreationResult>? _projectCreationTask;
@@ -44,7 +55,7 @@ internal sealed class EditorApplication : IDisposable
         EditorStateStore stateStore,
         EditorGlobalState globalState,
         EditorWorkspaceState workspaceState,
-        bool hasSavedLayout,
+        ImGuiRenderer imGuiRenderer,
         Action requestExit)
     {
         _requestExit = requestExit;
@@ -54,7 +65,10 @@ internal sealed class EditorApplication : IDisposable
         _logs = new EditorLogService();
         _projectManager = new DreambitProjectManager(
             paths,
-            reportAssetDiagnostic: LogAssetDiagnostic);
+            reportAssetDiagnostic: LogAssetDiagnostic,
+            reportAssetBake: LogAssetBake,
+            reportGameCode: LogGameCode,
+            reportSceneError: LogSceneError);
         var sdkManager = new DreambitSdkManager(paths, _logs);
         _projectCreationService = new ProjectCreationService(sdkManager, _logs);
 
@@ -81,16 +95,52 @@ internal sealed class EditorApplication : IDisposable
 
         if (_project is not null)
         {
-            _panels.Register(new HierarchyPanel());
-            _panels.Register(new ScenePanel());
-            _panels.Register(new InspectorPanel());
+            var session = _projectManager.CurrentSession!;
+            _panels.Register(new HierarchyPanel(
+                session.Scenes,
+                session.Scenes.Selection,
+                _dragDrop,
+                session.Assets,
+                _workspaceState));
+            _panels.Register(new ScenePanel(
+                session.Scenes,
+                session.Scenes.Selection,
+                _workspaceState,
+                new SceneViewportRenderer(Core.Instance.GraphicsDevice, imGuiRenderer),
+                _dragDrop,
+                session.Assets));
+            _panels.Register(new InspectorPanel(
+                session.Scenes,
+                session.InspectorMetadata,
+                session.EditorTypes,
+                session.AssetEditing,
+                session.Assets,
+                _dragDrop,
+                new AssetPreviewService(
+                    Core.Instance.GraphicsDevice,
+                    imGuiRenderer,
+                    session.Assets.ContentRoot),
+                session.CustomEditors,
+                _logs));
             _panels.Register(new ProjectPanel(
                 _project,
                 _projectManager.CurrentSession!.Assets,
                 _logs,
-                _dragDrop));
+                _dragDrop,
+                session.AssetEditing,
+                session.Scenes,
+                session.EditorTypes,
+                _workspaceState));
             _panels.Register(new ConsolePanel(_logs));
-            _rebuildDockLayout = !hasSavedLayout;
+            _panels.Register(new BuildPanel(_projectManager.CurrentSession.GameCode));
+            _rebuildDockLayout = !imGuiRenderer.HasSavedLayout;
+
+            if (!string.IsNullOrWhiteSpace(_workspaceState.LastScenePath) &&
+                File.Exists(_workspaceState.LastScenePath))
+            {
+                TryOpenScene(_workspaceState.LastScenePath);
+            }
+            RestoreWorkspaceSelection(session);
         }
 
         foreach (var warning in _stateStore.LoadWarnings)
@@ -121,11 +171,21 @@ internal sealed class EditorApplication : IDisposable
         else
         {
             _projectManager.CurrentSession!.Assets.Update();
+            _projectManager.CurrentSession.AssetBaking.Update();
+            _projectManager.CurrentSession.GameCode.Update();
+            _projectManager.CurrentSession.Scenes.Update(
+                _workspaceState.AutoSave,
+                TimeSpan.FromSeconds(Math.Clamp(_workspaceState.AutoSaveDelaySeconds, 0.25, 60)));
+            _projectManager.CurrentSession.AssetEditing.Update(
+                _workspaceState.AutoSave,
+                TimeSpan.FromSeconds(Math.Clamp(_workspaceState.AutoSaveDelaySeconds, 0.25, 60)));
             _panels.DrawPanels();
+            CaptureWorkspaceSelection(_projectManager.CurrentSession);
         }
 
         DrawOpenProjectPopup();
         DrawAboutPopup();
+        DrawScenePopups();
         HandleShortcuts();
     }
 
@@ -183,10 +243,15 @@ internal sealed class EditorApplication : IDisposable
 
         if (ImGui.BeginMenu("File"))
         {
-            ImGui.BeginDisabled();
-            ImGui.MenuItem("New Scene", "Ctrl+N");
-            ImGui.MenuItem("Open Scene...", "Ctrl+Shift+O");
-            ImGui.MenuItem("Save", "Ctrl+S");
+            ImGui.BeginDisabled(_project is null);
+            if (ImGui.MenuItem("New Scene", "Ctrl+N"))
+                _newScenePopupRequested = true;
+            if (ImGui.MenuItem("Open Scene...", "Ctrl+Shift+O"))
+                _openScenePopupRequested = true;
+            if (ImGui.MenuItem("Save", "Ctrl+S"))
+                SaveCurrentDocument();
+            if (ImGui.MenuItem("Save As...", "Ctrl+Shift+S"))
+                RequestSaveSceneAs();
             ImGui.EndDisabled();
             ImGui.Separator();
 
@@ -204,29 +269,62 @@ internal sealed class EditorApplication : IDisposable
 
         if (ImGui.BeginMenu("Edit"))
         {
-            ImGui.BeginDisabled();
-            ImGui.MenuItem("Undo", "Ctrl+Z");
-            ImGui.MenuItem("Redo", "Ctrl+Y");
-            ImGui.Separator();
-            ImGui.MenuItem("Preferences...");
+            var undo = _projectManager.CurrentSession?.AssetEditing.Current?.Undo ??
+                       _projectManager.CurrentSession?.Scenes.Current?.Undo;
+            ImGui.BeginDisabled(undo?.CanUndo != true);
+            if (ImGui.MenuItem(undo?.UndoName is { } undoName ? $"Undo {undoName}" : "Undo", "Ctrl+Z"))
+                undo!.Undo();
             ImGui.EndDisabled();
+            ImGui.BeginDisabled(undo?.CanRedo != true);
+            if (ImGui.MenuItem(undo?.RedoName is { } redoName ? $"Redo {redoName}" : "Redo", "Ctrl+Y"))
+                undo!.Redo();
+            ImGui.EndDisabled();
+            ImGui.Separator();
+            var autoSave = _workspaceState.AutoSave;
+            if (ImGui.MenuItem("Auto Save", string.Empty, ref autoSave))
+                _workspaceState.AutoSave = autoSave;
             ImGui.EndMenu();
         }
 
         if (ImGui.BeginMenu("Assets"))
         {
-            ImGui.BeginDisabled();
-            ImGui.MenuItem("Create");
-            ImGui.MenuItem("Bake Selected");
+            ImGui.BeginDisabled(_project is null);
+            if (ImGui.BeginMenu("Create"))
+            {
+                var projectPanel = _project is null
+                    ? null
+                    : (ProjectPanel)_panels.GetRequired(EditorPanelIds.Project);
+                if (ImGui.MenuItem("Entity Blueprint"))
+                    projectPanel!.RequestCreateAsset(typeof(EntityBlueprint));
+                if (ImGui.BeginMenu("Dreambit Asset"))
+                {
+                    foreach (var type in _projectManager.CurrentSession!.EditorTypes.AssetTypes
+                                 .Where(type => type != typeof(EntityBlueprint)))
+                        if (ImGui.MenuItem(type.Name))
+                            projectPanel!.RequestCreateAsset(type);
+                    ImGui.EndMenu();
+                }
+                ImGui.EndMenu();
+            }
             ImGui.EndDisabled();
+            if (_project is not null && ImGui.MenuItem("Bake Changed"))
+                _projectManager.CurrentSession!.AssetBaking.RequestBake(false);
+            if (_project is not null && ImGui.MenuItem("Rebuild All"))
+                _projectManager.CurrentSession!.AssetBaking.RequestBake(true);
             ImGui.EndMenu();
         }
 
         if (ImGui.BeginMenu("Entity"))
         {
-            ImGui.BeginDisabled();
-            ImGui.MenuItem("Create Empty");
-            ImGui.MenuItem("Create From Blueprint");
+            var document = _projectManager.CurrentSession?.Scenes.Current;
+            ImGui.BeginDisabled(document is null);
+            if (ImGui.MenuItem("Create Empty"))
+                document!.CreateEmpty();
+            if (ImGui.MenuItem("Create From Blueprint"))
+            {
+                _blueprintSearch = string.Empty;
+                _createFromBlueprintPopupRequested = true;
+            }
             ImGui.EndDisabled();
             ImGui.EndMenu();
         }
@@ -249,11 +347,15 @@ internal sealed class EditorApplication : IDisposable
 
         if (ImGui.BeginMenu("Build"))
         {
-            ImGui.BeginDisabled();
-            ImGui.MenuItem("Build Game");
-            ImGui.MenuItem("Bake Assets");
-            ImGui.MenuItem("Rebuild All Assets");
-            ImGui.EndDisabled();
+            if (_project is not null && ImGui.MenuItem("Build Game"))
+                _projectManager.CurrentSession!.GameCode.RequestBuild(false, true);
+            if (_project is not null && ImGui.MenuItem("Rebuild Game"))
+                _projectManager.CurrentSession!.GameCode.RequestBuild(true, true);
+            ImGui.Separator();
+            if (_project is not null && ImGui.MenuItem("Bake Assets"))
+                _projectManager.CurrentSession!.AssetBaking.RequestBake(false);
+            if (_project is not null && ImGui.MenuItem("Rebuild All Assets"))
+                _projectManager.CurrentSession!.AssetBaking.RequestBake(true);
             ImGui.EndMenu();
         }
 
@@ -274,10 +376,14 @@ internal sealed class EditorApplication : IDisposable
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
         var projectStatus = _project is null
             ? "No project open"
-            : $"{_project.Metadata.Name}  |  SDK {_project.Metadata.Sdk.Version}";
+            : BuildProjectStatus();
         ImGui.TextDisabled(projectStatus);
 
-        var status = _projectCreationStatus.IsRunning ? "Creating project..." : "Ready";
+        var status = _projectCreationStatus.IsRunning
+            ? "Creating project..."
+            : _projectManager.CurrentSession?.GameCode.IsRunning == true
+                ? _projectManager.CurrentSession.GameCode.Status.Message
+                : _projectManager.CurrentSession?.AssetBaking.Status.Message ?? "Ready";
         var statusWidth = ImGui.CalcTextSize(status).X;
         ImGui.SameLine(MathF.Max(0f, ImGui.GetWindowWidth() - statusWidth - 16f));
         ImGui.TextDisabled(status);
@@ -286,8 +392,262 @@ internal sealed class EditorApplication : IDisposable
     private void HandleShortcuts()
     {
         var io = ImGui.GetIO();
-        if (io.KeyCtrl && ImGui.IsKeyPressed(ImGuiKey.O))
+        if (io.KeyCtrl && io.KeyShift && ImGui.IsKeyPressed(ImGuiKey.O) && _project is not null)
+            _openScenePopupRequested = true;
+        else if (io.KeyCtrl && ImGui.IsKeyPressed(ImGuiKey.O))
             _openProjectPopupRequested = true;
+        if (_project is null || !io.KeyCtrl)
+            return;
+        if (ImGui.IsKeyPressed(ImGuiKey.N))
+            _newScenePopupRequested = true;
+        if (ImGui.IsKeyPressed(ImGuiKey.S))
+        {
+            if (io.KeyShift)
+                RequestSaveSceneAs();
+            else
+                SaveCurrentDocument();
+        }
+        var undo = _projectManager.CurrentSession?.AssetEditing.Current?.Undo ??
+                   _projectManager.CurrentSession?.Scenes.Current?.Undo;
+        if (ImGui.IsKeyPressed(ImGuiKey.Z))
+            undo?.Undo();
+        if (ImGui.IsKeyPressed(ImGuiKey.Y))
+            undo?.Redo();
+    }
+
+    private string BuildProjectStatus()
+    {
+        var project = $"{_project!.Metadata.Name}  |  SDK {_project.Metadata.Sdk.Version}";
+        var assetDocument = _projectManager.CurrentSession?.AssetEditing.Current;
+        if (assetDocument is not null)
+            return $"{project}  |  {assetDocument.Asset.Name}{(assetDocument.IsDirty ? " *" : string.Empty)}";
+        var document = _projectManager.CurrentSession?.Scenes.Current;
+        return document is null
+            ? project
+            : $"{project}  |  {document.DisplayName}{(document.IsDirty ? " *" : string.Empty)}";
+    }
+
+    private void DrawScenePopups()
+    {
+        if (_newScenePopupRequested)
+        {
+            ImGui.OpenPopup("New Scene##Dreambit.Editor");
+            _newScenePopupRequested = false;
+        }
+        if (_openScenePopupRequested)
+        {
+            ImGui.OpenPopup("Open Scene##Dreambit.Editor");
+            _openScenePopupRequested = false;
+        }
+        if (_saveSceneAsPopupRequested)
+        {
+            ImGui.OpenPopup("Save Scene As##Dreambit.Editor");
+            _saveSceneAsPopupRequested = false;
+        }
+
+        DrawNewScenePopup();
+        DrawCreateFromBlueprintPopup();
+        DrawScenePathPopup("Open Scene##Dreambit.Editor", "Open", TryOpenScene);
+        DrawScenePathPopup("Save Scene As##Dreambit.Editor", "Save", TrySaveSceneAs);
+    }
+
+    private void DrawNewScenePopup()
+    {
+        if (!ImGui.BeginPopupModal("New Scene##Dreambit.Editor", ImGuiWindowFlags.AlwaysAutoResize))
+            return;
+        ImGui.SetNextItemWidth(360f);
+        ImGui.InputText("Name", ref _newSceneName, 128);
+        if (ImGui.Button("Create", new Vector2(90f, 0f)) && !string.IsNullOrWhiteSpace(_newSceneName))
+        {
+            _projectManager.CurrentSession!.Scenes.New(_newSceneName.Trim());
+            _sceneOperationError = null;
+            ImGui.CloseCurrentPopup();
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Cancel", new Vector2(90f, 0f)))
+            ImGui.CloseCurrentPopup();
+        ImGui.EndPopup();
+    }
+
+    private void DrawCreateFromBlueprintPopup()
+    {
+        if (_createFromBlueprintPopupRequested)
+        {
+            ImGui.OpenPopup("Create From Blueprint##Dreambit.Editor");
+            _createFromBlueprintPopupRequested = false;
+        }
+        if (!ImGui.BeginPopupModal(
+                "Create From Blueprint##Dreambit.Editor",
+                ImGuiWindowFlags.AlwaysAutoResize))
+            return;
+
+        var session = _projectManager.CurrentSession!;
+        var document = session.Scenes.Current;
+        ImGui.SetNextItemWidth(460f);
+        ImGui.InputTextWithHint("##BlueprintSearch", "Search Blueprints", ref _blueprintSearch, 256);
+        ImGui.BeginChild("##BlueprintResults", new Vector2(460f, 300f), ImGuiChildFlags.Borders);
+        var blueprints = session.Assets.GetSnapshot().Assets
+            .Where(asset => asset.Kind == AssetKind.Blueprint &&
+                            (string.IsNullOrWhiteSpace(_blueprintSearch) ||
+                             asset.RelativePath.Contains(_blueprintSearch, StringComparison.OrdinalIgnoreCase)))
+            .ToArray();
+        if (blueprints.Length == 0)
+            ImGui.TextDisabled("No matching Entity Blueprints.");
+        foreach (var blueprint in blueprints)
+        {
+            if (!ImGui.Selectable(blueprint.RelativePath))
+                continue;
+            try
+            {
+                var path = Path.Combine(
+                    session.Assets.ContentRoot,
+                    blueprint.RelativePath.Replace('/', Path.DirectorySeparatorChar));
+                var source = DreambitJson.Deserialize<EntityBlueprint>(File.ReadAllText(path))
+                             ?? throw new InvalidDataException("Blueprint file is empty.");
+                document!.InstantiateBlueprint(source);
+                _sceneOperationError = null;
+                ImGui.CloseCurrentPopup();
+            }
+            catch (Exception exception)
+            {
+                _sceneOperationError = exception.Message;
+            }
+        }
+        ImGui.EndChild();
+        if (!string.IsNullOrWhiteSpace(_sceneOperationError))
+            ImGui.TextColored(new Vector4(0.96f, 0.34f, 0.36f, 1f), _sceneOperationError);
+        if (ImGui.Button("Cancel", new Vector2(90f, 0f)))
+            ImGui.CloseCurrentPopup();
+        ImGui.EndPopup();
+    }
+
+    private void DrawScenePathPopup(string popupName, string action, Func<string, bool> execute)
+    {
+        if (!ImGui.BeginPopupModal(popupName, ImGuiWindowFlags.AlwaysAutoResize))
+            return;
+        ImGui.TextDisabled("Path is relative to the project's raw Assets folder.");
+        ImGui.SetNextItemWidth(520f);
+        var submit = ImGui.InputText(
+            "##ScenePath",
+            ref _scenePath,
+            1024,
+            ImGuiInputTextFlags.EnterReturnsTrue);
+        if (!string.IsNullOrWhiteSpace(_sceneOperationError))
+            ImGui.TextColored(new Vector4(0.96f, 0.34f, 0.36f, 1f), _sceneOperationError);
+        if ((submit || ImGui.Button(action, new Vector2(90f, 0f))) && execute(_scenePath))
+            ImGui.CloseCurrentPopup();
+        ImGui.SameLine();
+        if (ImGui.Button("Cancel", new Vector2(90f, 0f)))
+            ImGui.CloseCurrentPopup();
+        ImGui.EndPopup();
+    }
+
+    private bool TryOpenScene(string path)
+    {
+        try
+        {
+            _projectManager.CurrentSession!.Scenes.Open(path);
+            _workspaceState.LastScenePath = _projectManager.CurrentSession.Scenes.Current!.Path;
+            if (string.Equals(_workspaceState.LastSelectionKind, "entity", StringComparison.OrdinalIgnoreCase))
+            {
+                _projectManager.CurrentSession.Scenes.Selection.Restore(
+                    _workspaceState.LastSelectedEntityIds);
+                _projectManager.CurrentSession.Scenes.Selection.RemoveMissing(
+                    _projectManager.CurrentSession.Scenes.Current.Scene);
+            }
+            _sceneOperationError = null;
+            _logs.Info("Scene", $"Opened '{_projectManager.CurrentSession.Scenes.Current.DisplayName}'.");
+            return true;
+        }
+        catch (Exception exception)
+        {
+            _sceneOperationError = exception.Message;
+            _logs.Error("Scene", "Could not open scene.", exception);
+            return false;
+        }
+    }
+
+    private void RestoreWorkspaceSelection(DreambitProjectSession session)
+    {
+        if (!string.Equals(_workspaceState.LastSelectionKind, "asset", StringComparison.OrdinalIgnoreCase) ||
+            string.IsNullOrWhiteSpace(_workspaceState.LastSelectedAssetPath))
+            return;
+        if (session.Assets.TryGetAsset(_workspaceState.LastSelectedAssetPath, out var asset))
+            session.AssetEditing.Select(asset);
+    }
+
+    private void CaptureWorkspaceSelection(DreambitProjectSession session)
+    {
+        if (session.AssetEditing.Selected is { } asset)
+        {
+            _workspaceState.LastSelectedAssetPath = asset.RelativePath;
+            _workspaceState.LastSelectedAssetIsFolder = false;
+            _workspaceState.LastSelectionKind = "asset";
+            return;
+        }
+        if (session.Scenes.Selection.EntityIds.Count == 0)
+            return;
+        _workspaceState.LastSelectedEntityIds = session.Scenes.Selection.EntityIds.ToList();
+        _workspaceState.LastSelectionKind = "entity";
+    }
+
+    private void SaveCurrentScene()
+    {
+        var document = _projectManager.CurrentSession?.Scenes.Current;
+        if (document is null)
+            return;
+        if (document.Path is null)
+        {
+            RequestSaveSceneAs();
+            return;
+        }
+        TrySaveSceneAs(document.Path);
+    }
+
+    private void SaveCurrentDocument()
+    {
+        if (_projectManager.CurrentSession?.AssetEditing.Current is { } assetDocument)
+        {
+            try
+            {
+                _projectManager.CurrentSession.AssetEditing.Save();
+                _logs.Info("Assets", $"Saved '{assetDocument.Asset.RelativePath}'.");
+            }
+            catch (Exception exception)
+            {
+                _logs.Error("Assets", "Could not save asset.", exception);
+            }
+            return;
+        }
+        SaveCurrentScene();
+    }
+
+    private void RequestSaveSceneAs()
+    {
+        var document = _projectManager.CurrentSession?.Scenes.Current;
+        if (document is null)
+            return;
+        _scenePath = document.Path ?? $"Scenes/{document.DisplayName}.scene.json";
+        _saveSceneAsPopupRequested = true;
+    }
+
+    private bool TrySaveSceneAs(string path)
+    {
+        try
+        {
+            _projectManager.CurrentSession!.Scenes.Save(path);
+            var document = _projectManager.CurrentSession.Scenes.Current!;
+            _workspaceState.LastScenePath = document.Path;
+            _sceneOperationError = null;
+            _logs.Info("Scene", $"Saved '{document.DisplayName}'.");
+            return true;
+        }
+        catch (Exception exception)
+        {
+            _sceneOperationError = exception.Message;
+            _logs.Error("Scene", "Could not save scene.", exception);
+            return false;
+        }
     }
 
     private void DrawOpenProjectPopup()
@@ -508,6 +868,41 @@ internal sealed class EditorApplication : IDisposable
         }
     }
 
+    private void LogAssetBake(AssetBakeMessage message)
+    {
+        switch (message.Severity)
+        {
+            case AssetBakeMessageSeverity.Information:
+                _logs.Info("Asset Baker", message.Message);
+                break;
+            case AssetBakeMessageSeverity.Warning:
+                _logs.Warning("Asset Baker", message.Message);
+                break;
+            case AssetBakeMessageSeverity.Error:
+                _logs.Error("Asset Baker", message.Message, message.Exception);
+                break;
+        }
+    }
+
+    private void LogGameCode(GameCodeMessage message)
+    {
+        switch (message.Severity)
+        {
+            case GameCodeMessageSeverity.Information:
+                _logs.Info("Game Build", message.Message);
+                break;
+            case GameCodeMessageSeverity.Warning:
+                _logs.Warning("Game Build", message.Message);
+                break;
+            case GameCodeMessageSeverity.Error:
+                _logs.Error("Game Build", message.Message, message.Exception);
+                break;
+        }
+    }
+
+    private void LogSceneError(string message, Exception? exception) =>
+        _logs.Error("Scene", message, exception);
+
     private void TryPersistGlobalState()
     {
         if (!_stateStore.TrySaveGlobalState(_globalState, out var error))
@@ -521,6 +916,9 @@ internal sealed class EditorApplication : IDisposable
 
         foreach (var panel in _panels.Panels)
             _workspaceState.PanelVisibility[panel.Id] = panel.IsOpen;
+
+        if (_projectManager.CurrentSession?.Scenes.Current?.Path is { } scenePath)
+            _workspaceState.LastScenePath = scenePath;
 
         _panels.Dispose();
         _projectCreationLifetime.Cancel();

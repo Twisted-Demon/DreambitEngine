@@ -40,6 +40,10 @@ public class EntityRepository
         tags ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "default" };
 
         var guid = guidOverride ?? Guid.NewGuid();
+        if (_entitiesById.ContainsKey(guid) || _toCreateById.ContainsKey(guid))
+            throw new InvalidOperationException(
+                $"An entity with GUID '{guid}' already exists in this scene.");
+
         var entity = new Entity(guid, name, tags, enabled, _scene);
         entity.Transform.Entity = entity;
 
@@ -253,6 +257,25 @@ public class EntityRepository
         HandleEntityCreations();
         UpdateEntities();
         HandleEntityDeletions();
+    }
+
+    internal void FlushStructuralChanges()
+    {
+        HandleEntityCreations();
+        for (var index = 0; index < _entities.Count; index++)
+            _entities[index].FlushStructuralChanges();
+        HandleEntityDeletions();
+    }
+
+    internal void EditorUpdate()
+    {
+        FlushStructuralChanges();
+        for (var index = 0; index < _entities.Count; index++)
+        {
+            var entity = _entities[index];
+            if (entity.Enabled)
+                entity.EditorUpdate();
+        }
     }
 
     internal void PhysicsTick()

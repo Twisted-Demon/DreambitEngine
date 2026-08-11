@@ -5,6 +5,10 @@
     <PublishReadyToRun>false</PublishReadyToRun>
     <TieredCompilation>false</TieredCompilation>
     <MonoGamePlatform>DesktopVK</MonoGamePlatform>
+    <DreambitContentBuildEnabled>true</DreambitContentBuildEnabled>
+    <DreambitProjectRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../..'))</DreambitProjectRoot>
+    <DreambitContentRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../DreambitGame.Content/Assets'))</DreambitContentRoot>
+    <DreambitAssetRegistry>$([System.IO.Path]::GetFullPath('$(DreambitProjectRoot)/.dreambit/assets.json'))</DreambitAssetRegistry>
 
     <BaseOutputPath>$(MSBuildProjectDirectory)/Build/</BaseOutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>

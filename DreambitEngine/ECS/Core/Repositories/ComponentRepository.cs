@@ -1,5 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using Type = System.Type;
 
@@ -214,6 +215,13 @@ public class ComponentRepository
                 c.Update();
     }
 
+    internal void EditorUpdateComponents()
+    {
+        foreach (var component in _attachedComponents)
+            if (component.Enabled)
+                component.EditorUpdate();
+    }
+
     public void PhysicsUpdateComponents()
     {
         foreach (var c in _attachedComponents)
@@ -230,7 +238,8 @@ public class ComponentRepository
                 if (add is DrawableComponent dc && _scene != null)
                     _scene.Drawables.Add(dc);
 
-                add.AddToEntity();
+                if (_scene?.ExecutionMode == SceneExecutionMode.Runtime)
+                    add.AddToEntity();
 
                 if (OverridesOnUpdate(add.GetType()))
                     _updatableComponents.Add(add);
@@ -271,5 +280,15 @@ public class ComponentRepository
                    onUpdate.DeclaringType != typeof(Component) &&
                    onUpdate.GetBaseDefinition().DeclaringType == typeof(Component);
         });
+    }
+
+    internal static void ReleaseAssembly(Assembly assembly)
+    {
+        foreach (var type in HasOnUpdateOverrideByType.Keys
+                     .Where(type => type.Assembly == assembly)
+                     .ToArray())
+        {
+            HasOnUpdateOverrideByType.TryRemove(type, out _);
+        }
     }
 }

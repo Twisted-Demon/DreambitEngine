@@ -43,6 +43,35 @@ public sealed class ProjectCreationServiceTests : IDisposable
         Assert.Contains("restore", runner.Commands[2].Arguments);
     }
 
+    [Fact]
+    public async Task TemplateFailureShowsTheCauseWithoutFrameworkStackFrames()
+    {
+        var settings = Path.Combine(_testRoot, "failure-settings");
+        var projects = Path.Combine(_testRoot, "failure-projects");
+        Directory.CreateDirectory(projects);
+        var paths = EditorPaths.Create(new EditorLaunchOptions(null, settings, false));
+        InstallFakeSdk(paths);
+        var runner = new FailingTemplateProcessRunner();
+        var logs = new EditorLogService();
+        var service = new ProjectCreationService(
+            new DreambitSdkManager(paths, logs, runner),
+            logs,
+            processRunner: runner);
+
+        var result = await service.CreateAsync(
+            new CreateProjectRequest(
+                "BrokenGame",
+                projects,
+                "Broken Game",
+                "DesktopVK",
+                DreambitSdkConstants.CurrentVersion),
+            CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("Sequence contains more than one matching element", result.Message);
+        Assert.DoesNotContain("at Microsoft.TemplateEngine", result.Message);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_testRoot))
@@ -136,6 +165,29 @@ public sealed class ProjectCreationServiceTests : IDisposable
             }
             Assert.InRange(index, 0, arguments.Count - 2);
             return arguments[index + 1];
+        }
+    }
+
+    private sealed class FailingTemplateProcessRunner : IProcessRunner
+    {
+        private int _calls;
+
+        public Task<ProcessRunResult> RunAsync(
+            ProcessCommand command,
+            Action<string>? output,
+            CancellationToken cancellationToken)
+        {
+            _calls++;
+            return Task.FromResult(_calls == 1
+                ? new ProcessRunResult(0, ["installed"])
+                : new ProcessRunResult(
+                    70,
+                    [
+                        "Could not find the template package containing template 'DreambitEngine.Templates.Game'",
+                        "Sequence contains more than one matching element",
+                        "   at Microsoft.TemplateEngine.Edge.Settings.TemplatePackageManager.GetTemplatePackageAsync()",
+                        "For details on the exit code, refer to the template exit-code documentation."
+                    ]));
         }
     }
 }

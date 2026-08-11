@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Security.Cryptography;
 using Dreambit.Editor.Infrastructure;
 using Dreambit.Editor.Logging;
 
@@ -16,6 +17,8 @@ internal sealed class DreambitSdkManager
     private readonly IProcessRunner _processRunner;
     private readonly EditorLogService _logs;
     private readonly SemaphoreSlim _installationGate = new(1, 1);
+    private readonly SemaphoreSlim _templateInstallationGate = new(1, 1);
+    private const string TemplateFingerprintFileName = ".dreambit-template.sha256";
 
     public DreambitSdkManager(
         EditorPaths paths,
@@ -71,9 +74,16 @@ internal sealed class DreambitSdkManager
         DreambitSdkInstallation installation,
         CancellationToken cancellationToken)
     {
-        Directory.CreateDirectory(installation.TemplateHiveDirectory);
-        _logs.Info("SDK", $"Preparing Dreambit project template {installation.Version}.");
-        var result = await _processRunner.RunAsync(
+        await _templateInstallationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var fingerprint = ComputeFileHash(installation.TemplatePackagePath);
+            if (IsTemplateHiveCurrent(installation.TemplateHiveDirectory, fingerprint))
+                return;
+
+            ResetTemplateHive(installation);
+            _logs.Info("SDK", $"Preparing Dreambit project template {installation.Version}.");
+            var result = await _processRunner.RunAsync(
                 new ProcessCommand(
                     "dotnet",
                     [
@@ -87,14 +97,97 @@ internal sealed class DreambitSdkManager
                     installation.RootDirectory),
                 line => LogProcessOutput("Template", line),
                 cancellationToken)
-            .ConfigureAwait(false);
+                .ConfigureAwait(false);
 
-        if (!result.Succeeded)
+            if (!result.Succeeded)
+            {
+                throw new InvalidOperationException(
+                    $"Could not install Dreambit project template {installation.Version}. " +
+                    $"dotnet new exited with code {result.ExitCode}." +
+                    FormatFailureDetails(result));
+            }
+
+            WriteTemplateFingerprint(installation.TemplateHiveDirectory, fingerprint);
+        }
+        finally
         {
+            _templateInstallationGate.Release();
+        }
+    }
+
+    private static string ComputeFileHash(string path)
+    {
+        using var stream = File.OpenRead(path);
+        return Convert.ToHexString(SHA256.HashData(stream));
+    }
+
+    private static bool IsTemplateHiveCurrent(string hiveDirectory, string fingerprint)
+    {
+        try
+        {
+            var markerPath = Path.Combine(hiveDirectory, TemplateFingerprintFileName);
+            if (!File.Exists(markerPath) ||
+                !string.Equals(File.ReadAllText(markerPath).Trim(), fingerprint, StringComparison.Ordinal))
+                return false;
+
+            var packageRegistryPath = Path.Combine(hiveDirectory, "packages.json");
+            if (!File.Exists(packageRegistryPath))
+                return false;
+            using var registry = JsonDocument.Parse(File.ReadAllText(packageRegistryPath));
+            if (!registry.RootElement.TryGetProperty("Packages", out var packages) ||
+                packages.ValueKind != JsonValueKind.Array)
+                return false;
+
+            var matches = 0;
+            foreach (var package in packages.EnumerateArray())
+            {
+                if (!package.TryGetProperty("Details", out var details) ||
+                    !details.TryGetProperty("PackageId", out var packageId))
+                    continue;
+                if (string.Equals(
+                        packageId.GetString(),
+                        DreambitSdkConstants.TemplatePackageId,
+                        StringComparison.OrdinalIgnoreCase))
+                    matches++;
+            }
+            return matches == 1;
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static void ResetTemplateHive(DreambitSdkInstallation installation)
+    {
+        var sdkRoot = Path.GetFullPath(installation.RootDirectory)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) +
+                      Path.DirectorySeparatorChar;
+        var hive = Path.GetFullPath(installation.TemplateHiveDirectory)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (!hive.StartsWith(sdkRoot, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException(
-                $"Could not install Dreambit project template {installation.Version}. " +
-                $"dotnet new exited with code {result.ExitCode}." +
-                FormatFailureDetails(result));
+                $"Template hive '{hive}' is outside SDK root '{sdkRoot}'.");
+
+        if (Directory.Exists(hive))
+            Directory.Delete(hive, recursive: true);
+        Directory.CreateDirectory(hive);
+    }
+
+    private static void WriteTemplateFingerprint(string hiveDirectory, string fingerprint)
+    {
+        var path = Path.Combine(hiveDirectory, TemplateFingerprintFileName);
+        var temporaryPath = path + $".{Guid.NewGuid():N}.tmp";
+        try
+        {
+            File.WriteAllText(temporaryPath, fingerprint);
+            File.Move(temporaryPath, path, true);
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+                File.Delete(temporaryPath);
         }
     }
 
@@ -169,6 +262,7 @@ internal sealed class DreambitSdkManager
         var projects = new[]
         {
             Path.Combine(sourceRoot, "DreambitEngine", "DreambitEngine.csproj"),
+            Path.Combine(sourceRoot, "Dreambit.Editor.Abstractions", "Dreambit.Editor.Abstractions.csproj"),
             Path.Combine(sourceRoot, "DreambitEngine.Build", "DreambitEngine.Build.csproj"),
             Path.Combine(sourceRoot, "DreambitEngine.Templates", "DreambitEngine.Templates.csproj")
         };
@@ -309,10 +403,18 @@ internal sealed class DreambitSdkManager
     {
         var details = result.Output
             .Where(static line => !string.IsNullOrWhiteSpace(line))
-            .TakeLast(8)
+            .Where(static line => !IsStackTraceLine(line))
+            .TakeLast(12)
             .ToArray();
         return details.Length == 0
             ? string.Empty
             : Environment.NewLine + string.Join(Environment.NewLine, details);
+    }
+
+    private static bool IsStackTraceLine(string line)
+    {
+        var trimmed = line.TrimStart();
+        return trimmed.StartsWith("at ", StringComparison.Ordinal) ||
+               trimmed.StartsWith("--- End of", StringComparison.Ordinal);
     }
 }

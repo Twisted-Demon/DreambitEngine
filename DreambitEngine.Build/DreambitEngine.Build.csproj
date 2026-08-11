@@ -13,6 +13,9 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>dreambit;msbuild;content-pipeline</PackageTags>
     <RepositoryUrl>https://github.com/Twisted-Demon/DreambitEngine</RepositoryUrl>
+    <TargetsForTfmSpecificContentInPackage>
+      $(TargetsForTfmSpecificContentInPackage);IncludeAssetBakerTools
+    </TargetsForTfmSpecificContentInPackage>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,4 +25,19 @@
           PackagePath="buildTransitive" />
     <Compile Remove="**/*" />
   </ItemGroup>
+
+  <Target Name="IncludeAssetBakerTools">
+    <PropertyGroup>
+      <_AssetBakerPublishDirectory>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/obj/assetbaker-publish'))/</_AssetBakerPublishDirectory>
+    </PropertyGroup>
+    <MSBuild Projects="../DreambitEngine.AssetBaker/DreambitEngine.AssetBaker.csproj"
+             Targets="Publish"
+             Properties="Configuration=$(Configuration);PublishDir=$(_AssetBakerPublishDirectory);UseAppHost=false;PublishReadyToRun=false"
+             RemoveProperties="TargetFramework;RuntimeIdentifier;RuntimeIdentifiers;OutputPath;BaseOutputPath" />
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="$(_AssetBakerPublishDirectory)**/*">
+        <PackagePath>tools/net8.0/any/%(RecursiveDir)%(Filename)%(Extension)</PackagePath>
+      </TfmSpecificPackageFile>
+    </ItemGroup>
+  </Target>
 </Project>

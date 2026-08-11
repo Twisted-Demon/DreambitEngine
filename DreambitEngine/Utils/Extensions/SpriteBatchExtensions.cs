@@ -572,9 +572,9 @@ public static class SpriteBatchExtensions
         Vector2? scale = null,
         float thickness = 1f)
     {
-        var minimumThickness = Scene.Instance.MainCamera.WorldUnitsPerScreenPixel;
-        if (thickness < minimumThickness)
-            thickness = minimumThickness;
+        var runtimeCamera = Core.Instance?.CurrentScene?.MainCamera;
+        if (runtimeCamera is not null && thickness < runtimeCamera.WorldUnitsPerScreenPixel)
+            thickness = runtimeCamera.WorldUnitsPerScreenPixel;
 
         var points = CreateTransformedRectanglePoints(position, size, rotation, origin, scale);
         spriteBatch.DrawHollowPolygon(points, color, thickness);

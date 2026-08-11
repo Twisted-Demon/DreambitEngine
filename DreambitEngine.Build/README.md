@@ -2,4 +2,7 @@
 
 This package is the versioned `buildTransitive` integration boundary for Dreambit game projects.
 
-Dreambit.Editor Milestone 2 establishes the package and SDK-version contract. The real Content and AssetBaker targets are integrated through this boundary in Milestone 4.
+The package carries the Dreambit AssetBaker and adds incremental, deterministic PAK generation to
+game executable projects. Set `DreambitContentBuildEnabled`, `DreambitProjectRoot`,
+`DreambitContentRoot`, and `DreambitAssetRegistry` in the host project. Use the
+`RebuildDreambitAssets` MSBuild target to bypass the baked-blob cache.

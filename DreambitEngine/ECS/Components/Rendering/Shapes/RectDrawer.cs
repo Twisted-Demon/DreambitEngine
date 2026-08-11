@@ -46,7 +46,9 @@ public class RectDrawer : DrawableComponent
     protected override void OnDraw()
     {
         Core.SpriteBatch.DrawHollowRectangle(
-            Bounds, Color
+            Bounds,
+            Color,
+            System.MathF.Max(1f, Scene.MainCamera?.WorldUnitsPerScreenPixel ?? 1f)
         );
     }
 }

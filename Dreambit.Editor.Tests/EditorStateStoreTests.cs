@@ -33,6 +33,14 @@ public sealed class EditorStateStoreTests : IDisposable
         {
             WindowWidth = 1720,
             WindowHeight = 980,
+            ProjectBrowserFolder = "characters/player",
+            LastSelectedAssetPath = "characters/player/player.blueprint.json",
+            LastSelectionKind = "entity",
+            LastSelectedEntityIds = [Guid.Parse("b7ca9d2b-17ca-4b88-b57c-65df588355b5")],
+            HierarchyExpandedEntityIds =
+            [
+                Guid.Parse("82e5641f-bce0-492b-b835-5ed4b2ff8df2")
+            ],
             PanelVisibility = new Dictionary<string, bool>
             {
                 ["Console"] = false
@@ -53,6 +61,11 @@ public sealed class EditorStateStoreTests : IDisposable
         Assert.Equal("0.1.4", recent.SdkVersion);
         Assert.Equal(1720, reloadedWorkspace.WindowWidth);
         Assert.Equal(980, reloadedWorkspace.WindowHeight);
+        Assert.Equal("characters/player", reloadedWorkspace.ProjectBrowserFolder);
+        Assert.Equal("characters/player/player.blueprint.json", reloadedWorkspace.LastSelectedAssetPath);
+        Assert.Equal("entity", reloadedWorkspace.LastSelectionKind);
+        Assert.Single(reloadedWorkspace.LastSelectedEntityIds);
+        Assert.Single(reloadedWorkspace.HierarchyExpandedEntityIds);
         Assert.False(reloadedWorkspace.PanelVisibility["Console"]);
         Assert.Empty(reloadedStore.LoadWarnings);
     }

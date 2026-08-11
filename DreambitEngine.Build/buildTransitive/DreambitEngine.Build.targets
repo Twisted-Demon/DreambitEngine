@@ -1,9 +1,53 @@
 <Project>
-  <!--
-    This package is the stable buildTransitive integration boundary for Dreambit.
-    Milestone 4 will add the real content and AssetBaker targets here.
-  -->
+  <PropertyGroup>
+    <DreambitAssetBakerDll Condition="'$(DreambitAssetBakerDll)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/net8.0/any/AssetBaker.dll'))</DreambitAssetBakerDll>
+    <DreambitContentOutputDirectory Condition="'$(DreambitContentOutputDirectory)' == ''">$([System.IO.Path]::GetFullPath('$(BaseOutputPath)$(Configuration)/Content'))</DreambitContentOutputDirectory>
+    <DreambitContentPak Condition="'$(DreambitContentPak)' == ''">$(DreambitContentOutputDirectory)/content.pak</DreambitContentPak>
+    <DreambitAssetCache Condition="'$(DreambitAssetCache)' == ''">$([System.IO.Path]::GetFullPath('$(BaseIntermediateOutputPath)DreambitAssetCache'))</DreambitAssetCache>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectCapability Include="Dreambit" />
+    <_DreambitRawAsset Include="$(DreambitContentRoot)/**/*"
+                       Condition="'$(DreambitContentBuildEnabled)' == 'true' and '$(DreambitContentRoot)' != ''" />
+    <UpToDateCheckInput Include="@(_DreambitRawAsset)" />
+    <UpToDateCheckInput Include="$(DreambitAssetRegistry)"
+                        Condition="Exists('$(DreambitAssetRegistry)')" />
   </ItemGroup>
+
+  <Target Name="ValidateDreambitAssetBuild"
+          Condition="'$(DreambitContentBuildEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true'">
+    <Error Condition="'$(DreambitContentRoot)' == '' or !Exists('$(DreambitContentRoot)')"
+           Text="DreambitContentRoot must point to the project's raw Content/Assets directory." />
+    <Error Condition="!Exists('$(DreambitAssetBakerDll)')"
+           Text="Dreambit AssetBaker was not found at '$(DreambitAssetBakerDll)'. Restore DreambitEngine.Build again." />
+  </Target>
+
+  <Target Name="BuildDreambitAssets"
+          BeforeTargets="BeforeCompile"
+          DependsOnTargets="ValidateDreambitAssetBuild"
+          Condition="'$(DreambitContentBuildEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true'"
+          Inputs="@(_DreambitRawAsset);$(DreambitAssetRegistry);$(DreambitAssetBakerDll)"
+          Outputs="$(DreambitContentPak)">
+    <MakeDir Directories="$(DreambitContentOutputDirectory);$(DreambitAssetCache)" />
+    <Exec Command="dotnet &quot;$(DreambitAssetBakerDll)&quot; bake-pak &quot;$(DreambitContentRoot)&quot; &quot;$(DreambitContentPak)&quot; --registry &quot;$(DreambitAssetRegistry)&quot; --cache &quot;$(DreambitAssetCache)&quot; --premul --srgb"
+          Condition="Exists('$(DreambitAssetRegistry)')" />
+    <Exec Command="dotnet &quot;$(DreambitAssetBakerDll)&quot; bake-pak &quot;$(DreambitContentRoot)&quot; &quot;$(DreambitContentPak)&quot; --cache &quot;$(DreambitAssetCache)&quot; --premul --srgb"
+          Condition="!Exists('$(DreambitAssetRegistry)')" />
+  </Target>
+
+  <Target Name="RebuildDreambitAssets"
+          DependsOnTargets="ValidateDreambitAssetBuild"
+          Condition="'$(DreambitContentBuildEnabled)' == 'true'">
+    <MakeDir Directories="$(DreambitContentOutputDirectory);$(DreambitAssetCache)" />
+    <Exec Command="dotnet &quot;$(DreambitAssetBakerDll)&quot; bake-pak &quot;$(DreambitContentRoot)&quot; &quot;$(DreambitContentPak)&quot; --registry &quot;$(DreambitAssetRegistry)&quot; --cache &quot;$(DreambitAssetCache)&quot; --rebuild --premul --srgb"
+          Condition="Exists('$(DreambitAssetRegistry)')" />
+    <Exec Command="dotnet &quot;$(DreambitAssetBakerDll)&quot; bake-pak &quot;$(DreambitContentRoot)&quot; &quot;$(DreambitContentPak)&quot; --cache &quot;$(DreambitAssetCache)&quot; --rebuild --premul --srgb"
+          Condition="!Exists('$(DreambitAssetRegistry)')" />
+  </Target>
+
+  <Target Name="CleanDreambitAssets" AfterTargets="Clean"
+          Condition="'$(DreambitContentBuildEnabled)' == 'true'">
+    <Delete Files="$(DreambitContentPak)" />
+  </Target>
 </Project>

@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using Dreambit.LDtk.Loaders;
 
 namespace Dreambit.LDtk;
@@ -62,4 +64,20 @@ public static class LDtkEntityBuilderRepository
 
         return _entityBuilders.TryGetValue(entityIdentifier, out builder);
     }
+
+    internal static void ReleaseAssembly(Assembly assembly)
+    {
+        if (_entityBuilders is null)
+            return;
+
+        foreach (var key in _entityBuilders
+                     .Where(pair => pair.Value.GetType().Assembly == assembly)
+                     .Select(pair => pair.Key)
+                     .ToArray())
+        {
+            _entityBuilders.Remove(key);
+        }
+    }
+
+    internal static void Refresh() => _entityBuilders = null;
 }

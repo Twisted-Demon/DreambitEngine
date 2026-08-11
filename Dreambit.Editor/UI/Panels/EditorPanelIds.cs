@@ -7,4 +7,5 @@ internal static class EditorPanelIds
     public const string Inspector = "Dreambit.Editor.Inspector";
     public const string Project = "Dreambit.Editor.Project";
     public const string Console = "Dreambit.Editor.Console";
+    public const string Build = "Dreambit.Editor.Build";
 }

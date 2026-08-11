@@ -19,8 +19,9 @@ public class Scene : IDisposable
     /// <summary>
     ///     Initializes base repositories, managers, and the render pipeline.
     /// </summary>
-    protected Scene()
+    protected Scene(SceneExecutionMode executionMode = SceneExecutionMode.Runtime)
     {
+        ExecutionMode = executionMode;
         Logger = new Logger(GetType());
 
         Entities = new EntityRepository(this);
@@ -52,7 +53,7 @@ public class Scene : IDisposable
 
         try
         {
-            if (_hasBegun && !_hasEnded)
+            if (ExecutionMode == SceneExecutionMode.Runtime && _hasBegun && !_hasEnded)
             {
                 _hasEnded = true;
                 OnEnd();
@@ -117,11 +118,47 @@ public class Scene : IDisposable
 
     public void LoadIntoSelf(SceneBlueprint blueprint)
     {
-        var entityBlueprints = blueprint.Entities;
+        LoadIntoSelf(blueprint, SceneBlueprintLoadOptions.Runtime);
+    }
 
-        foreach (var entity in entityBlueprints)
+    public void LoadIntoSelf(SceneBlueprint blueprint, SceneBlueprintLoadOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(blueprint);
+        ArgumentNullException.ThrowIfNull(options);
+        if (blueprint.Entities.Count == 0)
+            return;
+
+        if (!options.AllowMissingComponentTypes)
         {
-            CreateEntity(entity);
+            var validationRoot = new EntityBlueprint
+            {
+                Name = string.IsNullOrWhiteSpace(blueprint.Name) ? "scene" : blueprint.Name,
+                Children = blueprint.Entities
+            };
+            BlueprintValidator.ValidateOrThrow(validationRoot);
+        }
+
+        var context = new BlueprintSpawnContext(blueprint.Entities);
+        try
+        {
+            foreach (var root in blueprint.Entities)
+                CreateBlueprintHierarchy(
+                    root,
+                    null,
+                    context,
+                    true,
+                    null,
+                    null,
+                    null,
+                    null,
+                    options.PreserveEntityIds);
+
+            BuildBlueprintComponents(context, options.TolerateComponentLoadErrors);
+        }
+        catch
+        {
+            RollbackBlueprintSpawn(context);
+            throw;
         }
     }
 
@@ -162,6 +199,9 @@ public class Scene : IDisposable
 
     /// <summary>Current scene lifecycle state.</summary>
     public SceneState State { get; internal set; }
+
+    /// <summary>Whether this scene is executing gameplay or hosted for authoring.</summary>
+    public SceneExecutionMode ExecutionMode { get; }
 
     /// <summary>Enables engine-level debug drawing and diagnostics.</summary>
     public bool DebugMode { get; set; }
@@ -402,6 +442,60 @@ public class Scene : IDisposable
     }
 
     /// <summary>
+    /// Applies queued entity/component additions and removals without running gameplay.
+    /// </summary>
+    public void FlushStructuralChanges()
+    {
+        if (_isDisposed) return;
+        Entities.FlushStructuralChanges();
+    }
+
+    /// <summary>Runs opt-in editor callbacks while keeping gameplay lifecycle suppressed.</summary>
+    public void EditorTick()
+    {
+        if (_isDisposed) return;
+        if (ExecutionMode != SceneExecutionMode.Editor)
+            throw new InvalidOperationException("EditorTick is only valid for editor-hosted scenes.");
+
+        Entities.EditorUpdate();
+    }
+
+    /// <summary>Creates or returns the transient camera used by editor-hosted rendering.</summary>
+    public Camera2D EnsureEditorCamera()
+    {
+        if (ExecutionMode != SceneExecutionMode.Editor)
+            throw new InvalidOperationException("The transient editor camera is only valid in editor scenes.");
+        if (MainCamera is not null)
+            return MainCamera;
+
+        var cameraEntity = CreateEntity("__dreambit-editor-camera");
+        cameraEntity.IsEditorOnly = true;
+        MainCamera = cameraEntity.AttachComponent<Camera2D>();
+        FlushStructuralChanges();
+        return MainCamera;
+    }
+
+    /// <summary>Invokes component editor gizmos without running gameplay drawing callbacks.</summary>
+    public void DrawEditorGizmos(
+        IEditorGizmoContext context,
+        IReadOnlySet<Guid> selectedEntityIds)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(selectedEntityIds);
+        if (ExecutionMode != SceneExecutionMode.Editor)
+            throw new InvalidOperationException("Editor gizmos require an editor-hosted scene.");
+
+        foreach (var entity in GetAllEntities())
+        {
+            if (entity.IsEditorOnly || !entity.Enabled)
+                continue;
+            var selected = selectedEntityIds.Contains(entity.Id);
+            foreach (var component in entity.GetAllAttachedComponents())
+                component.EditorDrawGizmos(context, selected);
+        }
+    }
+
+    /// <summary>
     ///     Physics-step driver. Called at a fixed timestep by the engine.
     /// </summary>
     public virtual void PhysicsTick()
@@ -541,19 +635,10 @@ public class Scene : IDisposable
                 enabled,
                 createAt,
                 eulerRotation,
-                scale);
+                scale,
+                false);
 
-            foreach (var entityBlueprint in context.Hierarchy)
-                context.GetEntity(entityBlueprint.Guid)
-                    .BuildComponentsFromBlueprint(entityBlueprint);
-
-            foreach (var entityBlueprint in context.Hierarchy)
-                context.GetEntity(entityBlueprint.Guid)
-                    .DeserializeComponentsFromBlueprints(entityBlueprint, context);
-
-            foreach (var entityBlueprint in context.Hierarchy)
-                context.GetEntity(entityBlueprint.Guid)
-                    .CallComponentOnCreateAfterDeserialized();
+            BuildBlueprintComponents(context, false);
 
             return rootEntity;
         }
@@ -572,7 +657,8 @@ public class Scene : IDisposable
         bool? rootEnabled,
         Vector3? rootPosition,
         Vector3? rootRotation,
-        Vector3? rootScale)
+        Vector3? rootScale,
+        bool preserveEntityIds)
     {
         var enabled = isRoot && rootEnabled.HasValue
             ? rootEnabled.Value
@@ -596,7 +682,8 @@ public class Scene : IDisposable
             enabled,
             position,
             rotation,
-            scale);
+            scale,
+            preserveEntityIds ? blueprint.Guid : null);
 
         if (parent != null)
             entity.Parent = parent;
@@ -612,9 +699,30 @@ public class Scene : IDisposable
                 null,
                 null,
                 null,
-                null);
+                null,
+                preserveEntityIds);
 
         return entity;
+    }
+
+    private static void BuildBlueprintComponents(
+        BlueprintSpawnContext context,
+        bool tolerateComponentLoadErrors)
+    {
+        foreach (var entityBlueprint in context.Hierarchy)
+            context.GetEntity(entityBlueprint.Guid)
+                .BuildComponentsFromBlueprint(entityBlueprint, tolerateComponentLoadErrors);
+
+        foreach (var entityBlueprint in context.Hierarchy)
+            context.GetEntity(entityBlueprint.Guid)
+                .DeserializeComponentsFromBlueprints(
+                    entityBlueprint,
+                    context,
+                    tolerateComponentLoadErrors);
+
+        foreach (var entityBlueprint in context.Hierarchy)
+            context.GetEntity(entityBlueprint.Guid)
+                .CallComponentOnCreateAfterDeserialized();
     }
 
     private void RollbackBlueprintSpawn(BlueprintSpawnContext context)
@@ -658,6 +766,18 @@ public class Scene : IDisposable
     public IReadOnlyList<Entity> GetAllActiveEntities()
     {
         return Entities.GetAllActiveEntities();
+    }
+
+    /// <summary>Returns active and not-yet-flushed entities, including disabled entities.</summary>
+    public IReadOnlyList<Entity> GetAllEntities()
+    {
+        return Entities.GetAllEntities();
+    }
+
+    /// <summary>Returns drawable components registered with this scene.</summary>
+    public IReadOnlyList<DrawableComponent> GetAllDrawables()
+    {
+        return Drawables.GetAllDrawables();
     }
 
     /// <summary>Returns all entities with a given tag.</summary>

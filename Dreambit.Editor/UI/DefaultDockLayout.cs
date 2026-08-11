@@ -54,6 +54,9 @@ internal static class DefaultDockLayout
         ImGuiNativeDocking.DockWindow(
             panels.GetRequired(EditorPanelIds.Console).WindowName,
             bottomId);
+        ImGuiNativeDocking.DockWindow(
+            panels.GetRequired(EditorPanelIds.Build).WindowName,
+            bottomId);
 
         ImGuiNativeDocking.Finish(dockspaceId);
     }

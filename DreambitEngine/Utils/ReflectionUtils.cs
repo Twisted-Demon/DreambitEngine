@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 
 namespace Dreambit;
@@ -27,7 +28,7 @@ public static class ReflectionUtils
     {
         var typeList = new List<Type>();
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-        foreach (var type in assembly.GetTypes())
+        foreach (var type in GetLoadableTypes(assembly))
             if (type.IsSubclassOf(baseClassType) && !type.IsAbstract)
             {
                 if (onlyIncludeParameterlessConstructors)
@@ -54,7 +55,7 @@ public static class ReflectionUtils
     {
         var typeList = new List<Type>();
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-        foreach (var type in assembly.GetTypes())
+        foreach (var type in GetLoadableTypes(assembly))
             if (baseClassType.IsAssignableFrom(type) && !type.IsAbstract && !type.IsGenericType)
             {
                 if (onlyIncludeParameterlessConstructors)
@@ -90,10 +91,26 @@ public static class ReflectionUtils
     {
         var typeList = new List<Type>();
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-        foreach (var type in assembly.GetTypes())
+        foreach (var type in GetLoadableTypes(assembly))
             if (type.GetAttribute<T>() != null)
                 typeList.Add(type);
         return typeList;
+    }
+
+    private static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
+    {
+        try
+        {
+            return assembly.GetTypes();
+        }
+        catch (ReflectionTypeLoadException exception)
+        {
+            return exception.Types.OfType<Type>();
+        }
+        catch
+        {
+            return Array.Empty<Type>();
+        }
     }
 
     #region Fields

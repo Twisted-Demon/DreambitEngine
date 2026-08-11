@@ -2,5 +2,6 @@
   <ItemGroup>
     <PackageReference Include="MonoGame.Framework.DesktopGL" PrivateAssets="all" />
     <PackageReference Include="DreambitEngine" />
+    <PackageReference Include="Dreambit.Editor.Abstractions" PrivateAssets="all" />
   </ItemGroup>
 </Project>

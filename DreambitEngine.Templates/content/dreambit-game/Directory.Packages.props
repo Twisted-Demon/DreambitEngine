@@ -5,6 +5,7 @@
 
   <ItemGroup>
     <PackageVersion Include="DreambitEngine" Version="__DREAMBIT_SDK_VERSION__" />
+    <PackageVersion Include="Dreambit.Editor.Abstractions" Version="__DREAMBIT_SDK_VERSION__" />
     <PackageVersion Include="DreambitEngine.Build" Version="__DREAMBIT_SDK_VERSION__" />
 
     <PackageVersion Include="MonoGame.Framework.DesktopGL" Version="3.8.5" />

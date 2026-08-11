@@ -145,10 +145,18 @@ internal sealed class ProjectCreationService
     {
         var details = result.Output
             .Where(static line => !string.IsNullOrWhiteSpace(line))
-            .TakeLast(8)
+            .Where(static line => !IsStackTraceLine(line))
+            .TakeLast(12)
             .ToArray();
         return details.Length == 0
             ? string.Empty
             : Environment.NewLine + string.Join(Environment.NewLine, details);
+    }
+
+    private static bool IsStackTraceLine(string line)
+    {
+        var trimmed = line.TrimStart();
+        return trimmed.StartsWith("at ", StringComparison.Ordinal) ||
+               trimmed.StartsWith("--- End of", StringComparison.Ordinal);
     }
 }

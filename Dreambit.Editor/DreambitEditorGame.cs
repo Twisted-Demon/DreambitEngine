@@ -49,7 +49,7 @@ internal sealed class DreambitEditorGame : Core
             _stateStore,
             _globalState,
             _workspaceState,
-            _imGuiRenderer.HasSavedLayout,
+            _imGuiRenderer,
             Exit);
     }
 

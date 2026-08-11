@@ -3,6 +3,9 @@ using System.Numerics;
 using Dreambit.Editor.Assets;
 using Dreambit.Editor.Logging;
 using Dreambit.Editor.Projects;
+using Dreambit.Editor.Scenes;
+using Dreambit.Editor.Inspection;
+using Dreambit.Editor.Persistence;
 using ImGuiNET;
 
 namespace Dreambit.Editor.UI.Panels;
@@ -18,6 +21,10 @@ internal sealed class ProjectPanel : EditorPanel
     private readonly AssetDatabase _assets;
     private readonly EditorLogService _logs;
     private readonly EditorDragDropService _dragDrop;
+    private readonly AssetEditingService _assetEditing;
+    private readonly SceneDocumentService _scenes;
+    private readonly EditorTypeRegistry _types;
+    private readonly EditorWorkspaceState _workspace;
     private string _currentFolder = string.Empty;
     private string _search = string.Empty;
     private string? _selectedPath;
@@ -31,24 +38,44 @@ internal sealed class ProjectPanel : EditorPanel
     private bool _requestRenamePopup;
     private bool _requestMovePopup;
     private bool _requestDeletePopup;
+    private bool _requestCreateAssetPopup;
+    private Type? _createAssetType;
+    private string _createAssetPath = string.Empty;
+    private bool _restoreWorkspaceSelection;
 
     public ProjectPanel(
         DreambitProjectDefinition project,
         AssetDatabase assets,
         EditorLogService logs,
-        EditorDragDropService dragDrop)
+        EditorDragDropService dragDrop,
+        AssetEditingService assetEditing,
+        SceneDocumentService scenes,
+        EditorTypeRegistry types,
+        EditorWorkspaceState workspace)
         : base(EditorPanelIds.Project, "Project")
     {
         _project = project;
         _assets = assets;
         _logs = logs;
         _dragDrop = dragDrop;
+        _assetEditing = assetEditing;
+        _scenes = scenes;
+        _types = types;
+        _workspace = workspace;
+        _currentFolder = workspace.ProjectBrowserFolder;
+        _selectedPath = workspace.LastSelectedAssetPath;
+        _selectedIsFolder = workspace.LastSelectedAssetIsFolder;
+        _restoreWorkspaceSelection = string.Equals(
+            workspace.LastSelectionKind,
+            "asset",
+            StringComparison.OrdinalIgnoreCase);
     }
 
     protected override void DrawContents()
     {
         var snapshot = _assets.GetSnapshot();
         EnsureCurrentFolderExists(snapshot);
+        RestoreWorkspaceSelection();
         DrawToolbar();
         DrawBreadcrumbs();
 
@@ -70,6 +97,7 @@ internal sealed class ProjectPanel : EditorPanel
         DrawAssetTable(snapshot);
         DrawStatus(snapshot);
         DrawOperationPopups();
+        CaptureWorkspaceState();
     }
 
     private void DrawToolbar()
@@ -93,6 +121,16 @@ internal sealed class ProjectPanel : EditorPanel
                 _createFolderName = "New Folder";
                 _error = null;
                 _requestCreateFolderPopup = true;
+            }
+            ImGui.Separator();
+            if (ImGui.MenuItem("Entity Blueprint"))
+                RequestCreateAsset(typeof(EntityBlueprint));
+            if (ImGui.BeginMenu("Dreambit Asset"))
+            {
+                foreach (var type in _types.AssetTypes.Where(type => type != typeof(EntityBlueprint)))
+                    if (ImGui.MenuItem(type.Name))
+                        RequestCreateAsset(type);
+                ImGui.EndMenu();
             }
             ImGui.EndPopup();
         }
@@ -213,6 +251,7 @@ internal sealed class ProjectPanel : EditorPanel
         {
             _selectedPath = folder.RelativePath;
             _selectedIsFolder = true;
+            _workspace.LastSelectionKind = "asset";
             if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
             {
                 _currentFolder = folder.RelativePath;
@@ -240,10 +279,26 @@ internal sealed class ProjectPanel : EditorPanel
         if (ImGui.Selectable(
                 $"{asset.Name}##asset:{asset.Id}",
                 selected,
-                ImGuiSelectableFlags.SpanAllColumns))
+                ImGuiSelectableFlags.SpanAllColumns | ImGuiSelectableFlags.AllowDoubleClick))
         {
             _selectedPath = asset.RelativePath;
             _selectedIsFolder = false;
+            _workspace.LastSelectionKind = "asset";
+            _scenes.Selection.Clear();
+            _assetEditing.Select(asset);
+            if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left) && asset.Kind == AssetKind.Scene)
+            {
+                try
+                {
+                    _scenes.Open(asset.RelativePath);
+                    _assetEditing.Clear();
+                    _error = null;
+                }
+                catch (Exception exception)
+                {
+                    SetError($"Could not open scene. {exception.Message}");
+                }
+            }
         }
 
         DrawDragSource(new ProjectItemDragPayload(
@@ -388,6 +443,44 @@ internal sealed class ProjectPanel : EditorPanel
         DrawRenamePopup();
         DrawMovePopup();
         DrawDeletePopup();
+        DrawCreateAssetPopup();
+    }
+
+    public void RequestCreateAsset(Type type)
+    {
+        _createAssetType = type;
+        var suffix = type == typeof(EntityBlueprint) ? ".blueprint.json" : ".json";
+        _createAssetPath = JoinPath(_currentFolder, $"New {type.Name}{suffix}");
+        _requestCreateAssetPopup = true;
+    }
+
+    private void DrawCreateAssetPopup()
+    {
+        if (!ImGui.BeginPopupModal(
+                "Create Asset##Dreambit.Editor.Project",
+                ImGuiWindowFlags.AlwaysAutoResize))
+            return;
+        ImGui.TextUnformatted($"Create {_createAssetType?.Name ?? "Asset"}");
+        ImGui.SetNextItemWidth(480f);
+        var submit = ImGui.InputText("Path", ref _createAssetPath, 1024, ImGuiInputTextFlags.EnterReturnsTrue);
+        if ((submit || ImGui.Button("Create", new Vector2(90, 0))) && _createAssetType is not null)
+        {
+            if (_assetEditing.TryCreate(_createAssetType, _createAssetPath, out var error))
+            {
+                _selectedPath = _createAssetPath;
+                _selectedIsFolder = false;
+                _error = null;
+                ImGui.CloseCurrentPopup();
+            }
+            else
+            {
+                SetError(error ?? "Could not create asset.");
+            }
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Cancel", new Vector2(90, 0)))
+            ImGui.CloseCurrentPopup();
+        ImGui.EndPopup();
     }
 
     private void OpenRequestedPopups()
@@ -411,6 +504,11 @@ internal sealed class ProjectPanel : EditorPanel
         {
             ImGui.OpenPopup(DeletePopup);
             _requestDeletePopup = false;
+        }
+        if (_requestCreateAssetPopup)
+        {
+            ImGui.OpenPopup("Create Asset##Dreambit.Editor.Project");
+            _requestCreateAssetPopup = false;
         }
     }
 
@@ -581,6 +679,28 @@ internal sealed class ProjectPanel : EditorPanel
     {
         _selectedPath = null;
         _selectedIsFolder = false;
+    }
+
+    private void RestoreWorkspaceSelection()
+    {
+        if (!_restoreWorkspaceSelection)
+            return;
+        _restoreWorkspaceSelection = false;
+        if (_selectedPath is null || _selectedIsFolder)
+            return;
+        if (_assets.TryGetAsset(_selectedPath, out var asset))
+            _assetEditing.Select(asset);
+        else
+            ClearSelection();
+    }
+
+    private void CaptureWorkspaceState()
+    {
+        _workspace.ProjectBrowserFolder = _currentFolder;
+        _workspace.LastSelectedAssetPath = _selectedPath;
+        _workspace.LastSelectedAssetIsFolder = _selectedIsFolder;
+        if (_assetEditing.Selected is not null || _selectedPath is not null)
+            _workspace.LastSelectionKind = "asset";
     }
 
     private void SetError(string message)

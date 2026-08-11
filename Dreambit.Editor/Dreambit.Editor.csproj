@@ -32,6 +32,8 @@
 
   <ItemGroup>
     <ProjectReference Include="../DreambitEngine/DreambitEngine.csproj" />
+    <ProjectReference Include="../DreambitEngine.AssetBaker/DreambitEngine.AssetBaker.csproj" />
+    <ProjectReference Include="../Dreambit.Editor.Abstractions/Dreambit.Editor.Abstractions.csproj" />
   </ItemGroup>
 
   <Target Name="BundleDreambitSdk"
@@ -43,7 +45,7 @@
     </PropertyGroup>
 
     <MakeDir Directories="$(_DreambitBundledSdkDirectory)" />
-    <MSBuild Projects="../DreambitEngine/DreambitEngine.csproj;../DreambitEngine.Build/DreambitEngine.Build.csproj;../DreambitEngine.Templates/DreambitEngine.Templates.csproj"
+    <MSBuild Projects="../DreambitEngine/DreambitEngine.csproj;../Dreambit.Editor.Abstractions/Dreambit.Editor.Abstractions.csproj;../DreambitEngine.Build/DreambitEngine.Build.csproj;../DreambitEngine.Templates/DreambitEngine.Templates.csproj"
              Targets="Restore;Pack"
              BuildInParallel="false"
              Properties="$(_DreambitSdkPackProperties)" />

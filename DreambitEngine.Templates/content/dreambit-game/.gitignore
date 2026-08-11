@@ -45,6 +45,7 @@ packages/
 .env
 .env.*
 !.env.example
+/.dreambit/cache/
 
 # Logs and temporary files
 *.log

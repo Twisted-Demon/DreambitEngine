@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Reflection;
 using FontStashSharp;
 using Microsoft.Xna.Framework.Content;
 
@@ -12,33 +14,56 @@ public class Resources : Singleton<Resources>
     private readonly Dictionary<string, PakReader> _pakReaders =
         new(StringComparer.OrdinalIgnoreCase);
     private DreambitXnbReader _xnbReader;
+    private static string _contentDirectoryOverride;
 
     private static string ContentDirectory =>
-        Path.Combine(AppContext.BaseDirectory, Core.Instance.Content.RootDirectory);
+        string.IsNullOrWhiteSpace(_contentDirectoryOverride)
+            ? Path.Combine(AppContext.BaseDirectory, Core.Instance.Content.RootDirectory)
+            : _contentDirectoryOverride;
     public static bool UsePak { get; set; } = true;
     public static string PakName { get; set; } = "content.pak";
     public static IAssetRegistry AssetRegistry { get; set; }
 
     public DreambitContentCollection ContentCollection { get; } = new();
 
+    /// <summary>The directory currently used for PAK and loose content loading.</summary>
+    public static string ActiveContentDirectory => ContentDirectory;
+
+    /// <summary>
+    /// Points resource loading at an externally built game's content directory.
+    /// Existing cached content and PAK readers are released before the source changes.
+    /// </summary>
+    public static void SetContentSource(string contentDirectory, string pakName = "content.pak")
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(contentDirectory);
+        var fullPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(contentDirectory));
+        if (!string.IsNullOrWhiteSpace(_contentDirectoryOverride) &&
+            string.Equals(fullPath, _contentDirectoryOverride, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(pakName, PakName, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        RefreshContent();
+        _contentDirectoryOverride = fullPath;
+        PakName = pakName;
+    }
+
+    /// <summary>Releases cached assets and PAK readers so newly baked content can be opened.</summary>
+    public static void RefreshContent()
+    {
+        Instance.ReleaseEntries(Instance.ContentCollection.Drain());
+        foreach (var reader in Instance._pakReaders.Values)
+            reader.Dispose();
+        Instance._pakReaders.Clear();
+    }
+
     public void Init()
     {
-        Loaders.Clear();
+        RefreshLoaders();
         _xnbReader ??= new DreambitXnbReader(
             Core.Instance.Services,
             Core.Instance.Content.RootDirectory);
 
-        var loaderTypes = ReflectionUtils.GetAllTypesAssignableFrom(
-            typeof(IAssetLoader),
-            true);
-
-        foreach (var type in loaderTypes)
-        {
-            var instance = (IAssetLoader)Activator.CreateInstance(type);
-            if (instance is null) continue;
-
-            Loaders[instance.TargetType] = instance;
-        }
+        TryLoadRuntimeAssetRegistry();
     }
 
     /// <summary>
@@ -150,6 +175,46 @@ public class Resources : Singleton<Resources>
         Instance.ReleaseEntries(entries);
     }
 
+    internal static void RefreshLoaders()
+    {
+        Loaders.Clear();
+        var loaderTypes = ReflectionUtils.GetAllTypesAssignableFrom(
+            typeof(IAssetLoader),
+            true);
+        foreach (var type in loaderTypes)
+        {
+            var instance = (IAssetLoader)Activator.CreateInstance(type);
+            if (instance is not null)
+                Loaders[instance.TargetType] = instance;
+        }
+    }
+
+    private void TryLoadRuntimeAssetRegistry()
+    {
+        try
+        {
+            using var stream = OpenAssetStream(
+                RuntimeAssetRegistry.LogicalPath,
+                PakName,
+                UsePak,
+                ContentDirectory);
+            AssetRegistry = RuntimeAssetRegistry.Load(stream);
+            Logger.Trace("Loaded runtime asset registry.");
+        }
+        catch (FileNotFoundException)
+        {
+            // Legacy content does not contain a stable-ID manifest.
+        }
+        catch (DirectoryNotFoundException)
+        {
+            // Content may not have been built yet in a development checkout.
+        }
+        catch (Exception exception)
+        {
+            Logger.Warn("Could not load the runtime asset registry: {0}", exception.Message);
+        }
+    }
+
     public static object LoadDreambitAsset(
         AssetId assetId,
         string fallbackAssetName,
@@ -243,14 +308,25 @@ public class Resources : Singleton<Resources>
 
     internal void CleanUp()
     {
-        ReleaseEntries(ContentCollection.Drain());
+        RefreshContent();
         _xnbReader?.Dispose();
         _xnbReader = null;
+        _contentDirectoryOverride = null;
+    }
 
-        foreach (var reader in _pakReaders.Values)
-            reader.Dispose();
+    internal static void ReleaseAssembly(Assembly assembly)
+    {
+        foreach (var type in Loaders
+                     .Where(pair =>
+                         pair.Key.Assembly == assembly ||
+                         pair.Value.GetType().Assembly == assembly)
+                     .Select(pair => pair.Key)
+                     .ToArray())
+        {
+            Loaders.Remove(type);
+        }
 
-        _pakReaders.Clear();
+        Instance.ReleaseEntries(Instance.ContentCollection.RemoveAssembly(assembly));
     }
 
     private static string GetFontCacheName(string assetName, float fontSize)

@@ -68,6 +68,18 @@ public class Entity : IDisposable
         }
     }
 
+    /// <summary>Direct children in hierarchy order.</summary>
+    public IReadOnlyList<Entity> Children => _children;
+
+    /// <summary>The entity's own enabled flag, excluding parent state.</summary>
+    public bool LocallyEnabled => _enabled;
+
+    /// <summary>The scene that owns this entity.</summary>
+    public Scene OwningScene => Scene;
+
+    /// <summary>True for transient tooling entities that must never be serialized as scene content.</summary>
+    public bool IsEditorOnly { get; internal set; }
+
     public bool AlwaysUpdate
     {
         get => _alwaysUpdate;
@@ -257,6 +269,18 @@ public class Entity : IDisposable
         ComponentRepository.UpdateComponents();
     }
 
+    internal void FlushStructuralChanges()
+    {
+        if (!_isDestroyed)
+            ComponentRepository.UpdateLists();
+    }
+
+    internal void EditorUpdate()
+    {
+        if (_isDestroyed) return;
+        ComponentRepository.EditorUpdateComponents();
+    }
+
     internal void PhysicsUpdate()
     {
         if (_isDestroyed) return;
@@ -309,7 +333,9 @@ public class Entity : IDisposable
         return component;
     }
 
-    internal void BuildComponentsFromBlueprint(EntityBlueprint entityBlueprint)
+    internal void BuildComponentsFromBlueprint(
+        EntityBlueprint entityBlueprint,
+        bool tolerateLoadErrors = false)
     {
         _blueprintComponentCreateOrder.Clear();
 
@@ -318,7 +344,20 @@ public class Entity : IDisposable
 
         foreach (var componentBlueprint in entityBlueprint.Components)
         {
-            var componentType = BlueprintResolver.ResolveComponentType(componentBlueprint.Type);
+            Type componentType;
+            try
+            {
+                componentType = BlueprintResolver.ResolveComponentType(componentBlueprint.Type);
+            }
+            catch (Exception exception) when (tolerateLoadErrors)
+            {
+                _logger.Error(
+                    "Could not resolve component type {0} while opening entity {1}: {2}",
+                    componentBlueprint.Type,
+                    Name,
+                    exception);
+                continue;
+            }
             if (componentType == null)
             {
                 _logger.Warn("{0} is not a valid component type", componentBlueprint.Type);
@@ -329,9 +368,21 @@ public class Entity : IDisposable
             enabledByType[componentType] = componentBlueprint.Enabled;
         }
 
-        var creationOrder = ComponentRequirementResolver.ResolveCreationOrder(
-            declaredTypes,
-            HasComponentOfType);
+        IReadOnlyList<Type> creationOrder;
+        try
+        {
+            creationOrder = ComponentRequirementResolver.ResolveCreationOrder(
+                declaredTypes,
+                HasComponentOfType);
+        }
+        catch (Exception exception) when (tolerateLoadErrors)
+        {
+            _logger.Error(
+                "Could not resolve component requirements for entity {0}: {1}",
+                Name,
+                exception);
+            return;
+        }
 
         foreach (var componentType in creationOrder)
         {
@@ -341,7 +392,20 @@ public class Entity : IDisposable
                 ? configuredEnabled
                 : true;
 
-            var component = Component.BpFromType(componentType, this, enabled);
+            Component component;
+            try
+            {
+                component = Component.BpFromType(componentType, this, enabled);
+            }
+            catch (Exception exception) when (tolerateLoadErrors)
+            {
+                _logger.Error(
+                    "Could not construct component {0} for entity {1}: {2}",
+                    componentType.FullName,
+                    Name,
+                    exception);
+                continue;
+            }
             if (component == null)
             {
                 _logger.Warn(
@@ -358,30 +422,82 @@ public class Entity : IDisposable
 
     internal void DeserializeComponentsFromBlueprints(
         EntityBlueprint entityBlueprint,
-        BlueprintSpawnContext context)
+        BlueprintSpawnContext context,
+        bool tolerateLoadErrors = false)
     {
         var componentsByType = new Dictionary<Type, Component>();
 
         foreach (var component in ComponentRepository.GetAllComponents())
         {
             componentsByType[component.GetType()] = component;
-            component.MapRequiredFieldComponents();
+            try
+            {
+                component.MapRequiredFieldComponents();
+            }
+            catch (Exception exception) when (tolerateLoadErrors)
+            {
+                _logger.Error(
+                    "Could not map required fields for component {0} on entity {1}: {2}",
+                    component.GetType().FullName,
+                    Name,
+                    exception);
+            }
         }
 
         foreach (var componentBlueprint in entityBlueprint.Components)
         {
-            var componentType = BlueprintResolver.ResolveComponentType(componentBlueprint.Type);
+            Type componentType;
+            try
+            {
+                componentType = BlueprintResolver.ResolveComponentType(componentBlueprint.Type);
+            }
+            catch (Exception exception) when (tolerateLoadErrors)
+            {
+                _logger.Error(
+                    "Could not resolve component type {0} while deserializing entity {1}: {2}",
+                    componentBlueprint.Type,
+                    Name,
+                    exception);
+                continue;
+            }
             if (componentType == null)
                 continue;
 
             if (!componentsByType.TryGetValue(componentType, out var component))
+            {
+                if (tolerateLoadErrors)
+                    continue;
                 throw new InvalidOperationException(
                     $"Entity '{Name}' did not construct blueprint component " +
                     $"'{componentType.FullName}'.");
+            }
 
-            component.BeforeDeserialize();
-            BlueprintResolver.ResolveComponent(componentBlueprint, context, component);
-            component.AfterDeserialize();
+            try
+            {
+                component.BeforeDeserialize();
+                if (tolerateLoadErrors)
+                {
+                    component.SetEditorSerializationFailures(
+                        BlueprintResolver.ResolveComponentForEditor(
+                            componentBlueprint,
+                            context,
+                            component));
+                }
+                else
+                {
+                    BlueprintResolver.ResolveComponent(componentBlueprint, context, component);
+                }
+                component.AfterDeserialize();
+            }
+            catch (Exception exception) when (tolerateLoadErrors)
+            {
+                component.SetEditorSerializationFailures(componentBlueprint.Properties.Keys);
+                _logger.Error(
+                    "Could not deserialize component {0} on entity {1}: {2}",
+                    componentType.FullName,
+                    Name,
+                    exception);
+            }
         }
     }
 
@@ -505,7 +621,48 @@ public class Entity : IDisposable
         //Todo: Implement on call back for components
     }
 
+    public void SetParent(Entity parentEntity, bool preserveWorldTransform)
+    {
+        if (ReferenceEquals(parentEntity, this))
+            throw new InvalidOperationException("An entity cannot be parented to itself.");
+        if (parentEntity is not null && !ReferenceEquals(parentEntity.Scene, Scene))
+            throw new InvalidOperationException("Entities from different scenes cannot be parented together.");
+
+        for (var ancestor = parentEntity; ancestor is not null; ancestor = ancestor.Parent)
+            if (ReferenceEquals(ancestor, this))
+                throw new InvalidOperationException("Reparenting would create an entity hierarchy cycle.");
+
+        if (!preserveWorldTransform)
+        {
+            SetParentInternal(parentEntity);
+            return;
+        }
+
+        var worldPosition = Transform.WorldPosition;
+        var worldRotation = Transform.WorldRotation;
+        var worldScale = Transform.WorldScale;
+        var previousParent = _parent;
+
+        SetParentInternal(parentEntity);
+        try
+        {
+            Transform.WorldScale = worldScale;
+            Transform.WorldRotation = worldRotation;
+            Transform.WorldPosition = worldPosition;
+        }
+        catch
+        {
+            SetParentInternal(previousParent);
+            throw;
+        }
+    }
+
     private void SetParent(Entity parentEntity)
+    {
+        SetParent(parentEntity, false);
+    }
+
+    private void SetParentInternal(Entity parentEntity)
     {
         if (_parent != null)
             _parent._children.Remove(this);
@@ -519,9 +676,9 @@ public class Entity : IDisposable
     internal void Destroy()
     {
         _isDestroyed = true;
-        Scene = null;
         ComponentRepository.DestroyAllComponentsNow();
         ComponentRepository.ClearLists();
+        Scene = null;
     }
 
     internal void Quarantine(Component source, string callback, Exception exception)

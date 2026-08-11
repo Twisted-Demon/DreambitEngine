@@ -28,6 +28,7 @@ public class Camera2D : Component
     private float _pixelPerfectPixelsPerUnit;
     private float _resolutionZoom = 1f;
     private float _zoom = 1f;
+    private Vector2? _editorViewportSize;
 
     [DreambitSerialize]
     public float LerpSpeed { get; set; } = 5f;
@@ -124,8 +125,8 @@ public class Camera2D : Component
     /// </summary>
     public float Scale => QuantizePixelPerfectScale(TotalZoom);
 
-    public float WorldUnitsWidth => Window.BackBufferWidth / Scale;
-    public float WorldUnitsHeight => Window.BackBufferHeight / Scale;
+    public float WorldUnitsWidth => ViewportSize.X / Scale;
+    public float WorldUnitsHeight => ViewportSize.Y / Scale;
 
     /// <summary>
     ///     Size of one screen pixel expressed in world units.
@@ -138,7 +139,7 @@ public class Camera2D : Component
         QuantizePixelPerfectScale(ResolutionZoom);
 
     private Vector2 ViewportSize =>
-        new(Window.Width, Window.Height);
+        _editorViewportSize ?? new Vector2(Window.Width, Window.Height);
 
     [DreambitSerialize]
     public float TargetVerticalResolution { get; private set; } =
@@ -223,6 +224,33 @@ public class Camera2D : Component
         SetResolutionZoom();
 
         // Ensure conversions are valid before the first OnUpdate call.
+        EnsureMatricesCurrent();
+    }
+
+    public override void OnEditorCreated()
+    {
+        SetResolutionZoom();
+        EnsureMatricesCurrent();
+    }
+
+    public override void OnEditorDestroyed()
+    {
+        TransformToFollow = null;
+        _editorViewportSize = null;
+    }
+
+    /// <summary>Configures matrix calculations for an editor-owned viewport.</summary>
+    public void ConfigureEditorViewport(int width, int height, float? targetVerticalResolution = null)
+    {
+        if (Scene?.ExecutionMode != SceneExecutionMode.Editor)
+            throw new InvalidOperationException("Editor viewport overrides require an editor-hosted scene.");
+        _editorViewportSize = new Vector2(Math.Max(1, width), Math.Max(1, height));
+        if (targetVerticalResolution.HasValue)
+            TargetVerticalResolution = Math.Max(1f, targetVerticalResolution.Value);
+        else if (TargetVerticalResolution <= 1f)
+            TargetVerticalResolution = _editorViewportSize.Value.Y;
+        SetResolutionZoom();
+        _matricesDirty = true;
         EnsureMatricesCurrent();
     }
 
@@ -461,7 +489,7 @@ public class Camera2D : Component
             MathF.Max(MinimumScale, TargetVerticalResolution);
 
         var actualHeight =
-            Math.Max(1, Window.Height);
+            Math.Max(1, ViewportSize.Y);
 
         ResolutionZoom =
             actualHeight / targetHeight;
