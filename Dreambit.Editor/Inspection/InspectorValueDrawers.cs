@@ -115,37 +115,43 @@ internal sealed class InspectorValueDrawerRegistry
             if (!ImGui.BeginDragDropTarget())
                 return false;
             var changed = false;
-            if (typeof(DreambitAsset).IsAssignableFrom(type))
+            try
             {
-                var payload = ImGui.AcceptDragDropPayload(EditorDragDropService.ProjectItemPayloadType);
-                if (payload.NativePtr != null && dragDrop.ProjectItem is { IsFolder: false } item &&
-                    assets.TryGetAsset(item.RelativePath, out var asset))
+                if (typeof(DreambitAsset).IsAssignableFrom(type))
                 {
-                    var loaded = Resources.LoadDreambitAsset(item.AssetId, asset!.LogicalAssetName, type);
-                    if (loaded is not null && type.IsInstanceOfType(loaded))
+                    var payload = ImGui.AcceptDragDropPayload(EditorDragDropService.ProjectItemPayloadType);
+                    if (payload.NativePtr != null && dragDrop.ProjectItem is { IsFolder: false } item &&
+                        assets.TryGetAsset(item.RelativePath, out var asset))
                     {
-                        value = loaded;
-                        changed = true;
+                        var loaded = Resources.LoadDreambitAsset(item.AssetId, asset!.LogicalAssetName, type);
+                        if (loaded is not null && type.IsInstanceOfType(loaded))
+                        {
+                            value = loaded;
+                            changed = true;
+                        }
+                        dragDrop.ClearProjectItem();
                     }
-                    dragDrop.ClearProjectItem();
+                }
+                else
+                {
+                    var payload = ImGui.AcceptDragDropPayload(EditorDragDropService.HierarchyEntityPayloadType);
+                    if (payload.NativePtr != null && dragDrop.HierarchyEntityId is { } id &&
+                        scenes.Current?.Scene?.FindEntity(id) is { } entity)
+                    {
+                        object? candidate = type == typeof(Entity) ? entity : entity.GetComponent(type);
+                        if (candidate is not null && type.IsInstanceOfType(candidate))
+                        {
+                            value = candidate;
+                            changed = true;
+                        }
+                        dragDrop.ClearHierarchyEntity();
+                    }
                 }
             }
-            else
+            finally
             {
-                var payload = ImGui.AcceptDragDropPayload(EditorDragDropService.HierarchyEntityPayloadType);
-                if (payload.NativePtr != null && dragDrop.HierarchyEntityId is { } id &&
-                    scenes.Current?.Scene?.FindEntity(id) is { } entity)
-                {
-                    object? candidate = type == typeof(Entity) ? entity : entity.GetComponent(type);
-                    if (candidate is not null && type.IsInstanceOfType(candidate))
-                    {
-                        value = candidate;
-                        changed = true;
-                    }
-                    dragDrop.ClearHierarchyEntity();
-                }
+                ImGui.EndDragDropTarget();
             }
-            ImGui.EndDragDropTarget();
             return changed;
         }
 
@@ -153,46 +159,58 @@ internal sealed class InspectorValueDrawerRegistry
         {
             if (!ImGui.BeginPopup($"Object Picker##{id}"))
                 return false;
-            ImGui.SetNextItemWidth(360f);
-            ImGui.InputTextWithHint("##PickerSearch", "Search", ref _search, 128);
-            ImGui.Separator();
             var changed = false;
-            ImGui.BeginChild("##PickerItems", new Vector2(360f, 260f));
-            if (typeof(DreambitAsset).IsAssignableFrom(type))
+            try
             {
-                foreach (var asset in assets.GetSnapshot().Assets)
+                ImGui.SetNextItemWidth(360f);
+                ImGui.InputTextWithHint("##PickerSearch", "Search", ref _search, 128);
+                ImGui.Separator();
+                ImGui.BeginChild("##PickerItems", new Vector2(360f, 260f));
+                try
                 {
-                    if (!string.IsNullOrWhiteSpace(_search) &&
-                        !asset.RelativePath.Contains(_search, StringComparison.OrdinalIgnoreCase))
-                        continue;
-                    if (!ImGui.Selectable(asset.RelativePath))
-                        continue;
-                    var loaded = Resources.LoadDreambitAsset(asset.Id, asset.LogicalAssetName, type);
-                    if (loaded is not null && type.IsInstanceOfType(loaded))
+                    if (typeof(DreambitAsset).IsAssignableFrom(type))
                     {
-                        value = loaded;
-                        changed = true;
-                        ImGui.CloseCurrentPopup();
+                        foreach (var asset in assets.GetSnapshot().Assets)
+                        {
+                            if (!string.IsNullOrWhiteSpace(_search) &&
+                                !asset.RelativePath.Contains(_search, StringComparison.OrdinalIgnoreCase))
+                                continue;
+                            if (!ImGui.Selectable(asset.RelativePath))
+                                continue;
+                            var loaded = Resources.LoadDreambitAsset(asset.Id, asset.LogicalAssetName, type);
+                            if (loaded is not null && type.IsInstanceOfType(loaded))
+                            {
+                                value = loaded;
+                                changed = true;
+                                ImGui.CloseCurrentPopup();
+                            }
+                        }
+                    }
+                    else if (scenes.Current?.Scene is { } scene)
+                    {
+                        foreach (var entity in scene.GetAllEntities().Where(entity => !entity.IsEditorOnly))
+                        {
+                            if (!string.IsNullOrWhiteSpace(_search) &&
+                                !entity.Name.Contains(_search, StringComparison.OrdinalIgnoreCase))
+                                continue;
+                            object? candidate = type == typeof(Entity) ? entity : entity.GetComponent(type);
+                            if (candidate is null || !ImGui.Selectable(entity.Name))
+                                continue;
+                            value = candidate;
+                            changed = true;
+                            ImGui.CloseCurrentPopup();
+                        }
                     }
                 }
-            }
-            else if (scenes.Current?.Scene is { } scene)
-            {
-                foreach (var entity in scene.GetAllEntities().Where(entity => !entity.IsEditorOnly))
+                finally
                 {
-                    if (!string.IsNullOrWhiteSpace(_search) &&
-                        !entity.Name.Contains(_search, StringComparison.OrdinalIgnoreCase))
-                        continue;
-                    object? candidate = type == typeof(Entity) ? entity : entity.GetComponent(type);
-                    if (candidate is null || !ImGui.Selectable(entity.Name))
-                        continue;
-                    value = candidate;
-                    changed = true;
-                    ImGui.CloseCurrentPopup();
+                    ImGui.EndChild();
                 }
             }
-            ImGui.EndChild();
-            ImGui.EndPopup();
+            finally
+            {
+                ImGui.EndPopup();
+            }
             return changed;
         }
     }

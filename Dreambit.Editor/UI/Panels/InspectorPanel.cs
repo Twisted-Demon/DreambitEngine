@@ -24,6 +24,7 @@ internal sealed class InspectorPanel : EditorPanel
     private readonly EditorLogService _logs;
     private readonly InspectorValueDrawerRegistry _drawers;
     private string _componentSearch = string.Empty;
+    private string _blueprintReferenceSearch = string.Empty;
     private string? _error;
 
     public InspectorPanel(
@@ -338,32 +339,37 @@ internal sealed class InspectorPanel : EditorPanel
         foreach (var component in blueprint.Components.ToArray())
         {
             ImGui.PushID(component.GetHashCode());
-            var componentType = BlueprintResolver.ResolveComponentType(component.Type);
-            var title = componentType?.Name ?? $"Missing: {component.Type}";
-            var (open, removeRequested) = DrawRemovableHeader(title);
-            if (removeRequested)
+            try
             {
-                document.Apply($"Remove {title}", asset => ((EntityBlueprint)asset).Components.Remove(component));
+                var componentType = BlueprintResolver.ResolveComponentType(component.Type);
+                var title = componentType?.Name ?? $"Missing: {component.Type}";
+                var (open, removeRequested) = DrawRemovableHeader(title);
+                if (removeRequested)
+                {
+                    document.Apply($"Remove {title}", asset => ((EntityBlueprint)asset).Components.Remove(component));
+                    continue;
+                }
+                if (open)
+                {
+                    var componentEnabled = component.Enabled;
+                    if (ImGui.Checkbox("Enabled", ref componentEnabled))
+                        document.Apply("Set Component Enabled", _ => component.Enabled = componentEnabled);
+                    if (componentType is null)
+                    {
+                        ImGui.TextColored(
+                            new Vector4(1f, 0.68f, 0.28f, 1f),
+                            "Type unavailable. Serialized properties are preserved.");
+                    }
+                    else
+                    {
+                        DrawBlueprintComponentMembers(document, blueprint, component, componentType);
+                    }
+                }
+            }
+            finally
+            {
                 ImGui.PopID();
-                continue;
             }
-            if (open)
-            {
-                var componentEnabled = component.Enabled;
-                if (ImGui.Checkbox("Enabled", ref componentEnabled))
-                    document.Apply("Set Component Enabled", _ => component.Enabled = componentEnabled);
-                if (componentType is null)
-                {
-                    ImGui.TextColored(
-                        new Vector4(1f, 0.68f, 0.28f, 1f),
-                        "Type unavailable. Serialized properties are preserved.");
-                }
-                else
-                {
-                    DrawBlueprintComponentMembers(document, component, componentType);
-                }
-            }
-            ImGui.PopID();
         }
 
         if (ImGui.Button("Add Component", new System.Numerics.Vector2(-1, 0)))
@@ -403,11 +409,19 @@ internal sealed class InspectorPanel : EditorPanel
 
     private void DrawBlueprintComponentMembers(
         DreambitAssetDocument document,
+        EntityBlueprint blueprint,
         ComponentBlueprint component,
         Type componentType)
     {
         foreach (var member in _metadata.Get(componentType, InspectorTargetKind.Component))
         {
+            if (member.ValueType == typeof(Entity) ||
+                typeof(Component).IsAssignableFrom(member.ValueType))
+            {
+                DrawBlueprintReferenceMember(document, blueprint, component, member);
+                continue;
+            }
+
             object? value = null;
             if (component.Properties.TryGetValue(member.SerializedName, out var token))
             {
@@ -440,6 +454,112 @@ internal sealed class InspectorPanel : EditorPanel
                 document.Apply($"Change {member.DisplayName}", _ =>
                     component.Properties[member.SerializedName] = DreambitJson.ToToken(result.Value));
         }
+    }
+
+    private void DrawBlueprintReferenceMember(
+        DreambitAssetDocument document,
+        EntityBlueprint blueprint,
+        ComponentBlueprint component,
+        InspectorMemberMetadata member)
+    {
+        component.Properties.TryGetValue(member.SerializedName, out var token);
+        var referencedGuid = Guid.Empty;
+        var hasReference = token?.Type == Newtonsoft.Json.Linq.JTokenType.String &&
+                           Guid.TryParse((string?)token, out referencedGuid);
+        var candidates = GetBlueprintReferenceCandidates(blueprint, member.ValueType);
+        var selected = hasReference
+            ? candidates.FirstOrDefault(candidate => candidate.Guid == referencedGuid)
+            : null;
+        var display = selected is not null
+            ? member.ValueType == typeof(Entity)
+                ? selected.Name
+                : $"{selected.Name} ({member.ValueType.Name})"
+            : hasReference
+                ? $"Missing ({referencedGuid.ToString()[..8]})"
+                : "None";
+        var pickerId = $"BlueprintReference.{component.Type}.{member.SerializedName}";
+
+        ImGui.TextUnformatted(member.DisplayName);
+        ImGui.SameLine(110f);
+        ImGui.SetNextItemWidth(-32f);
+        if (ImGui.Button($"{display}##{pickerId}", new System.Numerics.Vector2(-32f, 0f)))
+        {
+            _blueprintReferenceSearch = string.Empty;
+            ImGui.OpenPopup($"Blueprint Reference Picker##{pickerId}");
+        }
+        ImGui.SameLine();
+        ImGui.BeginDisabled(!hasReference || member.IsReadOnly);
+        if (ImGui.SmallButton($"×##{pickerId}.Clear"))
+            document.Apply($"Clear {member.DisplayName}", _ =>
+                component.Properties.Remove(member.SerializedName));
+        ImGui.EndDisabled();
+
+        if (!ImGui.BeginPopup($"Blueprint Reference Picker##{pickerId}"))
+            return;
+        try
+        {
+            ImGui.TextDisabled(
+                member.ValueType == typeof(Entity)
+                    ? "Select an entity from this Blueprint."
+                    : $"Select an entity in this Blueprint containing {member.ValueType.Name}.");
+            ImGui.SetNextItemWidth(360f);
+            ImGui.InputTextWithHint(
+                "##BlueprintReferenceSearch",
+                "Search Blueprint entities",
+                ref _blueprintReferenceSearch,
+                128);
+            ImGui.Separator();
+            ImGui.BeginChild(
+                "##BlueprintReferenceItems",
+                new System.Numerics.Vector2(360f, 260f));
+            try
+            {
+                foreach (var candidate in candidates)
+                {
+                    if (!string.IsNullOrWhiteSpace(_blueprintReferenceSearch) &&
+                        !candidate.Name.Contains(
+                            _blueprintReferenceSearch,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    var label = $"{candidate.Name}##{candidate.Guid:N}";
+                    if (!ImGui.Selectable(label, candidate.Guid == referencedGuid) || member.IsReadOnly)
+                        continue;
+                    document.Apply($"Change {member.DisplayName}", _ =>
+                        component.Properties[member.SerializedName] =
+                            new Newtonsoft.Json.Linq.JValue(candidate.Guid.ToString()));
+                    ImGui.CloseCurrentPopup();
+                }
+            }
+            finally
+            {
+                ImGui.EndChild();
+            }
+        }
+        finally
+        {
+            ImGui.EndPopup();
+        }
+    }
+
+    internal static IReadOnlyList<EntityBlueprint> GetBlueprintReferenceCandidates(
+        EntityBlueprint blueprint,
+        Type referenceType)
+    {
+        ArgumentNullException.ThrowIfNull(blueprint);
+        ArgumentNullException.ThrowIfNull(referenceType);
+        return blueprint.FlattenedHierarchy()
+            .Where(entity => referenceType == typeof(Entity) ||
+                             typeof(Component).IsAssignableFrom(referenceType) &&
+                             entity.Components.Any(component =>
+                             {
+                                 var candidateType = BlueprintResolver.ResolveComponentType(component.Type);
+                                 return candidateType is not null &&
+                                        referenceType.IsAssignableFrom(candidateType);
+                             }))
+            .ToArray();
     }
 
     private static void DrawMixedLabel(string label, bool mixed)
@@ -544,49 +664,54 @@ internal sealed class InspectorPanel : EditorPanel
         {
             var components = entities.Select(entity => entity.GetComponent(componentType)!).ToArray();
             ImGui.PushID(componentType.FullName);
-            var generated = entities.Any(entity => entity.IsLDtkGenerated);
-            var (open, removeRequested) = DrawRemovableHeader(componentType.Name, !generated);
-            if (removeRequested)
+            try
             {
-                Apply(document, $"Remove {componentType.Name}", $"Component.Remove.{componentType.FullName}", () =>
+                var generated = entities.Any(entity => entity.IsLDtkGenerated);
+                var (open, removeRequested) = DrawRemovableHeader(componentType.Name, !generated);
+                if (removeRequested)
                 {
-                    foreach (var entity in entities)
-                        if (entity.GetComponent(componentType) is { } component)
-                            entity.DetachComponent(component);
-                });
-                ImGui.PopID();
-                continue;
-            }
-            if (open)
-            {
-                if (_customEditors.TryGet(componentType, out var customEditor))
+                    Apply(document, $"Remove {componentType.Name}", $"Component.Remove.{componentType.FullName}", () =>
+                    {
+                        foreach (var entity in entities)
+                            if (entity.GetComponent(componentType) is { } component)
+                                entity.DetachComponent(component);
+                    });
+                    continue;
+                }
+                if (open)
                 {
-                    var context = new CustomInspectorContext(
-                        components.Cast<object>().ToArray(),
-                        () => DrawComponentMembers(document, components),
-                        (name, mutation) => document.Apply(name, _ =>
+                    if (_customEditors.TryGet(componentType, out var customEditor))
+                    {
+                        var context = new CustomInspectorContext(
+                            components.Cast<object>().ToArray(),
+                            () => DrawComponentMembers(document, components),
+                            (name, mutation) => document.Apply(name, _ =>
+                            {
+                                mutation();
+                                RecordLDtkComponentValues(document, components);
+                            }),
+                            LogExtension);
+                        try
                         {
-                            mutation();
-                            RecordLDtkComponentValues(document, components);
-                        }),
-                        LogExtension);
-                    try
-                    {
-                        customEditor!.Draw(context);
+                            customEditor!.Draw(context);
+                        }
+                        catch (Exception exception)
+                        {
+                            _logs.Error("Game Editor", $"Custom Component Editor for '{componentType.FullName}' failed.", exception);
+                            ImGui.TextColored(new Vector4(0.96f, 0.34f, 0.36f, 1f), exception.Message);
+                            DrawComponentMembers(document, components);
+                        }
                     }
-                    catch (Exception exception)
+                    else
                     {
-                        _logs.Error("Game Editor", $"Custom Component Editor for '{componentType.FullName}' failed.", exception);
-                        ImGui.TextColored(new Vector4(0.96f, 0.34f, 0.36f, 1f), exception.Message);
                         DrawComponentMembers(document, components);
                     }
                 }
-                else
-                {
-                    DrawComponentMembers(document, components);
-                }
             }
-            ImGui.PopID();
+            finally
+            {
+                ImGui.PopID();
+            }
         }
 
         var partialCount = entities[0].GetAllComponents().Count - commonTypes.Length;

@@ -1,6 +1,7 @@
 using Dreambit.ECS;
 using Dreambit.Editor.Inspection;
 using Dreambit.Editor.Assets;
+using Dreambit.Editor.UI.Panels;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -126,6 +127,36 @@ public sealed class InspectorMetadataTests
         {
             File.Delete(path);
         }
+    }
+
+    [Fact]
+    public void BlueprintComponentReferencePickerOnlyOffersCompatibleSourceEntities()
+    {
+        var root = new EntityBlueprint
+        {
+            Name = "Player",
+            Guid = Guid.NewGuid(),
+            Components =
+            [
+                new ComponentBlueprint { Type = nameof(FilledRectDrawer) }
+            ],
+            Children =
+            [
+                new EntityBlueprint
+                {
+                    Name = "Child Without Mover",
+                    Guid = Guid.NewGuid()
+                }
+            ]
+        };
+
+        var componentCandidates = InspectorPanel.GetBlueprintReferenceCandidates(
+            root,
+            typeof(FilledRectDrawer));
+        Assert.Equal(root.Guid, Assert.Single(componentCandidates).Guid);
+
+        var entityCandidates = InspectorPanel.GetBlueprintReferenceCandidates(root, typeof(Entity));
+        Assert.Equal(2, entityCandidates.Count);
     }
 }
 
