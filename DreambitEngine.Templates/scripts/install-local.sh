@@ -10,6 +10,7 @@ feed="$data_root/Dreambit/Editor/sdks/$version/packages"
 
 mkdir -p "$feed"
 dotnet pack "$engine_root/DreambitEngine/DreambitEngine.csproj" -c "$configuration" -p:PackageVersion="$version" -o "$feed" --nologo
+dotnet pack "$engine_root/Dreambit.Editor.Abstractions/Dreambit.Editor.Abstractions.csproj" -c "$configuration" -p:PackageVersion="$version" -o "$feed" --nologo
 dotnet pack "$engine_root/DreambitEngine.Build/DreambitEngine.Build.csproj" -c "$configuration" -p:PackageVersion="$version" -o "$feed" --nologo
 dotnet pack "$template_root/DreambitEngine.Templates.csproj" -c "$configuration" -p:PackageVersion="$version" -o "$feed" --nologo
 

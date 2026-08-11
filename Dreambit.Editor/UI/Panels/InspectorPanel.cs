@@ -5,6 +5,7 @@ using Dreambit.Editor.Graphics;
 using Dreambit.Editor.Logging;
 using Dreambit.EditorApi;
 using Dreambit.Editor.Scenes;
+using Dreambit.LDtk;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
 using Vector3 = System.Numerics.Vector3;
@@ -88,8 +89,7 @@ internal sealed class InspectorPanel : EditorPanel
         }
 
         var document = _documents.Current;
-        var entities = document?.Selection.Resolve(document.Scene) ?? [];
-        if (document is null || entities.Count == 0)
+        if (document is null)
         {
             ImGui.TextDisabled("Nothing selected");
             ImGui.Spacing();
@@ -97,17 +97,153 @@ internal sealed class InspectorPanel : EditorPanel
             return;
         }
 
+        if (document.LDtkReference is not null)
+            DrawLDtkImportOptions(document);
+
+        var entities = document.Selection.Resolve(document.Scene);
+        if (entities.Count == 0)
+        {
+            ImGui.TextDisabled("No entity selected");
+            ImGui.Spacing();
+            ImGui.TextWrapped("Select an entity in the Hierarchy or Scene view to inspect it.");
+            return;
+        }
+
+        if (entities.Count == 1 &&
+            document.TryGetBlueprintInstanceRoot(entities[0], out var instanceRoot, out var instance))
+        {
+            ImGui.TextUnformatted(entities[0].Name);
+            ImGui.Separator();
+            ImGui.TextColored(new Vector4(0.35f, 0.72f, 1f, 1f), "Boxed Blueprint Instance");
+            ImGui.TextWrapped(instance.AssetName);
+            ImGui.TextDisabled("Source changes update this instance automatically.");
+            ImGui.TextDisabled("Right-click it in the Hierarchy and choose Unbox to edit its contents.");
+            ImGui.Separator();
+            if (ReferenceEquals(entities[0], instanceRoot))
+                DrawTransform(document, entities);
+            else
+                ImGui.TextDisabled("Linked child values are read-only.");
+            return;
+        }
+        if (entities.Count > 1 &&
+            entities.Any(entity => document.TryGetBlueprintInstanceRoot(entity, out _, out _)))
+        {
+            ImGui.TextUnformatted($"{entities.Count} Entities");
+            ImGui.Separator();
+            ImGui.TextDisabled("A boxed Blueprint instance is included in this selection.");
+            ImGui.TextDisabled("Unbox it before editing this selection together.");
+            return;
+        }
+
         DrawEntityHeader(document, entities);
+        if (entities.Any(entity => entity.IsLDtkGenerated))
+        {
+            ImGui.TextColored(new Vector4(0.42f, 0.78f, 1f, 1f), "LDtk-generated visualization");
+            ImGui.TextDisabled("Value changes are stored as Dreambit overrides and survive reimport.");
+            ImGui.TextDisabled("Hierarchy structure and components remain owned by LDtk.");
+        }
         ImGui.Separator();
+
         DrawTransform(document, entities);
         DrawComponents(document, entities);
-        DrawAddComponent(document, entities);
+        if (entities.All(entity => !entity.IsLDtkGenerated))
+            DrawAddComponent(document, entities);
 
         if (!string.IsNullOrWhiteSpace(_error))
         {
             ImGui.Spacing();
             ImGui.TextColored(new Vector4(0.96f, 0.34f, 0.36f, 1f), _error);
         }
+    }
+
+    private void DrawLDtkImportOptions(SceneDocument document)
+    {
+        if (!ImGui.CollapsingHeader("LDtk Import Options", ImGuiTreeNodeFlags.DefaultOpen))
+            return;
+
+        var current = document.LDtkReference!.ImportOptions ?? new LDtkImportOptions();
+        var edited = current.Clone();
+        var pixelsPerUnit = edited.PixelsPerUnit;
+        var baseDrawLayer = edited.BaseDrawLayer;
+        var drawLayerStep = edited.DrawLayerStep;
+        var worldDepthStride = edited.WorldDepthDrawLayerStride;
+        var renderBackgroundColor = edited.RenderLevelBackgroundColor;
+        var renderBackgroundImage = edited.RenderLevelBackgroundImage;
+        var includeInvisibleLayers = edited.IncludeInvisibleLayers;
+        var changed = false;
+        changed |= ImGui.DragFloat(
+            "Pixels Per Unit##LDtk",
+            ref pixelsPerUnit,
+            0.1f,
+            0.001f,
+            100000f);
+        changed |= ImGui.DragInt("Base Draw Layer##LDtk", ref baseDrawLayer, 1f);
+        changed |= ImGui.DragInt(
+            "Draw Layer Step##LDtk",
+            ref drawLayerStep,
+            1f,
+            1,
+            100000);
+        changed |= ImGui.DragInt(
+            "World Depth Stride##LDtk",
+            ref worldDepthStride,
+            1f,
+            1,
+            int.MaxValue);
+        changed |= ImGui.Checkbox(
+            "Render Background Color##LDtk",
+            ref renderBackgroundColor);
+        changed |= ImGui.Checkbox(
+            "Render Background Image##LDtk",
+            ref renderBackgroundImage);
+        changed |= ImGui.Checkbox(
+            "Include Invisible Layers##LDtk",
+            ref includeInvisibleLayers);
+
+        edited.PixelsPerUnit = pixelsPerUnit;
+        edited.BaseDrawLayer = baseDrawLayer;
+        edited.DrawLayerStep = drawLayerStep;
+        edited.WorldDepthDrawLayerStride = worldDepthStride;
+        edited.RenderLevelBackgroundColor = renderBackgroundColor;
+        edited.RenderLevelBackgroundImage = renderBackgroundImage;
+        edited.IncludeInvisibleLayers = includeInvisibleLayers;
+
+        if (changed)
+        {
+            try
+            {
+                document.UpdateLDtkImportOptions("Change LDtk Import Options", options =>
+                {
+                    options.PixelsPerUnit = edited.PixelsPerUnit;
+                    options.BaseDrawLayer = edited.BaseDrawLayer;
+                    options.DrawLayerStep = edited.DrawLayerStep;
+                    options.WorldDepthDrawLayerStride = edited.WorldDepthDrawLayerStride;
+                    options.RenderLevelBackgroundColor = edited.RenderLevelBackgroundColor;
+                    options.RenderLevelBackgroundImage = edited.RenderLevelBackgroundImage;
+                    options.IncludeInvisibleLayers = edited.IncludeInvisibleLayers;
+                });
+                _error = null;
+            }
+            catch (Exception exception)
+            {
+                _error = exception.Message;
+            }
+        }
+
+        if (ImGui.Button("Reimport LDtk Now", new System.Numerics.Vector2(-1f, 0f)))
+        {
+            try
+            {
+                document.ReimportLDtk();
+                _error = null;
+            }
+            catch (Exception exception)
+            {
+                _error = exception.Message;
+            }
+        }
+        ImGui.TextDisabled("Live sync watches the .ldtk project and its external level files.");
+        ImGui.Separator();
     }
 
     private void DrawAssetDocument(DreambitAssetDocument document)
@@ -184,6 +320,7 @@ internal sealed class InspectorPanel : EditorPanel
         if (ImGui.Checkbox("Enabled", ref enabled))
             document.Apply("Set Blueprint Enabled", asset => ((EntityBlueprint)asset).Enabled = enabled);
 
+        ImGui.TextDisabled("Drag to adjust. Double-click a number to type an exact value.");
         var position = new Vector3(blueprint.Position.X, blueprint.Position.Y, blueprint.Position.Z);
         if (ImGui.DragFloat3("Position", ref position, 0.1f))
             document.Apply("Change Blueprint Position", asset =>
@@ -335,7 +472,10 @@ internal sealed class InspectorPanel : EditorPanel
             Apply(document, "Set Enabled", "Entity.Enabled", () =>
             {
                 foreach (var entity in entities)
+                {
                     entity.Enabled = enabled;
+                    document.RecordLDtkEntityEnabled(entity);
+                }
             });
     }
 
@@ -344,6 +484,7 @@ internal sealed class InspectorPanel : EditorPanel
         if (!ImGui.CollapsingHeader("Transform", ImGuiTreeNodeFlags.DefaultOpen))
             return;
         ImGui.PushID("TransformInspector");
+        ImGui.TextDisabled("Drag to adjust. Double-click a number to type an exact value.");
         var first = entities[0].Transform;
 
         var position = new Vector3(first.Position.X, first.Position.Y, first.Position.Z);
@@ -353,7 +494,10 @@ internal sealed class InspectorPanel : EditorPanel
             {
                 var value = new Microsoft.Xna.Framework.Vector3(position.X, position.Y, position.Z);
                 foreach (var entity in entities)
+                {
                     entity.Transform.Position = value;
+                    document.RecordLDtkPosition(entity);
+                }
             });
         DrawMixedLabel("Position", mixedPosition);
 
@@ -365,7 +509,10 @@ internal sealed class InspectorPanel : EditorPanel
             {
                 var value = MathHelper.ToRadians(rotation);
                 foreach (var entity in entities)
+                {
                     entity.Transform.Rotation2D = value;
+                    document.RecordLDtkRotation(entity);
+                }
             });
         DrawMixedLabel("Rotation", mixedRotation);
 
@@ -376,7 +523,10 @@ internal sealed class InspectorPanel : EditorPanel
             {
                 var value = new Microsoft.Xna.Framework.Vector3(scale.X, scale.Y, scale.Z);
                 foreach (var entity in entities)
+                {
                     entity.Transform.Scale = value;
+                    document.RecordLDtkScale(entity);
+                }
             });
         DrawMixedLabel("Scale", mixedScale);
         ImGui.PopID();
@@ -394,7 +544,8 @@ internal sealed class InspectorPanel : EditorPanel
         {
             var components = entities.Select(entity => entity.GetComponent(componentType)!).ToArray();
             ImGui.PushID(componentType.FullName);
-            var (open, removeRequested) = DrawRemovableHeader(componentType.Name);
+            var generated = entities.Any(entity => entity.IsLDtkGenerated);
+            var (open, removeRequested) = DrawRemovableHeader(componentType.Name, !generated);
             if (removeRequested)
             {
                 Apply(document, $"Remove {componentType.Name}", $"Component.Remove.{componentType.FullName}", () =>
@@ -413,7 +564,11 @@ internal sealed class InspectorPanel : EditorPanel
                     var context = new CustomInspectorContext(
                         components.Cast<object>().ToArray(),
                         () => DrawComponentMembers(document, components),
-                        (name, mutation) => document.Apply(name, _ => mutation()),
+                        (name, mutation) => document.Apply(name, _ =>
+                        {
+                            mutation();
+                            RecordLDtkComponentValues(document, components);
+                        }),
                         LogExtension);
                     try
                     {
@@ -439,7 +594,9 @@ internal sealed class InspectorPanel : EditorPanel
             ImGui.TextDisabled("Components not shared by every selected entity are hidden.");
     }
 
-    private static (bool Open, bool RemoveRequested) DrawRemovableHeader(string title)
+    private static (bool Open, bool RemoveRequested) DrawRemovableHeader(
+        string title,
+        bool allowRemove = true)
     {
         var open = false;
         var removeRequested = false;
@@ -453,10 +610,17 @@ internal sealed class InspectorPanel : EditorPanel
         ImGui.TableSetColumnIndex(0);
         open = ImGui.CollapsingHeader(title, ImGuiTreeNodeFlags.DefaultOpen);
         ImGui.TableSetColumnIndex(1);
-        if (ImGui.SmallButton("×"))
-            removeRequested = true;
-        if (ImGui.IsItemHovered())
-            ImGui.SetTooltip($"Remove {title}");
+        if (allowRemove)
+        {
+            if (ImGui.SmallButton("×"))
+                removeRequested = true;
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip($"Remove {title}");
+        }
+        else
+        {
+            ImGui.TextDisabled("LDtk");
+        }
         ImGui.EndTable();
         return (open, removeRequested);
     }
@@ -496,6 +660,10 @@ internal sealed class InspectorPanel : EditorPanel
                     {
                         member.SetValue(component, result.Value);
                         component.AcknowledgeEditorSerializationFailure(member.SerializedName);
+                        document.RecordLDtkComponentMember(
+                            component,
+                            member.SerializedName,
+                            result.Value);
                         if (result.Value is null &&
                             (typeof(DreambitAsset).IsAssignableFrom(member.ValueType) ||
                              member.ValueType == typeof(Entity) ||
@@ -515,6 +683,19 @@ internal sealed class InspectorPanel : EditorPanel
                 ImGui.TextColored(new Vector4(0.96f, 0.34f, 0.36f, 1f), _error);
             }
         }
+    }
+
+    private void RecordLDtkComponentValues(
+        SceneDocument document,
+        IReadOnlyList<Component> components)
+    {
+        foreach (var component in components)
+            foreach (var member in _metadata.Get(component.GetType(), InspectorTargetKind.Component))
+                if (!member.IsReadOnly)
+                    document.RecordLDtkComponentMember(
+                        component,
+                        member.SerializedName,
+                        member.GetValue(component));
     }
 
     private void DrawAddComponent(SceneDocument document, IReadOnlyList<Entity> entities)

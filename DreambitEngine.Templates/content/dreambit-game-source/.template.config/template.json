@@ -1,0 +1,121 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Dreambit Engine",
+  "classifications": ["Game", "Dreambit", "MonoGame", "Source"],
+  "identity": "DreambitEngine.Templates.Game.Source",
+  "groupIdentity": "DreambitEngine.Templates.Game.Source",
+  "name": "Dreambit Engine Game (Source)",
+  "shortName": "dreambit-game-source",
+  "sourceName": "DreambitGame",
+  "defaultName": "DreambitGame",
+  "preferNameDirectory": true,
+  "tags": {
+    "language": "C#",
+    "type": "solution"
+  },
+  "symbols": {
+    "gameTitle": {
+      "type": "parameter",
+      "datatype": "text",
+      "displayName": "Game title",
+      "defaultValue": "Dreambit Game",
+      "replaces": "Dreambit Game"
+    },
+    "sdkVersion": {
+      "type": "parameter",
+      "datatype": "text",
+      "displayName": "Dreambit SDK version",
+      "defaultValue": "0.1.6",
+      "replaces": "__DREAMBIT_SDK_VERSION__"
+    },
+    "targetRenderer": {
+      "type": "parameter",
+      "datatype": "choice",
+      "displayName": "Target renderer",
+      "defaultValue": "DesktopVK",
+      "replaces": "__DREAMBIT_TARGET_RENDERER__",
+      "choices": [
+        {
+          "choice": "DesktopVK",
+          "description": "Desktop Vulkan launcher for Windows, macOS, and Linux."
+        }
+      ]
+    },
+    "targetFps": {
+      "type": "parameter",
+      "datatype": "int",
+      "displayName": "Target FPS",
+      "defaultValue": "240",
+      "replaces": "__DREAMBIT_TARGET_FPS__"
+    },
+    "engineRepository": {
+      "type": "parameter",
+      "datatype": "text",
+      "displayName": "Engine Git repository",
+      "defaultValue": "https://github.com/Twisted-Demon/DreambitEngine.git",
+      "replaces": "__DREAMBIT_ENGINE_REPOSITORY__"
+    },
+    "engineRef": {
+      "type": "parameter",
+      "datatype": "text",
+      "displayName": "Engine Git ref",
+      "defaultValue": "main",
+      "replaces": "__DREAMBIT_ENGINE_REF__"
+    }
+  },
+  "guids": [
+    "5D6122AE-216C-53FC-C59E-1F3C4B53B101",
+    "5D6122AE-216C-53FC-C59E-1F3C4B53B102",
+    "5D6122AE-216C-53FC-C59E-1F3C4B53B103",
+    "5D6122AE-216C-53FC-C59E-1F3C4B53B104"
+  ],
+  "sources": [
+    {
+      "source": "./",
+      "target": "./",
+      "exclude": [
+        ".template.config/**/*",
+        ".git/**/*",
+        "**/[Bb]in/**/*",
+        "**/[Oo]bj/**/*",
+        "**/[Bb]uild/**/*"
+      ]
+    }
+  ],
+  "primaryOutputs": [
+    { "path": "DreambitGame.sln" },
+    { "path": "src/DreambitGame.VK/DreambitGame.VK.csproj" }
+  ],
+  "postActions": [
+    {
+      "condition": "(OS == \"Windows_NT\")",
+      "description": "Initialize DreambitEngine as .dreambit/engine Git submodule.",
+      "manualInstructions": [
+        { "text": "Run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-engine.ps1" }
+      ],
+      "actionId": "3A7C4B45-1F5D-4A30-959A-51B88E82B5D2",
+      "continueOnError": false,
+      "args": {
+        "executable": "powershell",
+        "args": "-NoProfile -ExecutionPolicy Bypass -File scripts/setup-engine.ps1",
+        "redirectStandardOutput": false,
+        "redirectStandardError": false
+      }
+    },
+    {
+      "condition": "(OS != \"Windows_NT\")",
+      "description": "Initialize DreambitEngine as .dreambit/engine Git submodule.",
+      "manualInstructions": [
+        { "text": "Run: sh scripts/setup-engine.sh" }
+      ],
+      "actionId": "3A7C4B45-1F5D-4A30-959A-51B88E82B5D2",
+      "continueOnError": false,
+      "args": {
+        "executable": "sh",
+        "args": "scripts/setup-engine.sh",
+        "redirectStandardOutput": false,
+        "redirectStandardError": false
+      }
+    }
+  ]
+}

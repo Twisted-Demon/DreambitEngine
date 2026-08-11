@@ -98,6 +98,25 @@ public sealed class PlayerController : Component
 The `[Require]` attribute ensures that the drawable exists, while
 `[FromRequired]` injects it before `PlayerController.OnCreated` runs.
 
+### Loading a scene created by Dreambit Editor
+
+Save the scene anywhere under the project's `Assets` directory. The build and the Editor's asset
+baker include `*.scene.json` files in `content.pak`. A runtime scene can load one directly:
+
+```csharp
+public sealed class GameScene : Scene<GameScene>
+{
+    protected override void OnInitialize()
+    {
+        LoadIntoSelf("scenes/first-level");
+    }
+}
+```
+
+`scenes/first-level`, `scenes/first-level.scene`, and
+`scenes/first-level.scene.json` are accepted. The equivalent explicit form is
+`LoadIntoSelf(Resources.LoadAsset<SceneBlueprint>("scenes/first-level"));`.
+
 ## UI without hard-coded screens
 
 Dreambit layouts are readable XML files that can be edited without rebuilding

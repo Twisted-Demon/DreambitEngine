@@ -11,7 +11,7 @@ internal static class AssetTypeClassifier
         (".blueprint.json", AssetKind.Blueprint, "Dreambit.EntityBlueprint"),
         (".particlefx.json", AssetKind.ParticleEffect, "Dreambit.ParticleFxConfig"),
         (".soundcue.json", AssetKind.SoundCue, "Dreambit.SoundCue"),
-        (".cutscene.json", AssetKind.Cutscene, "Dreambit.Cutscene"),
+        (".cutscene.json", AssetKind.Cutscene, "Dreambit.Scripting.Cutscene"),
         (".sprite.json", AssetKind.Sprite, "Dreambit.Sprite"),
         (".scene.json", AssetKind.Scene, "Dreambit.SceneBlueprint")
     ];
@@ -51,5 +51,18 @@ internal static class AssetTypeClassifier
 
         var extension = Path.GetExtension(fileName);
         return fileName[..^extension.Length] + copyLabel + extension;
+    }
+
+    public static string GetFileSuffix(Type type)
+    {
+        if (type == typeof(EntityBlueprint)) return ".blueprint.json";
+        if (type == typeof(SceneBlueprint)) return ".scene.json";
+        if (type == typeof(Sprite)) return ".sprite.json";
+        if (type == typeof(SpriteSheet)) return ".spritesheet.json";
+        if (type == typeof(SpriteSheetAnimation)) return ".animation.json";
+        if (type == typeof(SoundCue)) return ".soundcue.json";
+        if (type == typeof(ParticleFxConfig)) return ".particlefx.json";
+        if (type == typeof(Dreambit.Scripting.Cutscene)) return ".cutscene.json";
+        return ".json";
     }
 }

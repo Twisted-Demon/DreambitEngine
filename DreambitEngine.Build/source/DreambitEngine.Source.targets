@@ -1,0 +1,87 @@
+<Project>
+  <!-- Build integration for games that reference a DreambitEngine source submodule. -->
+  <PropertyGroup>
+    <DreambitContentBuildEnabled Condition="'$(DreambitContentBuildEnabled)' == ''">true</DreambitContentBuildEnabled>
+    <DreambitContentRoot>$([System.IO.Path]::GetFullPath('$(DreambitContentRoot)'))</DreambitContentRoot>
+    <DreambitContentProject>$([System.IO.Path]::GetFullPath('$(DreambitContentProject)'))</DreambitContentProject>
+    <DreambitEngineContentProject>$([System.IO.Path]::GetFullPath('$(DreambitEngineRoot)/Dreambit.Content/Dreambit.Content.csproj'))</DreambitEngineContentProject>
+    <DreambitEngineContentRoot>$([System.IO.Path]::GetFullPath('$(DreambitEngineRoot)/Dreambit.Content/Assets'))</DreambitEngineContentRoot>
+    <DreambitAssetBakerProject>$([System.IO.Path]::GetFullPath('$(DreambitEngineRoot)/DreambitEngine.AssetBaker/DreambitEngine.AssetBaker.csproj'))</DreambitAssetBakerProject>
+    <DreambitRuntimeOutput>$([System.IO.Path]::GetFullPath('$(BaseOutputPath)$(Configuration)'))</DreambitRuntimeOutput>
+    <DreambitRuntimeContent>$(DreambitRuntimeOutput)/Content</DreambitRuntimeContent>
+    <DreambitContentCacheRoot Condition="'$(DreambitContentCacheRoot)' == ''">$([System.IO.Path]::GetFullPath('$(DreambitProjectRoot)/.cache/dreambit'))</DreambitContentCacheRoot>
+    <DreambitContentPak Condition="'$(DreambitContentPak)' == ''">$(DreambitContentCacheRoot)/content.pak</DreambitContentPak>
+    <DreambitAssetCache Condition="'$(DreambitAssetCache)' == ''">$(DreambitContentCacheRoot)/bake</DreambitAssetCache>
+    <DreambitAssetRegistry Condition="'$(DreambitAssetRegistry)' == ''">$([System.IO.Path]::GetFullPath('$(DreambitProjectRoot)/.dreambit/assets.json'))</DreambitAssetRegistry>
+    <DreambitContentBuildStamp>$([System.IO.Path]::GetFullPath('$(BaseIntermediateOutputPath)DreambitContent/build.stamp'))</DreambitContentBuildStamp>
+    <DreambitUserContentIntermediate>$([System.IO.Path]::GetFullPath('$(BaseIntermediateOutputPath)DreambitUserContent'))</DreambitUserContentIntermediate>
+    <DreambitEngineContentIntermediate>$([System.IO.Path]::GetFullPath('$(BaseIntermediateOutputPath)DreambitEngineContent'))</DreambitEngineContentIntermediate>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <_DreambitSourceContentInput Include="$(MSBuildThisFileFullPath);$(DreambitContentProject);$(DreambitEngineContentProject);$(DreambitAssetBakerProject)" />
+    <_DreambitSourceContentInput Include="$(DreambitAssetRegistry)" Condition="Exists('$(DreambitAssetRegistry)')" />
+    <_DreambitSourceContentInput Include="$(DreambitContentRoot)/**/*;$(DreambitEngineContentRoot)/**/*" />
+    <_DreambitSourceContentInput Include="$([System.IO.Path]::GetDirectoryName('$(DreambitContentProject)'))/Builder/**/*.cs" />
+    <_DreambitSourceContentInput Include="$([System.IO.Path]::GetDirectoryName('$(DreambitEngineContentProject)'))/Builder/**/*.cs" />
+    <UpToDateCheckInput Include="@(_DreambitSourceContentInput)" />
+  </ItemGroup>
+
+  <Target Name="ValidateDreambitSourceContent"
+          Condition="'$(DreambitContentBuildEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true'">
+    <Error Condition="'$(MonoGamePlatform)' == ''" Text="MonoGamePlatform must be set by the executable project." />
+    <Error Condition="'$(DreambitProjectRoot)' == ''" Text="DreambitProjectRoot must point to the game repository root." />
+    <Error Condition="!Exists('$(DreambitContentProject)')" Text="The game content project was not found at '$(DreambitContentProject)'." />
+    <Error Condition="!Exists('$(DreambitEngineContentProject)')" Text="DreambitEngine content tools were not found. Initialize the .dreambit/engine submodule." />
+    <Error Condition="!Exists('$(DreambitAssetBakerProject)')" Text="DreambitEngine AssetBaker was not found. Initialize the .dreambit/engine submodule." />
+  </Target>
+
+  <Target Name="BuildDreambitSourceContent"
+          BeforeTargets="BeforeCompile"
+          DependsOnTargets="ValidateDreambitSourceContent"
+          Condition="'$(DreambitContentBuildEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true'"
+          Inputs="@(_DreambitSourceContentInput)"
+          Outputs="$(DreambitContentBuildStamp);$(DreambitContentPak)">
+    <Message Text="Building Dreambit source content for $(MonoGamePlatform)..." Importance="high" />
+    <MSBuild Projects="$(DreambitEngineContentProject)"
+             Targets="Restore;Build"
+             Properties="Configuration=$(Configuration)"
+             RemoveProperties="TargetFramework;RuntimeIdentifier;RuntimeIdentifiers;OutputPath;BaseOutputPath;ManagePackageVersionsCentrally;CentralPackageTransitivePinningEnabled" />
+    <MSBuild Projects="$(DreambitContentProject)"
+             Targets="Restore;Build"
+             Properties="Configuration=$(Configuration)"
+             RemoveProperties="TargetFramework;RuntimeIdentifier;RuntimeIdentifiers;OutputPath;BaseOutputPath;ManagePackageVersionsCentrally;CentralPackageTransitivePinningEnabled" />
+    <MSBuild Projects="$(DreambitAssetBakerProject)"
+             Targets="Restore;Build"
+             Properties="Configuration=$(Configuration)"
+             RemoveProperties="TargetFramework;RuntimeIdentifier;RuntimeIdentifiers;OutputPath;BaseOutputPath;ManagePackageVersionsCentrally;CentralPackageTransitivePinningEnabled" />
+    <MakeDir Directories="$(DreambitRuntimeContent);$(DreambitContentCacheRoot);$(DreambitAssetCache);$([System.IO.Path]::GetDirectoryName('$(DreambitContentBuildStamp)'))" />
+    <Exec Command="dotnet run --project &quot;$(DreambitEngineContentProject)&quot; --configuration &quot;$(Configuration)&quot; --no-build --no-restore -- build -p &quot;$(MonoGamePlatform)&quot; -s &quot;$(DreambitEngineContentRoot)&quot; -o &quot;$(DreambitRuntimeOutput)&quot; -i &quot;$(DreambitEngineContentIntermediate)&quot;" />
+    <Exec Command="dotnet run --project &quot;$(DreambitContentProject)&quot; --configuration &quot;$(Configuration)&quot; --no-build --no-restore -- build -p &quot;$(MonoGamePlatform)&quot; -s &quot;$(DreambitContentRoot)&quot; -o &quot;$(DreambitRuntimeOutput)&quot; -i &quot;$(DreambitUserContentIntermediate)&quot;" />
+    <Exec Command="dotnet run --project &quot;$(DreambitAssetBakerProject)&quot; --configuration &quot;$(Configuration)&quot; --no-build --no-restore -- bake-pak &quot;$(DreambitContentRoot)&quot; &quot;$(DreambitContentPak)&quot; --registry &quot;$(DreambitAssetRegistry)&quot; --cache &quot;$(DreambitAssetCache)&quot; --premul --srgb"
+          Condition="Exists('$(DreambitAssetRegistry)')" />
+    <Exec Command="dotnet run --project &quot;$(DreambitAssetBakerProject)&quot; --configuration &quot;$(Configuration)&quot; --no-build --no-restore -- bake-pak &quot;$(DreambitContentRoot)&quot; &quot;$(DreambitContentPak)&quot; --cache &quot;$(DreambitAssetCache)&quot; --premul --srgb"
+          Condition="!Exists('$(DreambitAssetRegistry)')" />
+    <Touch Files="$(DreambitContentBuildStamp)" AlwaysCreate="true" />
+  </Target>
+
+  <Target Name="CopyDreambitSourceContentToOutput"
+          AfterTargets="Build"
+          DependsOnTargets="BuildDreambitSourceContent"
+          Condition="'$(DreambitContentBuildEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true'">
+    <MakeDir Directories="$(DreambitRuntimeContent)" />
+    <Copy SourceFiles="$(DreambitContentPak)" DestinationFiles="$(DreambitRuntimeContent)/.dreambit-content.pak.tmp" SkipUnchangedFiles="true" />
+    <Move SourceFiles="$(DreambitRuntimeContent)/.dreambit-content.pak.tmp"
+          DestinationFiles="$(DreambitRuntimeContent)/content.pak"
+          Condition="Exists('$(DreambitRuntimeContent)/.dreambit-content.pak.tmp')" />
+  </Target>
+
+  <Target Name="IncludeDreambitSourceContentInPublish"
+          AfterTargets="ComputeFilesToPublish"
+          DependsOnTargets="BuildDreambitSourceContent"
+          Condition="'$(DreambitContentBuildEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true'">
+    <ItemGroup>
+      <ResolvedFileToPublish Include="$(DreambitContentPak)" RelativePath="Content/content.pak" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
+</Project>

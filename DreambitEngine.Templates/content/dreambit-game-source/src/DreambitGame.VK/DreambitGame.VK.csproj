@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <RollForward>Major</RollForward>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <TieredCompilation>false</TieredCompilation>
+    <MonoGamePlatform>DesktopVK</MonoGamePlatform>
+    <DreambitContentBuildEnabled>true</DreambitContentBuildEnabled>
+    <DreambitProjectRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../..'))</DreambitProjectRoot>
+    <DreambitContentRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../DreambitGame.Content/Assets'))</DreambitContentRoot>
+    <DreambitContentProject>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../DreambitGame.Content/DreambitGame.Content.csproj'))</DreambitContentProject>
+    <DreambitAssetRegistry>$([System.IO.Path]::GetFullPath('$(DreambitProjectRoot)/.dreambit/assets.json'))</DreambitAssetRegistry>
+    <BaseOutputPath>$(MSBuildProjectDirectory)/Build/</BaseOutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="MonoGame.Framework.Native" />
+    <PackageReference Include="MonoGame.Runtime.Windows.Vulkan" />
+    <PackageReference Include="MonoGame.Runtime.Mac.Vulkan" />
+    <PackageReference Include="MonoGame.Runtime.Linux.Vulkan" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../DreambitGame/DreambitGame.csproj" />
+  </ItemGroup>
+  <Import Project="$(DreambitEngineRoot)/DreambitEngine.Build/source/DreambitEngine.Source.targets" />
+</Project>

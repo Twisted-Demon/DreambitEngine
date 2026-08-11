@@ -80,6 +80,14 @@ public class Entity : IDisposable
     /// <summary>True for transient tooling entities that must never be serialized as scene content.</summary>
     public bool IsEditorOnly { get; internal set; }
 
+    /// <summary>
+    /// Stable source identity for entities regenerated from an LDtk project. Editor hosts use it
+    /// to show and override imported visualization nodes without serializing duplicate entities.
+    /// </summary>
+    public string LDtkSourceKey { get; internal set; }
+
+    public bool IsLDtkGenerated => !string.IsNullOrWhiteSpace(LDtkSourceKey);
+
     public bool AlwaysUpdate
     {
         get => _alwaysUpdate;

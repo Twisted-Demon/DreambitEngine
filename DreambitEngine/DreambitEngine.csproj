@@ -7,7 +7,7 @@
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <IsPackable>true</IsPackable>
         <PackageId>DreambitEngine</PackageId>
-        <PackageVersion Condition="'$(PackageVersion)' == ''">0.1.4</PackageVersion>
+        <PackageVersion Condition="'$(PackageVersion)' == ''">0.1.6</PackageVersion>
         <Authors>Dreambit Engine</Authors>
         <Description>DreambitEngine runtime library for MonoGame games.</Description>
         <PackageReadmeFile>README.md</PackageReadmeFile>

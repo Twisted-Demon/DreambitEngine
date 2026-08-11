@@ -41,6 +41,7 @@ internal sealed class DreambitProjectSession : IDisposable
         Scenes = new SceneDocumentService(
             project,
             GameCode.Assemblies,
+            Assets,
             reportSceneError);
         AssetEditing = new AssetEditingService(
             project,
@@ -49,6 +50,7 @@ internal sealed class DreambitProjectSession : IDisposable
             InspectorMetadata,
             GameCode.Assemblies,
             reportSceneError);
+        AssetEditing.PreviewChanged += OnAssetPreviewChanged;
         Scenes.Selection.Changed += OnEntitySelectionChanged;
         AssetBaking.BakeCompleted += OnBakeCompleted;
         Resources.AssetRegistry = Assets;
@@ -73,6 +75,7 @@ internal sealed class DreambitProjectSession : IDisposable
 
         _lifetime.Cancel();
         AssetBaking.BakeCompleted -= OnBakeCompleted;
+        AssetEditing.PreviewChanged -= OnAssetPreviewChanged;
         Scenes.Selection.Changed -= OnEntitySelectionChanged;
         AssetEditing.Dispose();
         Scenes.Dispose();
@@ -90,7 +93,22 @@ internal sealed class DreambitProjectSession : IDisposable
 
     private void OnBakeCompleted(DreambitEngine.AssetBaker.Pipeline.AssetBakeResult _)
     {
-        Scenes.ReloadContent();
+        AssetEditing.BeforeContentReload();
+        try
+        {
+            Scenes.ClearBlueprintPreviews();
+            Scenes.ReloadContent();
+        }
+        finally
+        {
+            AssetEditing.AfterContentReload();
+        }
+    }
+
+    private void OnAssetPreviewChanged(DreambitAssetDocument document)
+    {
+        if (document.Instance is EntityBlueprint blueprint)
+            Scenes.PreviewBlueprint(document.Asset, blueprint);
     }
 
     private void OnEntitySelectionChanged()

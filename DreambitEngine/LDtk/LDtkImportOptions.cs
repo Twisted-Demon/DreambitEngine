@@ -1,26 +1,47 @@
 using System;
+using Newtonsoft.Json;
 
 namespace Dreambit.LDtk;
 
 public sealed class LDtkImportOptions
 {
     /// <summary>Number of LDtk source pixels represented by one Dreambit world unit.</summary>
-    public float PixelsPerUnit { get; init; } = 1f;
+    [JsonProperty("pixels_per_unit")]
+    public float PixelsPerUnit { get; set; } = 1f;
 
     /// <summary>Lowest draw layer used for a world-depth slice.</summary>
-    public int BaseDrawLayer { get; init; }
+    [JsonProperty("base_draw_layer")]
+    public int BaseDrawLayer { get; set; }
 
     /// <summary>Distance between adjacent LDtk visual layers.</summary>
-    public int DrawLayerStep { get; init; } = 1;
+    [JsonProperty("draw_layer_step")]
+    public int DrawLayerStep { get; set; } = 1;
 
     /// <summary>Draw-layer distance between LDtk worldDepth values.</summary>
-    public int WorldDepthDrawLayerStride { get; init; } = 1000;
+    [JsonProperty("world_depth_draw_layer_stride")]
+    public int WorldDepthDrawLayerStride { get; set; } = 1000;
 
-    public bool RenderLevelBackgroundColor { get; init; } = true;
-    public bool RenderLevelBackgroundImage { get; init; } = true;
-    public bool IncludeInvisibleLayers { get; init; }
+    [JsonProperty("render_level_background_color")]
+    public bool RenderLevelBackgroundColor { get; set; } = true;
 
-    internal void Validate()
+    [JsonProperty("render_level_background_image")]
+    public bool RenderLevelBackgroundImage { get; set; } = true;
+
+    [JsonProperty("include_invisible_layers")]
+    public bool IncludeInvisibleLayers { get; set; }
+
+    public LDtkImportOptions Clone() => new()
+    {
+        PixelsPerUnit = PixelsPerUnit,
+        BaseDrawLayer = BaseDrawLayer,
+        DrawLayerStep = DrawLayerStep,
+        WorldDepthDrawLayerStride = WorldDepthDrawLayerStride,
+        RenderLevelBackgroundColor = RenderLevelBackgroundColor,
+        RenderLevelBackgroundImage = RenderLevelBackgroundImage,
+        IncludeInvisibleLayers = IncludeInvisibleLayers
+    };
+
+    public void Validate()
     {
         if (!float.IsFinite(PixelsPerUnit) || PixelsPerUnit <= 0f)
             throw new ArgumentOutOfRangeException(nameof(PixelsPerUnit), "PixelsPerUnit must be positive and finite.");

@@ -6,7 +6,7 @@
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
 
     <PackageId>DreambitEngine.Build</PackageId>
-    <PackageVersion Condition="'$(PackageVersion)' == ''">0.1.4</PackageVersion>
+    <PackageVersion Condition="'$(PackageVersion)' == ''">0.1.6</PackageVersion>
     <Title>Dreambit Engine Build Integration</Title>
     <Authors>Dreambit Engine</Authors>
     <Description>MSBuild integration point for Dreambit content and asset tooling.</Description>
@@ -23,6 +23,9 @@
     <None Include="buildTransitive/**/*"
           Pack="true"
           PackagePath="buildTransitive" />
+    <None Include="source/**/*"
+          Pack="true"
+          PackagePath="source" />
     <Compile Remove="**/*" />
   </ItemGroup>
 

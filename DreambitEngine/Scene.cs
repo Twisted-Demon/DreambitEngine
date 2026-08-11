@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Dreambit.ECS;
 using Dreambit.Events;
+using Dreambit.LDtk;
 using Dreambit.Scripting;
 using Dreambit.UI;
 using Microsoft.Xna.Framework;
@@ -121,27 +122,43 @@ public class Scene : IDisposable
         LoadIntoSelf(blueprint, SceneBlueprintLoadOptions.Runtime);
     }
 
+    /// <summary>Loads a baked scene asset and materializes it into this scene.</summary>
+    public void LoadIntoSelf(string sceneAssetName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sceneAssetName);
+        var blueprint = Resources.LoadAsset<SceneBlueprint>(sceneAssetName)
+                        ?? throw new InvalidOperationException(
+                            $"Scene asset '{sceneAssetName}' could not be loaded.");
+        LoadIntoSelf(blueprint);
+    }
+
     public void LoadIntoSelf(SceneBlueprint blueprint, SceneBlueprintLoadOptions options)
     {
         ArgumentNullException.ThrowIfNull(blueprint);
         ArgumentNullException.ThrowIfNull(options);
+        if (blueprint.LDtk is { } ldtk)
+            MaterializeLDtkScene(ldtk, options);
         if (blueprint.Entities.Count == 0)
             return;
+
+        var materializedRoots = BlueprintInstanceMaterializer.Materialize(
+            blueprint.Entities,
+            options.BlueprintInstanceResolver ?? ResolveBlueprintInstance);
 
         if (!options.AllowMissingComponentTypes)
         {
             var validationRoot = new EntityBlueprint
             {
                 Name = string.IsNullOrWhiteSpace(blueprint.Name) ? "scene" : blueprint.Name,
-                Children = blueprint.Entities
+                Children = materializedRoots.ToList()
             };
             BlueprintValidator.ValidateOrThrow(validationRoot);
         }
 
-        var context = new BlueprintSpawnContext(blueprint.Entities);
+        var context = new BlueprintSpawnContext(materializedRoots);
         try
         {
-            foreach (var root in blueprint.Entities)
+            foreach (var root in materializedRoots)
                 CreateBlueprintHierarchy(
                     root,
                     null,
@@ -192,7 +209,7 @@ public class Scene : IDisposable
     public static Scene Instance => Core.Instance.CurrentScene;
 
     /// <summary>Logger for this scene.</summary>
-    protected readonly ILogger Logger;
+    protected internal readonly ILogger Logger;
 
     /// <summary>Access to the coroutine system</summary>
     public ICoroutineService CoroutineService => _coroutineScheduler;
@@ -487,12 +504,71 @@ public class Scene : IDisposable
 
         foreach (var entity in GetAllEntities())
         {
-            if (entity.IsEditorOnly || !entity.Enabled)
+            if ((entity.IsEditorOnly && !entity.IsLDtkGenerated) || !entity.Enabled)
                 continue;
             var selected = selectedEntityIds.Contains(entity.Id);
             foreach (var component in entity.GetAllAttachedComponents())
                 component.EditorDrawGizmos(context, selected);
         }
+    }
+
+    private static EntityBlueprint ResolveBlueprintInstance(BlueprintInstanceReference instance)
+    {
+        object resolved = instance.AssetId != Guid.Empty
+            ? Resources.LoadDreambitAsset(
+                new AssetId(instance.AssetId),
+                instance.AssetName,
+                typeof(EntityBlueprint))
+            : Resources.LoadDreambitAsset(instance.AssetName, typeof(EntityBlueprint));
+        return resolved as EntityBlueprint
+               ?? throw new InvalidOperationException(
+                   $"Blueprint asset '{instance.AssetName}' could not be loaded.");
+    }
+
+    private void MaterializeLDtkScene(
+        LDtkSceneReference reference,
+        SceneBlueprintLoadOptions options)
+    {
+        var project = (options.LDtkProjectResolver ?? ResolveLDtkProject)(reference)
+                      ?? throw new InvalidOperationException(
+                          $"LDtk project asset '{reference.AssetName}' could not be loaded.");
+        var world = reference.WorldIid == Guid.Empty
+            ? project.LoadWorld()
+            : project.LoadWorld(reference.WorldIid);
+        var importer = new LDtkLevelImporter();
+        var importOptions = (reference.ImportOptions ?? new LDtkImportOptions()).Clone();
+        importOptions.Validate();
+
+        foreach (var levelStub in world.Levels)
+        {
+            var level = world.LoadLevel(levelStub.Iid);
+            var instance = importer.Import(this, world, level, importOptions);
+            if (options.MaterializeLDtkEntities)
+                LDtkSceneEntityMaterializer.Materialize(this, instance, instance.EntityInstances);
+            LDtkGeneratedEntityOverrides.Apply(
+                instance.OwnedEntities,
+                reference.EntityOverrides ?? new Dictionary<string, LDtkGeneratedEntityOverride>());
+            if (!options.MarkImportedLDtkEntitiesEditorOnly)
+                continue;
+            foreach (var entity in instance.OwnedEntities)
+                entity.IsEditorOnly = true;
+        }
+    }
+
+    private static LDtkFile ResolveLDtkProject(LDtkSceneReference reference)
+    {
+        var assetName = reference.AssetName;
+        if (reference.AssetId != Guid.Empty &&
+            Resources.AssetRegistry?.TryResolveAssetName(
+                new AssetId(reference.AssetId),
+                out var resolvedName) == true)
+        {
+            assetName = resolvedName;
+        }
+
+        return string.IsNullOrWhiteSpace(assetName)
+            ? null
+            : Resources.LoadAsset<LDtkFile>(assetName);
     }
 
     /// <summary>

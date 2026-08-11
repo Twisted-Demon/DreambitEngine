@@ -6,6 +6,7 @@ The Milestone 2 package set is:
 
 ```text
 DreambitEngine             Runtime assembly and runtime dependencies
+Dreambit.Editor.Abstractions Reload-safe Editor extension contracts
 DreambitEngine.Build       buildTransitive MSBuild integration boundary
 DreambitEngine.Templates   dotnet new templates
 ```
@@ -21,6 +22,7 @@ Dreambit.Editor maintains installed SDKs outside game repositories:
 |-- sdk.json
 |-- packages/
 |   |-- DreambitEngine.<version>.nupkg
+|   |-- Dreambit.Editor.Abstractions.<version>.nupkg
 |   |-- DreambitEngine.Build.<version>.nupkg
 |   `-- DreambitEngine.Templates.<version>.nupkg
 `-- template-hive/
@@ -34,6 +36,7 @@ The Editor passes the installed package feed as an additional NuGet source while
 
 ## Build package boundary
 
-`DreambitEngine.Build` ships through `buildTransitive`. Milestone 2 establishes the stable import boundary and SDK version property. Milestone 4 will place the real content builder and AssetBaker integration behind this package without changing every generated game project.
+`DreambitEngine.Build` ships through `buildTransitive` and owns incremental asset baking,
+runtime-output copying, and publish integration without duplicating that pipeline in every game.
 
 Future package splits such as dedicated content-pipeline or tool packages remain implementation details of `DreambitEngine.Build`; they do not need to become direct runtime dependencies of the game executable.

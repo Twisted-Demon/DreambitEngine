@@ -134,6 +134,8 @@ internal sealed class ScenePanel : EditorPanel
                     asset!.RelativePath.Replace('/', Path.DirectorySeparatorChar));
                 var source = DreambitJson.Deserialize<EntityBlueprint>(File.ReadAllText(path))
                              ?? throw new InvalidDataException("Blueprint file is empty.");
+                source.AssetId = asset.Id;
+                source.AssetName = asset.LogicalAssetName;
                 var world = camera.ScreenToWorld(new XnaVector2(mouseLocal.X, mouseLocal.Y));
                 document.InstantiateBlueprint(
                     source,
@@ -352,6 +354,9 @@ internal sealed class ScenePanel : EditorPanel
         var active = _selection.GetActive(document.Scene);
         if (active is null || _workspace.GizmoMode == 0)
             return false;
+        if (document.TryGetBlueprintInstanceRoot(active, out var activeInstanceRoot, out _) &&
+            !ReferenceEquals(active, activeInstanceRoot))
+            return false;
 
         var screen = camera.WorldToScreen(active.Transform.WorldPosition2D);
         var center = canvasPosition + new Vector2(screen.X, screen.Y);
@@ -398,6 +403,9 @@ internal sealed class ScenePanel : EditorPanel
         {
             var startWorld = camera.ScreenToWorld(new XnaVector2(mouseLocal.X, mouseLocal.Y));
             var states = _selection.Resolve(document.Scene)
+                .Where(entity =>
+                    !document.TryGetBlueprintInstanceRoot(entity, out var instanceRoot, out _) ||
+                    ReferenceEquals(entity, instanceRoot))
                 .Select(entity => new GizmoEntityStart(
                     entity.Id,
                     entity.Transform.WorldPosition,
@@ -463,7 +471,10 @@ internal sealed class ScenePanel : EditorPanel
                     }
                     foreach (var state in drag.Entities)
                         if (scene.FindEntity(state.Id) is { } entity)
+                        {
                             entity.Transform.WorldPosition = state.WorldPosition + new Microsoft.Xna.Framework.Vector3(delta, 0f);
+                            document.RecordLDtkPosition(entity);
+                        }
                     break;
                 }
                 case 2:
@@ -476,7 +487,10 @@ internal sealed class ScenePanel : EditorPanel
                     }
                     foreach (var state in drag.Entities)
                         if (scene.FindEntity(state.Id) is { } entity)
+                        {
                             entity.Transform.WorldRotation2D = state.WorldRotation + angle;
+                            document.RecordLDtkRotation(entity);
+                        }
                     break;
                 }
                 case 3:
@@ -490,7 +504,10 @@ internal sealed class ScenePanel : EditorPanel
                     factor = MathF.Max(0.001f, factor);
                     foreach (var state in drag.Entities)
                         if (scene.FindEntity(state.Id) is { } entity)
+                        {
                             entity.Transform.Scale = state.Scale * factor;
+                            document.RecordLDtkScale(entity);
+                        }
                     break;
                 }
             }
@@ -509,6 +526,8 @@ internal sealed class ScenePanel : EditorPanel
         var cameraColor = ImGui.GetColorU32(new Vector4(0.65f, 0.42f, 1f, 0.9f));
         foreach (var entity in _selection.Resolve(_documents.Current?.Scene))
         {
+            if (document.TryGetBlueprintInstanceRoot(entity, out _, out _))
+                continue;
             foreach (var collider in entity.GetAllComponents().OfType<Collider>())
             {
                 if (collider.Bounds is null)

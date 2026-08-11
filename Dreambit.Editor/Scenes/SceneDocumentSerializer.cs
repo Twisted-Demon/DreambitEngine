@@ -33,7 +33,8 @@ internal static class SceneDocumentSerializer
         return new SceneBlueprint
         {
             Name = sceneName,
-            Entities = roots
+            Entities = roots,
+            LDtk = source.LDtk
         };
     }
 
@@ -71,6 +72,24 @@ internal static class SceneDocumentSerializer
         IReadOnlySet<string>? explicitlyClearedReferences)
     {
         sourceEntities.TryGetValue(entity.Id, out var source);
+        if (source?.BlueprintInstance is { } instance)
+        {
+            return new EntityBlueprint
+            {
+                Name = entity.Name,
+                Guid = entity.Id,
+                Enabled = entity.LocallyEnabled,
+                Position = entity.Transform.Position,
+                Rotation = new Microsoft.Xna.Framework.Vector3(0f, 0f, entity.Transform.Rotation2D),
+                Scale = entity.Transform.Scale,
+                BlueprintInstance = new BlueprintInstanceReference
+                {
+                    AssetId = instance.AssetId,
+                    AssetName = instance.AssetName
+                }
+            };
+        }
+
         var sourceComponents = source?.Components ?? [];
         var liveComponents = entity.GetAllComponents().ToArray();
         var capturedComponents = new List<ComponentBlueprint>(liveComponents.Length + sourceComponents.Count);

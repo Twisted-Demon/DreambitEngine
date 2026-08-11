@@ -18,7 +18,7 @@
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
     <ApplicationManifest>app.manifest</ApplicationManifest>
 
-    <DreambitSdkVersion>0.1.4</DreambitSdkVersion>
+    <DreambitSdkVersion>0.1.6</DreambitSdkVersion>
     <BundleDreambitSdkOnPublish Condition="'$(BundleDreambitSdkOnPublish)' == ''">true</BundleDreambitSdkOnPublish>
   </PropertyGroup>
 
@@ -45,8 +45,10 @@
     </PropertyGroup>
 
     <MakeDir Directories="$(_DreambitBundledSdkDirectory)" />
+    <!-- Honor the outer publish's restore choice. A normal publish restores first; a publish
+         configured to skip restore can bundle entirely from an already-restored checkout. -->
     <MSBuild Projects="../DreambitEngine/DreambitEngine.csproj;../Dreambit.Editor.Abstractions/Dreambit.Editor.Abstractions.csproj;../DreambitEngine.Build/DreambitEngine.Build.csproj;../DreambitEngine.Templates/DreambitEngine.Templates.csproj"
-             Targets="Restore;Pack"
+             Targets="Pack"
              BuildInParallel="false"
              Properties="$(_DreambitSdkPackProperties)" />
   </Target>

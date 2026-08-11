@@ -32,6 +32,14 @@ public class EntityBlueprint : DreambitAsset
 
     [JsonProperty("children")] public List<EntityBlueprint> Children { get; set; } = [];
 
+    /// <summary>
+    /// When present, this entity is an instance of an external Entity Blueprint. The scene stores
+    /// only the instance root transform and source identity; components and children are resolved
+    /// from the source Blueprint every time the scene is loaded.
+    /// </summary>
+    [JsonProperty("blueprint_instance", NullValueHandling = NullValueHandling.Ignore)]
+    public BlueprintInstanceReference BlueprintInstance { get; set; }
+
     public IEnumerable<EntityBlueprint> FlattenedHierarchy()
     {
         var stack = new Stack<EntityBlueprint>();

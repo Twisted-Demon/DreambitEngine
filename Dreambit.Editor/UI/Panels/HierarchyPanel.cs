@@ -62,7 +62,8 @@ internal sealed class HierarchyPanel : EditorPanel
 
         DrawRootDropTarget(document);
         foreach (var root in scene.GetAllEntities()
-                     .Where(entity => entity.Parent is null && !entity.IsEditorOnly)
+                     .Where(entity => entity.Parent is null &&
+                                      (!entity.IsEditorOnly || entity.IsLDtkGenerated))
                      .ToArray())
             DrawEntity(document, root);
 
@@ -104,7 +105,13 @@ internal sealed class HierarchyPanel : EditorPanel
         ImGui.SetNextItemOpen(
             _workspace.HierarchyExpandedEntityIds.Contains(entity.Id),
             ImGuiCond.Once);
-        var open = ImGui.TreeNodeEx($"{entity.Name}##Hierarchy.{entity.Id}", flags);
+        var boxedRoot = document.IsBlueprintInstanceRoot(entity);
+        var displayName = boxedRoot
+            ? $"[B] {entity.Name}"
+            : entity.IsLDtkGenerated
+                ? $"[LDtk] {entity.Name}"
+                : entity.Name;
+        var open = ImGui.TreeNodeEx($"{displayName}##Hierarchy.{entity.Id}", flags);
         if (ImGui.IsItemToggledOpen())
         {
             if (open)
@@ -117,7 +124,7 @@ internal sealed class HierarchyPanel : EditorPanel
         if (ImGui.IsItemClicked() && !ImGui.IsItemToggledOpen())
             _selection.Set(entity, ImGui.GetIO().KeyCtrl);
 
-        DrawDragSource(entity);
+        DrawDragSource(document, entity);
         DrawDropTarget(document, entity);
         DrawContextMenu(document, entity);
 
@@ -150,20 +157,47 @@ internal sealed class HierarchyPanel : EditorPanel
         if (!ImGui.BeginPopupContextItem($"HierarchyContext##{entity.Id}"))
             return;
 
+        var linked = document.TryGetBlueprintInstanceRoot(entity, out var instanceRoot, out var instance);
+        var isInstanceRoot = linked && ReferenceEquals(entity, instanceRoot);
+        if (entity.IsLDtkGenerated)
+        {
+            ImGui.TextDisabled("Generated from the linked LDtk project");
+            ImGui.Separator();
+        }
+        ImGui.BeginDisabled(linked || entity.IsLDtkGenerated);
         if (ImGui.MenuItem("Create Child"))
             document.CreateEmpty("Entity", entity);
+        ImGui.EndDisabled();
+        ImGui.BeginDisabled(linked);
         if (ImGui.MenuItem("Rename", "F2"))
             RequestRename(entity);
+        ImGui.EndDisabled();
+        ImGui.BeginDisabled(entity.IsLDtkGenerated || (linked && !isInstanceRoot));
         if (ImGui.MenuItem("Duplicate", "Ctrl+D"))
             document.Duplicate(entity);
+        ImGui.EndDisabled();
+        if (linked)
+        {
+            ImGui.Separator();
+            ImGui.TextDisabled(instance.AssetName);
+            if (ImGui.MenuItem("Unbox Blueprint Instance"))
+                document.UnboxBlueprint(instanceRoot);
+        }
         ImGui.Separator();
+        ImGui.BeginDisabled(entity.IsLDtkGenerated || (linked && !isInstanceRoot));
         if (ImGui.MenuItem("Delete", "Delete"))
             RequestDelete([entity]);
+        ImGui.EndDisabled();
         ImGui.EndPopup();
     }
 
-    private void DrawDragSource(Entity entity)
+    private void DrawDragSource(SceneDocument document, Entity entity)
     {
+        if (entity.IsLDtkGenerated)
+            return;
+        if (document.TryGetBlueprintInstanceRoot(entity, out var instanceRoot, out _) &&
+            !ReferenceEquals(entity, instanceRoot))
+            return;
         if (!ImGui.BeginDragDropSource())
             return;
         _dragDrop.SetHierarchyEntity(entity.Id);
@@ -174,6 +208,10 @@ internal sealed class HierarchyPanel : EditorPanel
 
     private unsafe void DrawDropTarget(SceneDocument document, Entity parent)
     {
+        if (parent.IsLDtkGenerated)
+            return;
+        if (document.TryGetBlueprintInstanceRoot(parent, out _, out _))
+            return;
         if (!ImGui.BeginDragDropTarget())
             return;
         var payload = ImGui.AcceptDragDropPayload(EditorDragDropService.HierarchyEntityPayloadType);
@@ -272,6 +310,8 @@ internal sealed class HierarchyPanel : EditorPanel
                     blueprint.RelativePath.Replace('/', Path.DirectorySeparatorChar));
                 var source = DreambitJson.Deserialize<EntityBlueprint>(File.ReadAllText(path))
                              ?? throw new InvalidDataException("Blueprint file is empty.");
+                source.AssetId = blueprint.Id;
+                source.AssetName = blueprint.LogicalAssetName;
                 document.InstantiateBlueprint(source);
                 _error = null;
                 ImGui.CloseCurrentPopup();
@@ -334,11 +374,17 @@ internal sealed class HierarchyPanel : EditorPanel
         var selected = _selection.Resolve(document.Scene);
         if (selected.Count == 0)
             return;
-        if (ImGui.IsKeyPressed(ImGuiKey.Delete))
+        var hasLockedBlueprintChild = selected.Any(entity =>
+            document.TryGetBlueprintInstanceRoot(entity, out var instanceRoot, out _) &&
+            !ReferenceEquals(entity, instanceRoot));
+        var hasLDtkGeneratedEntity = selected.Any(entity => entity.IsLDtkGenerated);
+        if (ImGui.IsKeyPressed(ImGuiKey.Delete) && !hasLockedBlueprintChild && !hasLDtkGeneratedEntity)
             RequestDelete(selected);
-        if (ImGui.IsKeyPressed(ImGuiKey.F2) && selected.Count == 1)
+        if (ImGui.IsKeyPressed(ImGuiKey.F2) && selected.Count == 1 &&
+            !document.TryGetBlueprintInstanceRoot(selected[0], out _, out _))
             RequestRename(selected[0]);
-        if (ImGui.GetIO().KeyCtrl && ImGui.IsKeyPressed(ImGuiKey.D) && selected.Count == 1)
+        if (ImGui.GetIO().KeyCtrl && ImGui.IsKeyPressed(ImGuiKey.D) && selected.Count == 1 &&
+            !hasLockedBlueprintChild && !hasLDtkGeneratedEntity)
             document.Duplicate(selected[0]);
     }
 }

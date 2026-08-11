@@ -9,6 +9,7 @@ $templateRoot = Split-Path -Parent $PSScriptRoot
 $engineRoot = Split-Path -Parent $templateRoot
 $templateProject = Join-Path $templateRoot "DreambitEngine.Templates.csproj"
 $runtimeProject = Join-Path $engineRoot "DreambitEngine/DreambitEngine.csproj"
+$editorApiProject = Join-Path $engineRoot "Dreambit.Editor.Abstractions/Dreambit.Editor.Abstractions.csproj"
 $buildProject = Join-Path $engineRoot "DreambitEngine.Build/DreambitEngine.Build.csproj"
 $testRoot = Join-Path $templateRoot "TemplateTests"
 $feed = Join-Path $testRoot "packages"
@@ -31,7 +32,7 @@ try {
     Remove-Item $testRoot -Recurse -Force -ErrorAction SilentlyContinue
     New-Item $feed -ItemType Directory -Force | Out-Null
 
-    foreach ($project in @($runtimeProject, $buildProject, $templateProject)) {
+    foreach ($project in @($runtimeProject, $editorApiProject, $buildProject, $templateProject)) {
         Invoke-DotNet -Arguments @(
             "pack", $project, "-c", $Configuration,
             "-p:PackageVersion=$version", "-o", $feed, "--nologo")

@@ -10,10 +10,16 @@ public class EntityBlueprintLoader : AssetLoaderBase
 
     public override object Load(string assetName, string pakName, bool usePak, string contentDirectory)
     {
-        using var s = GetStream(GetPath(assetName), pakName, usePak, contentDirectory);
+        using var s = GetDocumentStream(
+            assetName,
+            ".blueprint",
+            pakName,
+            usePak,
+            contentDirectory,
+            out var resolvedAssetName);
 
         var entity = JsnbLoader.Deserialize<EntityBlueprint>(s);
-        entity.AssetName = assetName;
+        entity.AssetName = resolvedAssetName;
 
         return entity;
     }

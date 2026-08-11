@@ -8,7 +8,9 @@ namespace Dreambit;
 
 public class SpriteSheetAnimation : DreambitAsset
 {
-    [JsonProperty("sprite_sheet", Required = Required.Always)]
+    // Allow a null draft while the asset is being authored. Runtime loading remains strict through
+    // GetValidationErrors() in SpriteSheetAnimationLoader.
+    [JsonProperty("sprite_sheet", Required = Required.AllowNull)]
     public SpriteSheet SpriteSheet { get; set; }
 
     [JsonProperty("frames", Required = Required.Always)]

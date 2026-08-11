@@ -60,12 +60,11 @@ internal sealed class AssetBakeService : IDisposable
         _lifetime = CancellationTokenSource.CreateLinkedTokenSource(projectLifetime);
         _lastAssetVersion = assets.GetSnapshot().Version;
         OutputPakPath = Path.Combine(
-            Path.GetDirectoryName(project.LauncherProjectPath)!,
-            "Build",
-            "Debug",
-            "Content",
+            project.RootDirectory,
+            ".cache",
+            "dreambit",
             "content.pak");
-        CacheDirectory = Path.Combine(project.RootDirectory, ".dreambit", "cache", "bake");
+        CacheDirectory = Path.Combine(project.RootDirectory, ".cache", "dreambit", "bake");
         if (!File.Exists(OutputPakPath))
             RequestBake(rebuildAll: false);
     }

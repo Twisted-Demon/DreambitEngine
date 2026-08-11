@@ -10,9 +10,9 @@ public class Sprite : DreambitAsset
     private const float MinimumPixelsPerUnit = 0.0001f;
 
     private float _pixelsPerUnit = 1f;
-    private string _texturePath;
+    private string _texturePath = string.Empty;
 
-    public Texture2D Texture { get; internal set; }
+    [JsonIgnore] public Texture2D Texture { get; internal set; }
 
     [JsonProperty("source")] public Rectangle SourceRect { get; init; }
 
@@ -38,8 +38,10 @@ public class Sprite : DreambitAsset
         get => _texturePath;
         set
         {
-            _texturePath = value;
-            Texture = Resources.LoadAsset<Texture2D>(value);
+            _texturePath = value ?? string.Empty;
+            Texture = string.IsNullOrWhiteSpace(_texturePath)
+                ? null
+                : Resources.LoadAsset<Texture2D>(_texturePath);
         }
     }
 

@@ -1,9 +1,10 @@
 <Project>
   <PropertyGroup>
     <DreambitAssetBakerDll Condition="'$(DreambitAssetBakerDll)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/net8.0/any/AssetBaker.dll'))</DreambitAssetBakerDll>
-    <DreambitContentOutputDirectory Condition="'$(DreambitContentOutputDirectory)' == ''">$([System.IO.Path]::GetFullPath('$(BaseOutputPath)$(Configuration)/Content'))</DreambitContentOutputDirectory>
-    <DreambitContentPak Condition="'$(DreambitContentPak)' == ''">$(DreambitContentOutputDirectory)/content.pak</DreambitContentPak>
-    <DreambitAssetCache Condition="'$(DreambitAssetCache)' == ''">$([System.IO.Path]::GetFullPath('$(BaseIntermediateOutputPath)DreambitAssetCache'))</DreambitAssetCache>
+    <DreambitContentCacheRoot Condition="'$(DreambitContentCacheRoot)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/.cache/dreambit'))</DreambitContentCacheRoot>
+    <DreambitContentPak Condition="'$(DreambitContentPak)' == ''">$(DreambitContentCacheRoot)/content.pak</DreambitContentPak>
+    <DreambitAssetCache Condition="'$(DreambitAssetCache)' == ''">$(DreambitContentCacheRoot)/bake</DreambitAssetCache>
+    <DreambitRuntimeContentDirectory Condition="'$(DreambitRuntimeContentDirectory)' == ''">$(TargetDir)Content</DreambitRuntimeContentDirectory>
   </PropertyGroup>
 
   <ItemGroup>
@@ -29,7 +30,7 @@
           Condition="'$(DreambitContentBuildEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true'"
           Inputs="@(_DreambitRawAsset);$(DreambitAssetRegistry);$(DreambitAssetBakerDll)"
           Outputs="$(DreambitContentPak)">
-    <MakeDir Directories="$(DreambitContentOutputDirectory);$(DreambitAssetCache)" />
+    <MakeDir Directories="$(DreambitContentCacheRoot);$(DreambitAssetCache)" />
     <Exec Command="dotnet &quot;$(DreambitAssetBakerDll)&quot; bake-pak &quot;$(DreambitContentRoot)&quot; &quot;$(DreambitContentPak)&quot; --registry &quot;$(DreambitAssetRegistry)&quot; --cache &quot;$(DreambitAssetCache)&quot; --premul --srgb"
           Condition="Exists('$(DreambitAssetRegistry)')" />
     <Exec Command="dotnet &quot;$(DreambitAssetBakerDll)&quot; bake-pak &quot;$(DreambitContentRoot)&quot; &quot;$(DreambitContentPak)&quot; --cache &quot;$(DreambitAssetCache)&quot; --premul --srgb"
@@ -39,15 +40,34 @@
   <Target Name="RebuildDreambitAssets"
           DependsOnTargets="ValidateDreambitAssetBuild"
           Condition="'$(DreambitContentBuildEnabled)' == 'true'">
-    <MakeDir Directories="$(DreambitContentOutputDirectory);$(DreambitAssetCache)" />
+    <MakeDir Directories="$(DreambitContentCacheRoot);$(DreambitAssetCache)" />
     <Exec Command="dotnet &quot;$(DreambitAssetBakerDll)&quot; bake-pak &quot;$(DreambitContentRoot)&quot; &quot;$(DreambitContentPak)&quot; --registry &quot;$(DreambitAssetRegistry)&quot; --cache &quot;$(DreambitAssetCache)&quot; --rebuild --premul --srgb"
           Condition="Exists('$(DreambitAssetRegistry)')" />
     <Exec Command="dotnet &quot;$(DreambitAssetBakerDll)&quot; bake-pak &quot;$(DreambitContentRoot)&quot; &quot;$(DreambitContentPak)&quot; --cache &quot;$(DreambitAssetCache)&quot; --rebuild --premul --srgb"
           Condition="!Exists('$(DreambitAssetRegistry)')" />
   </Target>
 
-  <Target Name="CleanDreambitAssets" AfterTargets="Clean"
-          Condition="'$(DreambitContentBuildEnabled)' == 'true'">
-    <Delete Files="$(DreambitContentPak)" />
+  <Target Name="CopyDreambitAssetsToOutput"
+          AfterTargets="Build"
+          DependsOnTargets="BuildDreambitAssets"
+          Condition="'$(DreambitContentBuildEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true'">
+    <MakeDir Directories="$(DreambitRuntimeContentDirectory)" />
+    <Copy SourceFiles="$(DreambitContentPak)"
+          DestinationFiles="$(DreambitRuntimeContentDirectory)/.dreambit-content.pak.tmp"
+          SkipUnchangedFiles="true" />
+    <Move SourceFiles="$(DreambitRuntimeContentDirectory)/.dreambit-content.pak.tmp"
+          DestinationFiles="$(DreambitRuntimeContentDirectory)/content.pak"
+          Condition="Exists('$(DreambitRuntimeContentDirectory)/.dreambit-content.pak.tmp')" />
+  </Target>
+
+  <Target Name="IncludeDreambitAssetsInPublish"
+          AfterTargets="ComputeFilesToPublish"
+          DependsOnTargets="BuildDreambitAssets"
+          Condition="'$(DreambitContentBuildEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true'">
+    <ItemGroup>
+      <ResolvedFileToPublish Include="$(DreambitContentPak)"
+                             RelativePath="Content/content.pak"
+                             CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
   </Target>
 </Project>

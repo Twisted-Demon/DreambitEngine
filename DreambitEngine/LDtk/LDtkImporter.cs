@@ -57,6 +57,7 @@ public sealed class LDtkLevelImporter
             $"LDtk Level: {level.Identifier}",
             new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "ldtk", "ldtk-level" },
             createAt: levelOrigin);
+        root.LDtkSourceKey = LDtkGeneratedEntityKeys.Level(level.Iid);
         ownedEntities.Add(root);
 
         try
@@ -88,17 +89,23 @@ public sealed class LDtkLevelImporter
 
                 if (!layer.Visible && !options.IncludeInvisibleLayers)
                     continue;
-                if (!HasTiles(layer))
-                    continue;
 
-                var renderer = ImportTileLayer(
+                var layerEntity = CreateLayerEntity(
                     scene,
                     root,
                     level,
                     layer,
                     options,
-                    drawLayer,
                     ownedEntities);
+                if (!HasTiles(layer))
+                    continue;
+
+                var renderer = ImportTileLayerRenderer(
+                    layerEntity,
+                    level,
+                    layer,
+                    options,
+                    drawLayer);
                 tilemapRenderers.Add(renderer);
             }
 
@@ -160,14 +167,33 @@ public sealed class LDtkLevelImporter
             tiles);
     }
 
-    private TilemapRenderer ImportTileLayer(
+    private Entity CreateLayerEntity(
         Scene scene,
         Entity root,
         LDtkLevel level,
         LayerInstance layer,
         LDtkImportOptions options,
-        int drawLayer,
         List<Entity> ownedEntities)
+    {
+        var layerEntity = CreateChild(
+            scene,
+            root,
+            $"LDtk Layer: {level.Identifier}/{layer._Identifier}",
+            new Vector2(
+                layer._PxTotalOffsetX / options.PixelsPerUnit,
+                layer._PxTotalOffsetY / options.PixelsPerUnit),
+            "ldtk-layer");
+        layerEntity.LDtkSourceKey = LDtkGeneratedEntityKeys.Layer(level.Iid, layer.Iid);
+        ownedEntities.Add(layerEntity);
+        return layerEntity;
+    }
+
+    private TilemapRenderer ImportTileLayerRenderer(
+        Entity layerEntity,
+        LDtkLevel level,
+        LayerInstance layer,
+        LDtkImportOptions options,
+        int drawLayer)
     {
         var assetName = layer.TilesetAssetName ?? layer.Tileset?.AssetName;
         if (string.IsNullOrWhiteSpace(assetName))
@@ -177,15 +203,6 @@ public sealed class LDtkLevelImporter
         var texture = Resources.LoadAsset<Texture2D>(assetName)
                       ?? throw new LdtkException(
                           $"Could not load tileset texture '{assetName}' for LDtk layer '{layer._Identifier}'.");
-        var layerEntity = CreateChild(
-            scene,
-            root,
-            $"LDtk Layer: {level.Identifier}/{layer._Identifier}",
-            new Vector2(
-                layer._PxTotalOffsetX / options.PixelsPerUnit,
-                layer._PxTotalOffsetY / options.PixelsPerUnit),
-            "ldtk-layer");
-        ownedEntities.Add(layerEntity);
 
         var renderer = layerEntity.AttachComponent<TilemapRenderer>();
         renderer.Configure(texture, CreateTilemapLayerData(layer, options.PixelsPerUnit));
@@ -210,6 +227,7 @@ public sealed class LDtkLevelImporter
             $"LDtk Background Color: {level.Identifier}",
             Vector2.Zero,
             "ldtk-background");
+        entity.LDtkSourceKey = LDtkGeneratedEntityKeys.BackgroundColor(level.Iid);
         ownedEntities.Add(entity);
         var rectangle = entity.AttachComponent<FilledRectDrawer>();
         rectangle.Width = level.PxWid / options.PixelsPerUnit;
@@ -249,6 +267,7 @@ public sealed class LDtkLevelImporter
             $"LDtk Background Image: {level.Identifier}",
             position,
             "ldtk-background");
+        entity.LDtkSourceKey = LDtkGeneratedEntityKeys.BackgroundImage(level.Iid);
         ownedEntities.Add(entity);
         entity.Transform.Scale2D = scale;
         var drawer = entity.AttachComponent<SpriteDrawer>()

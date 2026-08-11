@@ -41,7 +41,7 @@ internal sealed class DreambitProjectTestFixture : IDisposable
             ContentRoot = "src/TestGame.Content/Assets",
             LauncherProject = "src/TestGame.VK/TestGame.VK.csproj",
             TargetRenderer = "DesktopVK",
-            Sdk = new DreambitSdkReference { Version = "0.1.4" }
+            Sdk = new DreambitSdkReference { Version = DreambitSdkConstants.CurrentVersion }
         };
         Assert.True(
             new DreambitProjectMetadataStore().TrySave(Root, metadata, out var error),

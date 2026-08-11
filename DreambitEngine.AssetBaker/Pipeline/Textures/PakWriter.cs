@@ -49,7 +49,14 @@ public sealed class PakWriter
                 stream.Flush(true);
             }
 
-            File.Move(temporaryPath, outputPath, true);
+            // File.Move(overwrite: true) is not a replace-in-place operation on Windows and
+            // fails while the Editor has the previous PAK open. File.Replace atomically swaps
+            // the directory entry; existing readers continue using the old file handle and new
+            // readers immediately see the completed PAK.
+            if (File.Exists(outputPath))
+                File.Replace(temporaryPath, outputPath, null, true);
+            else
+                File.Move(temporaryPath, outputPath);
         }
         finally
         {

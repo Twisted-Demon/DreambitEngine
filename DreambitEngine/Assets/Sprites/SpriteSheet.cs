@@ -8,27 +8,61 @@ namespace Dreambit;
 public class SpriteSheet : DreambitAsset
 {
     [JsonIgnore] private static readonly Logger<SpriteSheet> Logger = new();
+    private int _columns = 1;
+    private int _rows = 1;
+    private Sprite _sourceSprite;
 
-    [JsonProperty("columns")] public readonly int Columns = 1;
+    [JsonProperty("columns")]
+    public int Columns
+    {
+        get => _columns;
+        set
+        {
+            if (value < 1)
+                throw new ArgumentOutOfRangeException(nameof(value), "Sprite sheet columns must be at least 1.");
+            _columns = value;
+            SplitSprite();
+        }
+    }
 
-    [JsonProperty("rows")] public readonly int Rows = 1;
+    [JsonProperty("rows")]
+    public int Rows
+    {
+        get => _rows;
+        set
+        {
+            if (value < 1)
+                throw new ArgumentOutOfRangeException(nameof(value), "Sprite sheet rows must be at least 1.");
+            _rows = value;
+            SplitSprite();
+        }
+    }
 
-    [JsonProperty("sprite")] public Sprite SourceSprite { get; set; }
+    [JsonProperty("sprite")]
+    public Sprite SourceSprite
+    {
+        get => _sourceSprite;
+        set
+        {
+            _sourceSprite = value;
+            SplitSprite();
+        }
+    }
 
     private SpriteSheet(int columns, int rows, Sprite sprite)
     {
-        Columns = columns;
-        Rows = rows;
-        SourceSprite = sprite;
+        _columns = Math.Max(1, columns);
+        _rows = Math.Max(1, rows);
+        _sourceSprite = sprite;
 
         SplitSprite();
     }
 
     private SpriteSheet(int gridSize, Sprite sprite)
     {
-        Columns = sprite.SourceRect.Width / gridSize;
-        Rows = sprite.SourceRect.Height / gridSize;
-        SourceSprite = sprite;
+        _columns = Math.Max(1, sprite.SourceRect.Width / gridSize);
+        _rows = Math.Max(1, sprite.SourceRect.Height / gridSize);
+        _sourceSprite = sprite;
 
         SplitSprite();
     }
@@ -140,7 +174,7 @@ public class SpriteSheet : DreambitAsset
 
     protected override void CleanUp()
     {
-        SourceSprite = null;
+        _sourceSprite = null;
         Frames = [];
     }
 }

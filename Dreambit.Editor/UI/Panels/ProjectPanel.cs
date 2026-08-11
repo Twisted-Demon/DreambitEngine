@@ -449,7 +449,7 @@ internal sealed class ProjectPanel : EditorPanel
     public void RequestCreateAsset(Type type)
     {
         _createAssetType = type;
-        var suffix = type == typeof(EntityBlueprint) ? ".blueprint.json" : ".json";
+        var suffix = AssetTypeClassifier.GetFileSuffix(type);
         _createAssetPath = JoinPath(_currentFolder, $"New {type.Name}{suffix}");
         _requestCreateAssetPopup = true;
     }

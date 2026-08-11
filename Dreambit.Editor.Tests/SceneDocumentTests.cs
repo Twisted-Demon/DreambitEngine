@@ -1,5 +1,7 @@
 using Dreambit.ECS;
+using Dreambit.Editor.Graphics;
 using Dreambit.Editor.Scenes;
+using Dreambit.LDtk;
 using Newtonsoft.Json.Linq;
 
 namespace Dreambit.Editor.Tests;
@@ -184,6 +186,306 @@ public sealed class SceneDocumentTests : IDisposable
         var restored = document.Scene!.FindEntity(id);
         Assert.NotNull(restored);
         Assert.True(selection.Contains(restored!));
+    }
+
+    [Fact]
+    public void BoxedBlueprintTracksSourceUntilItIsUnboxed()
+    {
+        var source = new EntityBlueprint
+        {
+            AssetId = AssetId.New(),
+            AssetName = "actors/hero.blueprint",
+            Name = "Hero",
+            Guid = Guid.NewGuid(),
+            Position = new Microsoft.Xna.Framework.Vector3(2, 3, 0)
+        };
+        var selection = new SelectionService();
+        using var document = SceneDocument.CreateNew(
+            "Linked",
+            selection,
+            blueprintInstanceResolver: _ => source);
+
+        var instance = document.InstantiateBlueprint(
+            source,
+            new Microsoft.Xna.Framework.Vector3(20, 30, 0));
+        var instanceId = instance.Id;
+        Assert.True(document.IsBlueprintInstanceRoot(instance));
+        Assert.Equal(new Microsoft.Xna.Framework.Vector3(20, 30, 0), instance.Transform.WorldPosition);
+
+        var scenePath = Path.Combine(_root, "boxed.scene.json");
+        document.Save(scenePath);
+        var boxedSource = Assert.Single(SceneDocumentSerializer.Deserialize(File.ReadAllText(scenePath)).Entities);
+        Assert.NotNull(boxedSource.BlueprintInstance);
+        Assert.Equal(source.AssetId.Value, boxedSource.BlueprintInstance.AssetId);
+        Assert.Empty(boxedSource.Components);
+        Assert.Empty(boxedSource.Children);
+
+        var duplicate = document.Duplicate(instance);
+        Assert.True(document.IsBlueprintInstanceRoot(duplicate));
+        Assert.NotEqual(instance.Id, duplicate.Id);
+        document.Delete([duplicate]);
+
+        var childSourceId = Guid.NewGuid();
+        source.Name = "Hero Updated";
+        source.Children.Add(new EntityBlueprint
+        {
+            Name = "New Source Child",
+            Guid = childSourceId
+        });
+
+        document.RefreshBlueprintInstances();
+        var refreshed = document.Scene!.FindEntity(instanceId)!;
+        var childId = Assert.Single(refreshed.Children).Id;
+        Assert.Equal("Hero Updated", refreshed.Name);
+        Assert.Equal(new Microsoft.Xna.Framework.Vector3(20, 30, 0), refreshed.Transform.WorldPosition);
+
+        document.BeforeAssemblyReload();
+        document.AfterAssemblyReload();
+        refreshed = document.Scene!.FindEntity(instanceId)!;
+        Assert.Equal(childId, Assert.Single(refreshed.Children).Id);
+
+        document.UnboxBlueprint(refreshed);
+        Assert.False(document.IsBlueprintInstanceRoot(refreshed));
+        source.Name = "Future Source Name";
+        source.Children.Clear();
+        document.BeforeAssemblyReload();
+        document.AfterAssemblyReload();
+
+        var unboxed = document.Scene!.FindEntity(instanceId)!;
+        Assert.Equal("Hero Updated", unboxed.Name);
+        Assert.Equal(childId, Assert.Single(unboxed.Children).Id);
+    }
+
+    [Fact]
+    public void LDtkSceneLinkSurvivesCaptureWhileGeneratedEntitiesStayOutOfTheSceneFile()
+    {
+        var assetId = Guid.NewGuid();
+        var worldId = Guid.NewGuid();
+        var source = new SceneBlueprint
+        {
+            Name = "LDtk World",
+            LDtk = new LDtkSceneReference
+            {
+                AssetId = assetId,
+                AssetName = "maps/world",
+                WorldIid = worldId,
+                PixelsPerUnit = 16f
+            }
+        };
+        using var scene = new TestEditorScene();
+        scene.EnsureEditorCamera();
+        scene.CreateEntity("Dreambit Placed");
+
+        var captured = SceneDocumentSerializer.Capture(scene, source, source.Name);
+        var restored = SceneDocumentSerializer.Deserialize(SceneDocumentSerializer.Serialize(captured));
+
+        Assert.NotNull(restored.LDtk);
+        Assert.Equal(assetId, restored.LDtk.AssetId);
+        Assert.Equal("maps/world", restored.LDtk.AssetName);
+        Assert.Equal(worldId, restored.LDtk.WorldIid);
+        Assert.Equal(16f, restored.LDtk.PixelsPerUnit);
+        Assert.Equal("Dreambit Placed", Assert.Single(restored.Entities).Name);
+
+        var legacy = SceneDocumentSerializer.Deserialize("""
+        {
+          "name": "Legacy LDtk",
+          "entities": [],
+          "ldtk": {
+            "asset": "maps/world",
+            "pixels_per_unit": 24
+          }
+        }
+        """);
+        Assert.Equal(24f, legacy.LDtk!.ImportOptions.PixelsPerUnit);
+    }
+
+    [Fact]
+    public void LDtkSourceLoaderProducesRuntimeLogicalAssetNames()
+    {
+        var contentRoot = Path.Combine(_root, "Assets");
+        var maps = Path.Combine(contentRoot, "maps");
+        Directory.CreateDirectory(maps);
+        var path = Path.Combine(maps, "world.ldtk");
+        File.WriteAllText(path, "{\"jsonVersion\":\"1.5.3\",\"levels\":[]}");
+
+        var project = LDtkFile.FromContentFile(path, "maps/world", contentRoot);
+
+        Assert.Equal("maps/world", project.SourcePath);
+        Assert.Equal("textures/tiles", project.ResolveAssetName("../textures/tiles.png"));
+        Assert.Empty(project.LoadWorld().Levels);
+    }
+
+    [Fact]
+    public void LDtkSceneLoadsExternalLevelFilesAndRendersTheirTransientDrawables()
+    {
+        var contentRoot = Path.Combine(_root, "Assets");
+        var maps = Path.Combine(contentRoot, "maps");
+        var levels = Path.Combine(maps, "Levels");
+        Directory.CreateDirectory(levels);
+        var worldId = Guid.NewGuid();
+        var levelId = Guid.NewGuid();
+        var layerId = Guid.NewGuid();
+        var projectPath = Path.Combine(maps, "world.ldtk");
+        var levelPath = Path.Combine(levels, "Forest.ldtkl");
+        File.WriteAllText(projectPath, $$"""
+        {
+          "jsonVersion": "1.5.3",
+          "externalLevels": true,
+          "worlds": [{
+            "identifier": "ForestWorld",
+            "iid": "{{worldId}}",
+            "worldLayout": "Free",
+            "worldGridWidth": 32,
+            "worldGridHeight": 32,
+            "levels": [{
+              "__bgColor": "#123456",
+              "identifier": "Forest",
+              "iid": "{{levelId}}",
+              "uid": 1,
+              "pxWid": 32,
+              "pxHei": 32,
+              "worldX": 0,
+              "worldY": 0,
+              "worldDepth": 0,
+              "externalRelPath": "Levels/Forest.ldtkl",
+              "fieldInstances": [],
+              "__neighbours": [],
+              "layerInstances": null
+            }]
+          }]
+        }
+        """);
+        File.WriteAllText(levelPath, $$"""
+        {
+          "__bgColor": "#123456",
+          "identifier": "Forest",
+          "iid": "{{levelId}}",
+          "uid": 1,
+          "pxWid": 32,
+          "pxHei": 32,
+          "worldX": 0,
+          "worldY": 0,
+          "worldDepth": 0,
+          "externalRelPath": "Levels/Forest.ldtkl",
+          "fieldInstances": [],
+          "__neighbours": [],
+          "layerInstances": [{
+            "__identifier": "GameplayMarkers",
+            "iid": "{{layerId}}",
+            "__cHei": 1,
+            "__cWid": 1,
+            "__gridSize": 16,
+            "__opacity": 1,
+            "__pxTotalOffsetX": 0,
+            "__pxTotalOffsetY": 0,
+            "__tilesetDefUid": null,
+            "__tilesetRelPath": null,
+            "__type": "Entities",
+            "autoLayerTiles": [],
+            "entityInstances": [],
+            "gridTiles": [],
+            "intGridCsv": [],
+            "layerDefUid": 1,
+            "levelId": 1,
+            "pxOffsetX": 0,
+            "pxOffsetY": 0,
+            "visible": true
+          }]
+        }
+        """);
+
+        var selection = new SelectionService();
+        using var document = SceneDocument.CreateNew(
+            "External LDtk",
+            selection,
+            ldtkProjectResolver: _ => LDtkFile.FromContentFile(
+                projectPath,
+                "maps/world",
+                contentRoot),
+            ldtk: new LDtkSceneReference
+            {
+                AssetName = "maps/world",
+                WorldIid = worldId
+            });
+
+        var generated = document.Scene!.GetAllEntities()
+            .Where(entity => entity.IsEditorOnly)
+            .ToArray();
+        Assert.Contains(generated, entity => entity.Name == "LDtk Level: Forest");
+        Assert.Contains(generated, entity => entity.Name.Contains("GameplayMarkers"));
+        var background = Assert.Single(
+            generated.SelectMany(entity => entity.GetAllComponents()).OfType<FilledRectDrawer>());
+        Assert.True(SceneViewportRenderer.ShouldRenderDrawable(background));
+        Assert.All(generated, entity => Assert.True(entity.IsLDtkGenerated));
+
+        var placed = document.CreateEmpty("Dreambit Placed");
+        var placedId = placed.Id;
+        document.Apply("Move Dreambit Entity", _ =>
+            placed.Transform.Position = new Microsoft.Xna.Framework.Vector3(12, 34, 0));
+        document.Apply("Override LDtk Background", _ =>
+        {
+            background.Entity.Transform.Position = new Microsoft.Xna.Framework.Vector3(5, 7, 0);
+            background.Width = 99f;
+            document.RecordLDtkPosition(background.Entity);
+            document.RecordLDtkComponentMember(background, nameof(FilledRectDrawer.Width), background.Width);
+        });
+
+        File.WriteAllText(levelPath, File.ReadAllText(levelPath)
+            .Replace("\"identifier\": \"Forest\"", "\"identifier\": \"Forest Updated\"")
+            .Replace("\"pxWid\": 32", "\"pxWid\": 64"));
+        document.ReimportLDtk();
+
+        var preserved = document.Scene!.FindEntity(placedId);
+        Assert.NotNull(preserved);
+        Assert.Equal(
+            new Microsoft.Xna.Framework.Vector3(12, 34, 0),
+            preserved.Transform.Position);
+        Assert.Contains(
+            document.Scene.GetAllEntities(),
+            entity => entity.Name == "LDtk Level: Forest Updated");
+        var reimportedBackground = Assert.Single(
+            document.Scene.GetAllEntities()
+                .SelectMany(entity => entity.GetAllComponents())
+                .OfType<FilledRectDrawer>());
+        Assert.Equal(new Microsoft.Xna.Framework.Vector3(5, 7, 0), reimportedBackground.Entity.Transform.Position);
+        Assert.Equal(99f, reimportedBackground.Width);
+
+        document.UpdateLDtkImportOptions("Disable LDtk Background", options =>
+        {
+            options.PixelsPerUnit = 16f;
+            options.RenderLevelBackgroundColor = false;
+        });
+        Assert.Equal(16f, document.LDtkReference!.ImportOptions.PixelsPerUnit);
+        Assert.Empty(document.Scene.GetAllEntities()
+            .SelectMany(entity => entity.GetAllComponents())
+            .OfType<FilledRectDrawer>());
+        Assert.NotNull(document.Scene.FindEntity(placedId));
+
+        var validExternalLevel = File.ReadAllText(levelPath);
+        var workingScene = document.Scene;
+        File.WriteAllText(levelPath, "{ incomplete LDtk save");
+        Assert.ThrowsAny<Exception>(() => document.ReimportLDtk());
+        Assert.Same(workingScene, document.Scene);
+        Assert.NotNull(document.Scene.FindEntity(placedId));
+        File.WriteAllText(levelPath, validExternalLevel);
+        document.ReimportLDtk();
+
+        var captured = SceneDocumentSerializer.Capture(
+            document.Scene,
+            new SceneBlueprint
+            {
+                Name = "External LDtk",
+                LDtk = document.LDtkReference
+            },
+            "External LDtk");
+        Assert.Single(captured.Entities);
+        Assert.Equal("Dreambit Placed", captured.Entities[0].Name);
+        Assert.NotEmpty(captured.LDtk!.EntityOverrides);
+        var roundTripped = SceneDocumentSerializer.Deserialize(SceneDocumentSerializer.Serialize(captured));
+        Assert.Equal(16f, roundTripped.LDtk!.ImportOptions.PixelsPerUnit);
+        Assert.Contains(
+            roundTripped.LDtk.EntityOverrides.Values,
+            item => item.Position == new Microsoft.Xna.Framework.Vector3(5, 7, 0));
     }
 
     public void Dispose()

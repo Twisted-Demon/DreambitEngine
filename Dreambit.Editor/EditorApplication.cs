@@ -9,6 +9,7 @@ using Dreambit.Editor.Projects;
 using Dreambit.Editor.Scenes;
 using Dreambit.Editor.UI;
 using Dreambit.Editor.UI.Panels;
+using Dreambit.LDtk;
 using ImGuiNET;
 
 namespace Dreambit.Editor;
@@ -37,12 +38,15 @@ internal sealed class EditorApplication : IDisposable
     private bool _openProjectPopupRequested;
     private bool _showAbout;
     private bool _newScenePopupRequested;
+    private bool _newLdtkScenePopupRequested;
     private bool _openScenePopupRequested;
     private bool _saveSceneAsPopupRequested;
     private bool _createFromBlueprintPopupRequested;
     private string _newSceneName = "Untitled";
     private string _scenePath = string.Empty;
     private string _blueprintSearch = string.Empty;
+    private string _ldtkSearch = string.Empty;
+    private LDtkImportOptions _newLdtkImportOptions = new();
     private string? _sceneOperationError;
     private bool _rebuildDockLayout;
     private bool _disposed;
@@ -246,6 +250,12 @@ internal sealed class EditorApplication : IDisposable
             ImGui.BeginDisabled(_project is null);
             if (ImGui.MenuItem("New Scene", "Ctrl+N"))
                 _newScenePopupRequested = true;
+            if (ImGui.MenuItem("New LDtk Scene..."))
+            {
+                _ldtkSearch = string.Empty;
+                _newLdtkImportOptions = new LDtkImportOptions();
+                _newLdtkScenePopupRequested = true;
+            }
             if (ImGui.MenuItem("Open Scene...", "Ctrl+Shift+O"))
                 _openScenePopupRequested = true;
             if (ImGui.MenuItem("Save", "Ctrl+S"))
@@ -434,6 +444,11 @@ internal sealed class EditorApplication : IDisposable
             ImGui.OpenPopup("New Scene##Dreambit.Editor");
             _newScenePopupRequested = false;
         }
+        if (_newLdtkScenePopupRequested)
+        {
+            ImGui.OpenPopup("New LDtk Scene##Dreambit.Editor");
+            _newLdtkScenePopupRequested = false;
+        }
         if (_openScenePopupRequested)
         {
             ImGui.OpenPopup("Open Scene##Dreambit.Editor");
@@ -446,6 +461,7 @@ internal sealed class EditorApplication : IDisposable
         }
 
         DrawNewScenePopup();
+        DrawNewLDtkScenePopup();
         DrawCreateFromBlueprintPopup();
         DrawScenePathPopup("Open Scene##Dreambit.Editor", "Open", TryOpenScene);
         DrawScenePathPopup("Save Scene As##Dreambit.Editor", "Save", TrySaveSceneAs);
@@ -464,6 +480,88 @@ internal sealed class EditorApplication : IDisposable
             ImGui.CloseCurrentPopup();
         }
         ImGui.SameLine();
+        if (ImGui.Button("Cancel", new Vector2(90f, 0f)))
+            ImGui.CloseCurrentPopup();
+        ImGui.EndPopup();
+    }
+
+    private void DrawNewLDtkScenePopup()
+    {
+        if (!ImGui.BeginPopupModal(
+                "New LDtk Scene##Dreambit.Editor",
+                ImGuiWindowFlags.AlwaysAutoResize))
+            return;
+
+        var session = _projectManager.CurrentSession!;
+        ImGui.TextWrapped(
+            "Choose an LDtk project/world. Its tilemap stays linked and entities placed " +
+            "in Dreambit are preserved when LDtk is reimported.");
+        var pixelsPerUnit = _newLdtkImportOptions.PixelsPerUnit;
+        var baseDrawLayer = _newLdtkImportOptions.BaseDrawLayer;
+        var drawLayerStep = _newLdtkImportOptions.DrawLayerStep;
+        var worldDepthStride = _newLdtkImportOptions.WorldDepthDrawLayerStride;
+        var renderBackgroundColor = _newLdtkImportOptions.RenderLevelBackgroundColor;
+        var renderBackgroundImage = _newLdtkImportOptions.RenderLevelBackgroundImage;
+        var includeInvisibleLayers = _newLdtkImportOptions.IncludeInvisibleLayers;
+        ImGui.SetNextItemWidth(240f);
+        ImGui.DragFloat("Pixels Per Unit##NewLDtk", ref pixelsPerUnit, 0.1f, 0.001f, 100000f);
+        ImGui.SetNextItemWidth(240f);
+        ImGui.DragInt("Base Draw Layer##NewLDtk", ref baseDrawLayer, 1f);
+        ImGui.SetNextItemWidth(240f);
+        ImGui.DragInt("Draw Layer Step##NewLDtk", ref drawLayerStep, 1f, 1, 100000);
+        ImGui.SetNextItemWidth(240f);
+        ImGui.DragInt("World Depth Stride##NewLDtk", ref worldDepthStride, 1f, 1, int.MaxValue);
+        ImGui.Checkbox("Render Background Color##NewLDtk", ref renderBackgroundColor);
+        ImGui.Checkbox("Render Background Image##NewLDtk", ref renderBackgroundImage);
+        ImGui.Checkbox("Include Invisible Layers##NewLDtk", ref includeInvisibleLayers);
+        _newLdtkImportOptions.PixelsPerUnit = pixelsPerUnit;
+        _newLdtkImportOptions.BaseDrawLayer = baseDrawLayer;
+        _newLdtkImportOptions.DrawLayerStep = drawLayerStep;
+        _newLdtkImportOptions.WorldDepthDrawLayerStride = worldDepthStride;
+        _newLdtkImportOptions.RenderLevelBackgroundColor = renderBackgroundColor;
+        _newLdtkImportOptions.RenderLevelBackgroundImage = renderBackgroundImage;
+        _newLdtkImportOptions.IncludeInvisibleLayers = includeInvisibleLayers;
+        ImGui.Separator();
+        ImGui.SetNextItemWidth(520f);
+        ImGui.InputTextWithHint("##LDtkSearch", "Search LDtk projects", ref _ldtkSearch, 256);
+        ImGui.BeginChild("##LDtkResults", new Vector2(520f, 300f), ImGuiChildFlags.Borders);
+        var projects = session.Assets.GetSnapshot().Assets
+            .Where(asset => asset.Kind == AssetKind.Ldtk &&
+                            asset.RelativePath.EndsWith(".ldtk", StringComparison.OrdinalIgnoreCase) &&
+                            (string.IsNullOrWhiteSpace(_ldtkSearch) ||
+                             asset.RelativePath.Contains(_ldtkSearch, StringComparison.OrdinalIgnoreCase)))
+            .ToArray();
+        if (projects.Length == 0)
+            ImGui.TextDisabled("No matching .ldtk projects were found under Assets.");
+        foreach (var asset in projects)
+        {
+            try
+            {
+                foreach (var world in session.Scenes.GetLDtkWorldChoices(asset))
+                {
+                    var label = $"{asset.RelativePath}  /  {world.DisplayName}##{asset.Id.Value:N}-{world.WorldIid:N}";
+                    if (!ImGui.Selectable(label))
+                        continue;
+                    session.Scenes.NewFromLDtk(
+                        asset,
+                        world.WorldIid,
+                        world.DisplayName,
+                        _newLdtkImportOptions);
+                    session.AssetEditing.Clear();
+                    _sceneOperationError = null;
+                    ImGui.CloseCurrentPopup();
+                }
+            }
+            catch (Exception exception)
+            {
+                ImGui.TextColored(
+                    new Vector4(0.96f, 0.34f, 0.36f, 1f),
+                    $"{asset.RelativePath}: {exception.Message}");
+            }
+        }
+        ImGui.EndChild();
+        if (!string.IsNullOrWhiteSpace(_sceneOperationError))
+            ImGui.TextColored(new Vector4(0.96f, 0.34f, 0.36f, 1f), _sceneOperationError);
         if (ImGui.Button("Cancel", new Vector2(90f, 0f)))
             ImGui.CloseCurrentPopup();
         ImGui.EndPopup();
@@ -504,6 +602,8 @@ internal sealed class EditorApplication : IDisposable
                     blueprint.RelativePath.Replace('/', Path.DirectorySeparatorChar));
                 var source = DreambitJson.Deserialize<EntityBlueprint>(File.ReadAllText(path))
                              ?? throw new InvalidDataException("Blueprint file is empty.");
+                source.AssetId = blueprint.Id;
+                source.AssetName = blueprint.LogicalAssetName;
                 document!.InstantiateBlueprint(source);
                 _sceneOperationError = null;
                 ImGui.CloseCurrentPopup();

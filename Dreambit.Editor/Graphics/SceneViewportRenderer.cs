@@ -72,7 +72,7 @@ internal sealed class SceneViewportRenderer : IDisposable
         var nearestDistanceSquared = 100f;
         foreach (var entity in scene.GetAllEntities())
         {
-            if (entity.IsEditorOnly)
+            if (entity.IsEditorOnly && !entity.IsLDtkGenerated)
                 continue;
             var distanceSquared = Vector2.DistanceSquared(entity.Transform.WorldPosition2D, worldPosition);
             if (distanceSquared >= nearestDistanceSquared)
@@ -87,7 +87,7 @@ internal sealed class SceneViewportRenderer : IDisposable
     {
         _drawBuffer.Clear();
         foreach (var drawable in scene.GetAllDrawables())
-            if (drawable.Enabled && drawable.Entity.Enabled && !drawable.Entity.IsEditorOnly)
+            if (ShouldRenderDrawable(drawable))
                 _drawBuffer.Add(drawable);
         _drawBuffer.Sort(static (left, right) =>
         {
@@ -95,6 +95,11 @@ internal sealed class SceneViewportRenderer : IDisposable
             return layer != 0 ? layer : left.SortDepth.CompareTo(right.SortDepth);
         });
     }
+
+    // Editor-only means transient/non-serialized, not invisible. This keeps linked
+    // LDtk level geometry visible while selection and hierarchy editing remain disabled.
+    internal static bool ShouldRenderDrawable(DrawableComponent drawable) =>
+        drawable.Enabled && drawable.Entity.Enabled;
 
     private void Draw(Scene scene, Matrix transform)
     {

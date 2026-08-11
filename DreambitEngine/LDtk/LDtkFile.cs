@@ -45,6 +45,71 @@ public partial class LDtkFile
         return project;
     }
 
+    /// <summary>
+    /// Reads an LDtk project from source while resolving its texture and external-level
+    /// references as runtime logical asset names. This is intended for editor tooling.
+    /// </summary>
+    public static LDtkFile FromContentFile(
+        string path,
+        string logicalAssetName,
+        string contentRoot)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        ArgumentException.ThrowIfNullOrWhiteSpace(logicalAssetName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(contentRoot);
+
+        var fullPath = Path.GetFullPath(path);
+        var fullContentRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(contentRoot));
+        EnsureWithinContentRoot(fullPath, fullContentRoot);
+        var logicalName = logicalAssetName.Replace('\\', '/').Trim().TrimStart('/');
+        var project = LdtkJson.DeserializeProject(File.ReadAllText(fullPath));
+        var sourceDirectory = Path.GetDirectoryName(fullPath) ?? fullContentRoot;
+        var externalLevelFiles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var level in project.EnumerateLevelStubs())
+        {
+            if (string.IsNullOrWhiteSpace(level.ExternalRelPath))
+                continue;
+
+            var logicalLevelPath = LdtkPath.Resolve(
+                logicalName,
+                level.ExternalRelPath,
+                logical: true);
+            var sourceLevelPath = Path.GetFullPath(Path.Combine(
+                sourceDirectory,
+                level.ExternalRelPath.Replace('/', Path.DirectorySeparatorChar)));
+            EnsureWithinContentRoot(sourceLevelPath, fullContentRoot);
+            if (!externalLevelFiles.TryAdd(logicalLevelPath, sourceLevelPath))
+                throw new LdtkException(
+                    $"LDtk project '{fullPath}' references external level '{logicalLevelPath}' more than once.");
+        }
+
+        project.Attach(logicalName, externalPath =>
+        {
+            if (!externalLevelFiles.TryGetValue(externalPath, out var externalFile))
+                throw new LdtkException(
+                    $"LDtk project '{fullPath}' did not declare external level '{externalPath}'.");
+            try
+            {
+                return LdtkJson.DeserializeLevel(File.ReadAllText(externalFile));
+            }
+            catch (Exception exception) when (exception is IOException or JsonException)
+            {
+                throw new LdtkException($"Could not load external LDtk level '{externalFile}'.", exception);
+            }
+        }, usesLogicalAssetPaths: true);
+        return project;
+    }
+
+    private static void EnsureWithinContentRoot(string path, string contentRoot)
+    {
+        var rootWithSeparator = contentRoot + Path.DirectorySeparatorChar;
+        var comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        if (!path.StartsWith(rootWithSeparator, comparison))
+            throw new LdtkException($"LDtk source path '{path}' escapes content root '{contentRoot}'.");
+    }
+
     public LDtkLoadedWorld LoadWorld()
     {
         if (Worlds is { Length: > 1 })

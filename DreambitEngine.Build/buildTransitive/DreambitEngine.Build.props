@@ -1,7 +1,8 @@
 <Project>
   <PropertyGroup>
-    <DreambitSdkVersion Condition="'$(DreambitSdkVersion)' == ''">0.1.4</DreambitSdkVersion>
+    <DreambitSdkVersion Condition="'$(DreambitSdkVersion)' == ''">0.1.6</DreambitSdkVersion>
     <DreambitContentBuildEnabled Condition="'$(DreambitContentBuildEnabled)' == ''">false</DreambitContentBuildEnabled>
-    <DreambitAssetCache Condition="'$(DreambitAssetCache)' == '' and '$(DreambitProjectRoot)' != ''">$([System.IO.Path]::GetFullPath('$(DreambitProjectRoot)/.dreambit/cache/bake'))</DreambitAssetCache>
+    <DreambitContentCacheRoot Condition="'$(DreambitContentCacheRoot)' == '' and '$(DreambitProjectRoot)' != ''">$([System.IO.Path]::GetFullPath('$(DreambitProjectRoot)/.cache/dreambit'))</DreambitContentCacheRoot>
+    <DreambitAssetCache Condition="'$(DreambitAssetCache)' == '' and '$(DreambitContentCacheRoot)' != ''">$(DreambitContentCacheRoot)/bake</DreambitAssetCache>
   </PropertyGroup>
 </Project>

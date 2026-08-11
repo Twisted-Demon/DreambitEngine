@@ -1,0 +1,16 @@
+.idea/
+.vs/
+.vscode/
+*.user
+*.suo
+**/[Bb]in/
+**/[Oo]bj/
+**/[Bb]uild/
+**/[Pp]ublish/
+/.cache/
+/.dreambit/cache/
+/.dreambit/user/
+*.log
+*.tmp
+.DS_Store
+Thumbs.db

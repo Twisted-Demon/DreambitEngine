@@ -354,7 +354,15 @@ internal sealed class InspectorValueDrawerRegistry
                 var current = Convert.ToSingle(value, CultureInfo.InvariantCulture);
                 var changed = range is null
                     ? ImGui.DragFloat($"{label}##{context.Id}", ref current, 0.1f)
-                    : ImGui.SliderFloat($"{label}##{context.Id}", ref current, (float)range.Minimum, (float)range.Maximum);
+                    : ImGui.DragFloat(
+                        $"{label}##{context.Id}",
+                        ref current,
+                        0.1f,
+                        (float)range.Minimum,
+                        (float)range.Maximum,
+                        "%.3f",
+                        ImGuiSliderFlags.AlwaysClamp);
+                DrawExactEntryTooltip();
                 return changed ? new InspectorValueDrawResult(true, current) : InspectorValueDrawResult.Unchanged(value);
             }
             if (type == typeof(double) || type == typeof(decimal))
@@ -365,6 +373,25 @@ internal sealed class InspectorValueDrawerRegistry
                     current = Math.Clamp(current, range.Minimum, range.Maximum);
                 object converted = type == typeof(decimal) ? Convert.ToDecimal(current) : current;
                 return changed ? new InspectorValueDrawResult(true, converted) : InspectorValueDrawResult.Unchanged(value);
+            }
+
+            if (type == typeof(int))
+            {
+                var current = Convert.ToInt32(value, CultureInfo.InvariantCulture);
+                var changed = range is null
+                    ? ImGui.DragInt($"{label}##{context.Id}", ref current, 1f)
+                    : ImGui.DragInt(
+                        $"{label}##{context.Id}",
+                        ref current,
+                        1f,
+                        (int)Math.Ceiling(range.Minimum),
+                        (int)Math.Floor(range.Maximum),
+                        "%d",
+                        ImGuiSliderFlags.AlwaysClamp);
+                DrawExactEntryTooltip();
+                return changed
+                    ? new InspectorValueDrawResult(true, current)
+                    : InspectorValueDrawResult.Unchanged(value);
             }
 
             var text = Convert.ToString(value, CultureInfo.InvariantCulture) ?? "0";
@@ -379,6 +406,12 @@ internal sealed class InspectorValueDrawerRegistry
             {
                 return InspectorValueDrawResult.Unchanged(value);
             }
+        }
+
+        private static void DrawExactEntryTooltip()
+        {
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Drag to adjust. Double-click or Ctrl+click to type an exact value.");
         }
     }
 
@@ -571,8 +604,14 @@ internal sealed class InspectorValueDrawerRegistry
             return true;
         }
 
-        private static object? CreateDefault(Type type) =>
-            type.IsValueType ? Activator.CreateInstance(type) : null;
+        private static object? CreateDefault(Type type)
+        {
+            if (type == typeof(string))
+                return string.Empty;
+            if (type.IsValueType || type.GetConstructor(Type.EmptyTypes) is not null)
+                return Activator.CreateInstance(type);
+            return null;
+        }
 
         private static object BuildCollection(Type targetType, Type elementType, IReadOnlyList<object?> items)
         {

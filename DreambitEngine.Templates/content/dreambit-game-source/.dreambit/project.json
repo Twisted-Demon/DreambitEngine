@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "projectId": "5D6122AE-216C-53FC-C59E-1F3C4B53B104",
+  "name": "DreambitGame",
+  "solution": "DreambitGame.sln",
+  "gameProject": "src/DreambitGame/DreambitGame.csproj",
+  "contentProject": "src/DreambitGame.Content/DreambitGame.Content.csproj",
+  "contentRoot": "src/DreambitGame.Content/Assets",
+  "launcherProject": "src/DreambitGame.VK/DreambitGame.VK.csproj",
+  "targetRenderer": "__DREAMBIT_TARGET_RENDERER__",
+  "sdk": { "version": "__DREAMBIT_SDK_VERSION__" }
+}

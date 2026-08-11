@@ -18,7 +18,10 @@ public sealed class PakReader : IDisposable
             pakPath,
             FileMode.Open,
             FileAccess.Read,
-            FileShare.Read | FileShare.Delete);
+            // Windows' overwrite implementation opens the destination for write access before
+            // atomically replacing it. Keep the old file readable by this instance while allowing
+            // the Asset Baker to publish the new PAK beside a running editor or game.
+            FileShare.ReadWrite | FileShare.Delete);
         _entries = ReadToc(_fs);
     }
 

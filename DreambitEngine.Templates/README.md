@@ -1,17 +1,19 @@
 # Dreambit Engine Templates
 
-Version 0.1.4 creates package-based Dreambit projects with portable Editor metadata.
+Version 0.1.6 provides separate package-based and source-submodule project commands.
 
 ## Generated project
 
-- `DreambitGame` — reusable game code and scenes.
-- `DreambitGame.Content` — raw assets and the game's MonoGame content builder.
-- `DreambitGame.VK` — the DesktopVK executable.
-- `.dreambit/project.json` — portable paths, project identity, renderer, and SDK version.
+- `DreambitGame` - reusable game code and scenes.
+- `DreambitGame.Content` - raw assets and the game's MonoGame content builder.
+- `DreambitGame.VK` - the DesktopVK executable.
+- `.dreambit/project.json` - portable paths, project identity, renderer, and SDK version.
 - Repository-level central package versions for `DreambitEngine` and `DreambitEngine.Build`.
 - No DreambitEngine Git submodule, setup scripts, machine-specific SDK path, or build-tool project references.
 
-`DreambitEngine.Build` is the stable `buildTransitive` integration point. Real-time and explicit content baking is intentionally integrated in Editor Milestone 4.
+`dreambit-game` is the package-based template used by Dreambit.Editor. `dreambit-game-source`
+creates a Git repository and pins DreambitEngine as a submodule at `.dreambit/engine`.
+Both templates bake the PAK under `.cache/dreambit` and copy it into build and publish output.
 
 ## Pack and install locally
 
@@ -32,7 +34,10 @@ These scripts pack the coordinated runtime/build/template package set into the s
 Create a project:
 
 ```powershell
-dotnet new dreambit-game -n MyGame --game-title "My Game" --sdkVersion 0.1.4
+dotnet new dreambit-game -n MyGame --game-title "My Game" --sdkVersion 0.1.6
+
+# Source checkout at .dreambit/engine
+dotnet new dreambit-game-source -n MyGame --game-title "My Game" --sdkVersion 0.1.6 --allow-scripts yes
 ```
 
 Dreambit.Editor normally performs template installation, generation, and package restore automatically.
@@ -43,4 +48,4 @@ Dreambit.Editor normally performs template installation, generation, and package
 ./scripts/test-template.ps1
 ```
 
-The smoke test packs all three SDK packages, uses an isolated template hive, generates a dotted-name project, validates `.dreambit/project.json`, restores from the local package feed, and builds the generated solution.
+The smoke test packs all four SDK packages, uses an isolated template hive, generates a dotted-name project, validates `.dreambit/project.json`, restores from the local package feed, and builds the generated solution.

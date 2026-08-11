@@ -1,0 +1,10 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <DreambitSolutionRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..'))</DreambitSolutionRoot>
+    <DreambitEngineRoot Condition="'$(DreambitEngineRoot)' == ''">$([System.IO.Path]::GetFullPath('$(DreambitSolutionRoot)/.dreambit/engine'))</DreambitEngineRoot>
+  </PropertyGroup>
+</Project>

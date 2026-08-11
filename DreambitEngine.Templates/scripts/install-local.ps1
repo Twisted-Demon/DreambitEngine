@@ -14,6 +14,7 @@ $feed = Join-Path $localData "Dreambit/Editor/sdks/$version/packages"
 New-Item $feed -ItemType Directory -Force | Out-Null
 foreach ($project in @(
     (Join-Path $engineRoot "DreambitEngine/DreambitEngine.csproj"),
+    (Join-Path $engineRoot "Dreambit.Editor.Abstractions/Dreambit.Editor.Abstractions.csproj"),
     (Join-Path $engineRoot "DreambitEngine.Build/DreambitEngine.Build.csproj"),
     $templateProject
 )) {

@@ -1,3 +1,6 @@
+using System;
+using Dreambit.LDtk;
+
 namespace Dreambit;
 
 /// <summary>Controls how a serialized scene is materialized into a live scene.</summary>
@@ -9,7 +12,9 @@ public sealed class SceneBlueprintLoadOptions
     {
         AllowMissingComponentTypes = true,
         PreserveEntityIds = true,
-        TolerateComponentLoadErrors = true
+        TolerateComponentLoadErrors = true,
+        MarkImportedLDtkEntitiesEditorOnly = true,
+        MaterializeLDtkEntities = false
     };
 
     /// <summary>
@@ -26,4 +31,22 @@ public sealed class SceneBlueprintLoadOptions
     /// references, or cannot currently be constructed. Runtime loading remains strict.
     /// </summary>
     public bool TolerateComponentLoadErrors { get; init; }
+
+    /// <summary>
+    /// Optional host-specific resolver for boxed Blueprint instances. The runtime falls back to
+    /// Resources; editors can resolve directly from source files before a bake completes.
+    /// </summary>
+    public Func<BlueprintInstanceReference, EntityBlueprint> BlueprintInstanceResolver { get; init; }
+
+    /// <summary>Optional source-aware LDtk resolver used by editor hosts before a bake completes.</summary>
+    public Func<LDtkSceneReference, LDtkFile> LDtkProjectResolver { get; init; }
+
+    /// <summary>Keeps regenerated LDtk-owned entities out of serialized Dreambit entity data.</summary>
+    public bool MarkImportedLDtkEntitiesEditorOnly { get; init; }
+
+    /// <summary>
+    /// Creates gameplay entities described in LDtk entity layers. Editor scenes disable this so
+    /// LDtk remains a tilemap authoring source while Dreambit owns gameplay entity placement.
+    /// </summary>
+    public bool MaterializeLDtkEntities { get; init; } = true;
 }
