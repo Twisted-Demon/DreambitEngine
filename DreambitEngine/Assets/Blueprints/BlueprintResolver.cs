@@ -251,11 +251,18 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
 
         if (IsDreambitAsset(targetType))
         {
-            var assetName = token.Value<string>();
-            if (string.IsNullOrWhiteSpace(assetName))
-                return null;
+            if (DreambitAssetReferenceToken.TryRead(
+                    token,
+                    out var assetId,
+                    out var fallbackAssetName))
+            {
+                return GetAssetReference(assetId, fallbackAssetName, targetType);
+            }
 
-            return GetAssetReference(assetName, targetType);
+            var assetName = token.Value<string>();
+            return string.IsNullOrWhiteSpace(assetName)
+                ? null
+                : GetAssetReference(assetName, targetType);
         }
 
         if (IsEntityReference(targetType))
@@ -537,6 +544,21 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
                 "Unable to deserialize {0} reference {1}",
                 assetType.Name,
                 assetName);
+
+        return reference;
+    }
+
+    public static object GetAssetReference(
+        AssetId assetId,
+        string fallbackAssetName,
+        Type assetType)
+    {
+        var reference = Resources.LoadDreambitAsset(assetId, fallbackAssetName, assetType);
+        if (reference is null)
+            Instance.Logger.Warn(
+                "Unable to deserialize {0} reference {1}",
+                assetType.Name,
+                assetId);
 
         return reference;
     }

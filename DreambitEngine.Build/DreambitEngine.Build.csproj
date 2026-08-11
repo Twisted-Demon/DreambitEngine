@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsPackable>true</IsPackable>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+
+    <PackageId>DreambitEngine.Build</PackageId>
+    <PackageVersion Condition="'$(PackageVersion)' == ''">0.1.4</PackageVersion>
+    <Title>Dreambit Engine Build Integration</Title>
+    <Authors>Dreambit Engine</Authors>
+    <Description>MSBuild integration point for Dreambit content and asset tooling.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>dreambit;msbuild;content-pipeline</PackageTags>
+    <RepositoryUrl>https://github.com/Twisted-Demon/DreambitEngine</RepositoryUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Update="README.md" Pack="true" PackagePath="/" />
+    <None Include="buildTransitive/**/*"
+          Pack="true"
+          PackagePath="buildTransitive" />
+    <Compile Remove="**/*" />
+  </ItemGroup>
+</Project>

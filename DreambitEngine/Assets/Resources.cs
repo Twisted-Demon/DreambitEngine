@@ -17,6 +17,7 @@ public class Resources : Singleton<Resources>
         Path.Combine(AppContext.BaseDirectory, Core.Instance.Content.RootDirectory);
     public static bool UsePak { get; set; } = true;
     public static string PakName { get; set; } = "content.pak";
+    public static IAssetRegistry AssetRegistry { get; set; }
 
     public DreambitContentCollection ContentCollection { get; } = new();
 
@@ -126,6 +127,12 @@ public class Resources : Singleton<Resources>
                 asset,
                 loader.AddToDisposableList);
 
+            if (asset is DreambitAsset dreambitAsset &&
+                AssetRegistry?.TryGetAssetId(assetName, out var assetId) == true)
+            {
+                dreambitAsset.AssetId = assetId;
+            }
+
             return asset;
         }
         catch (Exception e)
@@ -141,6 +148,28 @@ public class Resources : Singleton<Resources>
     {
         var entries = Instance.ContentCollection.Remove(assetName);
         Instance.ReleaseEntries(entries);
+    }
+
+    public static object LoadDreambitAsset(
+        AssetId assetId,
+        string fallbackAssetName,
+        Type type)
+    {
+        if (assetId.IsEmpty)
+            return null;
+
+        var assetName = fallbackAssetName;
+        if (AssetRegistry?.TryResolveAssetName(assetId, out var resolvedAssetName) == true)
+            assetName = resolvedAssetName;
+
+        if (string.IsNullOrWhiteSpace(assetName))
+            return null;
+
+        var asset = LoadDreambitAsset(assetName, type);
+        if (asset is DreambitAsset dreambitAsset)
+            dreambitAsset.AssetId = assetId;
+
+        return asset;
     }
 
     public static bool TryRegisterAsset(DreambitAsset asset)

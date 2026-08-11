@@ -1,19 +1,17 @@
 # Dreambit Engine Templates
 
-> Version 0.1.4 adds the referenced DreambitEngine projects to generated solutions. It also supports dotted project names such as `Dreambit.ExampleGame`.
+Version 0.1.4 creates package-based Dreambit projects with portable Editor metadata.
 
-This repository builds the installable `dreambit-game` template.
-
-## What the generated game contains
+## Generated project
 
 - `DreambitGame` — reusable game code and scenes.
-- `DreambitGame.Content` — the game's MonoGame content builder and raw assets.
-- `DreambitGame.VK` — the Vulkan executable and deployment output.
-- Automatic Dreambit engine content compilation and `content.pak` baking.
-- No build-tool project references in the executable project, so content-builder and AssetBaker executables are not copied into the game output.
-- Incremental content builds and IDE up-to-date inputs.
-- Setup scripts that initialize Git, add DreambitEngine as a submodule, restore, and build.
-- Generated solution entries for the DreambitEngine runtime, content builder, and AssetBaker projects.
+- `DreambitGame.Content` — raw assets and the game's MonoGame content builder.
+- `DreambitGame.VK` — the DesktopVK executable.
+- `.dreambit/project.json` — portable paths, project identity, renderer, and SDK version.
+- Repository-level central package versions for `DreambitEngine` and `DreambitEngine.Build`.
+- No DreambitEngine Git submodule, setup scripts, machine-specific SDK path, or build-tool project references.
+
+`DreambitEngine.Build` is the stable `buildTransitive` integration point. Real-time and explicit content baking is intentionally integrated in Editor Milestone 4.
 
 ## Pack and install locally
 
@@ -29,45 +27,20 @@ Bash:
 ./scripts/install-local.sh
 ```
 
-Or manually:
+These scripts pack the coordinated runtime/build/template package set into the same user SDK-cache layout consumed by Dreambit.Editor, then install the project template for direct command-line use.
+
+Create a project:
 
 ```powershell
-dotnet pack -c Release
-$version = ([xml](Get-Content ./DreambitEngine.Templates.csproj)).Project.PropertyGroup.Version | Select-Object -First 1
-dotnet new install "./bin/Release/DreambitEngine.Templates.$version.nupkg" --force
-dotnet new dreambit-game -n MyGame --game-title "My Game"
+dotnet new dreambit-game -n MyGame --game-title "My Game" --sdkVersion 0.1.4
 ```
 
-After generation:
+Dreambit.Editor normally performs template installation, generation, and package restore automatically.
 
-```powershell
-cd MyGame
-./scripts/setup-engine.ps1
-dotnet run --project src/MyGame.VK
-```
-
-Use a valid C# identifier for `-n`, such as `MyGame` or `OrbitalDefense`. Use `--game-title` for spaces and punctuation.
-
-## Test without touching the user's installed templates
+## Test
 
 ```powershell
 ./scripts/test-template.ps1
 ```
 
-The test packs the template, installs it into an isolated template cache, generates `TemplateSmokeTest`, verifies the important project structure, and optionally builds it when a DreambitEngine checkout is supplied. It does not change the templates installed for your user account.
-
-## Engine setup is required
-
-After creating a game, change into the generated project directory and run:
-
-```powershell
-.\scripts\setup-engine.ps1
-```
-
-The .NET template engine creates files but does not clone the DreambitEngine Git submodule automatically. Building before running setup will fail because `external/DreambitEngine` does not exist yet.
-
-To generate directly into the current empty directory, use `-o .`:
-
-```powershell
-dotnet new dreambit-game -n MyGame -o . --game-title "My Game"
-```
+The smoke test packs all three SDK packages, uses an isolated template hive, generates a dotted-name project, validates `.dreambit/project.json`, restores from the local package feed, and builds the generated solution.

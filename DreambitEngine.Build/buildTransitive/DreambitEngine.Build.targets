@@ -1,0 +1,9 @@
+<Project>
+  <!--
+    This package is the stable buildTransitive integration boundary for Dreambit.
+    Milestone 4 will add the real content and AssetBaker targets here.
+  -->
+  <ItemGroup>
+    <ProjectCapability Include="Dreambit" />
+  </ItemGroup>
+</Project>

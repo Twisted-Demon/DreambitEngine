@@ -4,23 +4,26 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$root = Split-Path -Parent $PSScriptRoot
-$project = Join-Path $root "DreambitEngine.Templates.csproj"
+$templateRoot = Split-Path -Parent $PSScriptRoot
+$engineRoot = Split-Path -Parent $templateRoot
+$templateProject = Join-Path $templateRoot "DreambitEngine.Templates.csproj"
+$version = ([xml](Get-Content $templateProject)).Project.PropertyGroup.Version | Select-Object -First 1
+$localData = if ($env:LOCALAPPDATA) { $env:LOCALAPPDATA } else { $HOME }
+$feed = Join-Path $localData "Dreambit/Editor/sdks/$version/packages"
 
-Push-Location $root
-try {
-    dotnet pack $project -c $Configuration
-    if ($LASTEXITCODE -ne 0) { throw "Template package build failed." }
-
-    $version = ([xml](Get-Content $project)).Project.PropertyGroup.Version | Select-Object -First 1
-    $package = Join-Path $root "bin/$Configuration/DreambitEngine.Templates.$version.nupkg"
-
-    dotnet new install $package --force
-    if ($LASTEXITCODE -ne 0) { throw "Template installation failed." }
-
-    Write-Host "Installed DreambitEngine.Templates $version." -ForegroundColor Green
-    Write-Host 'Create a game with: dotnet new dreambit-game -n MyGame --game-title "My Game"'
+New-Item $feed -ItemType Directory -Force | Out-Null
+foreach ($project in @(
+    (Join-Path $engineRoot "DreambitEngine/DreambitEngine.csproj"),
+    (Join-Path $engineRoot "DreambitEngine.Build/DreambitEngine.Build.csproj"),
+    $templateProject
+)) {
+    dotnet pack $project -c $Configuration "-p:PackageVersion=$version" -o $feed --nologo
+    if ($LASTEXITCODE -ne 0) { throw "SDK package build failed for '$project'." }
 }
-finally {
-    Pop-Location
-}
+
+$templatePackage = Join-Path $feed "DreambitEngine.Templates.$version.nupkg"
+dotnet new install $templatePackage --force
+if ($LASTEXITCODE -ne 0) { throw "Template installation failed." }
+
+Write-Host "Installed Dreambit SDK $version at $feed." -ForegroundColor Green
+Write-Host 'Create a game with: dotnet new dreambit-game -n MyGame --game-title "My Game"'

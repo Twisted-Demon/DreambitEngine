@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <DreambitSdkVersion Condition="'$(DreambitSdkVersion)' == ''">0.1.4</DreambitSdkVersion>
+    <DreambitContentBuildEnabled Condition="'$(DreambitContentBuildEnabled)' == ''">false</DreambitContentBuildEnabled>
+  </PropertyGroup>
+</Project>

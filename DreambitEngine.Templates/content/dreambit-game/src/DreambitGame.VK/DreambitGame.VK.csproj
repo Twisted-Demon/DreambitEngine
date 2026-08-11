@@ -26,11 +26,12 @@
     <PackageReference Include="MonoGame.Runtime.Windows.Vulkan" />
     <PackageReference Include="MonoGame.Runtime.Mac.Vulkan" />
     <PackageReference Include="MonoGame.Runtime.Linux.Vulkan" />
+    <PackageReference Include="DreambitEngine.Build" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- This is the executable's only project dependency. Build-time content tools
-         are invoked by DreambitGame.Content.targets and never copied locally. -->
+    <!-- The executable references only game code as a project. Dreambit build tools
+         remain private package assets and are never copied into runtime output. -->
     <ProjectReference Include="../DreambitGame/DreambitGame.csproj" />
   </ItemGroup>
 
@@ -39,11 +40,5 @@
     <UpToDateCheckInput Include="../DreambitGame.Content/Assets/**/*" />
     <UpToDateCheckInput Include="../DreambitGame.Content/Builder/**/*.cs" />
     <UpToDateCheckInput Include="../DreambitGame.Content/DreambitGame.Content.csproj" />
-    <UpToDateCheckInput Include="../../build/DreambitGame.Content.targets" />
-    <UpToDateCheckInput Include="$(DreambitEngineRoot)/Dreambit.Content/Assets/**/*" />
-    <UpToDateCheckInput Include="$(DreambitEngineRoot)/Dreambit.Content/Builder/**/*.cs" />
-    <UpToDateCheckInput Include="$(DreambitEngineRoot)/DreambitEngine.AssetBaker/**/*.cs" />
   </ItemGroup>
-
-  <Import Project="../../build/DreambitGame.Content.targets" />
 </Project>

@@ -4,8 +4,5 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
-
-    <DreambitSolutionRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..'))</DreambitSolutionRoot>
-    <DreambitEngineRoot Condition="'$(DreambitEngineRoot)' == ''">$([System.IO.Path]::GetFullPath('$(DreambitSolutionRoot)/external/DreambitEngine'))</DreambitEngineRoot>
   </PropertyGroup>
 </Project>

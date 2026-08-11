@@ -2,46 +2,39 @@
 set -euo pipefail
 
 configuration="${1:-Release}"
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-project="$root/DreambitEngine.Templates.csproj"
-test_root="$root/TemplateTests"
+template_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+engine_root="$(cd "$template_root/.." && pwd)"
+test_root="$template_root/TemplateTests"
+feed="$test_root/packages"
 template_hive="$test_root/.template-hive"
-version="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' "$project" | head -n 1)"
-package="$root/bin/$configuration/DreambitEngine.Templates.$version.nupkg"
+version="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' "$template_root/DreambitEngine.Templates.csproj" | head -n 1)"
 test_name="Dreambit.TemplateSmokeTest"
-test_repository="https://example.invalid/DreambitEngine.git"
-test_fps="144"
+generated="$test_root/$test_name"
 
 rm -rf "$test_root"
-mkdir -p "$test_root"
+mkdir -p "$feed"
 
-dotnet pack "$project" -c "$configuration"
-[[ -f "$package" ]] || {
-  echo "Expected template package was not created: $package" >&2
-  exit 1
-}
+dotnet pack "$engine_root/DreambitEngine/DreambitEngine.csproj" -c "$configuration" -p:PackageVersion="$version" -o "$feed" --nologo
+dotnet pack "$engine_root/DreambitEngine.Build/DreambitEngine.Build.csproj" -c "$configuration" -p:PackageVersion="$version" -o "$feed" --nologo
+dotnet pack "$template_root/DreambitEngine.Templates.csproj" -c "$configuration" -p:PackageVersion="$version" -o "$feed" --nologo
 
-dotnet new --debug:custom-hive "$template_hive" install "$package" --force
-(
-  cd "$test_root"
-  dotnet new --debug:custom-hive "$template_hive" dreambit-game \
-    -n "$test_name" \
-    --game-title "Template Smoke Test" \
-    --engine-repository "$test_repository" \
-    --target-fps "$test_fps" \
-    --no-update-check
-)
+dotnet new --debug:custom-hive "$template_hive" install "$feed/DreambitEngine.Templates.$version.nupkg" --force
+dotnet new --debug:custom-hive "$template_hive" dreambit-game \
+  -n "$test_name" \
+  -o "$generated" \
+  --game-title "Template Smoke Test" \
+  --sdkVersion "$version" \
+  --targetRenderer DesktopVK \
+  --target-fps 144 \
+  --no-update-check
 
-generated="$test_root/$test_name"
 expected_files=(
+  ".dreambit/project.json"
   ".editorconfig"
   ".gitignore"
+  "Directory.Packages.props"
   "$test_name.sln"
-  "build/$test_name.Content.targets"
-  "scripts/setup-engine.ps1"
-  "scripts/setup-engine.sh"
-  "scripts/update-engine.ps1"
-  "scripts/update-engine.sh"
+  "src/Directory.Build.props"
   "src/$test_name/$test_name.csproj"
   "src/$test_name.Content/$test_name.Content.csproj"
   "src/$test_name.VK/$test_name.VK.csproj"
@@ -54,48 +47,30 @@ for relative_path in "${expected_files[@]}"; do
   }
 done
 
-[[ ! -e "$generated/.template.config" ]] || {
-  echo "Generated output contains the template authoring configuration." >&2
-  exit 1
-}
-
-bash -n "$generated/scripts/setup-engine.sh" "$generated/scripts/update-engine.sh"
+[[ ! -e "$generated/external" && ! -e "$generated/scripts" && ! -e "$generated/build" ]]
+grep -Fq '"targetRenderer": "DesktopVK"' "$generated/.dreambit/project.json"
 grep -Fq 'title: "Template Smoke Test"' "$generated/src/$test_name.VK/Program.cs"
-grep -Fq "Core.SetTargetFps($test_fps);" "$generated/src/$test_name.VK/Program.cs"
-grep -Fq "$test_repository" "$generated/scripts/setup-engine.sh"
+grep -Fq 'Core.SetTargetFps(144);' "$generated/src/$test_name.VK/Program.cs"
 
 if grep -R -E \
     --include='*.cs' --include='*.csproj' --include='*.json' --include='*.md' \
-    --include='*.props' --include='*.ps1' --include='*.sh' --include='*.sln' \
-    --include='*.targets' \
+    --include='*.props' --include='*.sln' --include='*.targets' \
     '__DREAMBIT_[A-Z_]+__' "$generated"; then
   echo "Generated output contains an unresolved template placeholder." >&2
   exit 1
 fi
 
-launcher="$generated/src/$test_name.VK/$test_name.VK.csproj"
-project_reference_count="$(grep -c '<ProjectReference ' "$launcher" || true)"
-if [[ "$project_reference_count" != "1" ]] || ! grep -Fq "<ProjectReference Include=\"../$test_name/$test_name.csproj\" />" "$launcher"; then
-  echo "The launcher does not contain exactly one game-code ProjectReference." >&2
-  exit 1
-fi
-
-dotnet msbuild "$launcher" -getProperty:TargetFramework -p:DreambitContentBuildEnabled=false >/dev/null
 solution_projects="$(dotnet sln "$generated/$test_name.sln" list | tr '\\' '/')"
-expected_solution_projects=(
-  "src/$test_name/$test_name.csproj"
-  "src/$test_name.Content/$test_name.Content.csproj"
-  "src/$test_name.VK/$test_name.VK.csproj"
-  "external/DreambitEngine/DreambitEngine/DreambitEngine.csproj"
-  "external/DreambitEngine/Dreambit.Content/Dreambit.Content.csproj"
-  "external/DreambitEngine/DreambitEngine.AssetBaker/DreambitEngine.AssetBaker.csproj"
-)
-
-for expected_project in "${expected_solution_projects[@]}"; do
-  grep -Fxq "$expected_project" <<<"$solution_projects" || {
-    echo "Generated solution is missing '$expected_project'." >&2
-    exit 1
-  }
+for expected_project in \
+  "src/$test_name/$test_name.csproj" \
+  "src/$test_name.Content/$test_name.Content.csproj" \
+  "src/$test_name.VK/$test_name.VK.csproj"; do
+  grep -Fxq "$expected_project" <<<"$solution_projects"
 done
+
+dotnet restore "$generated/$test_name.sln" -p:RestoreAdditionalProjectSources="$feed" --nologo
+imported_sdk_version="$(dotnet msbuild "$generated/src/$test_name.VK/$test_name.VK.csproj" -getProperty:DreambitSdkVersion --nologo | tail -n 1)"
+[[ "$imported_sdk_version" == "$version" ]]
+dotnet build "$generated/$test_name.sln" --no-restore --nologo
 
 echo "Template smoke test passed: $generated"

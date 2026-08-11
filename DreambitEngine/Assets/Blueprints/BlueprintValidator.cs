@@ -142,8 +142,12 @@ public static class BlueprintValidator
 
         if (BlueprintResolver.IsDreambitAsset(targetType))
         {
-            if (token.Type != JTokenType.String || string.IsNullOrWhiteSpace(token.Value<string>()))
-                errors.Add($"{path}: asset references must be non-empty strings.");
+            var isLegacyPath = token.Type == JTokenType.String &&
+                               !string.IsNullOrWhiteSpace(token.Value<string>());
+            var isStableReference = DreambitAssetReferenceToken.TryRead(token, out _, out _);
+            if (!isLegacyPath && !isStableReference)
+                errors.Add(
+                    $"{path}: asset references must be non-empty paths or tagged asset IDs.");
             return;
         }
 

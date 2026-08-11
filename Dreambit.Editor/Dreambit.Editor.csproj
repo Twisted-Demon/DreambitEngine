@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <AssemblyName>Dreambit.Editor</AssemblyName>
+    <RootNamespace>Dreambit.Editor</RootNamespace>
+    <MonoGamePlatform>DesktopVK</MonoGamePlatform>
+    <RollForward>Major</RollForward>
+    <PublishReadyToRun>false</PublishReadyToRun>
+
+    <BaseOutputPath>$(MSBuildProjectDirectory)/Build/</BaseOutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+
+    <DreambitSdkVersion>0.1.4</DreambitSdkVersion>
+    <BundleDreambitSdkOnPublish Condition="'$(BundleDreambitSdkOnPublish)' == ''">true</BundleDreambitSdkOnPublish>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ImGui.NET" Version="1.91.6.1" />
+    <PackageReference Include="MonoGame.Framework.Native" Version="3.8.5" />
+    <PackageReference Include="MonoGame.Runtime.Windows.Vulkan" Version="3.8.5" />
+    <PackageReference Include="MonoGame.Runtime.Mac.Vulkan" Version="3.8.5" />
+    <PackageReference Include="MonoGame.Runtime.Linux.Vulkan" Version="3.8.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../DreambitEngine/DreambitEngine.csproj" />
+  </ItemGroup>
+
+  <Target Name="BundleDreambitSdk"
+          AfterTargets="Publish"
+          Condition="'$(BundleDreambitSdkOnPublish)' == 'true'">
+    <PropertyGroup>
+      <_DreambitBundledSdkDirectory>$(PublishDir)SDK/$(DreambitSdkVersion)/packages</_DreambitBundledSdkDirectory>
+      <_DreambitSdkPackProperties>Configuration=$(Configuration);PackageVersion=$(DreambitSdkVersion);PackageOutputPath=$(_DreambitBundledSdkDirectory)</_DreambitSdkPackProperties>
+    </PropertyGroup>
+
+    <MakeDir Directories="$(_DreambitBundledSdkDirectory)" />
+    <MSBuild Projects="../DreambitEngine/DreambitEngine.csproj;../DreambitEngine.Build/DreambitEngine.Build.csproj;../DreambitEngine.Templates/DreambitEngine.Templates.csproj"
+             Targets="Restore;Pack"
+             BuildInParallel="false"
+             Properties="$(_DreambitSdkPackProperties)" />
+  </Target>
+</Project>

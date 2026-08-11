@@ -5,6 +5,14 @@
         <AssemblyName>Dreambit</AssemblyName>
         <RootNamespace>Dreambit</RootNamespace>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <IsPackable>true</IsPackable>
+        <PackageId>DreambitEngine</PackageId>
+        <PackageVersion Condition="'$(PackageVersion)' == ''">0.1.4</PackageVersion>
+        <Authors>Dreambit Engine</Authors>
+        <Description>DreambitEngine runtime library for MonoGame games.</Description>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageTags>dreambit;monogame;game-engine</PackageTags>
+        <RepositoryUrl>https://github.com/Twisted-Demon/DreambitEngine</RepositoryUrl>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
         <OutputPath>$(BaseOutputPath)</OutputPath> <!-- No version folder for Debug -->
@@ -14,6 +22,7 @@
         <OutputPath>$(BaseOutputPath)</OutputPath> <!-- No version folder for Release -->
     </PropertyGroup>
     <ItemGroup>
+        <None Include="..\README.md" Pack="true" PackagePath="/" />
         <PackageReference Include="FontStashSharp.MonoGame" Version="1.5.6" />
         <PackageReference Include="MonoGame.Framework.Native" Version="3.8.5">
             <PrivateAssets>All</PrivateAssets>

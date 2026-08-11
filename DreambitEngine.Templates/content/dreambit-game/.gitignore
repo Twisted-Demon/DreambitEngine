@@ -39,6 +39,7 @@ lcov.info
 # NuGet restore state
 .nuget/
 packages/
+.dreambit/user/
 
 # Local environment and secrets
 .env

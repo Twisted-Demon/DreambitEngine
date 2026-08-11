@@ -1,15 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <PackageReference Include="MonoGame.Framework.DesktopGL" PrivateAssets="all" />
+    <PackageReference Include="DreambitEngine" />
   </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="$(DreambitEngineRoot)/DreambitEngine/DreambitEngine.csproj"
-                      Condition="Exists('$(DreambitEngineRoot)/DreambitEngine/DreambitEngine.csproj')" />
-  </ItemGroup>
-
-  <Target Name="ValidateDreambitEngine" BeforeTargets="PrepareForBuild;ResolveProjectReferences">
-    <Error Condition="!Exists('$(DreambitEngineRoot)/DreambitEngine/DreambitEngine.csproj')"
-           Text="DreambitEngine was not found at '$(DreambitEngineRoot)'. Run scripts/setup-engine.ps1 (Windows) or scripts/setup-engine.sh (macOS/Linux)." />
-  </Target>
 </Project>

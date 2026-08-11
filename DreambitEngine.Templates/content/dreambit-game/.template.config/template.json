@@ -26,13 +26,27 @@
       "defaultValue": "Dreambit Game",
       "replaces": "Dreambit Game"
     },
-    "engineRepository": {
+    "sdkVersion": {
       "type": "parameter",
       "datatype": "text",
-      "displayName": "DreambitEngine repository",
-      "description": "Git repository used by the setup scripts.",
-      "defaultValue": "https://github.com/Twisted-Demon/DreambitEngine.git",
-      "replaces": "__DREAMBIT_ENGINE_REPOSITORY__"
+      "displayName": "Dreambit SDK version",
+      "description": "Coordinated Dreambit NuGet package version used by the generated game.",
+      "defaultValue": "0.1.4",
+      "replaces": "__DREAMBIT_SDK_VERSION__"
+    },
+    "targetRenderer": {
+      "type": "parameter",
+      "datatype": "choice",
+      "displayName": "Target renderer",
+      "description": "Primary renderer/platform for the generated launcher.",
+      "defaultValue": "DesktopVK",
+      "replaces": "__DREAMBIT_TARGET_RENDERER__",
+      "choices": [
+        {
+          "choice": "DesktopVK",
+          "description": "Desktop Vulkan launcher for Windows, macOS, and Linux."
+        }
+      ]
     },
     "targetFps": {
       "type": "parameter",
@@ -46,7 +60,8 @@
   "guids": [
     "4C5011FD-105B-42FB-B48D-0F2B3A42A001",
     "4C5011FD-105B-42FB-B48D-0F2B3A42A002",
-    "4C5011FD-105B-42FB-B48D-0F2B3A42A003"
+    "4C5011FD-105B-42FB-B48D-0F2B3A42A003",
+    "4C5011FD-105B-42FB-B48D-0F2B3A42A004"
   ],
   "sources": [
     {
@@ -73,18 +88,6 @@
     },
     {
       "path": "src/DreambitGame.VK/DreambitGame.VK.csproj"
-    }
-  ],
-  "postActions": [
-    {
-      "description": "Initialize the DreambitEngine submodule before opening or building the solution.",
-      "manualInstructions": [
-        {
-          "text": "From the generated project directory, run .\\scripts\\setup-engine.ps1 on Windows or ./scripts/setup-engine.sh on macOS/Linux."
-        }
-      ],
-      "actionId": "AC1156F7-BB77-4DB8-B28F-24EEBCCA1E5C",
-      "continueOnError": true
     }
   ]
 }

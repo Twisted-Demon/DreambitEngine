@@ -46,6 +46,24 @@ internal sealed class DreambitAssetReferenceConverter : JsonConverter
         if (reader.TokenType == JsonToken.StartObject)
         {
             var jsonObject = JObject.Load(reader);
+
+            if (DreambitAssetReferenceToken.TryRead(
+                    jsonObject,
+                    out var assetId,
+                    out var fallbackAssetName))
+            {
+                var referencedAsset = Resources.LoadDreambitAsset(
+                    assetId,
+                    fallbackAssetName,
+                    objectType);
+
+                if (referencedAsset is null)
+                    throw new JsonSerializationException(
+                        $"Could not resolve asset ID '{assetId}' as '{objectType.FullName}'.");
+
+                return referencedAsset;
+            }
+
             var inlineAsset = jsonObject.ToObject(objectType, serializer);
 
             if (inlineAsset is null)
@@ -72,6 +90,12 @@ internal sealed class DreambitAssetReferenceConverter : JsonConverter
         }
 
         var asset = (DreambitAsset)value;
+
+        if (!asset.AssetId.IsEmpty)
+        {
+            DreambitAssetReferenceToken.Create(asset.AssetId, asset.AssetName).WriteTo(writer);
+            return;
+        }
 
         if (!string.IsNullOrWhiteSpace(asset.AssetName))
         {
