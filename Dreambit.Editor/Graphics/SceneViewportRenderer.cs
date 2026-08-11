@@ -1,4 +1,5 @@
 using Dreambit.ECS;
+using Dreambit.Editor.UI;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -29,7 +30,7 @@ internal sealed class SceneViewportRenderer : IDisposable
         EnsureTarget(width, height);
         var camera = scene.EnsureEditorCamera();
         camera.Transform.Position = new Vector3(position, camera.Transform.Position.Z);
-        camera.Zoom = Math.Clamp(zoom, 0.02f, 100f);
+        camera.Zoom = EditorViewportUi.NormalizeZoom(zoom);
         camera.ConfigureEditorViewport(_target!.Width, _target.Height);
 
         _device.SetRenderTarget(_target);

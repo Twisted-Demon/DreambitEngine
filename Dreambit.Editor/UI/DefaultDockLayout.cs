@@ -13,8 +13,6 @@ internal static class DefaultDockLayout
         Vector2 dockspaceSize,
         EditorPanelRegistry panels)
     {
-        panels.OpenAll();
-
         ImGuiNativeDocking.RemoveNode(dockspaceId);
         ImGuiNativeDocking.AddNode(dockspaceId, DockSpaceNodeFlag);
         ImGuiNativeDocking.SetNodeSize(dockspaceId, dockspaceSize);
@@ -44,6 +42,9 @@ internal static class DefaultDockLayout
             leftId);
         ImGuiNativeDocking.DockWindow(
             panels.GetRequired(EditorPanelIds.Scene).WindowName,
+            centerId);
+        ImGuiNativeDocking.DockWindow(
+            panels.GetRequired(EditorPanelIds.Blueprint).WindowName,
             centerId);
         ImGuiNativeDocking.DockWindow(
             panels.GetRequired(EditorPanelIds.Inspector).WindowName,

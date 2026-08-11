@@ -37,6 +37,11 @@ public sealed class AssetDatabaseTests : IDisposable
             Assert.Equal("characters/hero.sprite", sprite.LogicalAssetName);
             Assert.False(sprite.Id.IsEmpty);
             spriteId = sprite.Id;
+            var texture = Assert.Single(
+                snapshot.Assets,
+                asset => asset.RelativePath == "characters/hero.texture.png");
+            Assert.Equal(AssetKind.Texture, texture.Kind);
+            Assert.Equal(typeof(TextureAsset).FullName, texture.TypeName);
             Assert.True(File.Exists(database.RegistryPath));
         }
 

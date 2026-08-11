@@ -1,6 +1,7 @@
 using Dreambit.ECS;
 using Dreambit.Editor.Graphics;
 using Dreambit.Editor.Scenes;
+using Dreambit.Editor.UI.Panels;
 using Dreambit.LDtk;
 using Newtonsoft.Json.Linq;
 
@@ -66,6 +67,31 @@ public sealed class SceneDocumentTests : IDisposable
 
         Assert.Equal(1, EditorLifecycleTestComponent.GizmosDrawn);
         Assert.Equal(1, EditorLifecycleTestComponent.SelectedGizmosDrawn);
+    }
+
+    [Fact]
+    public void PointLightRadiusHandleUsesWorldDistanceAndOptionalSnapping()
+    {
+        var center = new Microsoft.Xna.Framework.Vector2(2f, 3f);
+        var handle = new Microsoft.Xna.Framework.Vector2(5f, 7f);
+
+        Assert.Equal(5f, ScenePanel.CalculatePointLightRadius(center, handle, false, 1f));
+        Assert.Equal(6f, ScenePanel.CalculatePointLightRadius(center, handle, true, 3f));
+    }
+
+    [Fact]
+    public void SelectedPointLightDrawsItsRadiusCircle()
+    {
+        using var scene = new TestEditorScene();
+        var entity = scene.CreateEntity("point light");
+        entity.AttachComponent<PointLight2D>().Radius = 4.5f;
+        scene.FlushStructuralChanges();
+        var context = new RecordingGizmoContext();
+
+        scene.DrawEditorGizmos(context, new HashSet<Guid> { entity.Id });
+
+        Assert.Equal(1, context.CircleCount);
+        Assert.Equal(4.5f, context.LastCircleRadius);
     }
 
     [Fact]
@@ -509,8 +535,15 @@ public sealed class SceneDocumentTests : IDisposable
 
     private sealed class RecordingGizmoContext : IEditorGizmoContext
     {
+        public int CircleCount { get; private set; }
+        public float LastCircleRadius { get; private set; }
+
         public void Line(Microsoft.Xna.Framework.Vector2 from, Microsoft.Xna.Framework.Vector2 to, Microsoft.Xna.Framework.Color color, float thickness = 1) { }
-        public void Circle(Microsoft.Xna.Framework.Vector2 center, float radius, Microsoft.Xna.Framework.Color color, float thickness = 1) { }
+        public void Circle(Microsoft.Xna.Framework.Vector2 center, float radius, Microsoft.Xna.Framework.Color color, float thickness = 1)
+        {
+            CircleCount++;
+            LastCircleRadius = radius;
+        }
         public void Rectangle(RectangleF rectangle, Microsoft.Xna.Framework.Color color, float thickness = 1) { }
         public void Label(Microsoft.Xna.Framework.Vector2 position, string text, Microsoft.Xna.Framework.Color color) { }
     }

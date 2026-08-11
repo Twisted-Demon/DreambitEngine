@@ -30,6 +30,7 @@ internal sealed class EditorApplication : IDisposable
     private readonly ProjectLauncherView _projectLauncher;
     private readonly ProjectCreationService _projectCreationService;
     private readonly EditorDragDropService _dragDrop = new();
+    private readonly EditorIconService _icons;
     private readonly CancellationTokenSource _projectCreationLifetime = new();
 
     private readonly DreambitProjectDefinition? _project;
@@ -67,6 +68,7 @@ internal sealed class EditorApplication : IDisposable
         _globalState = globalState;
         _workspaceState = workspaceState;
         _logs = new EditorLogService();
+        _icons = new EditorIconService(Core.Instance.GraphicsDevice, imGuiRenderer);
         _projectManager = new DreambitProjectManager(
             paths,
             reportAssetDiagnostic: LogAssetDiagnostic,
@@ -100,19 +102,31 @@ internal sealed class EditorApplication : IDisposable
         if (_project is not null)
         {
             var session = _projectManager.CurrentSession!;
+            var blueprintDockLayoutMissing =
+                !_workspaceState.PanelVisibility.ContainsKey(EditorPanelIds.Blueprint);
             _panels.Register(new HierarchyPanel(
                 session.Scenes,
                 session.Scenes.Selection,
                 _dragDrop,
                 session.Assets,
-                _workspaceState));
+                _workspaceState,
+                _icons));
             _panels.Register(new ScenePanel(
                 session.Scenes,
                 session.Scenes.Selection,
                 _workspaceState,
                 new SceneViewportRenderer(Core.Instance.GraphicsDevice, imGuiRenderer),
                 _dragDrop,
-                session.Assets));
+                session.Assets,
+                _icons));
+            var blueprintView = new BlueprintViewPanel(
+                session.Assets,
+                session.AssetEditing,
+                session.GameCode.Assemblies,
+                _workspaceState,
+                new SceneViewportRenderer(Core.Instance.GraphicsDevice, imGuiRenderer),
+                _icons);
+            _panels.Register(blueprintView);
             _panels.Register(new InspectorPanel(
                 session.Scenes,
                 session.InspectorMetadata,
@@ -134,10 +148,12 @@ internal sealed class EditorApplication : IDisposable
                 session.AssetEditing,
                 session.Scenes,
                 session.EditorTypes,
-                _workspaceState));
+                _workspaceState,
+                _icons,
+                blueprintView.Open));
             _panels.Register(new ConsolePanel(_logs));
-            _panels.Register(new BuildPanel(_projectManager.CurrentSession.GameCode));
-            _rebuildDockLayout = !imGuiRenderer.HasSavedLayout;
+            _panels.Register(new BuildPanel(_projectManager.CurrentSession.GameCode, _icons));
+            _rebuildDockLayout = !imGuiRenderer.HasSavedLayout || blueprintDockLayoutMissing;
 
             if (!string.IsNullOrWhiteSpace(_workspaceState.LastScenePath) &&
                 File.Exists(_workspaceState.LastScenePath))
@@ -193,10 +209,16 @@ internal sealed class EditorApplication : IDisposable
         HandleShortcuts();
     }
 
-    public void CaptureWindowSize(int width, int height)
+    public void CaptureWindowBounds(int x, int y, int width, int height)
     {
         _workspaceState.WindowWidth = Math.Clamp(width, 800, 7680);
         _workspaceState.WindowHeight = Math.Clamp(height, 600, 4320);
+        _workspaceState.WindowX = x;
+        _workspaceState.WindowY = y;
+        _workspaceState.HasWindowPosition = true;
+        _globalState.WindowX = x;
+        _globalState.WindowY = y;
+        _globalState.HasWindowPosition = true;
     }
 
     private void DrawDockHost()
@@ -841,6 +863,8 @@ internal sealed class EditorApplication : IDisposable
             return false;
         }
 
+        CaptureCurrentWindowPlacement();
+        TryPersistGlobalState();
         if (!ProjectProcessLauncher.TryLaunch(project.RootDirectory, out var launchError))
         {
             _projectLauncher.SetError(launchError ?? "Could not open the project.");
@@ -854,6 +878,16 @@ internal sealed class EditorApplication : IDisposable
         _openProjectError = null;
         _logs.Info("Project", $"Launched project '{project.Metadata.Name}'.");
         return true;
+    }
+
+    private void CaptureCurrentWindowPlacement()
+    {
+        var window = Core.Instance.Window;
+        var bounds = window.ClientBounds;
+        var position = window.Position;
+        CaptureWindowBounds(position.X, position.Y, bounds.Width, bounds.Height);
+        if (!_stateStore.TrySaveWorkspaceState(_workspaceState, out var error))
+            _logs.Warning("State", error ?? "Could not save the current window placement.");
     }
 
     private bool BeginCreateProject(CreateProjectRequest request)
@@ -1021,6 +1055,7 @@ internal sealed class EditorApplication : IDisposable
             _workspaceState.LastScenePath = scenePath;
 
         _panels.Dispose();
+        _icons.Dispose();
         _projectCreationLifetime.Cancel();
         _projectCreationLifetime.Dispose();
         _projectManager.Dispose();

@@ -73,6 +73,9 @@ public class SpriteSheet : DreambitAsset
 
     [JsonIgnore] public Texture2D Texture => SourceSprite?.Texture;
 
+    [JsonIgnore] public TextureAsset TextureAsset => SourceSprite?.TextureAsset;
+
+    [Obsolete("Use TextureAsset. TexturePath is retained for source compatibility only.")]
     [JsonIgnore] public string TexturePath => SourceSprite?.TexturePath;
 
     [JsonIgnore] public Sprite[] Frames { get; private set; } = [];
@@ -129,7 +132,7 @@ public class SpriteSheet : DreambitAsset
 
                     Frames[i] = new Sprite
                     {
-                        Texture = Texture,
+                        TextureAsset = TextureAsset,
                         SourceRect = new Rectangle(
                             SourceSprite.SourceRect.X + x * frameWidth,
                             SourceSprite.SourceRect.Y + y * frameHeight,
@@ -144,7 +147,7 @@ public class SpriteSheet : DreambitAsset
             default:
                 Frames[0] = new Sprite
                 {
-                    Texture = Texture,
+                    TextureAsset = TextureAsset,
                     SourceRect = SourceSprite.SourceRect,
                     PixelsPerUnit = SourceSprite.PixelsPerUnit
                 };
@@ -164,7 +167,7 @@ public class SpriteSheet : DreambitAsset
             Logger.Warn("Frame out of bounds, unable to get frame using default source rect");
             sprite = new Sprite
             {
-                Texture = Texture,
+                TextureAsset = TextureAsset,
                 SourceRect = SourceSprite.SourceRect,
                 PixelsPerUnit = SourceSprite.PixelsPerUnit
             };

@@ -6,6 +6,7 @@ using Dreambit.Editor.Projects;
 using Dreambit.Editor.Scenes;
 using Dreambit.Editor.Inspection;
 using Dreambit.Editor.Persistence;
+using Dreambit.Editor.UI;
 using ImGuiNET;
 
 namespace Dreambit.Editor.UI.Panels;
@@ -25,6 +26,8 @@ internal sealed class ProjectPanel : EditorPanel
     private readonly SceneDocumentService _scenes;
     private readonly EditorTypeRegistry _types;
     private readonly EditorWorkspaceState _workspace;
+    private readonly EditorIconService _icons;
+    private readonly Action<AssetRecord> _openBlueprint;
     private string _currentFolder = string.Empty;
     private string _search = string.Empty;
     private string? _selectedPath;
@@ -51,7 +54,9 @@ internal sealed class ProjectPanel : EditorPanel
         AssetEditingService assetEditing,
         SceneDocumentService scenes,
         EditorTypeRegistry types,
-        EditorWorkspaceState workspace)
+        EditorWorkspaceState workspace,
+        EditorIconService icons,
+        Action<AssetRecord> openBlueprint)
         : base(EditorPanelIds.Project, "Project")
     {
         _project = project;
@@ -62,6 +67,8 @@ internal sealed class ProjectPanel : EditorPanel
         _scenes = scenes;
         _types = types;
         _workspace = workspace;
+        _icons = icons;
+        _openBlueprint = openBlueprint;
         _currentFolder = workspace.ProjectBrowserFolder;
         _selectedPath = workspace.LastSelectedAssetPath;
         _selectedIsFolder = workspace.LastSelectedAssetIsFolder;
@@ -103,7 +110,7 @@ internal sealed class ProjectPanel : EditorPanel
     private void DrawToolbar()
     {
         ImGui.BeginDisabled(_currentFolder.Length == 0);
-        if (ImGui.Button("Up"))
+        if (_icons.Button("ProjectUp", "folder_open", "Up one folder"))
         {
             _currentFolder = GetParentPath(_currentFolder);
             ClearSelection();
@@ -111,7 +118,7 @@ internal sealed class ProjectPanel : EditorPanel
         ImGui.EndDisabled();
 
         ImGui.SameLine();
-        if (ImGui.Button("+"))
+        if (_icons.Button("ProjectCreate", "add", "Create asset or folder"))
             ImGui.OpenPopup("ProjectCreateMenu##Dreambit.Editor.Project");
 
         if (ImGui.BeginPopup("ProjectCreateMenu##Dreambit.Editor.Project"))
@@ -136,7 +143,7 @@ internal sealed class ProjectPanel : EditorPanel
         }
 
         ImGui.SameLine();
-        if (ImGui.Button("Refresh"))
+        if (_icons.Button("ProjectRefresh", "refresh", "Refresh project files"))
         {
             try
             {
@@ -150,7 +157,7 @@ internal sealed class ProjectPanel : EditorPanel
         }
 
         ImGui.SameLine();
-        if (ImGui.Button("Reveal"))
+        if (_icons.Button("ProjectReveal", "inventory_2", "Reveal in file browser"))
             RevealPath(_selectedPath ?? _currentFolder, _selectedPath is not null && !_selectedIsFolder);
     }
 
@@ -245,7 +252,7 @@ internal sealed class ProjectPanel : EditorPanel
         ImGui.TableSetColumnIndex(0);
         var selected = _selectedIsFolder && PathEquals(_selectedPath, folder.RelativePath);
         if (ImGui.Selectable(
-                $"[Folder]  {folder.Name}##folder:{folder.RelativePath}",
+                $"    {folder.Name}##folder:{folder.RelativePath}",
                 selected,
                 ImGuiSelectableFlags.SpanAllColumns | ImGuiSelectableFlags.AllowDoubleClick))
         {
@@ -258,6 +265,7 @@ internal sealed class ProjectPanel : EditorPanel
                 ClearSelection();
             }
         }
+        DrawRowIcon("folder", new Vector4(0.95f, 0.72f, 0.28f, 1f));
 
         DrawDragSource(new ProjectItemDragPayload(
             folder.RelativePath,
@@ -277,7 +285,7 @@ internal sealed class ProjectPanel : EditorPanel
         ImGui.TableSetColumnIndex(0);
         var selected = !_selectedIsFolder && PathEquals(_selectedPath, asset.RelativePath);
         if (ImGui.Selectable(
-                $"{asset.Name}##asset:{asset.Id}",
+                $"    {asset.Name}##asset:{asset.Id}",
                 selected,
                 ImGuiSelectableFlags.SpanAllColumns | ImGuiSelectableFlags.AllowDoubleClick))
         {
@@ -286,7 +294,12 @@ internal sealed class ProjectPanel : EditorPanel
             _workspace.LastSelectionKind = "asset";
             _scenes.Selection.Clear();
             _assetEditing.Select(asset);
-            if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left) && asset.Kind == AssetKind.Scene)
+            if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left) && asset.Kind == AssetKind.Blueprint)
+            {
+                _openBlueprint(asset);
+                _error = null;
+            }
+            else if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left) && asset.Kind == AssetKind.Scene)
             {
                 try
                 {
@@ -300,6 +313,7 @@ internal sealed class ProjectPanel : EditorPanel
                 }
             }
         }
+        DrawRowIcon(GetAssetIcon(asset.Kind));
 
         DrawDragSource(new ProjectItemDragPayload(
             asset.RelativePath,
@@ -325,6 +339,33 @@ internal sealed class ProjectPanel : EditorPanel
         ImGui.TableSetColumnIndex(3);
         ImGui.TextDisabled(FormatSize(asset.Length));
     }
+
+    private void DrawRowIcon(string icon, Vector4? tint = null)
+    {
+        var minimum = ImGui.GetItemRectMin();
+        var maximum = ImGui.GetItemRectMax();
+        var size = MathF.Min(17f, maximum.Y - minimum.Y - 2f);
+        _icons.DrawAt(
+            ImGui.GetWindowDrawList(),
+            icon,
+            minimum + new Vector2(4f, (maximum.Y - minimum.Y - size) * 0.5f),
+            new Vector2(size),
+            tint);
+    }
+
+    private static string GetAssetIcon(AssetKind kind) => kind switch
+    {
+        AssetKind.Blueprint => "view_in_ar",
+        AssetKind.Scene => "layers",
+        AssetKind.Texture => "image",
+        AssetKind.Sprite => "palette",
+        AssetKind.SpriteSheet => "image",
+        AssetKind.Animation => "animation",
+        AssetKind.Audio => "audiotrack",
+        AssetKind.SoundCue => "audiotrack",
+        AssetKind.Ldtk => "data_object",
+        _ => "extension"
+    };
 
     private void DrawItemContextMenu(string path, bool isFolder)
     {

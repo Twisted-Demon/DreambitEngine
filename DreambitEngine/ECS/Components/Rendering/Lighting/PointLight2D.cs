@@ -25,4 +25,12 @@ public class PointLight2D : Light2D
     {
         Core.SpriteBatch.DrawHollowRectangle(Bounds, Color.White);
     }
+
+    public override void OnEditorDrawGizmosSelected(IEditorGizmoContext context)
+    {
+        var radius = MathF.Max(0f, Radius);
+        var color = new Color(255, 196, 64, 230);
+        context.Circle(Position, radius, color, 2f);
+        context.Line(Position, Position + Vector2.UnitX * radius, color, 1.5f);
+    }
 }

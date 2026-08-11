@@ -35,7 +35,7 @@ public class ParticleFxConfig : DreambitAsset
     public float LinearDamping { get; set; } = 0.0f;
 
     // rendering
-    public string Texture { get; set; }
+    public TextureAsset Texture { get; set; }
 
     public void Validate()
     {

@@ -13,15 +13,18 @@ namespace Dreambit.Editor.UI.Panels;
 
 internal sealed class ScenePanel : EditorPanel
 {
-    private const float GridWorldSize = 32f;
+    private const string ViewSettingsPopup = "Scene View Settings##Dreambit.Editor.Scene";
     private readonly SceneDocumentService _documents;
     private readonly SelectionService _selection;
     private readonly EditorWorkspaceState _workspace;
     private readonly SceneViewportRenderer _renderer;
     private readonly EditorDragDropService _dragDrop;
     private readonly AssetDatabase _assets;
+    private readonly EditorIconService _icons;
     private GizmoDrag? _gizmoDrag;
     private ColliderDrag? _colliderDrag;
+    private PointLightDrag? _pointLightDrag;
+    private bool _viewSettingsRequested;
 
     public ScenePanel(
         SceneDocumentService documents,
@@ -29,7 +32,8 @@ internal sealed class ScenePanel : EditorPanel
         EditorWorkspaceState workspace,
         SceneViewportRenderer renderer,
         EditorDragDropService dragDrop,
-        AssetDatabase assets)
+        AssetDatabase assets,
+        EditorIconService icons)
         : base(EditorPanelIds.Scene, "Scene")
     {
         _documents = documents;
@@ -38,6 +42,7 @@ internal sealed class ScenePanel : EditorPanel
         _renderer = renderer;
         _dragDrop = dragDrop;
         _assets = assets;
+        _icons = icons;
     }
 
     protected override ImGuiWindowFlags WindowFlags =>
@@ -66,7 +71,7 @@ internal sealed class ScenePanel : EditorPanel
             (int)MathF.Ceiling(canvasSize.X),
             (int)MathF.Ceiling(canvasSize.Y),
             cameraPosition,
-            Math.Clamp(_workspace.SceneCameraZoom, 0.02f, 100f));
+            EditorViewportUi.NormalizeZoom(_workspace.SceneCameraZoom));
 
         ImGui.Image(_renderer.TextureId, canvasSize);
         var hovered = ImGui.IsItemHovered();
@@ -75,7 +80,12 @@ internal sealed class ScenePanel : EditorPanel
         DrawAssetDropTarget(document, camera, mouseLocal);
         var drawList = ImGui.GetWindowDrawList();
         if (_workspace.ShowGrid)
-            DrawGrid(drawList, camera, canvasPosition, canvasSize);
+            EditorViewportUi.DrawGrid(
+                drawList,
+                camera,
+                canvasPosition,
+                canvasSize,
+                _workspace.GridSize);
         scene.DrawEditorGizmos(
             new ImGuiEditorGizmoContext(drawList, camera, canvasPosition),
             document.Selection.EntityIds.ToHashSet());
@@ -163,10 +173,10 @@ internal sealed class ScenePanel : EditorPanel
         var io = ImGui.GetIO();
         if (hovered && MathF.Abs(io.MouseWheel) > float.Epsilon)
         {
-            var factor = MathF.Pow(1.15f, io.MouseWheel);
             var previousWorld = camera.ScreenToWorld(new XnaVector2(mouseLocal.X, mouseLocal.Y));
-            var nextZoom = Math.Clamp(_workspace.SceneCameraZoom * factor, 0.02f, 100f);
-            var nextScale = camera.Scale * (nextZoom / MathF.Max(_workspace.SceneCameraZoom, 0.02f));
+            var nextZoom = EditorViewportUi.ApplyZoomWheel(_workspace.SceneCameraZoom, io.MouseWheel);
+            var nextScale = camera.Scale *
+                            (nextZoom / EditorViewportUi.NormalizeZoom(_workspace.SceneCameraZoom));
             var offset = new XnaVector2(
                 mouseLocal.X - canvasSize.X * 0.5f,
                 mouseLocal.Y - canvasSize.Y * 0.5f) / nextScale;
@@ -196,20 +206,28 @@ internal sealed class ScenePanel : EditorPanel
 
     private void DrawToolbar()
     {
-        if (DrawToolButton("Q", _workspace.GizmoMode == 0)) _workspace.GizmoMode = 0;
+        if (_viewSettingsRequested)
+        {
+            ImGui.OpenPopup(ViewSettingsPopup);
+            _viewSettingsRequested = false;
+        }
+        if (_icons.Button("Select", "mouse", "Select (Q)", _workspace.GizmoMode == 0))
+            _workspace.GizmoMode = 0;
         ImGui.SameLine();
-        if (DrawToolButton("W", _workspace.GizmoMode == 1)) _workspace.GizmoMode = 1;
+        if (_icons.Button("Move", "open_with", "Move (W)", _workspace.GizmoMode == 1))
+            _workspace.GizmoMode = 1;
         ImGui.SameLine();
-        if (DrawToolButton("E", _workspace.GizmoMode == 2)) _workspace.GizmoMode = 2;
+        if (_icons.Button("Rotate", "rotate_right", "Rotate (E)", _workspace.GizmoMode == 2))
+            _workspace.GizmoMode = 2;
         ImGui.SameLine();
-        if (DrawToolButton("R", _workspace.GizmoMode == 3)) _workspace.GizmoMode = 3;
+        if (_icons.Button("Scale", "aspect_ratio", "Scale (R)", _workspace.GizmoMode == 3))
+            _workspace.GizmoMode = 3;
         ImGui.SameLine();
-        if (ImGui.Button("Frame", new Vector2(54f, 0f)))
+        if (_icons.Button("Frame", "center_focus_strong", "Frame selected (F)"))
             FrameSelected();
         ImGui.SameLine();
-        var grid = _workspace.ShowGrid;
-        if (ImGui.Checkbox("Grid", ref grid))
-            _workspace.ShowGrid = grid;
+        if (_icons.Button("Grid", "grid_on", "Toggle grid", _workspace.ShowGrid))
+            _workspace.ShowGrid = !_workspace.ShowGrid;
         ImGui.SameLine();
         var snap = _workspace.SnapEnabled;
         if (ImGui.Checkbox("Snap", ref snap))
@@ -238,17 +256,11 @@ internal sealed class ScenePanel : EditorPanel
             }
         }
         ImGui.SameLine();
+        if (_icons.Button("ViewSettings", "settings", "Grid and snapping settings"))
+            _viewSettingsRequested = true;
+        EditorViewportUi.DrawSettingsPopup(ViewSettingsPopup, _workspace);
+        ImGui.SameLine();
         ImGui.TextDisabled($"Zoom {_workspace.SceneCameraZoom:0.00}x");
-    }
-
-    private static bool DrawToolButton(string label, bool active)
-    {
-        if (active)
-            ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.16f, 0.39f, 0.67f, 1f));
-        var clicked = ImGui.Button(label, new Vector2(28f, 0f));
-        if (active)
-            ImGui.PopStyleColor();
-        return clicked;
     }
 
     private void FrameSelected()
@@ -261,40 +273,6 @@ internal sealed class ScenePanel : EditorPanel
         _workspace.SceneCameraY = position.Y;
     }
 
-    private static void DrawGrid(
-        ImDrawListPtr drawList,
-        Camera2D camera,
-        Vector2 canvasPosition,
-        Vector2 canvasSize)
-    {
-        var bounds = camera.BoundsF;
-        var minimumX = MathF.Floor(bounds.Left / GridWorldSize) * GridWorldSize;
-        var minimumY = MathF.Floor(bounds.Top / GridWorldSize) * GridWorldSize;
-        var color = ImGui.GetColorU32(new Vector4(0.72f, 0.76f, 0.84f, 0.12f));
-        var axisColor = ImGui.GetColorU32(new Vector4(0.72f, 0.76f, 0.84f, 0.28f));
-        for (var worldX = minimumX; worldX <= bounds.Right; worldX += GridWorldSize)
-        {
-            var screen = camera.WorldToScreen(new XnaVector2(worldX, 0));
-            var x = canvasPosition.X + screen.X;
-            if (x < canvasPosition.X || x > canvasPosition.X + canvasSize.X)
-                continue;
-            drawList.AddLine(
-                new Vector2(x, canvasPosition.Y),
-                new Vector2(x, canvasPosition.Y + canvasSize.Y),
-                MathF.Abs(worldX) < 0.001f ? axisColor : color);
-        }
-        for (var worldY = minimumY; worldY <= bounds.Bottom; worldY += GridWorldSize)
-        {
-            var screen = camera.WorldToScreen(new XnaVector2(0, worldY));
-            var y = canvasPosition.Y + screen.Y;
-            if (y < canvasPosition.Y || y > canvasPosition.Y + canvasSize.Y)
-                continue;
-            drawList.AddLine(
-                new Vector2(canvasPosition.X, y),
-                new Vector2(canvasPosition.X + canvasSize.X, y),
-                MathF.Abs(worldY) < 0.001f ? axisColor : color);
-        }
-    }
 
     private void DrawSelection(
         ImDrawListPtr drawList,
@@ -524,6 +502,7 @@ internal sealed class ScenePanel : EditorPanel
     {
         var colliderColor = ImGui.GetColorU32(new Vector4(0.32f, 0.92f, 0.55f, 0.9f));
         var cameraColor = ImGui.GetColorU32(new Vector4(0.65f, 0.42f, 1f, 0.9f));
+        var pointLightColor = ImGui.GetColorU32(new Vector4(1f, 0.77f, 0.25f, 0.95f));
         foreach (var entity in _selection.Resolve(_documents.Current?.Scene))
         {
             if (document.TryGetBlueprintInstanceRoot(entity, out _, out _))
@@ -554,7 +533,7 @@ internal sealed class ScenePanel : EditorPanel
                             var vertexScreen = editorCamera.WorldToScreen(vertices[index]);
                             var handle = canvasPosition + new Vector2(vertexScreen.X, vertexScreen.Y);
                             drawList.AddRectFilled(handle - new Vector2(4), handle + new Vector2(4), colliderColor);
-                            if (_colliderDrag is null && hovered &&
+                            if (_colliderDrag is null && _pointLightDrag is null && hovered &&
                                 Vector2.Distance(canvasPosition + mouseLocal, handle) <= 9f &&
                                 ImGui.IsMouseClicked(ImGuiMouseButton.Left))
                             {
@@ -575,6 +554,23 @@ internal sealed class ScenePanel : EditorPanel
                 }
                 catch
                 {
+                }
+            }
+            foreach (var light in entity.GetAllComponents().OfType<PointLight2D>())
+            {
+                var handleWorld = light.Position + XnaVector2.UnitX * MathF.Max(0f, light.Radius);
+                var handleScreen = editorCamera.WorldToScreen(handleWorld);
+                var handle = canvasPosition + new Vector2(handleScreen.X, handleScreen.Y);
+                drawList.AddCircleFilled(handle, 6f, pointLightColor, 20);
+                drawList.AddCircle(handle, 9f, pointLightColor, 24, 1.5f);
+
+                if (_colliderDrag is null && _pointLightDrag is null && hovered &&
+                    Vector2.Distance(canvasPosition + mouseLocal, handle) <= 12f &&
+                    ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+                {
+                    _pointLightDrag = new PointLightDrag(
+                        entity.Id,
+                        document.BeginTransaction("Resize Point Light"));
                 }
             }
             foreach (var camera in entity.GetAllComponents().OfType<Camera2D>())
@@ -598,6 +594,31 @@ internal sealed class ScenePanel : EditorPanel
                 {
                 }
             }
+        }
+
+        if (_pointLightDrag is not null)
+        {
+            if (!ImGui.IsMouseDown(ImGuiMouseButton.Left))
+            {
+                _pointLightDrag.Transaction.Commit();
+                _pointLightDrag = null;
+                return true;
+            }
+
+            var pointLightWorld = editorCamera.ScreenToWorld(new XnaVector2(mouseLocal.X, mouseLocal.Y));
+            var pointLightDrag = _pointLightDrag;
+            pointLightDrag.Transaction.Update(scene =>
+            {
+                var entity = scene.FindEntity(pointLightDrag.EntityId);
+                if (entity?.GetComponent<PointLight2D>() is not { } light)
+                    return;
+                light.Radius = CalculatePointLightRadius(
+                    light.Position,
+                    pointLightWorld,
+                    _workspace.SnapEnabled,
+                    _workspace.MoveSnap);
+            });
+            return true;
         }
 
         if (_colliderDrag is null)
@@ -629,6 +650,22 @@ internal sealed class ScenePanel : EditorPanel
             collider.SetShape(Box2D.CreateRectangle(center, halfWidth, halfHeight));
         });
         return true;
+    }
+
+    internal static float CalculatePointLightRadius(
+        XnaVector2 center,
+        XnaVector2 handle,
+        bool snapEnabled,
+        float snapSize)
+    {
+        var radius = XnaVector2.Distance(center, handle);
+        if (snapEnabled)
+        {
+            var snap = MathF.Max(0.001f, snapSize);
+            radius = MathF.Round(radius / snap) * snap;
+        }
+
+        return MathF.Max(0f, radius);
     }
 
     private static float DistanceToSegment(Vector2 point, Vector2 start, Vector2 end)
@@ -675,6 +712,10 @@ internal sealed class ScenePanel : EditorPanel
         Guid EntityId,
         int Corner,
         XnaVector2 OppositeLocal,
+        SceneDocument.SceneEditTransaction Transaction);
+
+    private sealed record PointLightDrag(
+        Guid EntityId,
         SceneDocument.SceneEditTransaction Transaction);
 
     private sealed class ImGuiEditorGizmoContext(

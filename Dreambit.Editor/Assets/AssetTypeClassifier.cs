@@ -26,7 +26,7 @@ internal static class AssetTypeClassifier
         {
             ".json" => new AssetTypeInfo(AssetKind.Json, null),
             ".png" or ".jpg" or ".jpeg" or ".bmp" or ".gif" or ".tga" or ".webp" =>
-                new AssetTypeInfo(AssetKind.Texture, "Microsoft.Xna.Framework.Graphics.Texture2D"),
+                new AssetTypeInfo(AssetKind.Texture, "Dreambit.TextureAsset"),
             ".wav" or ".ogg" or ".mp3" or ".flac" =>
                 new AssetTypeInfo(AssetKind.Audio, null),
             ".ttf" or ".otf" => new AssetTypeInfo(AssetKind.Font, null),
@@ -64,5 +64,35 @@ internal static class AssetTypeClassifier
         if (type == typeof(ParticleFxConfig)) return ".particlefx.json";
         if (type == typeof(Dreambit.Scripting.Cutscene)) return ".cutscene.json";
         return ".json";
+    }
+
+    public static bool IsCompatibleWith(AssetRecord asset, Type requestedType)
+    {
+        ArgumentNullException.ThrowIfNull(asset);
+        ArgumentNullException.ThrowIfNull(requestedType);
+
+        if (asset.Kind == AssetKind.Texture && requestedType == typeof(TextureAsset))
+            return true;
+        if (string.IsNullOrWhiteSpace(asset.TypeName))
+            return false;
+
+        var assetType = ResolveType(asset.TypeName);
+        return assetType is not null && requestedType.IsAssignableFrom(assetType);
+    }
+
+    private static Type? ResolveType(string typeName)
+    {
+        var type = Type.GetType(typeName, throwOnError: false, ignoreCase: true);
+        if (type is not null)
+            return type;
+
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            type = assembly.GetType(typeName, throwOnError: false, ignoreCase: true);
+            if (type is not null)
+                return type;
+        }
+
+        return null;
     }
 }

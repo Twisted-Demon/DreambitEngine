@@ -10,9 +10,16 @@ public class Sprite : DreambitAsset
     private const float MinimumPixelsPerUnit = 0.0001f;
 
     private float _pixelsPerUnit = 1f;
-    private string _texturePath = string.Empty;
 
-    [JsonIgnore] public Texture2D Texture { get; internal set; }
+    [JsonIgnore] public Texture2D Texture => TextureAsset?.Texture;
+
+    [JsonProperty("texture")]
+    public TextureAsset TextureAsset { get; set; }
+
+    /// <summary>Legacy read-only path view. Serialize <see cref="TextureAsset"/> instead.</summary>
+    [JsonIgnore]
+    [Obsolete("Use TextureAsset. TexturePath is retained for source compatibility only.")]
+    public string TexturePath => TextureAsset?.AssetName ?? string.Empty;
 
     [JsonProperty("source")] public Rectangle SourceRect { get; init; }
 
@@ -32,19 +39,6 @@ public class Sprite : DreambitAsset
         }
     }
 
-    [JsonProperty("texture")]
-    public string TexturePath
-    {
-        get => _texturePath;
-        set
-        {
-            _texturePath = value ?? string.Empty;
-            Texture = string.IsNullOrWhiteSpace(_texturePath)
-                ? null
-                : Resources.LoadAsset<Texture2D>(_texturePath);
-        }
-    }
-
     public static Sprite Create(
         string texturePath,
         int sourceX,
@@ -53,15 +47,14 @@ public class Sprite : DreambitAsset
         int sourceHeight,
         float pixelsPerUnit = 1f)
     {
-        var texture = Resources.LoadAsset<Texture2D>(texturePath);
+        var texture = LoadTextureAsset(texturePath);
 
         if (texture is null)
             return null;
 
         var sprite = new Sprite
         {
-            Texture = texture,
-            _texturePath = texturePath,
+            TextureAsset = texture,
             SourceRect = new Rectangle(sourceX, sourceY, sourceWidth, sourceHeight),
             PixelsPerUnit = pixelsPerUnit
         };
@@ -81,7 +74,7 @@ public class Sprite : DreambitAsset
     {
         var sprite = new Sprite
         {
-            Texture = texture,
+            TextureAsset = Dreambit.TextureAsset.FromTexture(texture),
             SourceRect = new Rectangle(sourceX, sourceY, sourceWidth, sourceHeight),
             PixelsPerUnit = pixelsPerUnit
         };
@@ -98,7 +91,7 @@ public class Sprite : DreambitAsset
     {
         var sprite = new Sprite
         {
-            Texture = texture,
+            TextureAsset = Dreambit.TextureAsset.FromTexture(texture),
             SourceRect = sourceRect,
             PixelsPerUnit = pixelsPerUnit
         };
@@ -113,13 +106,12 @@ public class Sprite : DreambitAsset
         Rectangle sourceRect,
         float pixelsPerUnit = 1f)
     {
-        var texture = Resources.LoadAsset<Texture2D>(texturePath);
+        var texture = LoadTextureAsset(texturePath);
         if (texture is null) return null;
 
         var sprite = new Sprite
         {
-            Texture = texture,
-            _texturePath = texturePath,
+            TextureAsset = texture,
             SourceRect = sourceRect,
             PixelsPerUnit = pixelsPerUnit
         };
@@ -135,7 +127,7 @@ public class Sprite : DreambitAsset
     {
         return new Sprite
         {
-            Texture = texture,
+            TextureAsset = Dreambit.TextureAsset.FromTexture(texture),
             SourceRect = new Rectangle(0, 0, texture.Width, texture.Height),
             PixelsPerUnit = pixelsPerUnit
         };
@@ -145,15 +137,22 @@ public class Sprite : DreambitAsset
         string texturePath,
         float pixelsPerUnit = 1f)
     {
-        var texture = Resources.LoadAsset<Texture2D>(texturePath);
+        var texture = LoadTextureAsset(texturePath);
         if (texture is null) return null;
 
         return new Sprite
         {
-            Texture = texture,
-            _texturePath = texturePath,
+            TextureAsset = texture,
             SourceRect = new Rectangle(0, 0, texture.Width, texture.Height),
             PixelsPerUnit = pixelsPerUnit
         };
+    }
+
+    private static TextureAsset LoadTextureAsset(string texturePath)
+    {
+        if (string.IsNullOrWhiteSpace(texturePath))
+            return null;
+
+        return Resources.LoadDreambitAsset(texturePath, typeof(TextureAsset)) as TextureAsset;
     }
 }

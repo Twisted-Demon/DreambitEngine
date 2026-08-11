@@ -1,5 +1,6 @@
 using System.Numerics;
 using Dreambit.Editor.Compilation;
+using Dreambit.Editor.UI;
 using ImGuiNET;
 
 namespace Dreambit.Editor.UI.Panels;
@@ -7,20 +8,22 @@ namespace Dreambit.Editor.UI.Panels;
 internal sealed class BuildPanel : EditorPanel
 {
     private readonly GameCodeService _gameCode;
+    private readonly EditorIconService _icons;
 
-    public BuildPanel(GameCodeService gameCode)
+    public BuildPanel(GameCodeService gameCode, EditorIconService icons)
         : base(EditorPanelIds.Build, "Build")
     {
         _gameCode = gameCode;
+        _icons = icons;
     }
 
     protected override void DrawContents()
     {
         ImGui.BeginDisabled(_gameCode.IsRunning);
-        if (ImGui.Button("Build", new Vector2(90f, 0f)))
+        if (_icons.Button("BuildGame", "build", "Build game code"))
             _gameCode.RequestBuild(rebuild: false, immediate: true);
         ImGui.SameLine();
-        if (ImGui.Button("Rebuild", new Vector2(90f, 0f)))
+        if (_icons.Button("RebuildGame", "restart_alt", "Rebuild game code"))
             _gameCode.RequestBuild(rebuild: true, immediate: true);
         ImGui.EndDisabled();
 

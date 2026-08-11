@@ -118,7 +118,7 @@ public sealed class InspectorMetadataTests
                 new InspectorMetadataCache());
 
             var sprite = Assert.IsType<Sprite>(document.Instance);
-            Assert.Equal(string.Empty, sprite.TexturePath);
+            Assert.Null(sprite.TextureAsset);
             Assert.Null(sprite.Texture);
             Assert.DoesNotContain("Texture", JObject.Parse(document.CaptureJson()).Properties()
                 .Select(property => property.Name));
@@ -158,6 +158,73 @@ public sealed class InspectorMetadataTests
         var entityCandidates = InspectorPanel.GetBlueprintReferenceCandidates(root, typeof(Entity));
         Assert.Equal(2, entityCandidates.Count);
     }
+
+    [Fact]
+    public void AssetPickerCompatibilityUsesTheRequestedDreambitAssetType()
+    {
+        var animation = CreateAssetRecord(
+            "characters/hero.animation.json",
+            AssetKind.Animation,
+            typeof(SpriteSheetAnimation));
+        var blueprint = CreateAssetRecord(
+            "characters/hero.blueprint.json",
+            AssetKind.Blueprint,
+            typeof(EntityBlueprint));
+        var texture = CreateAssetRecord(
+            "characters/hero.texture.png",
+            AssetKind.Texture,
+            typeof(TextureAsset));
+
+        Assert.True(AssetTypeClassifier.IsCompatibleWith(animation, typeof(SpriteSheetAnimation)));
+        Assert.False(AssetTypeClassifier.IsCompatibleWith(blueprint, typeof(SpriteSheetAnimation)));
+        Assert.True(AssetTypeClassifier.IsCompatibleWith(texture, typeof(TextureAsset)));
+        Assert.False(AssetTypeClassifier.IsCompatibleWith(texture, typeof(SpriteSheetAnimation)));
+    }
+
+    [Fact]
+    public void BlueprintValidatorAcceptsTaggedAssetReferencesAndRejectsInlineCopies()
+    {
+        var component = new ComponentBlueprint
+        {
+            Type = typeof(InspectorAssetReferenceComponent).FullName!,
+            Properties = new Dictionary<string, JToken>
+            {
+                [nameof(InspectorAssetReferenceComponent.Animation)] =
+                    DreambitAssetReferenceToken.Create(
+                        AssetId.New(),
+                        "characters/hero.animation")
+            }
+        };
+        var root = new EntityBlueprint
+        {
+            Name = "Player",
+            Guid = Guid.NewGuid(),
+            Components = [component]
+        };
+
+        Assert.Empty(BlueprintValidator.Validate(root));
+
+        component.Properties[nameof(InspectorAssetReferenceComponent.Animation)] =
+            JObject.FromObject(new { frames = Array.Empty<int>() });
+        Assert.Contains(
+            BlueprintValidator.Validate(root),
+            error => error.Contains("asset references must be", StringComparison.Ordinal));
+    }
+
+    private static AssetRecord CreateAssetRecord(
+        string relativePath,
+        AssetKind kind,
+        Type type) =>
+        new(
+            AssetId.New(),
+            relativePath,
+            Path.GetFileName(relativePath),
+            Path.GetDirectoryName(relativePath)?.Replace('\\', '/') ?? string.Empty,
+            Path.ChangeExtension(relativePath, null)!.Replace('\\', '/'),
+            kind,
+            type.FullName,
+            0,
+            DateTimeOffset.UtcNow);
 }
 
 public sealed class InspectorTestComponent : Component
@@ -178,4 +245,10 @@ public sealed class InspectorCircularRuntimeAsset : DreambitAsset
 {
     [JsonProperty("editable")] public int Editable { get; set; }
     public InspectorCircularRuntimeAsset RuntimeCycle => this;
+}
+
+public sealed class InspectorAssetReferenceComponent : Component
+{
+    [DreambitSerialize]
+    public SpriteSheetAnimation? Animation { get; set; }
 }

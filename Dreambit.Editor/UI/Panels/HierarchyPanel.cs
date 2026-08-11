@@ -15,6 +15,7 @@ internal sealed class HierarchyPanel : EditorPanel
     private readonly EditorDragDropService _dragDrop;
     private readonly AssetDatabase _assets;
     private readonly EditorWorkspaceState _workspace;
+    private readonly EditorIconService _icons;
     private string _search = string.Empty;
     private string _blueprintSearch = string.Empty;
     private string _rename = string.Empty;
@@ -29,7 +30,8 @@ internal sealed class HierarchyPanel : EditorPanel
         SelectionService selection,
         EditorDragDropService dragDrop,
         AssetDatabase assets,
-        EditorWorkspaceState workspace)
+        EditorWorkspaceState workspace,
+        EditorIconService icons)
         : base(EditorPanelIds.Hierarchy, "Hierarchy")
     {
         _documents = documents;
@@ -37,12 +39,13 @@ internal sealed class HierarchyPanel : EditorPanel
         _dragDrop = dragDrop;
         _assets = assets;
         _workspace = workspace;
+        _icons = icons;
     }
 
     protected override void DrawContents()
     {
         var document = _documents.Current;
-        if (ImGui.Button("+", new Vector2(28f, 0f)))
+        if (_icons.Button("HierarchyCreate", "add", "Create entity"))
             ImGui.OpenPopup("Create Entity##Hierarchy");
 
         ImGui.SameLine();

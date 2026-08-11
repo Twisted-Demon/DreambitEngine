@@ -9,19 +9,23 @@ public class Tileset : DreambitAsset
     public Sprite Sprite { get; private set; }
     public int PixelsPerUnit { get; set; } = 1;
 
-    private string _texturePath;
-    public string TexturePath
+    private TextureAsset _texture;
+    public TextureAsset Texture
     {
-        get => _texturePath;
+        get => _texture;
         set
         {
-            if (string.IsNullOrWhiteSpace(value)) return;
-            _texturePath = value;
+            _texture = value;
+            if (_texture?.Texture is null)
+            {
+                Sprite = null;
+                SpriteSheet = null;
+                return;
+            }
 
-            Sprite = Sprite.Create(_texturePath, pixelsPerUnit: PixelsPerUnit);
+            Sprite = Sprite.Create(_texture.Texture, pixelsPerUnit: PixelsPerUnit);
+            Sprite.TextureAsset = _texture;
             SpriteSheet = SpriteSheet.Create(TileGridSize, Sprite);
         }
     }
-
-
 }

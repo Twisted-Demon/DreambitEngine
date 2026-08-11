@@ -1,5 +1,4 @@
 ﻿using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 
 namespace Dreambit.ECS;
 
@@ -10,23 +9,19 @@ public class ParticleSystemDrawer : DrawableComponent<ParticleSystemDrawer>
 
     private ParticleFxConfig _particleFx;
     private float _pixelsPerUnit = 1f;
-    private string _texturePath;
     private bool _useLocalSpace;
-    private Texture2D Texture { get; set; }
+    private TextureAsset _texture;
 
     [DreambitSerialize]
-    public string TexturePath
+    public TextureAsset Texture
     {
-        get => _texturePath;
+        get => _texture;
         set
         {
-            if (_texturePath == value)
+            if (ReferenceEquals(_texture, value))
                 return;
 
-            _texturePath = value;
-            Texture = string.IsNullOrWhiteSpace(value)
-                ? null
-                : Resources.LoadAsset<Texture2D>(value);
+            _texture = value;
             UpdateRenderMetrics();
         }
     }
@@ -75,7 +70,7 @@ public class ParticleSystemDrawer : DrawableComponent<ParticleSystemDrawer>
     {
         get
         {
-            if (Texture is null) return Vector2.Zero;
+            if (Texture?.Texture is null) return Vector2.Zero;
             return new Vector2(Texture.Width * 0.5f, Texture.Height * 0.5f);
         }
     }
@@ -98,7 +93,7 @@ public class ParticleSystemDrawer : DrawableComponent<ParticleSystemDrawer>
 
     protected override void OnDraw()
     {
-        if (Texture is null) return;
+        if (Texture?.Texture is null) return;
 
         var parts = Simulation.GetParticles();
         for (var i = 0; i < parts.Alive; i++)
@@ -120,7 +115,7 @@ public class ParticleSystemDrawer : DrawableComponent<ParticleSystemDrawer>
             }
 
             Core.SpriteBatch.DrawWorldSprite(
-                Texture,
+                Texture.Texture,
                 position,
                 null,
                 parts.COLOR[phys],
@@ -166,8 +161,8 @@ public class ParticleSystemDrawer : DrawableComponent<ParticleSystemDrawer>
             return;
 
         Simulation.SetParticleFxConfig(_particleFx);
-        if (!string.IsNullOrWhiteSpace(_particleFx.Texture))
-            TexturePath = _particleFx.Texture;
+        if (_particleFx.Texture is not null)
+            Texture = _particleFx.Texture;
     }
 
     private void UpdateRenderMetrics()

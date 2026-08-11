@@ -121,7 +121,8 @@ internal sealed class InspectorValueDrawerRegistry
                 {
                     var payload = ImGui.AcceptDragDropPayload(EditorDragDropService.ProjectItemPayloadType);
                     if (payload.NativePtr != null && dragDrop.ProjectItem is { IsFolder: false } item &&
-                        assets.TryGetAsset(item.RelativePath, out var asset))
+                        assets.TryGetAsset(item.RelativePath, out var asset) &&
+                        AssetTypeClassifier.IsCompatibleWith(asset!, type))
                     {
                         var loaded = Resources.LoadDreambitAsset(item.AssetId, asset!.LogicalAssetName, type);
                         if (loaded is not null && type.IsInstanceOfType(loaded))
@@ -172,6 +173,8 @@ internal sealed class InspectorValueDrawerRegistry
                     {
                         foreach (var asset in assets.GetSnapshot().Assets)
                         {
+                            if (!AssetTypeClassifier.IsCompatibleWith(asset, type))
+                                continue;
                             if (!string.IsNullOrWhiteSpace(_search) &&
                                 !asset.RelativePath.Contains(_search, StringComparison.OrdinalIgnoreCase))
                                 continue;

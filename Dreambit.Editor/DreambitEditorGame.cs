@@ -42,6 +42,7 @@ internal sealed class DreambitEditorGame : Core
     protected override void LoadContent()
     {
         base.LoadContent();
+        RestoreWindowPosition();
         _imGuiRenderer = new ImGuiRenderer(this, _paths.ImGuiLayoutPath);
         _application = new EditorApplication(
             _options,
@@ -82,7 +83,12 @@ internal sealed class DreambitEditorGame : Core
         if (_application is not null)
         {
             var bounds = Window.ClientBounds;
-            _application.CaptureWindowSize(bounds.Width, bounds.Height);
+            var position = Window.Position;
+            _application.CaptureWindowBounds(
+                position.X,
+                position.Y,
+                bounds.Width,
+                bounds.Height);
         }
 
         _imGuiRenderer?.SaveLayout();
@@ -92,5 +98,21 @@ internal sealed class DreambitEditorGame : Core
         _imGuiRenderer = null;
 
         base.OnExiting(sender, args);
+    }
+
+    private void RestoreWindowPosition()
+    {
+        var hasPosition = _workspaceState.HasWindowPosition || _globalState.HasWindowPosition;
+        if (!hasPosition)
+            return;
+        var x = _workspaceState.HasWindowPosition ? _workspaceState.WindowX : _globalState.WindowX;
+        var y = _workspaceState.HasWindowPosition ? _workspaceState.WindowY : _globalState.WindowY;
+        try
+        {
+            Window.Position = new Point(x, y);
+        }
+        catch (PlatformNotSupportedException)
+        {
+        }
     }
 }

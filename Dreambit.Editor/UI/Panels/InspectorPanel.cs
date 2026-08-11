@@ -19,6 +19,7 @@ internal sealed class InspectorPanel : EditorPanel
     private readonly InspectorMetadataCache _metadata;
     private readonly EditorTypeRegistry _types;
     private readonly AssetEditingService _assetEditing;
+    private readonly AssetDatabase _assets;
     private readonly AssetPreviewService _previews;
     private readonly CustomEditorRegistry _customEditors;
     private readonly EditorLogService _logs;
@@ -43,6 +44,7 @@ internal sealed class InspectorPanel : EditorPanel
         _metadata = metadata;
         _types = types;
         _assetEditing = assetEditing;
+        _assets = assets;
         _drawers = new InspectorValueDrawerRegistry(assets, dragDrop, documents);
         _previews = previews;
         _customEditors = customEditors;
@@ -422,6 +424,12 @@ internal sealed class InspectorPanel : EditorPanel
                 continue;
             }
 
+            if (typeof(DreambitAsset).IsAssignableFrom(member.ValueType))
+            {
+                DrawBlueprintAssetReferenceMember(document, component, member);
+                continue;
+            }
+
             object? value = null;
             if (component.Properties.TryGetValue(member.SerializedName, out var token))
             {
@@ -453,6 +461,106 @@ internal sealed class InspectorPanel : EditorPanel
             if (result.Changed && !member.IsReadOnly)
                 document.Apply($"Change {member.DisplayName}", _ =>
                     component.Properties[member.SerializedName] = DreambitJson.ToToken(result.Value));
+        }
+    }
+
+    private void DrawBlueprintAssetReferenceMember(
+        DreambitAssetDocument document,
+        ComponentBlueprint component,
+        InspectorMemberMetadata member)
+    {
+        component.Properties.TryGetValue(member.SerializedName, out var token);
+        var snapshot = _assets.GetSnapshot();
+        AssetRecord? selected = null;
+        string? fallbackPath = null;
+
+        if (DreambitAssetReferenceToken.TryRead(token, out var assetId, out fallbackPath))
+            selected = snapshot.Assets.FirstOrDefault(asset => asset.Id == assetId);
+        else if (token?.Type == Newtonsoft.Json.Linq.JTokenType.String)
+        {
+            fallbackPath = (string?)token;
+            selected = snapshot.Assets.FirstOrDefault(asset =>
+                string.Equals(
+                    asset.LogicalAssetName,
+                    fallbackPath,
+                    StringComparison.OrdinalIgnoreCase));
+        }
+
+        var display = selected?.RelativePath ??
+                      (!string.IsNullOrWhiteSpace(fallbackPath)
+                          ? $"Missing ({fallbackPath})"
+                          : token is null || token.Type == Newtonsoft.Json.Linq.JTokenType.Null
+                              ? "None"
+                              : "Invalid inline asset");
+        var pickerId = $"BlueprintAsset.{component.Type}.{member.SerializedName}";
+
+        ImGui.TextUnformatted(member.DisplayName);
+        ImGui.SameLine(110f);
+        ImGui.SetNextItemWidth(-32f);
+        if (ImGui.Button($"{display}##{pickerId}", new System.Numerics.Vector2(-32f, 0f)))
+        {
+            _blueprintReferenceSearch = string.Empty;
+            ImGui.OpenPopup($"Blueprint Asset Picker##{pickerId}");
+        }
+        ImGui.SameLine();
+        ImGui.BeginDisabled(token is null || member.IsReadOnly);
+        if (ImGui.SmallButton($"×##{pickerId}.Clear"))
+            document.Apply($"Clear {member.DisplayName}", _ =>
+                component.Properties.Remove(member.SerializedName));
+        ImGui.EndDisabled();
+
+        if (!ImGui.BeginPopup($"Blueprint Asset Picker##{pickerId}"))
+            return;
+        try
+        {
+            ImGui.TextDisabled($"Select a {member.ValueType.Name} asset.");
+            ImGui.SetNextItemWidth(420f);
+            ImGui.InputTextWithHint(
+                "##BlueprintAssetSearch",
+                $"Search {member.ValueType.Name} assets",
+                ref _blueprintReferenceSearch,
+                128);
+            ImGui.Separator();
+            ImGui.BeginChild(
+                "##BlueprintAssetItems",
+                new System.Numerics.Vector2(420f, 260f));
+            try
+            {
+                foreach (var candidate in snapshot.Assets)
+                {
+                    if (!AssetTypeClassifier.IsCompatibleWith(candidate, member.ValueType))
+                        continue;
+                    if (!string.IsNullOrWhiteSpace(_blueprintReferenceSearch) &&
+                        !candidate.RelativePath.Contains(
+                            _blueprintReferenceSearch,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    if (!ImGui.Selectable(
+                            $"{candidate.RelativePath}##{candidate.Id}",
+                            candidate.Id == selected?.Id) || member.IsReadOnly)
+                    {
+                        continue;
+                    }
+
+                    document.Apply($"Change {member.DisplayName}", _ =>
+                        component.Properties[member.SerializedName] =
+                            DreambitAssetReferenceToken.Create(
+                                candidate.Id,
+                                candidate.LogicalAssetName));
+                    ImGui.CloseCurrentPopup();
+                }
+            }
+            finally
+            {
+                ImGui.EndChild();
+            }
+        }
+        finally
+        {
+            ImGui.EndPopup();
         }
     }
 
