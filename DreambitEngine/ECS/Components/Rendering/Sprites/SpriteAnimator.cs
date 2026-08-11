@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace Dreambit.ECS;
@@ -7,40 +7,65 @@ namespace Dreambit.ECS;
 [Require(typeof(SpriteDrawer))]
 public class SpriteAnimator : Component
 {
-    private readonly Dictionary<string, Action> _eventActions = [];
+    private readonly Dictionary<string, Action<SpriteAnimationEvent>> _eventHandlers =
+        new(StringComparer.Ordinal);
+    private readonly Queue<SpriteSheetAnimation> _animationQueue = [];
 
-    public Action OnAnimationEnded;
+    [FromRequired]
+    private SpriteDrawer _spriteDrawer;
 
-    private string _animationPath;
-    private Queue<SpriteSheetAnimation> _animationQueue = [];
-    private int _currentAnimationFrame;
     private float _elapsedFrameTime;
-
-    //internals
-    [FromRequired] private SpriteDrawer _spriteDrawer;
-    private float _timeToNextFrame;
-    public bool IsPlaying { get; private set; }
+    private float _playSpeed = 1f;
+    private bool _currentFrameEventDispatched;
+    private uint _playbackVersion;
 
     [DreambitSerialize]
-    public bool PlayOnStart { get; set; } = false;
+    public SpriteSheetAnimation InitialAnimation { get; set; }
 
     [DreambitSerialize]
-    public float PlaySpeed { get; set; } = 1.0f;
-
-    public SpriteSheetAnimation Animation { get; private set; }
-    public SpriteSheet CurrentSpriteSheet { get; private set; }
+    public bool PlayOnStart { get; set; }
 
     [DreambitSerialize]
-    public string AnimationPath
+    public float PlaySpeed
     {
-        get => _animationPath;
-        set => SetAnimation(value);
+        get => _playSpeed;
+        set
+        {
+            if (!float.IsFinite(value) || value < 0f)
+                throw new ArgumentOutOfRangeException(nameof(value), "Animation play speed must be finite and non-negative.");
+            _playSpeed = value;
+        }
     }
 
+    public event Action<SpriteSheetAnimation> AnimationCompleted;
+
+    public SpriteSheetAnimation Animation { get; private set; }
+    public SpriteSheet CurrentSpriteSheet => Animation?.SpriteSheet;
+    public SpriteAnimationFrame CurrentFrame => Animation?[CurrentFrameIndex];
+    public int CurrentFrameIndex { get; private set; }
+    public bool IsPlaying { get; private set; }
+
+    public float NormalizedProgress
+    {
+        get
+        {
+            if (Animation is null || Animation.FrameCount == 0)
+                return 0f;
+
+            var elapsed = _elapsedFrameTime;
+            for (var i = 0; i < CurrentFrameIndex; i++)
+                elapsed += Animation.GetFrameDuration(i);
+
+            return Math.Clamp(elapsed / Animation.Duration, 0f, 1f);
+        }
+    }
 
     public override void OnCreated()
     {
         _spriteDrawer.WithPivot(PivotType.Custom);
+
+        if (InitialAnimation is not null)
+            StartAnimation(InitialAnimation);
 
         if (PlayOnStart)
             Play();
@@ -48,69 +73,57 @@ public class SpriteAnimator : Component
 
     public override void OnUpdate()
     {
-        if (Animation == null)
+        if (!IsPlaying || Animation is null || PlaySpeed == 0f)
             return;
 
-        if (!IsPlaying)
+        Advance(Time.DeltaTime * PlaySpeed);
+    }
+
+    public void SetAnimation(string animationPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(animationPath);
+
+        var animation = Resources.LoadAsset<SpriteSheetAnimation>(animationPath);
+        if (animation is null)
+            throw new InvalidOperationException($"Could not load sprite animation '{animationPath}'.");
+
+        SetAnimation(animation);
+    }
+
+    /// <summary>
+    /// Selects an animation and displays its first frame. Selecting the current
+    /// animation is a no-op; call <see cref="Restart"/> to restart it explicitly.
+    /// </summary>
+    public void SetAnimation(SpriteSheetAnimation animation)
+    {
+        ArgumentNullException.ThrowIfNull(animation);
+
+        if (ReferenceEquals(Animation, animation))
             return;
 
-        Run();
+        StartAnimation(animation);
     }
 
-    private void Run()
+    public void Play(SpriteSheetAnimation animation)
     {
-        _elapsedFrameTime += Time.DeltaTime * PlaySpeed;
-
-        if (!(_elapsedFrameTime >= _timeToNextFrame)) return;
-
-        _elapsedFrameTime -= _timeToNextFrame;
-        ChangeAnimationFrame();
+        SetAnimation(animation);
+        Play();
     }
 
-    private void ChangeAnimationFrame()
+    public void Play()
     {
-        //if we have another frame in the animation, set the current frame to the next one
-        if (Animation.TryGetFrame(_currentAnimationFrame + 1, out var nextFrame))
-        {
-            SetAnimationFrame(_currentAnimationFrame + 1);
+        if (Animation is null && InitialAnimation is not null)
+            StartAnimation(InitialAnimation);
+        if (Animation is null)
             return;
-        }
 
-        AnimationEnded(); //end the animation as we have no more frames
-    }
+        if (!Animation.Loop &&
+            CurrentFrameIndex == Animation.FrameCount - 1 &&
+            _elapsedFrameTime >= Animation.GetFrameDuration(CurrentFrameIndex))
+            Rewind(dispatchEvent: false);
 
-    private void AnimationEnded()
-    {
-        //if we are a one shot
-        if (Animation.OneShot)
-        {
-            OnAnimationEnded?.Invoke();
-
-            //load next animation if we have one queued
-            if (_animationQueue.Count > 0)
-            {
-                Animation = null;
-                Animation = _animationQueue.Dequeue();
-            }
-            else
-            {
-                Pause(); //or else just pause at the end of the oneshot.
-            }
-        }
-        else
-        {
-            SetAnimationFrame(0); //reset and loop.
-        }
-    }
-
-    public void QueueAnimation(SpriteSheetAnimation animation)
-    {
-        _animationQueue.Enqueue(animation);
-    }
-
-    public void ClearAnimationQueue()
-    {
-        _animationQueue.Clear();
+        IsPlaying = true;
+        DispatchCurrentFrameEvent();
     }
 
     public void Pause()
@@ -118,99 +131,199 @@ public class SpriteAnimator : Component
         IsPlaying = false;
     }
 
+    /// <summary>
+    /// Pauses playback and rewinds the current animation to its first frame.
+    /// </summary>
     public void Stop()
     {
         IsPlaying = false;
-        ResetInternals();
+        Rewind(dispatchEvent: false);
     }
 
-    public void Play()
+    public void Restart()
     {
-        IsPlaying = true;
-    }
+        if (Animation is null)
+            return;
 
-    public void ResetAndPlay()
-    {
-        Stop();
+        Rewind(dispatchEvent: false);
         Play();
     }
 
-    public void SetAnimation(string animationPath)
+    public void QueueAnimation(SpriteSheetAnimation animation)
     {
-        if (_animationPath == animationPath)
-            return;
-
-        _animationPath = animationPath;
-        UpdateAnimation(animationPath);
+        ArgumentNullException.ThrowIfNull(animation);
+        ThrowIfInvalid(animation);
+        _animationQueue.Enqueue(animation);
     }
 
-    public void RegisterEvent(string eventName, Action eventAction)
+    public void QueueAnimation(string animationPath)
     {
-        if (!_eventActions.TryAdd(eventName, null))
-            // Add the event action to the existing one (+= syntax allows you to chain multiple methods to the same event)
-            _eventActions[eventName] += eventAction;
+        ArgumentException.ThrowIfNullOrWhiteSpace(animationPath);
+
+        var animation = Resources.LoadAsset<SpriteSheetAnimation>(animationPath);
+        if (animation is null)
+            throw new InvalidOperationException($"Could not load sprite animation '{animationPath}'.");
+
+        QueueAnimation(animation);
+    }
+
+    /// <summary>
+    /// Removes pending animations without changing the current animation.
+    /// </summary>
+    public void ClearAnimationQueue()
+    {
+        _animationQueue.Clear();
+    }
+
+    public void RegisterEvent(string eventName, Action<SpriteAnimationEvent> handler)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(eventName);
+        ArgumentNullException.ThrowIfNull(handler);
+
+        if (_eventHandlers.TryGetValue(eventName, out var existing))
+            _eventHandlers[eventName] = existing + handler;
         else
-            // If the event doesn't exist, create a new one
-            _eventActions[eventName] += eventAction;
+            _eventHandlers.Add(eventName, handler);
+    }
+
+    public void DeregisterEvent(string eventName, Action<SpriteAnimationEvent> handler)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(eventName);
+        ArgumentNullException.ThrowIfNull(handler);
+
+        if (!_eventHandlers.TryGetValue(eventName, out var existing))
+            return;
+
+        existing -= handler;
+        if (existing is null)
+            _eventHandlers.Remove(eventName);
+        else
+            _eventHandlers[eventName] = existing;
     }
 
     public void DeregisterEvent(string eventName)
     {
-        if (_eventActions.TryGetValue(eventName, out var eventAction))
-            _eventActions[eventName] -= eventAction;
+        ArgumentException.ThrowIfNullOrWhiteSpace(eventName);
+        _eventHandlers.Remove(eventName);
     }
 
-    private void SetAnimationFrame(int frameNumber)
+    private void Advance(float elapsedTime)
     {
-        if (Animation.TryGetFrame(frameNumber, out var nextFrame))
+        _elapsedFrameTime += elapsedTime;
+
+        while (IsPlaying && Animation is not null)
         {
-            _currentAnimationFrame = frameNumber;
-            var sprite = CurrentSpriteSheet[nextFrame.FrameIndex];
-            _spriteDrawer.SetSprite(sprite);
+            var frameDuration = Animation.GetFrameDuration(CurrentFrameIndex);
+            if (_elapsedFrameTime < frameDuration)
+                return;
 
-            // Animation pivots use the same sprite-local pixel space as SpriteDrawer.
-            _spriteDrawer.WithPivot(nextFrame.Pivot);
-
-            if (nextFrame.AnimationEvent == null) return;
-
-            if (_eventActions.TryGetValue(nextFrame.AnimationEvent.Name, out var eventAction))
-                eventAction?.Invoke();
+            _elapsedFrameTime -= frameDuration;
+            AdvanceFrame();
         }
     }
 
-    private void UpdateAnimation(string animPath)
+    private void AdvanceFrame()
     {
-        var newAnimation = Resources.LoadAsset<SpriteSheetAnimation>(animPath);
-        CurrentSpriteSheet = Resources.LoadAsset<SpriteSheet>(newAnimation.SpriteSheetPath);
+        if (CurrentFrameIndex + 1 < Animation.FrameCount)
+        {
+            SetCurrentFrame(CurrentFrameIndex + 1, dispatchEvent: true);
+            return;
+        }
 
-        Animation = newAnimation;
+        CompleteAnimationIteration();
+    }
 
+    private void CompleteAnimationIteration()
+    {
+        var completedAnimation = Animation;
+        var playbackVersion = _playbackVersion;
+        AnimationCompleted?.Invoke(completedAnimation);
+
+        // A completion handler may select, restart, stop, or pause playback itself.
+        if (!ReferenceEquals(Animation, completedAnimation) || _playbackVersion != playbackVersion)
+            return;
+        if (!IsPlaying)
+        {
+            _elapsedFrameTime = Animation.GetFrameDuration(CurrentFrameIndex);
+            return;
+        }
+
+        if (_animationQueue.Count > 0)
+        {
+            StartAnimation(_animationQueue.Dequeue(), preserveElapsedTime: true);
+            return;
+        }
+
+        if (Animation.Loop)
+        {
+            SetCurrentFrame(0, dispatchEvent: IsPlaying);
+            return;
+        }
+
+        IsPlaying = false;
+        _elapsedFrameTime = Animation.GetFrameDuration(CurrentFrameIndex);
+    }
+
+    private void StartAnimation(SpriteSheetAnimation animation, bool preserveElapsedTime = false)
+    {
+        ThrowIfInvalid(animation);
+
+        _playbackVersion++;
+        Animation = animation;
+        if (!preserveElapsedTime)
+            _elapsedFrameTime = 0f;
+        SetCurrentFrame(0, dispatchEvent: IsPlaying);
+    }
+
+    private void Rewind(bool dispatchEvent)
+    {
         if (Animation is null)
             return;
 
-        if (CurrentSpriteSheet is null)
+        _playbackVersion++;
+        _elapsedFrameTime = 0f;
+        SetCurrentFrame(0, dispatchEvent);
+    }
+
+    private void SetCurrentFrame(int frameIndex, bool dispatchEvent)
+    {
+        CurrentFrameIndex = frameIndex;
+        _currentFrameEventDispatched = false;
+
+        var frame = Animation[frameIndex];
+        var sprite = Animation.SpriteSheet[frame.SpriteIndex];
+        _spriteDrawer.SetSprite(sprite);
+        _spriteDrawer.WithPivot(Animation.GetFramePivot(frameIndex));
+
+        if (dispatchEvent)
+            DispatchCurrentFrameEvent();
+    }
+
+    private void DispatchCurrentFrameEvent()
+    {
+        if (_currentFrameEventDispatched || CurrentFrame?.Event is not { } animationEvent)
             return;
 
-        SetFrameRate(Animation.FrameRate);
-        ResetInternals();
-        SetAnimationFrame(0);
+        _currentFrameEventDispatched = true;
+        if (_eventHandlers.TryGetValue(animationEvent.Name, out var handler))
+            handler.Invoke(animationEvent);
     }
 
-    private void ResetInternals()
+    private static void ThrowIfInvalid(SpriteSheetAnimation animation)
     {
-        _elapsedFrameTime = 0;
-    }
-
-    private void SetFrameRate(int newFrameRate)
-    {
-        _timeToNextFrame = 1 / (float)newFrameRate;
+        var errors = animation.GetValidationErrors();
+        if (errors.Count > 0)
+            throw new ArgumentException(
+                $"Sprite animation '{animation.AssetName ?? "<inline>"}' is invalid: {string.Join(" ", errors)}",
+                nameof(animation));
     }
 
     public override void OnDestroyed()
     {
-        _spriteDrawer = null;
+        IsPlaying = false;
         Animation = null;
         _animationQueue.Clear();
-        _animationQueue = null;
+        _eventHandlers.Clear();
+        _spriteDrawer = null;
     }
 }

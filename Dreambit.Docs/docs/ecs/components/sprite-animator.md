@@ -1,24 +1,39 @@
 # SpriteAnimator
 
-`SpriteAnimator` advances a `SpriteSheetAnimation` and updates the entity's
-required sprite drawer.
+`SpriteAnimator` plays a `SpriteSheetAnimation` through the entity's required
+`SpriteDrawer`.
 
 ```csharp
 var animator = entity.AttachComponent<SpriteAnimator>();
-animator.AnimationPath = "Animations/player_run";
-animator.PlaySpeed = 1f;
-animator.PlayOnStart = true;
-animator.RegisterEvent("footstep", PlayFootstep);
-animator.Play();
+var run = Resources.LoadAsset<SpriteSheetAnimation>("Animations/player_run");
+
+animator.RegisterEvent("footstep", animationEvent =>
+{
+    var surface = animationEvent.Args.GetValueOrDefault("surface", "default");
+    PlayFootstep(surface);
+});
+
+animator.Play(run);
 ```
 
-Control playback with `Play`, `Pause`, `Stop`, and `ResetAndPlay`. Use
-`SetAnimation(path)` to switch immediately, or `QueueAnimation(asset)` to append
-an animation. `ClearAnimationQueue` removes pending animations.
+`SetAnimation(asset)` selects an animation and displays its first frame while
+preserving the current play/pause state. Re-selecting the current asset is a
+no-op, which makes it safe for state resolvers to call every update. Use
+`Restart()` when an intentional restart is needed.
 
-Subscribe to `OnAnimationEnded` for completion. Deregister named animation events
-when the owning gameplay behavior no longer needs them.
+`Play()`, `Pause()`, and `Stop()` control playback. `Stop()` pauses and rewinds.
+`Play(asset)` selects and plays in one call. String-path overloads remain
+available for runtime-loaded animations.
 
-The component relies on animation and sprite-sheet assets described in
-[Sprite animation](../../assets/animations.md).
+`QueueAnimation(asset)` starts the queued animation when the current animation
+reaches its end, even when the current animation normally loops. Queued
+animations are initialized exactly like directly selected animations.
 
+Subscribe to `AnimationCompleted` to observe the end of each animation
+iteration. `CurrentFrame`, `CurrentFrameIndex`, `IsPlaying`, and
+`NormalizedProgress` expose playback state.
+
+Named frame handlers receive the complete `SpriteAnimationEvent`, including its
+`Args` dictionary. Deregister a particular callback with
+`DeregisterEvent(name, callback)`, or clear every callback for a name with
+`DeregisterEvent(name)`.

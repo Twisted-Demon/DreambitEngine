@@ -1,39 +1,53 @@
 # Sprite animation
 
-`SpriteSheetAnimation` selects a frame range from a sprite sheet and gives it a
-frame rate, pivot, loop mode, and optional per-frame events.
-
-The properties consumed by the current runtime type are:
+`SpriteSheetAnimation` is an ordered sequence of sprites from a `SpriteSheet`.
+The simplest form is a compact list of sprite-sheet indices:
 
 ```json
 {
-  "frame_rate": 8,
-  "sprite_sheet_path": "SpriteSheets/player",
-  "one_shot": false,
-  "index_start": 0,
-  "index_end": 5,
-  "pivot": [15, 15],
-  "frame_overrides": [
-    {
-      "frame_index": 2,
-      "pivot": [16, 15],
-      "event": { "name": "footstep", "args": {} }
-    }
-  ]
+  "sprite_sheet": "SpriteSheets/player",
+  "frames": [0, 1, 2, 3, 2, 1],
+  "frames_per_second": 8,
+  "loop": true,
+  "pivot": [15, 15]
 }
 ```
 
-Both the animation-level `pivot` and each frame override use pixel coordinates
-relative to a sprite-sheet cell. They are passed directly to `SpriteDrawer` and
-converted to world space at draw time using the sprite's `PixelsPerUnit` and
-world scale.
+`sprite_sheet` is a normal Dreambit asset reference. In the Asset Editor, drag a
+sprite-sheet asset onto this field or enter its project-relative asset path.
 
-Load through `SpriteAnimator.AnimationPath`, then register events and play. See
-the [`SpriteAnimator` component](../ecs/components/sprite-animator.md).
+Frames are played in the exact order listed, so indices can start anywhere, be
+repeated, or be arranged non-sequentially. A frame that needs extra behavior can
+use the detailed form:
 
-!!! warning "Current frame-range limitation"
-    `SpriteSheetAnimation.Initialize` indexes its internal frame array with the
-    source frame index. Keep `index_start` at `0` in current content. Also use
-    the `frame_overrides` property shown above; older example content using a
-    `frames` property does not match the current serialized member name.
+```json
+{
+  "sprite_sheet": "SpriteSheets/player",
+  "frames": [
+    0,
+    1,
+    {
+      "sprite": 2,
+      "duration": 0.2,
+      "pivot": [16, 15],
+      "event": {
+        "name": "footstep",
+        "args": { "surface": "stone" }
+      }
+    },
+    3
+  ],
+  "frames_per_second": 8,
+  "loop": false,
+  "pivot": [15, 15]
+}
+```
 
+Detailed frame properties are optional except for `sprite`:
+
+- `duration` overrides the default `1 / frames_per_second` duration, in seconds.
+- `pivot` overrides the animation pivot for that frame, in sprite-local pixels.
+- `event` dispatches a named event when the frame becomes active.
+
+The loader validates required fields, timing, frame indices, and event names and
+reports all discovered errors together.

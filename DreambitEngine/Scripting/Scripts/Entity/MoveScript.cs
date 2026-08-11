@@ -22,16 +22,13 @@ public class MoveScript : ScriptAction
     {
         _entity = Entity.FindByName(_entityName);
         _mover = _entity.AttachComponent<Mover>();
-        _mover.Velocity = Vector3.Zero;
     }
 
     public override void OnUpdate()
     {
-        if (_mover.MoveTo(_moveTo.ToVector3(), _speed)) IsComplete = true;
     }
 
     public override void OnCompleted()
     {
-        _mover.Velocity = Vector3.Zero;
     }
 }

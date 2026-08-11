@@ -608,6 +608,10 @@ internal sealed class MainWindow : AvaloniaWindow
                             ?? throw new InvalidDataException("The SceneBlueprint deserialized to null.");
                 errors = scene.Entities.SelectMany(BlueprintValidator.Validate).ToArray();
             }
+            else if (_document.AssetType == typeof(SpriteSheetAnimation))
+            {
+                errors = ValidateSpriteSheetAnimation(_document.Json);
+            }
             else
             {
                 var memberErrors = new List<string>();
@@ -648,6 +652,56 @@ internal sealed class MainWindow : AvaloniaWindow
         {
             await ShowErrorAsync("Validation failed", exception);
         }
+    }
+
+    private static IReadOnlyList<string> ValidateSpriteSheetAnimation(JObject json)
+    {
+        var errors = new List<string>();
+
+        var spriteSheet = json["sprite_sheet"];
+        if (spriteSheet is null ||
+            spriteSheet.Type == JTokenType.Null ||
+            spriteSheet is JValue { Type: JTokenType.String } value &&
+            string.IsNullOrWhiteSpace(value.Value<string>()) ||
+            spriteSheet.Type is not JTokenType.String and not JTokenType.Object)
+            errors.Add("Sprite Sheet: enter a project-relative sprite-sheet asset path.");
+
+        var framesPerSecond = json.Value<float?>("frames_per_second") ?? 12f;
+        if (!float.IsFinite(framesPerSecond) || framesPerSecond <= 0f)
+            errors.Add("Frames Per Second: value must be finite and greater than zero.");
+
+        if (json["frames"] is not JArray frameTokens)
+        {
+            errors.Add("Frames: an array is required.");
+            return errors;
+        }
+
+        if (frameTokens.Count == 0)
+            errors.Add("Frames: add at least one frame.");
+
+        try
+        {
+            var frames = (List<SpriteAnimationFrame>)DreambitJson.FromToken(
+                frameTokens,
+                typeof(List<SpriteAnimationFrame>))!;
+
+            for (var i = 0; i < frames.Count; i++)
+            {
+                var frame = frames[i];
+                if (frame.SpriteIndex < 0)
+                    errors.Add($"Frames[{i}]: sprite cannot be negative.");
+                if (frame.Duration is <= 0f)
+                    errors.Add($"Frames[{i}]: duration must be greater than zero when specified.");
+                if (frame.Event is not null && string.IsNullOrWhiteSpace(frame.Event.Name))
+                    errors.Add($"Frames[{i}]: event name is required.");
+            }
+        }
+        catch (Exception exception)
+        {
+            errors.Add($"Frames: {exception.GetBaseException().Message}");
+        }
+
+        return errors;
     }
 
     private async Task EditRawJsonAsync()

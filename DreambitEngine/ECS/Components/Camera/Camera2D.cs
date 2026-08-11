@@ -590,9 +590,7 @@ public class Camera2D : Component
     }
 
     /// <summary>
-    ///     Converts a world position to actual UI/screen pixel coordinates.
-    ///     This must use the centered camera matrix. The old implementation
-    ///     incorrectly used TopLeftTransformMatrix.
+    ///     Converts a world position to actual UI/screen pixel coordinates
     /// </summary>
     public Vector2 WorldToUiScreen(Vector2 worldPosition)
     {

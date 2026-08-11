@@ -150,45 +150,13 @@ public class LDtkScene : Scene
         foreach (var entityInstance in entityInstances)
         {
             var ldtkEntity = level.CreateEntityData(entityInstance);
-
-            Entity entity;
-
-            if (ldtkEntity.TryGetField<string>("Blueprint", out var blueprintPath) &&
-                !string.IsNullOrWhiteSpace(blueprintPath))
-            {
-                var blueprint = Resources.LoadAsset<EntityBlueprint>(blueprintPath);
-                if (blueprint == null)
-                {
-                    Core.Logger.Warn(
-                        $"Could not load blueprint '{blueprintPath}' for LDtk entity " +
-                        $"'{ldtkEntity.Identifier}' ({ldtkEntity.Iid}).");
-                    continue;
-                }
-
-                Core.Logger.Info($"Loading Entity {ldtkEntity.Identifier} from Blueprint: {blueprintPath}");
-                entity = CreateChildOfEntity(
-                    blueprint,
-                    level.RootEntity,
-                    createAt: ldtkEntity.Position.ToVector3());
-            }
-            else
-            {
-                Core.Logger.Info($"Generating Entity: {ldtkEntity.Identifier}");
-                entity = CreateEntity(
-                    ldtkEntity.Identifier,
-                    createAt: ldtkEntity.Position.ToVector3(),
-                    tags: [..ldtkEntity.Tags]);
-                entity.Parent = level.RootEntity;
-            }
+            var entity = CreateLDtkEntity(level, ldtkEntity);
+            if (entity is null)
+                continue;
 
             ResetSpawnedHierarchyTransforms(entity);
             level.ApplyDrawLayer(entity, entityInstance);
             level.TrackEntity(entity);
-
-            if (LDtkEntityBuilderRepository.TryGetEntityBuilder(ldtkEntity.Identifier, out var builder))
-            {
-                builder.BuildEntity(level, entity, entityInstance);
-            }
         }
     }
 
@@ -211,6 +179,45 @@ public class LDtkScene : Scene
 
     protected virtual void OnLDtkSceneEnding()
     {
+    }
+
+    private Entity CreateLDtkEntity(LDtkLevelInstance level, LDtkEntity ldtkEntity)
+    {
+        if (LDtkEntityBuilderRepository.TryGetEntityBuilder(ldtkEntity.Identifier, out var builder))
+            return builder.BuildEntity(this, level, ldtkEntity);
+
+        if (ldtkEntity.TryGetField<string>("Blueprint", out var blueprintPath) &&
+            !string.IsNullOrWhiteSpace(blueprintPath))
+            return CreateBlueprintEntity(level, ldtkEntity, blueprintPath);
+
+        Logger.Info($"Generating Entity: {ldtkEntity.Identifier}");
+        var entity = CreateEntity(
+            ldtkEntity.Identifier,
+            createAt: ldtkEntity.Position.ToVector3(),
+            tags: [..ldtkEntity.Tags]);
+        entity.Parent = level.RootEntity;
+        return entity;
+    }
+
+    private Entity CreateBlueprintEntity(
+        LDtkLevelInstance level,
+        LDtkEntity ldtkEntity,
+        string blueprintPath)
+    {
+        var blueprint = Resources.LoadAsset<EntityBlueprint>(blueprintPath);
+        if (blueprint is null)
+        {
+            Logger.Warn(
+                $"Could not load blueprint '{blueprintPath}' for LDtk entity " +
+                $"'{ldtkEntity.Identifier}' ({ldtkEntity.Iid}).");
+            return null;
+        }
+
+        Logger.Info($"Loading Entity {ldtkEntity.Identifier} from Blueprint: {blueprintPath}");
+        return CreateChildOfEntity(
+            blueprint,
+            level.RootEntity,
+            createAt: ldtkEntity.Position.ToVector3());
     }
 
     private LDtkLoadedWorld SelectWorld(LDtkManager manager)

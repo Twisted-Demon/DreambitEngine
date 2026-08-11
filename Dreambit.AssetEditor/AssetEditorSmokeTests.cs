@@ -224,6 +224,80 @@ internal static class AssetEditorSmokeTests
             }
             passed.Add($"generic editors and member conversion for {catalog.AssetTypes.Count - 2} asset types");
 
+            var animationFrameTokens = new JArray
+            {
+                4,
+                new JObject
+                {
+                    ["sprite"] = 7,
+                    ["duration"] = 0.25f,
+                    ["pivot"] = new JArray(12f, 20f),
+                    ["event"] = new JObject
+                    {
+                        ["name"] = "footstep",
+                        ["args"] = new JObject { ["surface"] = "stone" }
+                    }
+                }
+            };
+            var animationFrames = (List<SpriteAnimationFrame>)DreambitJson.FromToken(
+                animationFrameTokens,
+                typeof(List<SpriteAnimationFrame>))!;
+            Require(animationFrames.Count == 2 && animationFrames[0].SpriteIndex == 4,
+                "Compact sprite animation frames did not deserialize.");
+            Require(animationFrames[1].SpriteIndex == 7 && animationFrames[1].Duration == 0.25f,
+                "Detailed sprite animation frames did not deserialize.");
+            Require(animationFrames[1].Pivot == new Microsoft.Xna.Framework.Vector2(12f, 20f),
+                "Detailed sprite animation frame pivots did not deserialize.");
+            Require(animationFrames[1].Event?.Args["surface"] == "stone",
+                "Detailed sprite animation frame events did not deserialize.");
+
+            var roundTrippedFrames = (JArray)DreambitJson.ToToken(animationFrames);
+            Require(roundTrippedFrames[0]?.Type == JTokenType.Integer && roundTrippedFrames[0]!.Value<int>() == 4,
+                "Simple sprite animation frames did not retain their compact JSON form.");
+            Require(roundTrippedFrames[1]?["event"]?["name"]?.Value<string>() == "footstep",
+                "Detailed sprite animation frames did not survive JSON round-tripping.");
+            var animationAsset = new SpriteSheetAnimation
+            {
+                SpriteSheet = new SpriteSheet { AssetName = "sprites/hero.spritesheet" },
+                Frames = animationFrames,
+                FramesPerSecond = 8f,
+                Loop = true,
+                Pivot = new Microsoft.Xna.Framework.Vector2(12f, 20f)
+            };
+            var animationAssetToken = (JObject)DreambitJson.ToToken(animationAsset);
+            Require(animationAssetToken.Value<string>("sprite_sheet") == "sprites/hero.spritesheet",
+                "SpriteSheetAnimation did not serialize its SpriteSheet as an asset reference.");
+            Require(animationAssetToken["frames"] is JArray { Count: 2 },
+                "SpriteSheetAnimation did not serialize its ordered frame list.");
+            var animationFramesEditor = JsonMemberEditor.Create(
+                project,
+                typeof(List<SpriteAnimationFrame>),
+                roundTrippedFrames,
+                _ => { },
+                "Animation frames");
+            var animationEditorLabels = animationFramesEditor.GetLogicalDescendants()
+                .OfType<TextBlock>()
+                .Select(label => label.Text)
+                .ToArray();
+            Require(animationEditorLabels.Contains("Sprite") &&
+                    animationEditorLabels.Contains("Duration (seconds)") &&
+                    animationEditorLabels.Contains("Pivot override") &&
+                    animationEditorLabels.Contains("Event name") &&
+                    animationEditorLabels.Contains("Event args"),
+                "The sprite animation frame editor did not render all frame options.");
+            var addFrame = animationFramesEditor.GetLogicalDescendants()
+                .OfType<Button>()
+                .SingleOrDefault(button => Equals(button.Content, "+ Add Frame"));
+            Require(addFrame is not null,
+                "The sprite animation frame collection did not render its Add Frame action.");
+            addFrame.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            await DrainUiAsync();
+            Require(animationFramesEditor.GetLogicalDescendants()
+                    .OfType<TextBlock>()
+                    .Any(label => label.Text == "Frame 2"),
+                "A newly added sprite animation frame did not render its dedicated frame editor.");
+            passed.Add("compact and detailed sprite animation frame editing and JSON round trip");
+
             var sceneJson = new JObject
             {
                 ["name"] = "Smoke Scene",

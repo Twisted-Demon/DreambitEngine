@@ -24,6 +24,8 @@ internal static class JsonMemberEditor
         if (nullable is not null)
             valueType = nullable;
 
+        if (valueType == typeof(SpriteAnimationFrame))
+            return CreateSpriteAnimationFrameEditor(project, initialValue, onChanged, title);
         if (valueType == typeof(bool))
             return CreateBool(initialValue, onChanged);
         if (valueType.IsEnum)
@@ -53,6 +55,183 @@ internal static class JsonMemberEditor
             return CreateUntypedTokenEditor(initialValue, onChanged, title);
 
         return CreateScalarTokenEditor(initialValue, onChanged);
+    }
+
+    private static Control CreateSpriteAnimationFrameEditor(
+        AssetEditorProject project,
+        JToken initialValue,
+        Action<JToken> onChanged,
+        string title)
+    {
+        var frameObject = initialValue as JObject;
+        var spriteIndex = initialValue.Type == JTokenType.Integer
+            ? initialValue.Value<int>()
+            : frameObject?.Value<int?>("sprite") ?? 0;
+        var duration = frameObject?.Value<float?>("duration");
+        var pivotArray = frameObject?["pivot"] as JArray;
+        float? pivotX = pivotArray?.ElementAtOrDefault(0)?.Value<float>();
+        float? pivotY = pivotArray?.ElementAtOrDefault(1)?.Value<float>();
+        var eventObject = frameObject?["event"] as JObject;
+        var eventName = eventObject?.Value<string>("name") ?? string.Empty;
+        var eventArgs = eventObject?["args"] is JObject args
+            ? (JObject)args.DeepClone()
+            : new JObject();
+
+        void Commit()
+        {
+            var hasPivot = pivotX is not null && pivotY is not null;
+            var hasEvent = !string.IsNullOrWhiteSpace(eventName) || eventArgs.Count > 0;
+
+            if (duration is null && !hasPivot && !hasEvent)
+            {
+                onChanged(new JValue(spriteIndex));
+                return;
+            }
+
+            var frame = new JObject { ["sprite"] = spriteIndex };
+            if (duration is not null)
+                frame["duration"] = duration.Value;
+            if (hasPivot)
+                frame["pivot"] = new JArray(pivotX!.Value, pivotY!.Value);
+            if (hasEvent)
+            {
+                frame["event"] = new JObject
+                {
+                    ["name"] = eventName.Trim(),
+                    ["args"] = eventArgs.DeepClone()
+                };
+            }
+
+            onChanged(frame);
+        }
+
+        var spriteEditor = CreateNumeric(typeof(int), new JValue(spriteIndex), value =>
+        {
+            spriteIndex = value.Value<int>();
+            Commit();
+        });
+
+        var durationEditor = EditorTheme.TextBox(
+            duration?.ToString("0.###", CultureInfo.InvariantCulture),
+            "Optional; uses animation FPS");
+        durationEditor.PropertyChanged += (_, args) =>
+        {
+            if (args.Property != TextBox.TextProperty)
+                return;
+
+            var raw = durationEditor.Text?.Trim();
+            if (string.IsNullOrEmpty(raw))
+            {
+                duration = null;
+                durationEditor.BorderBrush = EditorTheme.Border;
+                Commit();
+                return;
+            }
+
+            if (!float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
+            {
+                durationEditor.BorderBrush = EditorTheme.Danger;
+                return;
+            }
+
+            duration = value;
+            durationEditor.BorderBrush = value > 0f ? EditorTheme.Border : EditorTheme.Danger;
+            Commit();
+        };
+
+        var pivotXEditor = EditorTheme.TextBox(
+            pivotX?.ToString("0.###", CultureInfo.InvariantCulture),
+            "Default");
+        var pivotYEditor = EditorTheme.TextBox(
+            pivotY?.ToString("0.###", CultureInfo.InvariantCulture),
+            "Default");
+
+        void CommitPivot()
+        {
+            var rawX = pivotXEditor.Text?.Trim();
+            var rawY = pivotYEditor.Text?.Trim();
+            if (string.IsNullOrEmpty(rawX) && string.IsNullOrEmpty(rawY))
+            {
+                pivotX = null;
+                pivotY = null;
+                pivotXEditor.BorderBrush = EditorTheme.Border;
+                pivotYEditor.BorderBrush = EditorTheme.Border;
+                Commit();
+                return;
+            }
+
+            var validX = float.TryParse(rawX, NumberStyles.Float, CultureInfo.InvariantCulture, out var x);
+            var validY = float.TryParse(rawY, NumberStyles.Float, CultureInfo.InvariantCulture, out var y);
+            pivotXEditor.BorderBrush = validX ? EditorTheme.Border : EditorTheme.Danger;
+            pivotYEditor.BorderBrush = validY ? EditorTheme.Border : EditorTheme.Danger;
+            if (!validX || !validY)
+                return;
+
+            pivotX = x;
+            pivotY = y;
+            Commit();
+        }
+
+        pivotXEditor.PropertyChanged += (_, args) =>
+        {
+            if (args.Property == TextBox.TextProperty)
+                CommitPivot();
+        };
+        pivotYEditor.PropertyChanged += (_, args) =>
+        {
+            if (args.Property == TextBox.TextProperty)
+                CommitPivot();
+        };
+
+        var pivotEditor = new Grid
+        {
+            ColumnDefinitions = ColumnDefinitions.Parse("Auto,*,Auto,*"),
+            ColumnSpacing = 6
+        };
+        pivotEditor.Children.Add(EditorTheme.Caption("X"));
+        Grid.SetColumn(pivotXEditor, 1);
+        pivotEditor.Children.Add(pivotXEditor);
+        var pivotYLabel = EditorTheme.Caption("Y");
+        Grid.SetColumn(pivotYLabel, 2);
+        pivotEditor.Children.Add(pivotYLabel);
+        Grid.SetColumn(pivotYEditor, 3);
+        pivotEditor.Children.Add(pivotYEditor);
+
+        var eventNameEditor = EditorTheme.TextBox(eventName, "Optional event name");
+        eventNameEditor.PropertyChanged += (_, args) =>
+        {
+            if (args.Property != TextBox.TextProperty)
+                return;
+            eventName = eventNameEditor.Text ?? string.Empty;
+            Commit();
+        };
+
+        var eventArgsEditor = CreateDictionaryEditor(
+            project,
+            typeof(string),
+            typeof(string),
+            eventArgs,
+            value =>
+            {
+                eventArgs = value as JObject ?? new JObject();
+                Commit();
+            },
+            $"{title}.Event.Args");
+
+        return new StackPanel
+        {
+            Spacing = 10,
+            Children =
+            {
+                CreateLabeledField("Sprite", spriteEditor),
+                CreateLabeledField("Duration (seconds)", durationEditor),
+                CreateLabeledField("Pivot override", pivotEditor),
+                EditorTheme.Separator(),
+                EditorTheme.SectionTitle("Event (optional)"),
+                CreateLabeledField("Event name", eventNameEditor),
+                CreateLabeledField("Event args", eventArgsEditor)
+            }
+        };
     }
 
     private static Control CreateBool(JToken initialValue, Action<JToken> onChanged)
@@ -311,8 +490,9 @@ internal static class JsonMemberEditor
                     Render();
                 };
 
+                var itemName = elementType == typeof(SpriteAnimationFrame) ? "Frame" : "Item";
                 var header = new Grid { ColumnDefinitions = ColumnDefinitions.Parse("*,Auto") };
-                header.Children.Add(EditorTheme.SectionTitle($"Item {index}"));
+                header.Children.Add(EditorTheme.SectionTitle($"{itemName} {index}"));
                 Grid.SetColumn(remove, 1);
                 header.Children.Add(remove);
 
@@ -324,7 +504,8 @@ internal static class JsonMemberEditor
                 host.Children.Add(EditorTheme.SubtleCard(item, new Thickness(12)));
             }
 
-            var add = EditorTheme.Button("+ Add Item", EditorTheme.ButtonTone.Secondary);
+            var addLabel = elementType == typeof(SpriteAnimationFrame) ? "+ Add Frame" : "+ Add Item";
+            var add = EditorTheme.Button(addLabel, EditorTheme.ButtonTone.Secondary);
             add.HorizontalAlignment = AvaloniaHorizontalAlignment.Left;
             add.Click += (_, _) =>
             {

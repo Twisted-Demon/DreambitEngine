@@ -20,7 +20,7 @@ public static class LDtkEntityBuilderRepository
         {
             var instance = (ILDtkEntityBuilder)Activator.CreateInstance(builderType);
             if (instance is null) continue;
-            _entityBuilders[builderType.Name] = instance;
+            _entityBuilders[instance.EntityDefinitionIdentifier] = instance;
         }
     }
 
