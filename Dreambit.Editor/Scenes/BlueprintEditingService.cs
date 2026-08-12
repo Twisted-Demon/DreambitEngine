@@ -153,9 +153,28 @@ internal sealed class BlueprintEditingService : IDisposable
     private void OnAssetEditingChanged()
     {
         if (_assetEditing.Current?.Asset.Id == _openAssetId)
+        {
             RebuildFromAssetDocument();
-        else
-            CloseDocument();
+            return;
+        }
+
+        if (_assetEditing.Selected?.Id == _openAssetId)
+        {
+            SuspendDocumentPreservingSelection();
+            return;
+        }
+
+        CloseDocument();
+    }
+
+    private void SuspendDocumentPreservingSelection()
+    {
+        if (Current is not null)
+            Current.Changed -= OnSceneDocumentChanged;
+
+        Current?.Dispose();
+        Current = null;
+        _rootEntityId = Guid.Empty;
     }
 
     private void OnAssetPreviewChanged(DreambitAssetDocument document)
