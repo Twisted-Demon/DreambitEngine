@@ -75,9 +75,6 @@ public class SpriteSheet : DreambitAsset
 
     [JsonIgnore] public TextureAsset TextureAsset => SourceSprite?.TextureAsset;
 
-    [Obsolete("Use TextureAsset. TexturePath is retained for source compatibility only.")]
-    [JsonIgnore] public string TexturePath => SourceSprite?.TexturePath;
-
     [JsonIgnore] public Sprite[] Frames { get; private set; } = [];
 
     [JsonIgnore] public int FrameCount => Frames.Length;

@@ -16,10 +16,6 @@ public class Sprite : DreambitAsset
     [JsonProperty("texture")]
     public TextureAsset TextureAsset { get; set; }
 
-    /// <summary>Legacy read-only path view. Serialize <see cref="TextureAsset"/> instead.</summary>
-    [JsonIgnore]
-    [Obsolete("Use TextureAsset. TexturePath is retained for source compatibility only.")]
-    public string TexturePath => TextureAsset?.AssetName ?? string.Empty;
 
     [JsonProperty("source")] public Rectangle SourceRect { get; init; }
 
