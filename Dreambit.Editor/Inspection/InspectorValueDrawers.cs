@@ -1,12 +1,11 @@
 using System.Collections;
 using System.Globalization;
 using System.Reflection;
-using ImGuiNET;
-using Microsoft.Xna.Framework;
 using Dreambit.ECS;
 using Dreambit.Editor.Assets;
-using Dreambit.Editor.Scenes;
 using Dreambit.Editor.UI;
+using ImGuiNET;
+using Microsoft.Xna.Framework;
 using Newtonsoft.Json;
 using Vector2 = System.Numerics.Vector2;
 using Vector3 = System.Numerics.Vector3;
@@ -23,13 +22,17 @@ internal readonly record struct InspectorValueDrawContext(
 
 internal readonly record struct InspectorValueDrawResult(bool Changed, object? Value)
 {
-    public static InspectorValueDrawResult Unchanged(object? value) => new(false, value);
+    public static InspectorValueDrawResult Unchanged(object? value)
+    {
+        return new InspectorValueDrawResult(false, value);
+    }
 }
 
 internal interface IInspectorValueDrawer
 {
     int Priority { get; }
     bool CanDraw(Type type);
+
     InspectorValueDrawResult Draw(
         InspectorValueDrawerRegistry registry,
         string label,
@@ -61,163 +64,6 @@ internal sealed class InspectorValueDrawerRegistry
         Register(new UnsupportedValueDrawer());
     }
 
-    private sealed class ObjectReferenceValueDrawer(
-        AssetDatabase assets,
-        EditorDragDropService dragDrop,
-        Func<Scene?> sceneProvider) : IInspectorValueDrawer
-    {
-        private string _search = string.Empty;
-
-        public int Priority => 95;
-        public bool CanDraw(Type type) =>
-            typeof(DreambitAsset).IsAssignableFrom(type) ||
-            type == typeof(Entity) ||
-            typeof(Component).IsAssignableFrom(type);
-
-        public InspectorValueDrawResult Draw(
-            InspectorValueDrawerRegistry registry,
-            string label,
-            Type type,
-            object? value,
-            InspectorValueDrawContext context)
-        {
-            ImGui.TextUnformatted(label);
-            ImGui.SameLine(110f);
-            var display = value switch
-            {
-                DreambitAsset asset => asset.AssetName ?? asset.GetType().Name,
-                Entity entity => entity.Name,
-                Component component => $"{component.Entity.Name} ({component.GetType().Name})",
-                _ => "None"
-            };
-            ImGui.SetNextItemWidth(-32f);
-            if (ImGui.Button($"{display}##{context.Id}", new Vector2(-32f, 0f)))
-            {
-                _search = string.Empty;
-                ImGui.OpenPopup($"Object Picker##{context.Id}");
-            }
-
-            object? changedValue = value;
-            var changed = AcceptDrop(type, ref changedValue);
-            ImGui.SameLine();
-            if (ImGui.SmallButton($"×##{context.Id}.Clear"))
-            {
-                changedValue = null;
-                changed = true;
-            }
-            if (DrawPicker(type, context.Id, ref changedValue))
-                changed = true;
-            return new InspectorValueDrawResult(changed, changedValue);
-        }
-
-        private unsafe bool AcceptDrop(Type type, ref object? value)
-        {
-            if (!ImGui.BeginDragDropTarget())
-                return false;
-            var changed = false;
-            try
-            {
-                if (typeof(DreambitAsset).IsAssignableFrom(type))
-                {
-                    var payload = ImGui.AcceptDragDropPayload(EditorDragDropService.ProjectItemPayloadType);
-                    if (payload.NativePtr != null && dragDrop.ProjectItem is { IsFolder: false } item &&
-                        assets.TryGetAsset(item.RelativePath, out var asset) &&
-                        AssetTypeClassifier.IsCompatibleWith(asset!, type))
-                    {
-                        var loaded = Resources.LoadDreambitAsset(item.AssetId, asset!.LogicalAssetName, type);
-                        if (loaded is not null && type.IsInstanceOfType(loaded))
-                        {
-                            value = loaded;
-                            changed = true;
-                        }
-                        dragDrop.ClearProjectItem();
-                    }
-                }
-                else
-                {
-                    var payload = ImGui.AcceptDragDropPayload(EditorDragDropService.HierarchyEntityPayloadType);
-                    if (payload.NativePtr != null && dragDrop.HierarchyEntityId is { } id &&
-                        sceneProvider()?.FindEntity(id) is { } entity)
-                    {
-                        object? candidate = type == typeof(Entity) ? entity : entity.GetComponent(type);
-                        if (candidate is not null && type.IsInstanceOfType(candidate))
-                        {
-                            value = candidate;
-                            changed = true;
-                        }
-                        dragDrop.ClearHierarchyEntity();
-                    }
-                }
-            }
-            finally
-            {
-                ImGui.EndDragDropTarget();
-            }
-            return changed;
-        }
-
-        private bool DrawPicker(Type type, string id, ref object? value)
-        {
-            if (!ImGui.BeginPopup($"Object Picker##{id}"))
-                return false;
-            var changed = false;
-            try
-            {
-                ImGui.SetNextItemWidth(360f);
-                ImGui.InputTextWithHint("##PickerSearch", "Search", ref _search, 128);
-                ImGui.Separator();
-                ImGui.BeginChild("##PickerItems", new Vector2(360f, 260f));
-                try
-                {
-                    if (typeof(DreambitAsset).IsAssignableFrom(type))
-                    {
-                        foreach (var asset in assets.GetSnapshot().Assets)
-                        {
-                            if (!AssetTypeClassifier.IsCompatibleWith(asset, type))
-                                continue;
-                            if (!string.IsNullOrWhiteSpace(_search) &&
-                                !asset.RelativePath.Contains(_search, StringComparison.OrdinalIgnoreCase))
-                                continue;
-                            if (!ImGui.Selectable(asset.RelativePath))
-                                continue;
-                            var loaded = Resources.LoadDreambitAsset(asset.Id, asset.LogicalAssetName, type);
-                            if (loaded is not null && type.IsInstanceOfType(loaded))
-                            {
-                                value = loaded;
-                                changed = true;
-                                ImGui.CloseCurrentPopup();
-                            }
-                        }
-                    }
-                    else if (sceneProvider() is { } scene)
-                    {
-                        foreach (var entity in scene.GetAllEntities().Where(entity => !entity.IsEditorOnly))
-                        {
-                            if (!string.IsNullOrWhiteSpace(_search) &&
-                                !entity.Name.Contains(_search, StringComparison.OrdinalIgnoreCase))
-                                continue;
-                            object? candidate = type == typeof(Entity) ? entity : entity.GetComponent(type);
-                            if (candidate is null || !ImGui.Selectable(entity.Name))
-                                continue;
-                            value = candidate;
-                            changed = true;
-                            ImGui.CloseCurrentPopup();
-                        }
-                    }
-                }
-                finally
-                {
-                    ImGui.EndChild();
-                }
-            }
-            finally
-            {
-                ImGui.EndPopup();
-            }
-            return changed;
-        }
-    }
-
     public void Register(IInspectorValueDrawer drawer)
     {
         _drawers.Add(drawer);
@@ -241,10 +87,232 @@ internal sealed class InspectorValueDrawerRegistry
         return result;
     }
 
+    private sealed class ObjectReferenceValueDrawer(
+        AssetDatabase assets,
+        EditorDragDropService dragDrop,
+        Func<Scene?> sceneProvider) : IInspectorValueDrawer
+    {
+        private string _search = string.Empty;
+
+        public int Priority => 95;
+
+        public bool CanDraw(Type type)
+        {
+            return typeof(DreambitAsset).IsAssignableFrom(type) ||
+                   type == typeof(Entity) ||
+                   typeof(Component).IsAssignableFrom(type);
+        }
+
+        public InspectorValueDrawResult Draw(
+            InspectorValueDrawerRegistry registry,
+            string label,
+            Type type,
+            object? value,
+            InspectorValueDrawContext context)
+        {
+            var display = value switch
+            {
+                DreambitAsset asset => asset.AssetName ?? asset.GetType().Name,
+                Entity entity => entity.Name,
+                Component component => $"{component.Entity.Name} ({component.GetType().Name})",
+                _ => "None"
+            };
+
+            var changedValue = value;
+            var changed = false;
+
+            var availableWidth = MathF.Max(1f, ImGui.GetContentRegionAvail().X);
+            var labelWidth = Math.Clamp(
+                availableWidth * 0.32f,
+                120f,
+                190f);
+
+            var tableFlags =
+                ImGuiTableFlags.SizingStretchProp |
+                ImGuiTableFlags.NoSavedSettings;
+
+            if (ImGui.BeginTable(
+                    $"##ObjectReferenceRow.{context.Id}",
+                    3,
+                    tableFlags))
+                try
+                {
+                    ImGui.TableSetupColumn(
+                        "##Label",
+                        ImGuiTableColumnFlags.WidthFixed,
+                        labelWidth);
+
+                    ImGui.TableSetupColumn(
+                        "##Value",
+                        ImGuiTableColumnFlags.WidthStretch);
+
+                    ImGui.TableSetupColumn(
+                        "##Clear",
+                        ImGuiTableColumnFlags.WidthFixed,
+                        ImGui.GetFrameHeight());
+
+                    ImGui.TableNextRow();
+
+                    // Property name
+                    ImGui.TableSetColumnIndex(0);
+                    ImGui.AlignTextToFramePadding();
+                    ImGui.TextUnformatted(label);
+
+                    // Object reference field
+                    ImGui.TableSetColumnIndex(1);
+
+                    if (ImGui.Button(
+                            $"{display}##{context.Id}",
+                            new Vector2(-1f, 0f)))
+                    {
+                        _search = string.Empty;
+                        ImGui.OpenPopup($"Object Picker##{context.Id}");
+                    }
+
+                    // AcceptDrop must remain immediately after the field because
+                    // BeginDragDropTarget operates on the previously drawn item.
+                    if (AcceptDrop(type, ref changedValue))
+                        changed = true;
+
+                    // Clear button
+                    ImGui.TableSetColumnIndex(2);
+
+                    if (ImGui.SmallButton($"×##{context.Id}.Clear"))
+                    {
+                        changedValue = null;
+                        changed = true;
+                    }
+
+                    // Keep this inside the same table/ID scope as OpenPopup.
+                    if (DrawPicker(type, context.Id, ref changedValue))
+                        changed = true;
+                }
+                finally
+                {
+                    ImGui.EndTable();
+                }
+
+            return new InspectorValueDrawResult(
+                changed,
+                changedValue);
+        }
+
+        private unsafe bool AcceptDrop(Type type, ref object? value)
+        {
+            if (!ImGui.BeginDragDropTarget())
+                return false;
+            var changed = false;
+            try
+            {
+                if (typeof(DreambitAsset).IsAssignableFrom(type))
+                {
+                    var payload = ImGui.AcceptDragDropPayload(EditorDragDropService.ProjectItemPayloadType);
+                    if (payload.NativePtr != null && dragDrop.ProjectItem is { IsFolder: false } item &&
+                        assets.TryGetAsset(item.RelativePath, out var asset) &&
+                        AssetTypeClassifier.IsCompatibleWith(asset!, type))
+                    {
+                        var loaded = Resources.LoadDreambitAsset(item.AssetId, asset!.LogicalAssetName, type);
+                        if (loaded is not null && type.IsInstanceOfType(loaded))
+                        {
+                            value = loaded;
+                            changed = true;
+                        }
+
+                        dragDrop.ClearProjectItem();
+                    }
+                }
+                else
+                {
+                    var payload = ImGui.AcceptDragDropPayload(EditorDragDropService.HierarchyEntityPayloadType);
+                    if (payload.NativePtr != null && dragDrop.HierarchyEntityId is { } id &&
+                        sceneProvider()?.FindEntity(id) is { } entity)
+                    {
+                        object? candidate = type == typeof(Entity) ? entity : entity.GetComponent(type);
+                        if (candidate is not null && type.IsInstanceOfType(candidate))
+                        {
+                            value = candidate;
+                            changed = true;
+                        }
+
+                        dragDrop.ClearHierarchyEntity();
+                    }
+                }
+            }
+            finally
+            {
+                ImGui.EndDragDropTarget();
+            }
+
+            return changed;
+        }
+
+        private bool DrawPicker(Type type, string id, ref object? value)
+        {
+            if (!ImGui.BeginPopup($"Object Picker##{id}"))
+                return false;
+            var changed = false;
+            try
+            {
+                ImGui.SetNextItemWidth(360f);
+                ImGui.InputTextWithHint("##PickerSearch", "Search", ref _search, 128);
+                ImGui.Separator();
+                ImGui.BeginChild("##PickerItems", new Vector2(360f, 260f));
+                try
+                {
+                    if (typeof(DreambitAsset).IsAssignableFrom(type))
+                        foreach (var asset in assets.GetSnapshot().Assets)
+                        {
+                            if (!AssetTypeClassifier.IsCompatibleWith(asset, type))
+                                continue;
+                            if (!string.IsNullOrWhiteSpace(_search) &&
+                                !asset.RelativePath.Contains(_search, StringComparison.OrdinalIgnoreCase))
+                                continue;
+                            if (!ImGui.Selectable(asset.RelativePath))
+                                continue;
+                            var loaded = Resources.LoadDreambitAsset(asset.Id, asset.LogicalAssetName, type);
+                            if (loaded is not null && type.IsInstanceOfType(loaded))
+                            {
+                                value = loaded;
+                                changed = true;
+                                ImGui.CloseCurrentPopup();
+                            }
+                        }
+                    else if (sceneProvider() is { } scene)
+                        foreach (var entity in scene.GetAllEntities().Where(entity => !entity.IsEditorOnly))
+                        {
+                            if (!string.IsNullOrWhiteSpace(_search) &&
+                                !entity.Name.Contains(_search, StringComparison.OrdinalIgnoreCase))
+                                continue;
+                            object? candidate = type == typeof(Entity) ? entity : entity.GetComponent(type);
+                            if (candidate is null || !ImGui.Selectable(entity.Name))
+                                continue;
+                            value = candidate;
+                            changed = true;
+                            ImGui.CloseCurrentPopup();
+                        }
+                }
+                finally
+                {
+                    ImGui.EndChild();
+                }
+            }
+            finally
+            {
+                ImGui.EndPopup();
+            }
+
+            return changed;
+        }
+    }
+
     private sealed class NullableValueDrawer : IInspectorValueDrawer
     {
         public int Priority => 100;
-        public bool CanDraw(Type type) => Nullable.GetUnderlyingType(type) is not null;
+
+        public bool CanDraw(Type type)
+        {
+            return Nullable.GetUnderlyingType(type) is not null;
+        }
 
         public InspectorValueDrawResult Draw(
             InspectorValueDrawerRegistry registry,
@@ -275,7 +343,11 @@ internal sealed class InspectorValueDrawerRegistry
     private sealed class BooleanValueDrawer : IInspectorValueDrawer
     {
         public int Priority => 90;
-        public bool CanDraw(Type type) => type == typeof(bool);
+
+        public bool CanDraw(Type type)
+        {
+            return type == typeof(bool);
+        }
 
         public InspectorValueDrawResult Draw(
             InspectorValueDrawerRegistry registry,
@@ -294,7 +366,11 @@ internal sealed class InspectorValueDrawerRegistry
     private sealed class EnumValueDrawer : IInspectorValueDrawer
     {
         public int Priority => 85;
-        public bool CanDraw(Type type) => type.IsEnum;
+
+        public bool CanDraw(Type type)
+        {
+            return type.IsEnum;
+        }
 
         public InspectorValueDrawResult Draw(
             InspectorValueDrawerRegistry registry,
@@ -322,8 +398,10 @@ internal sealed class InspectorValueDrawerRegistry
                             changed = true;
                         }
                     }
+
                     ImGui.TreePop();
                 }
+
                 return changed
                     ? new InspectorValueDrawResult(true, Enum.ToObject(type, bits))
                     : InspectorValueDrawResult.Unchanged(value);
@@ -333,7 +411,7 @@ internal sealed class InspectorValueDrawerRegistry
             var currentName = Enum.GetName(type, value!) ?? value!.ToString() ?? string.Empty;
             if (!ImGui.BeginCombo($"{label}##{context.Id}", currentName))
                 return InspectorValueDrawResult.Unchanged(value);
-            object? selectedValue = value;
+            var selectedValue = value;
             var changedValue = false;
             foreach (var name in names)
             {
@@ -343,9 +421,11 @@ internal sealed class InspectorValueDrawerRegistry
                     selectedValue = Enum.Parse(type, name);
                     changedValue = true;
                 }
+
                 if (selected)
                     ImGui.SetItemDefaultFocus();
             }
+
             ImGui.EndCombo();
             return new InspectorValueDrawResult(changedValue, selectedValue);
         }
@@ -360,7 +440,11 @@ internal sealed class InspectorValueDrawerRegistry
         ];
 
         public int Priority => 80;
-        public bool CanDraw(Type type) => Types.Contains(type);
+
+        public bool CanDraw(Type type)
+        {
+            return Types.Contains(type);
+        }
 
         public InspectorValueDrawResult Draw(
             InspectorValueDrawerRegistry registry,
@@ -384,8 +468,11 @@ internal sealed class InspectorValueDrawerRegistry
                         "%.3f",
                         ImGuiSliderFlags.AlwaysClamp);
                 DrawExactEntryTooltip();
-                return changed ? new InspectorValueDrawResult(true, current) : InspectorValueDrawResult.Unchanged(value);
+                return changed
+                    ? new InspectorValueDrawResult(true, current)
+                    : InspectorValueDrawResult.Unchanged(value);
             }
+
             if (type == typeof(double) || type == typeof(decimal))
             {
                 var current = Convert.ToDouble(value, CultureInfo.InvariantCulture);
@@ -393,7 +480,9 @@ internal sealed class InspectorValueDrawerRegistry
                 if (range is not null)
                     current = Math.Clamp(current, range.Minimum, range.Maximum);
                 object converted = type == typeof(decimal) ? Convert.ToDecimal(current) : current;
-                return changed ? new InspectorValueDrawResult(true, converted) : InspectorValueDrawResult.Unchanged(value);
+                return changed
+                    ? new InspectorValueDrawResult(true, converted)
+                    : InspectorValueDrawResult.Unchanged(value);
             }
 
             if (type == typeof(int))
@@ -439,7 +528,11 @@ internal sealed class InspectorValueDrawerRegistry
     private sealed class StringValueDrawer : IInspectorValueDrawer
     {
         public int Priority => 75;
-        public bool CanDraw(Type type) => type == typeof(string) || type == typeof(char);
+
+        public bool CanDraw(Type type)
+        {
+            return type == typeof(string) || type == typeof(char);
+        }
 
         public InspectorValueDrawResult Draw(
             InspectorValueDrawerRegistry registry,
@@ -458,11 +551,14 @@ internal sealed class InspectorValueDrawerRegistry
     private sealed class VectorValueDrawer : IInspectorValueDrawer
     {
         public int Priority => 70;
-        public bool CanDraw(Type type) =>
-            type == typeof(Microsoft.Xna.Framework.Vector2) ||
-            type == typeof(Microsoft.Xna.Framework.Vector3) ||
-            type == typeof(Microsoft.Xna.Framework.Vector4) ||
-            type == typeof(Quaternion);
+
+        public bool CanDraw(Type type)
+        {
+            return type == typeof(Microsoft.Xna.Framework.Vector2) ||
+                   type == typeof(Microsoft.Xna.Framework.Vector3) ||
+                   type == typeof(Microsoft.Xna.Framework.Vector4) ||
+                   type == typeof(Quaternion);
+        }
 
         public InspectorValueDrawResult Draw(
             InspectorValueDrawerRegistry registry,
@@ -473,20 +569,27 @@ internal sealed class InspectorValueDrawerRegistry
         {
             if (type == typeof(Microsoft.Xna.Framework.Vector2))
             {
-                var source = value is Microsoft.Xna.Framework.Vector2 vector ? vector : Microsoft.Xna.Framework.Vector2.Zero;
+                var source = value is Microsoft.Xna.Framework.Vector2 vector
+                    ? vector
+                    : Microsoft.Xna.Framework.Vector2.Zero;
                 var current = new Vector2(source.X, source.Y);
                 return ImGui.DragFloat2($"{label}##{context.Id}", ref current, 0.1f)
                     ? new InspectorValueDrawResult(true, new Microsoft.Xna.Framework.Vector2(current.X, current.Y))
                     : InspectorValueDrawResult.Unchanged(value);
             }
+
             if (type == typeof(Microsoft.Xna.Framework.Vector3))
             {
-                var source = value is Microsoft.Xna.Framework.Vector3 vector ? vector : Microsoft.Xna.Framework.Vector3.Zero;
+                var source = value is Microsoft.Xna.Framework.Vector3 vector
+                    ? vector
+                    : Microsoft.Xna.Framework.Vector3.Zero;
                 var current = new Vector3(source.X, source.Y, source.Z);
                 return ImGui.DragFloat3($"{label}##{context.Id}", ref current, 0.1f)
-                    ? new InspectorValueDrawResult(true, new Microsoft.Xna.Framework.Vector3(current.X, current.Y, current.Z))
+                    ? new InspectorValueDrawResult(true,
+                        new Microsoft.Xna.Framework.Vector3(current.X, current.Y, current.Z))
                     : InspectorValueDrawResult.Unchanged(value);
             }
+
             var source4 = value switch
             {
                 Microsoft.Xna.Framework.Vector4 vector => new Vector4(vector.X, vector.Y, vector.Z, vector.W),
@@ -506,7 +609,11 @@ internal sealed class InspectorValueDrawerRegistry
     private sealed class ColorValueDrawer : IInspectorValueDrawer
     {
         public int Priority => 72;
-        public bool CanDraw(Type type) => type == typeof(Color);
+
+        public bool CanDraw(Type type)
+        {
+            return type == typeof(Color);
+        }
 
         public InspectorValueDrawResult Draw(
             InspectorValueDrawerRegistry registry,
@@ -527,7 +634,10 @@ internal sealed class InspectorValueDrawerRegistry
     {
         public int Priority => 60;
 
-        public bool CanDraw(Type type) => TryGetElementType(type, out _);
+        public bool CanDraw(Type type)
+        {
+            return TryGetElementType(type, out _);
+        }
 
         public InspectorValueDrawResult Draw(
             InspectorValueDrawerRegistry registry,
@@ -571,6 +681,7 @@ internal sealed class InspectorValueDrawerRegistry
                         items[index] = result.Value;
                         changed = true;
                     }
+
                     ImGui.SameLine();
                     if (ImGui.SmallButton("-") && !context.ReadOnly)
                         removeIndex = index;
@@ -582,11 +693,13 @@ internal sealed class InspectorValueDrawerRegistry
                     items.RemoveAt(removeIndex.Value);
                     changed = true;
                 }
+
                 if (ImGui.SmallButton($"+ Add##{context.Id}") && !context.ReadOnly)
                 {
                     items.Add(CreateDefault(elementType));
                     changed = true;
                 }
+
                 ImGui.TreePop();
             }
 
@@ -602,6 +715,7 @@ internal sealed class InspectorValueDrawerRegistry
                 elementType = type.GetElementType()!;
                 return true;
             }
+
             if (type == typeof(string))
             {
                 elementType = null!;
@@ -621,6 +735,7 @@ internal sealed class InspectorValueDrawerRegistry
                 elementType = null!;
                 return false;
             }
+
             elementType = collectionType.GetGenericArguments()[0];
             return true;
         }
@@ -664,12 +779,14 @@ internal sealed class InspectorValueDrawerRegistry
 
         public int Priority => 10;
 
-        public bool CanDraw(Type type) =>
-            type != typeof(object) &&
-            !type.IsPrimitive &&
-            !type.IsPointer &&
-            !type.IsByRef &&
-            type.Namespace != "System";
+        public bool CanDraw(Type type)
+        {
+            return type != typeof(object) &&
+                   !type.IsPrimitive &&
+                   !type.IsPointer &&
+                   !type.IsByRef &&
+                   type.Namespace != "System";
+        }
 
         public InspectorValueDrawResult Draw(
             InspectorValueDrawerRegistry registry,
@@ -683,7 +800,6 @@ internal sealed class InspectorValueDrawerRegistry
                 ImGui.TextDisabled($"{label}: null");
                 ImGui.SameLine();
                 if (!context.ReadOnly && ImGui.SmallButton($"Create##{context.Id}"))
-                {
                     try
                     {
                         return new InspectorValueDrawResult(true, Activator.CreateInstance(type));
@@ -692,14 +808,16 @@ internal sealed class InspectorValueDrawerRegistry
                     {
                         ImGui.SetTooltip($"{type.Name} needs a parameterless constructor.");
                     }
-                }
+
                 return InspectorValueDrawResult.Unchanged(value);
             }
+
             if (context.Depth >= 8)
             {
                 ImGui.TextDisabled($"{label}: maximum nesting depth reached");
                 return InspectorValueDrawResult.Unchanged(value);
             }
+
             if (!ImGui.TreeNodeEx($"{label}##{context.Id}", ImGuiTreeNodeFlags.SpanAvailWidth))
                 return InspectorValueDrawResult.Unchanged(value);
 
@@ -728,18 +846,22 @@ internal sealed class InspectorValueDrawerRegistry
                     editable = Clone(value, type);
                     cloned = true;
                 }
+
                 member.SetValue(editable!, result.Value);
                 changed = true;
             }
+
             ImGui.TreePop();
             return changed
                 ? new InspectorValueDrawResult(true, editable)
                 : InspectorValueDrawResult.Unchanged(value);
         }
 
-        private static object Clone(object value, Type type) =>
-            DreambitJson.FromToken(DreambitJson.ToToken(value), type)
-            ?? throw new InvalidOperationException($"Could not clone nested value '{type.FullName}'.");
+        private static object Clone(object value, Type type)
+        {
+            return DreambitJson.FromToken(DreambitJson.ToToken(value), type)
+                   ?? throw new InvalidOperationException($"Could not clone nested value '{type.FullName}'.");
+        }
 
         private static IEnumerable<InspectorMemberMetadata> DiscoverMembers(Type type)
         {
@@ -762,6 +884,7 @@ internal sealed class InspectorValueDrawerRegistry
                     property,
                     property.SetMethod is not null);
             }
+
             foreach (var field in type.GetFields(Flags))
             {
                 if (field.IsStatic || field.GetCustomAttribute<JsonIgnoreAttribute>() is not null ||
@@ -785,22 +908,29 @@ internal sealed class InspectorValueDrawerRegistry
             string displayName,
             Type valueType,
             MemberInfo member,
-            bool canWrite) => new(
-            serializedName,
-            displayName,
-            valueType,
-            member,
-            canWrite,
-            !canWrite || member.GetCustomAttribute<ReadOnlyInInspectorAttribute>() is not null,
-            member.GetCustomAttribute<RangeAttribute>(),
-            member.GetCustomAttribute<HeaderAttribute>()?.Text,
-            member.GetCustomAttribute<TooltipAttribute>()?.Text);
+            bool canWrite)
+        {
+            return new InspectorMemberMetadata(
+                serializedName,
+                displayName,
+                valueType,
+                member,
+                canWrite,
+                !canWrite || member.GetCustomAttribute<ReadOnlyInInspectorAttribute>() is not null,
+                member.GetCustomAttribute<RangeAttribute>(),
+                member.GetCustomAttribute<HeaderAttribute>()?.Text,
+                member.GetCustomAttribute<TooltipAttribute>()?.Text);
+        }
     }
 
     private sealed class UnsupportedValueDrawer : IInspectorValueDrawer
     {
         public int Priority => int.MinValue;
-        public bool CanDraw(Type type) => true;
+
+        public bool CanDraw(Type type)
+        {
+            return true;
+        }
 
         public InspectorValueDrawResult Draw(
             InspectorValueDrawerRegistry registry,

@@ -142,15 +142,21 @@ internal sealed class InspectorPanel : EditorPanel
         {
             ImGui.TextUnformatted(entities[0].Name);
             ImGui.Separator();
+
             ImGui.TextColored(new Vector4(0.35f, 0.72f, 1f, 1f), "Boxed Blueprint Instance");
+
             ImGui.TextWrapped(instance.AssetName);
             ImGui.TextDisabled("Source changes update this instance automatically.");
             ImGui.TextDisabled("Right-click it in the Hierarchy and choose Unbox to edit its contents.");
             ImGui.Separator();
+
             if (ReferenceEquals(entities[0], instanceRoot))
                 DrawTransform(document, entities);
             else
                 ImGui.TextDisabled("Linked child values are read-only.");
+
+            DrawComponents(document, entities, readOnly: true);
+
             return;
         }
         if (entities.Count > 1 &&
@@ -805,152 +811,263 @@ internal sealed class InspectorPanel : EditorPanel
         }
     }
 
-    private void DrawComponents(SceneDocument document, IReadOnlyList<Entity> entities)
+    private void DrawComponents(
+    SceneDocument document,
+    IReadOnlyList<Entity> entities,
+    bool readOnly = false)
+{
+    var commonTypes = entities[0]
+        .GetAllComponents()
+        .Select(component => component.GetType())
+        .Distinct()
+        .Where(type =>
+            entities.Skip(1).All(entity =>
+                entity.GetComponent(type) is not null))
+        .OrderBy(type => type.Name)
+        .ToArray();
+
+    foreach (var componentType in commonTypes)
     {
-        var commonTypes = entities[0]
-            .GetAllComponents()
-            .Select(component => component.GetType())
-            .Distinct()
-            .Where(type =>
-                entities.Skip(1).All(entity =>
-                    entity.GetComponent(type) is not null))
-            .OrderBy(type => type.Name)
+        var components = entities
+            .Select(entity => entity.GetComponent(componentType)!)
             .ToArray();
 
-        foreach (var componentType in commonTypes)
+        ImGui.PushID(componentType.FullName);
+        try
         {
-            var components = entities.Select(entity => entity.GetComponent(componentType)!).ToArray();
-            ImGui.PushID(componentType.FullName);
-            try
+            var generated = entities.Any(entity => entity.IsLDtkGenerated);
+
+            var allowRemove = !readOnly && !generated;
+            var statusText = readOnly
+                ? "Boxed"
+                : generated
+                    ? "LDtk"
+                    : null;
+
+            var (open, removeRequested) = DrawRemovableHeader(
+                componentType.Name,
+                allowRemove,
+                statusText);
+
+            if (removeRequested)
             {
-                var generated = entities.Any(entity => entity.IsLDtkGenerated);
-                var (open, removeRequested) = DrawRemovableHeader(componentType.Name, !generated);
-                if (removeRequested)
-                {
-                    Apply(document, $"Remove {componentType.Name}", $"Component.Remove.{componentType.FullName}", () =>
+                Apply(
+                    document,
+                    $"Remove {componentType.Name}",
+                    $"Component.Remove.{componentType.FullName}",
+                    () =>
                     {
                         foreach (var entity in entities)
+                        {
                             if (entity.GetComponent(componentType) is { } component)
                                 entity.DetachComponent(component);
+                        }
                     });
-                    continue;
-                }
-                if (open)
+
+                continue;
+            }
+
+            if (!open)
+                continue;
+
+            if (readOnly)
+            {
+                // Game-defined custom editors currently have a mutation API
+                // but no read-only contract. Use the default inspector while
+                // displaying source-owned boxed Blueprint component data.
+                DrawComponentMembers(
+                    document,
+                    components,
+                    readOnly: true);
+
+                continue;
+            }
+
+            if (_customEditors.TryGet(componentType, out var customEditor))
+            {
+                var context = new CustomInspectorContext(
+                    components.Cast<object>().ToArray(),
+                    () => DrawComponentMembers(document, components),
+                    (name, mutation) => document.Apply(name, _ =>
+                    {
+                        mutation();
+                        RecordLDtkComponentValues(document, components);
+                    }),
+                    LogExtension);
+
+                try
                 {
-                    if (_customEditors.TryGet(componentType, out var customEditor))
-                    {
-                        var context = new CustomInspectorContext(
-                            components.Cast<object>().ToArray(),
-                            () => DrawComponentMembers(document, components),
-                            (name, mutation) => document.Apply(name, _ =>
-                            {
-                                mutation();
-                                RecordLDtkComponentValues(document, components);
-                            }),
-                            LogExtension);
-                        try
-                        {
-                            customEditor!.Draw(context);
-                        }
-                        catch (Exception exception)
-                        {
-                            _logs.Error("Game Editor", $"Custom Component Editor for '{componentType.FullName}' failed.", exception);
-                            ImGui.TextColored(new Vector4(0.96f, 0.34f, 0.36f, 1f), exception.Message);
-                            DrawComponentMembers(document, components);
-                        }
-                    }
-                    else
-                    {
-                        DrawComponentMembers(document, components);
-                    }
+                    customEditor!.Draw(context);
+                }
+                catch (Exception exception)
+                {
+                    _logs.Error(
+                        "Game Editor",
+                        $"Custom Component Editor for '{componentType.FullName}' failed.",
+                        exception);
+
+                    ImGui.TextColored(
+                        new Vector4(0.96f, 0.34f, 0.36f, 1f),
+                        exception.Message);
+
+                    DrawComponentMembers(document, components);
                 }
             }
-            finally
+            else
             {
-                ImGui.PopID();
+                DrawComponentMembers(document, components);
             }
         }
-
-        var partialCount = entities[0].GetAllComponents().Count - commonTypes.Length;
-        if (entities.Count > 1 && partialCount != 0)
-            ImGui.TextDisabled("Components not shared by every selected entity are hidden.");
+        finally
+        {
+            ImGui.PopID();
+        }
     }
+
+    var partialCount =
+        entities[0].GetAllComponents().Count - commonTypes.Length;
+
+    if (entities.Count > 1 && partialCount != 0)
+    {
+        ImGui.TextDisabled(
+            "Components not shared by every selected entity are hidden.");
+    }
+}
 
     private static (bool Open, bool RemoveRequested) DrawRemovableHeader(
         string title,
-        bool allowRemove = true)
+        bool allowRemove = true,
+        string? statusText = null)
     {
         var open = false;
         var removeRequested = false;
-        var flags = ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.NoSavedSettings;
+
+        var flags =
+            ImGuiTableFlags.SizingStretchProp |
+            ImGuiTableFlags.NoSavedSettings;
+
         if (!ImGui.BeginTable("##RemovableHeader", 2, flags))
             return (false, false);
+
         try
         {
-            ImGui.TableSetupColumn("##Title", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("##Remove", ImGuiTableColumnFlags.WidthFixed, ImGui.GetFrameHeight());
+            ImGui.TableSetupColumn(
+                "##Title",
+                ImGuiTableColumnFlags.WidthStretch);
+
+            ImGui.TableSetupColumn(
+                "##Remove",
+                ImGuiTableColumnFlags.WidthFixed,
+                ImGui.GetFrameHeight());
+
             ImGui.TableNextRow();
+
             ImGui.TableSetColumnIndex(0);
-            open = ImGui.CollapsingHeader(title, ImGuiTreeNodeFlags.DefaultOpen);
+
+            open = ImGui.CollapsingHeader(
+                title,
+                ImGuiTreeNodeFlags.DefaultOpen);
+
             ImGui.TableSetColumnIndex(1);
+
             if (allowRemove)
             {
                 if (ImGui.SmallButton("×"))
                     removeRequested = true;
+
                 if (ImGui.IsItemHovered())
                     ImGui.SetTooltip($"Remove {title}");
             }
-            else
+            else if (!string.IsNullOrWhiteSpace(statusText))
             {
-                ImGui.TextDisabled("LDtk");
+                ImGui.TextDisabled(statusText);
             }
         }
         finally
         {
             ImGui.EndTable();
         }
+
         return (open, removeRequested);
     }
 
-    private void DrawComponentMembers(SceneDocument document, IReadOnlyList<Component> components)
-    {
-        var componentType = components[0].GetType();
-        var members = _metadata.Get(componentType, InspectorTargetKind.Component);
-        if (members.Count == 0)
-        {
-            ImGui.TextDisabled("No [DreambitSerialize] members.");
-            return;
-        }
+    private void DrawComponentMembers(
+    SceneDocument document,
+    IReadOnlyList<Component> components,
+    bool readOnly = false)
+{
+    var componentType = components[0].GetType();
+    var members = _metadata.Get(
+        componentType,
+        InspectorTargetKind.Component);
 
-        foreach (var member in members)
+    if (members.Count == 0)
+    {
+        ImGui.TextDisabled("No [DreambitSerialize] members.");
+        return;
+    }
+
+    foreach (var member in members)
+    {
+        try
         {
-            try
+            if (!string.IsNullOrWhiteSpace(member.Header))
             {
-                if (!string.IsNullOrWhiteSpace(member.Header))
-                {
-                    ImGui.Spacing();
-                    ImGui.TextDisabled(member.Header);
-                }
-                var first = member.GetValue(components[0]);
-                var mixed = components.Skip(1).Any(component => !ValuesEqual(first, member.GetValue(component)));
-                var id = $"{componentType.FullName}.{member.SerializedName}";
-                var result = _drawers.Draw(
-                    member.DisplayName,
-                    member.ValueType,
-                    first,
-                    new InspectorValueDrawContext(id, member, mixed, member.IsReadOnly));
-                if (!result.Changed || member.IsReadOnly)
-                    continue;
-                Apply(document, $"Change {member.DisplayName}", id, () =>
+                ImGui.Spacing();
+                ImGui.TextDisabled(member.Header);
+            }
+
+            var first = member.GetValue(components[0]);
+
+            var mixed = components
+                .Skip(1)
+                .Any(component =>
+                    !ValuesEqual(
+                        first,
+                        member.GetValue(component)));
+
+            var id =
+                $"{componentType.FullName}.{member.SerializedName}";
+
+            var effectiveReadOnly =
+                readOnly || member.IsReadOnly;
+
+            var result = _drawers.Draw(
+                member.DisplayName,
+                member.ValueType,
+                first,
+                new InspectorValueDrawContext(
+                    id,
+                    member,
+                    mixed,
+                    effectiveReadOnly));
+
+            // Keep this explicit even though disabled ImGui controls should
+            // not report changes. It protects the Blueprint ownership
+            // invariant if a drawer behaves unexpectedly.
+            if (!result.Changed || effectiveReadOnly)
+                continue;
+
+            Apply(
+                document,
+                $"Change {member.DisplayName}",
+                id,
+                () =>
                 {
                     foreach (var component in components)
                     {
-                        member.SetValue(component, result.Value);
-                        component.AcknowledgeEditorSerializationFailure(member.SerializedName);
+                        member.SetValue(
+                            component,
+                            result.Value);
+
+                        component.AcknowledgeEditorSerializationFailure(
+                            member.SerializedName);
+
                         document.RecordLDtkComponentMember(
                             component,
                             member.SerializedName,
                             result.Value);
+
                         if (result.Value is null &&
                             (typeof(DreambitAsset).IsAssignableFrom(member.ValueType) ||
                              member.ValueType == typeof(Entity) ||
@@ -963,14 +1080,18 @@ internal sealed class InspectorPanel : EditorPanel
                         }
                     }
                 });
-            }
-            catch (Exception exception)
-            {
-                _error = $"{componentType.Name}.{member.DisplayName}: {exception.Message}";
-                ImGui.TextColored(new Vector4(0.96f, 0.34f, 0.36f, 1f), _error);
-            }
+        }
+        catch (Exception exception)
+        {
+            _error =
+                $"{componentType.Name}.{member.DisplayName}: {exception.Message}";
+
+            ImGui.TextColored(
+                new Vector4(0.96f, 0.34f, 0.36f, 1f),
+                _error);
         }
     }
+}
 
     private void RecordLDtkComponentValues(
         SceneDocument document,

@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text;
 using Dreambit.ECS;
 using Newtonsoft.Json;
 
@@ -7,7 +8,9 @@ namespace Dreambit.Editor.Inspection;
 internal sealed class InspectorMetadataCache
 {
     private const BindingFlags Flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
-    private readonly Dictionary<(Type Type, InspectorTargetKind Kind), IReadOnlyList<InspectorMemberMetadata>> _cache = [];
+
+    private readonly Dictionary<(Type Type, InspectorTargetKind Kind), IReadOnlyList<InspectorMemberMetadata>> _cache =
+        [];
 
     public IReadOnlyList<InspectorMemberMetadata> Get(Type type, InspectorTargetKind kind)
     {
@@ -27,7 +30,10 @@ internal sealed class InspectorMetadataCache
             _cache.Remove(key);
     }
 
-    public void Clear() => _cache.Clear();
+    public void Clear()
+    {
+        _cache.Clear();
+    }
 
     private static IReadOnlyList<InspectorMemberMetadata> DiscoverComponent(Type type)
     {
@@ -38,8 +44,10 @@ internal sealed class InspectorMetadataCache
                 property.GetCustomAttribute<DreambitSerializeAttribute>() is null ||
                 property.GetCustomAttribute<HideInInspectorAttribute>() is not null)
                 continue;
-            members.Add(Create(property.Name, property.Name, property.PropertyType, property, property.SetMethod is not null));
+            members.Add(Create(property.Name, property.Name, property.PropertyType, property,
+                property.SetMethod is not null));
         }
+
         foreach (var field in type.GetFields(Flags))
         {
             if (field.IsStatic || field.IsLiteral ||
@@ -49,6 +57,7 @@ internal sealed class InspectorMetadataCache
                 continue;
             members.Add(Create(field.Name, field.Name, field.FieldType, field, !field.IsInitOnly));
         }
+
         return members.OrderBy(member => member.DisplayName).ToArray();
     }
 
@@ -67,6 +76,7 @@ internal sealed class InspectorMetadataCache
             var name = string.IsNullOrWhiteSpace(json?.PropertyName) ? property.Name : json!.PropertyName!;
             members.Add(Create(name, property.Name, property.PropertyType, property, property.SetMethod is not null));
         }
+
         foreach (var field in type.GetFields(Flags))
         {
             if (field.IsStatic || field.GetCustomAttribute<JsonIgnoreAttribute>() is not null ||
@@ -80,6 +90,7 @@ internal sealed class InspectorMetadataCache
                 continue;
             members.Add(Create(name, field.Name.TrimStart('_'), field.FieldType, field, !field.IsInitOnly));
         }
+
         return members.OrderBy(member => member.DisplayName).ToArray();
     }
 
@@ -88,22 +99,25 @@ internal sealed class InspectorMetadataCache
         string memberName,
         Type valueType,
         MemberInfo member,
-        bool canWrite) => new(
-        serializedName,
-        SplitName(memberName),
-        valueType,
-        member,
-        canWrite,
-        !canWrite || member.GetCustomAttribute<ReadOnlyInInspectorAttribute>() is not null,
-        member.GetCustomAttribute<RangeAttribute>(),
-        member.GetCustomAttribute<HeaderAttribute>()?.Text,
-        member.GetCustomAttribute<TooltipAttribute>()?.Text);
+        bool canWrite)
+    {
+        return new InspectorMemberMetadata(
+            serializedName,
+            SplitName(memberName),
+            valueType,
+            member,
+            canWrite,
+            !canWrite || member.GetCustomAttribute<ReadOnlyInInspectorAttribute>() is not null,
+            member.GetCustomAttribute<RangeAttribute>(),
+            member.GetCustomAttribute<HeaderAttribute>()?.Text,
+            member.GetCustomAttribute<TooltipAttribute>()?.Text);
+    }
 
     private static string SplitName(string name)
     {
         if (string.IsNullOrWhiteSpace(name))
             return name;
-        var result = new System.Text.StringBuilder(name.Length + 8);
+        var result = new StringBuilder(name.Length + 8);
         result.Append(char.ToUpperInvariant(name[0]));
         for (var index = 1; index < name.Length; index++)
         {
@@ -111,6 +125,7 @@ internal sealed class InspectorMetadataCache
                 result.Append(' ');
             result.Append(name[index]);
         }
+
         return result.ToString();
     }
 }

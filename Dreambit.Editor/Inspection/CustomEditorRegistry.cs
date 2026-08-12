@@ -6,8 +6,8 @@ namespace Dreambit.Editor.Inspection;
 internal sealed class CustomEditorRegistry : IDisposable
 {
     private readonly GameAssemblyLoadService _assemblies;
-    private readonly Action<string, Exception?>? _reportError;
     private readonly List<Entry> _entries = [];
+    private readonly Action<string, Exception?>? _reportError;
     private bool _disposed;
 
     public CustomEditorRegistry(
@@ -22,23 +22,39 @@ internal sealed class CustomEditorRegistry : IDisposable
             Rebuild(current);
     }
 
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+        _assemblies.Reloading -= OnReloading;
+        _assemblies.Reloaded -= OnReloaded;
+        Clear();
+        _disposed = true;
+    }
+
     public bool TryGet(Type targetType, out IDreambitCustomEditor? editor)
     {
         foreach (var entry in _entries)
-        {
             if (entry.TargetType == targetType ||
-                entry.IncludeDerivedTypes && entry.TargetType.IsAssignableFrom(targetType))
+                (entry.IncludeDerivedTypes && entry.TargetType.IsAssignableFrom(targetType)))
             {
                 editor = entry.Editor;
                 return true;
             }
-        }
+
         editor = null;
         return false;
     }
 
-    private void OnReloading(LoadedGameAssembly? _) => Clear();
-    private void OnReloaded(LoadedGameAssembly assembly) => Rebuild(assembly);
+    private void OnReloading(LoadedGameAssembly? _)
+    {
+        Clear();
+    }
+
+    private void OnReloaded(LoadedGameAssembly assembly)
+    {
+        Rebuild(assembly);
+    }
 
     private void Rebuild(LoadedGameAssembly assembly)
     {
@@ -79,16 +95,6 @@ internal sealed class CustomEditorRegistry : IDisposable
             if (editor is IDisposable disposable)
                 disposable.Dispose();
         _entries.Clear();
-    }
-
-    public void Dispose()
-    {
-        if (_disposed)
-            return;
-        _assemblies.Reloading -= OnReloading;
-        _assemblies.Reloaded -= OnReloaded;
-        Clear();
-        _disposed = true;
     }
 
     private sealed record Entry(

@@ -19,12 +19,15 @@ internal sealed record InspectorMemberMetadata(
     string? Header,
     string? Tooltip)
 {
-    public object? GetValue(object target) => Member switch
+    public object? GetValue(object target)
     {
-        PropertyInfo property => property.GetValue(target),
-        FieldInfo field => field.GetValue(target),
-        _ => null
-    };
+        return Member switch
+        {
+            PropertyInfo property => property.GetValue(target),
+            FieldInfo field => field.GetValue(target),
+            _ => null
+        };
+    }
 
     public void SetValue(object target, object? value)
     {
