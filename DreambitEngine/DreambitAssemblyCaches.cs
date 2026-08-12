@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using Dreambit.ECS;
 using Dreambit.LDtk;
@@ -14,6 +15,7 @@ public static class DreambitAssemblyCaches
     public static void Release(Assembly assembly)
     {
         ArgumentNullException.ThrowIfNull(assembly);
+        DreambitAssetTypeRegistry.ReleaseAssembly(assembly);
         PropertyConverterRegistry.ReleaseAssembly(assembly);
         BlueprintResolver.ReleaseAssembly(assembly);
         ComponentRepository.ReleaseAssembly(assembly);
@@ -23,6 +25,21 @@ public static class DreambitAssemblyCaches
 
     public static void Refresh()
     {
+        DreambitAssetTypeRegistry.Refresh();
+        DreambitJson.RefreshConverters();
+        BlueprintResolver.RebuildComponentTypeRegistry();
+        LDtkEntityBuilderRepository.Refresh();
+        Resources.RefreshLoaders();
+    }
+
+    /// <summary>
+    /// Refreshes reflection caches using an explicit set of non-engine asset types. Editors use
+    /// this overload to avoid rediscovering an assembly that is leaving a collectible context.
+    /// </summary>
+    public static void Refresh(IEnumerable<Type> assetTypes)
+    {
+        ArgumentNullException.ThrowIfNull(assetTypes);
+        DreambitAssetTypeRegistry.Refresh(assetTypes);
         DreambitJson.RefreshConverters();
         BlueprintResolver.RebuildComponentTypeRegistry();
         LDtkEntityBuilderRepository.Refresh();

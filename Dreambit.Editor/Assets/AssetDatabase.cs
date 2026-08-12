@@ -129,7 +129,7 @@ internal sealed class AssetDatabase : IAssetRegistry, IDisposable
                             asset.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ||
                             asset.RelativePath.Contains(search, StringComparison.OrdinalIgnoreCase) ||
                             asset.Kind.ToString().Contains(search, StringComparison.OrdinalIgnoreCase) ||
-                            (asset.TypeName?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false))
+                            (asset.TypeId?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false))
             .ToArray();
     }
 
@@ -531,22 +531,24 @@ internal sealed class AssetDatabase : IAssetRegistry, IDisposable
                 if (_entriesByPath.TryGetValue(relativePath, out var current) &&
                     current.Length == info.Length &&
                     current.LastWriteUtcTicks == info.LastWriteTimeUtc.Ticks &&
-                    !string.IsNullOrWhiteSpace(current.ContentHash))
+                    !string.IsNullOrWhiteSpace(current.ContentHash) &&
+                    current.ClassificationVersion == AssetTypeClassifier.ClassificationVersion)
                 {
                     return new ScannedFile(
                         relativePath,
                         info.Length,
                         info.LastWriteTimeUtc.Ticks,
                         current.ContentHash,
-                        AssetTypeClassifier.Classify(relativePath));
+                        new AssetTypeInfo(current.Kind, current.TypeId));
                 }
 
+                var typeInfo = ClassifyChangedFile(relativePath, path);
                 return new ScannedFile(
                     relativePath,
                     info.Length,
                     info.LastWriteTimeUtc.Ticks,
                     ComputeHash(path),
-                    AssetTypeClassifier.Classify(relativePath));
+                    typeInfo);
             })
             .ToArray();
     }
@@ -716,10 +718,11 @@ internal sealed class AssetDatabase : IAssetRegistry, IDisposable
     {
         entry.Path = file.RelativePath;
         entry.Kind = file.TypeInfo.Kind;
-        entry.Type = file.TypeInfo.TypeName;
+        entry.TypeId = file.TypeInfo.TypeId;
         entry.Length = file.Length;
         entry.LastWriteUtcTicks = file.LastWriteUtcTicks;
         entry.ContentHash = file.ContentHash;
+        entry.ClassificationVersion = AssetTypeClassifier.ClassificationVersion;
     }
 
     private static AssetRecord CreateAssetRecord(AssetRegistryEntry entry, ScannedFile file)
@@ -732,7 +735,7 @@ internal sealed class AssetDatabase : IAssetRegistry, IDisposable
             folder,
             ToLogicalAssetName(file.RelativePath),
             file.TypeInfo.Kind,
-            file.TypeInfo.TypeName,
+            file.TypeInfo.TypeId,
             file.Length,
             new DateTimeOffset(file.LastWriteUtcTicks, TimeSpan.Zero));
     }
@@ -846,6 +849,25 @@ internal sealed class AssetDatabase : IAssetRegistry, IDisposable
             128 * 1024,
             FileOptions.SequentialScan);
         return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
+    }
+
+    private AssetTypeInfo ClassifyChangedFile(string relativePath, string absolutePath)
+    {
+        var suffixClassification = AssetTypeClassifier.Classify(relativePath);
+        if (suffixClassification.Kind != AssetKind.Json)
+            return suffixClassification;
+
+        var json = File.ReadAllText(absolutePath);
+        var classification = AssetTypeClassifier.Classify(relativePath, json, out var diagnostic);
+        if (!string.IsNullOrWhiteSpace(diagnostic))
+        {
+            Report(
+                AssetDatabaseDiagnosticSeverity.Warning,
+                diagnostic,
+                relativePath);
+        }
+
+        return classification;
     }
 
     private static string FingerprintKey(long length, string hash) => $"{length}:{hash}";

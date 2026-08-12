@@ -9,6 +9,7 @@ namespace Dreambit.Tiled;
 /// Raw XML model for a Tiled TMX map.
 /// </summary>
 [XmlRoot("map")]
+[DreambitAssetType("dreambit.tiled.map")]
 public sealed class TmxMap : DreambitAsset
 {
     [XmlAttribute("version")]
@@ -106,6 +107,7 @@ public sealed class TmxMap : DreambitAsset
 /// or a tileset reference when Source is set.
 /// </summary>
 [XmlRoot("tileset")]
+[DreambitAssetType("dreambit.tiled.tileset")]
 public sealed class TmxTileset : DreambitAsset
 {
     // Present on a tileset reference inside a TMX map, absent on the external TSX root.

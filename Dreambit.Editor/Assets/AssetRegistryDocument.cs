@@ -17,9 +17,10 @@ internal sealed class AssetRegistryEntry
     public string Path { get; set; } = string.Empty;
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public AssetKind Kind { get; set; }
-    public string? Type { get; set; }
+    [JsonPropertyName("type")]
+    public string? TypeId { get; set; }
     public long Length { get; set; }
-    [JsonIgnore]
     public long LastWriteUtcTicks { get; set; }
     public string ContentHash { get; set; } = string.Empty;
+    public int ClassificationVersion { get; set; }
 }

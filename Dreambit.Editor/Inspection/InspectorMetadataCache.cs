@@ -7,7 +7,7 @@ namespace Dreambit.Editor.Inspection;
 
 internal sealed class InspectorMetadataCache
 {
-    private const BindingFlags Flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+    private const BindingFlags Flags = DreambitSerializationRules.PublicInstanceMembers;
 
     private readonly Dictionary<(Type Type, InspectorTargetKind Kind), IReadOnlyList<InspectorMemberMetadata>> _cache =
         [];
@@ -40,8 +40,7 @@ internal sealed class InspectorMetadataCache
         var members = new List<InspectorMemberMetadata>();
         foreach (var property in type.GetProperties(Flags))
         {
-            if (property.GetMethod is null || property.GetIndexParameters().Length != 0 ||
-                property.GetCustomAttribute<DreambitSerializeAttribute>() is null ||
+            if (!DreambitSerializationRules.ParticipatesInBlueprintSerialization(property) ||
                 property.GetCustomAttribute<HideInInspectorAttribute>() is not null)
                 continue;
             members.Add(Create(property.Name, property.Name, property.PropertyType, property,
@@ -50,8 +49,7 @@ internal sealed class InspectorMetadataCache
 
         foreach (var field in type.GetFields(Flags))
         {
-            if (field.IsStatic || field.IsLiteral ||
-                field.GetCustomAttribute<DreambitSerializeAttribute>() is null ||
+            if (!DreambitSerializationRules.ParticipatesInBlueprintSerialization(field) ||
                 field.GetCustomAttribute<HideInInspectorAttribute>() is not null ||
                 members.Any(member => member.SerializedName.Equals(field.Name, StringComparison.OrdinalIgnoreCase)))
                 continue;
@@ -64,28 +62,23 @@ internal sealed class InspectorMetadataCache
     private static IReadOnlyList<InspectorMemberMetadata> DiscoverAsset(Type type)
     {
         var members = new List<InspectorMemberMetadata>();
-        foreach (var property in type.GetProperties(Flags))
+        var serializedMembers = DreambitSerializationRules.GetSerializableMembers(type);
+        foreach (var property in serializedMembers.OfType<PropertyInfo>())
         {
-            if (property.GetMethod is null || property.GetIndexParameters().Length != 0 ||
-                property.GetCustomAttribute<JsonIgnoreAttribute>() is not null ||
-                property.GetCustomAttribute<HideInInspectorAttribute>() is not null)
+            if (property.GetCustomAttribute<HideInInspectorAttribute>() is not null)
                 continue;
             var json = property.GetCustomAttribute<JsonPropertyAttribute>();
             if (json is null && property.SetMethod?.IsPublic != true)
                 continue;
-            var name = string.IsNullOrWhiteSpace(json?.PropertyName) ? property.Name : json!.PropertyName!;
+            var name = DreambitSerializationRules.GetSerializedName(property);
             members.Add(Create(name, property.Name, property.PropertyType, property, property.SetMethod is not null));
         }
 
-        foreach (var field in type.GetFields(Flags))
+        foreach (var field in serializedMembers.OfType<FieldInfo>())
         {
-            if (field.IsStatic || field.GetCustomAttribute<JsonIgnoreAttribute>() is not null ||
-                field.GetCustomAttribute<HideInInspectorAttribute>() is not null)
+            if (field.GetCustomAttribute<HideInInspectorAttribute>() is not null)
                 continue;
-            var json = field.GetCustomAttribute<JsonPropertyAttribute>();
-            if (json is null && !field.IsPublic)
-                continue;
-            var name = string.IsNullOrWhiteSpace(json?.PropertyName) ? field.Name : json!.PropertyName!;
+            var name = DreambitSerializationRules.GetSerializedName(field);
             if (members.Any(member => member.SerializedName.Equals(name, StringComparison.OrdinalIgnoreCase)))
                 continue;
             members.Add(Create(name, field.Name.TrimStart('_'), field.FieldType, field, !field.IsInitOnly));

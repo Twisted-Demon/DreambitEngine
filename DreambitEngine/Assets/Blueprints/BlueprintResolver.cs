@@ -117,31 +117,23 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
 
             foreach (var property in type.GetProperties(flags))
             {
-                if (!property.CanWrite || property.GetIndexParameters().Length != 0)
-                    continue;
-
-                var attribute = property.GetCustomAttribute<DreambitSerializeAttribute>();
-                if (attribute is null)
+                if (!DreambitSerializationRules.ParticipatesInBlueprintSerialization(property))
                     continue;
 
                 var member = new BlueprintMember(property);
                 members[property.Name] = member;
-                AddFormerNames(members, attribute, member);
+                AddFormerNames(members, property, member);
             }
 
             foreach (var field in type.GetFields(flags))
             {
-                if (field.IsInitOnly || field.IsLiteral)
-                    continue;
-
-                var attribute = field.GetCustomAttribute<DreambitSerializeAttribute>();
-                if (attribute is null)
+                if (!DreambitSerializationRules.ParticipatesInBlueprintSerialization(field))
                     continue;
 
                 // A writable property wins if a field has the same name.
                 var member = new BlueprintMember(field);
                 if (members.TryAdd(field.Name, member))
-                    AddFormerNames(members, attribute, member);
+                    AddFormerNames(members, field, member);
             }
 
             return members;
@@ -150,10 +142,10 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
 
     private static void AddFormerNames(
         IDictionary<string, BlueprintMember> members,
-        DreambitSerializeAttribute attribute,
+        MemberInfo reflectedMember,
         BlueprintMember member)
     {
-        foreach (var formerName in attribute.FormerNames)
+        foreach (var formerName in DreambitSerializationRules.GetFormerNames(reflectedMember))
             if (!string.IsNullOrWhiteSpace(formerName))
                 members.TryAdd(formerName, member);
     }
@@ -350,15 +342,7 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
         if (TryGetCollectionElementType(targetType, out var elementType))
             return ConvertCollection(token, targetType, elementType, context);
 
-        if (Instance.Converters.TryGetValue(targetType, out var converter))
-        {
-            var settings = new JsonSerializerSettings();
-            settings.Converters.Add(converter);
-            var serializer = JsonSerializer.CreateDefault(settings);
-            return token.ToObject(targetType, serializer);
-        }
-
-        return token.ToObject(targetType);
+        return DreambitJson.FromToken(token, targetType);
     }
 
     private static Array ConvertArray(

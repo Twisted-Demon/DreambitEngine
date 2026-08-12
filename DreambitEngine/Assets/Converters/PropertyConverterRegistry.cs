@@ -24,7 +24,9 @@ internal static class PropertyConverterRegistry
     {
         var settings = new JsonSerializerSettings
         {
-            ContractResolver = DreambitAssetContractResolver.Instance
+            // DefaultContractResolver caches Type contracts for its lifetime. A fresh resolver
+            // keeps collectible game assembly Types scoped to this serializer operation.
+            ContractResolver = new DreambitAssetContractResolver()
         };
 
         lock (Sync)

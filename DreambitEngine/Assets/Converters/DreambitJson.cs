@@ -28,13 +28,50 @@ public static class DreambitJson
         => PropertyConverterRegistry.HasConverter(type);
 
     public static string Serialize(object value, Formatting formatting = Formatting.Indented)
-        => JsonConvert.SerializeObject(value, formatting, CreateSerializerSettings());
+    {
+        var json = JsonConvert.SerializeObject(value, formatting, CreateSerializerSettings());
+        if (value is not DreambitAsset asset ||
+            !DreambitAssetTypeRegistry.ShouldPersistTypeMetadata(asset.GetType()))
+        {
+            return json;
+        }
+
+        var document = JObject.Parse(json);
+        document.Property(
+            DreambitAssetTypeRegistry.MetadataPropertyName,
+            StringComparison.OrdinalIgnoreCase)?.Remove();
+        document.AddFirst(new JProperty(
+            DreambitAssetTypeRegistry.MetadataPropertyName,
+            DreambitAssetTypeRegistry.GetTypeId(asset.GetType())));
+        return document.ToString(formatting);
+    }
 
     public static T Deserialize<T>(string json)
         => JsonConvert.DeserializeObject<T>(json, CreateSerializerSettings());
 
     public static object Deserialize(string json, Type type)
         => JsonConvert.DeserializeObject(json, type, CreateSerializerSettings());
+
+    /// <summary>
+    /// Deserializes a self-describing generic Dreambit asset using its <c>$dreambitType</c> ID.
+    /// </summary>
+    public static DreambitAsset DeserializeAsset(string json)
+    {
+        var document = JObject.Parse(json);
+        var typeToken = document[DreambitAssetTypeRegistry.MetadataPropertyName];
+        if (typeToken?.Type != JTokenType.String ||
+            string.IsNullOrWhiteSpace(typeToken.Value<string>()))
+        {
+            throw new JsonSerializationException(
+                $"A generic Dreambit asset requires a non-empty string " +
+                $"'{DreambitAssetTypeRegistry.MetadataPropertyName}' property.");
+        }
+
+        var assetType = DreambitAssetTypeRegistry.Resolve(typeToken.Value<string>()!);
+        return Deserialize(json, assetType) as DreambitAsset
+               ?? throw new JsonSerializationException(
+                   $"Could not deserialize Dreambit asset type '{assetType.FullName}'.");
+    }
 
     public static JToken ToToken(object? value)
     {

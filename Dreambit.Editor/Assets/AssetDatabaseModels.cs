@@ -9,7 +9,7 @@ internal sealed record AssetRecord(
     string FolderPath,
     string LogicalAssetName,
     AssetKind Kind,
-    string? TypeName,
+    string? TypeId,
     long Length,
     DateTimeOffset LastWriteUtc);
 

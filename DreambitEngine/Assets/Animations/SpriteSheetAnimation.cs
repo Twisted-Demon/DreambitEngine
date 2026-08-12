@@ -1,30 +1,37 @@
 using System;
 using System.Collections.Generic;
+using Dreambit.ECS;
 using Microsoft.Xna.Framework;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace Dreambit;
 
+[DreambitAssetType("dreambit.animation.sprite-sheet")]
 public class SpriteSheetAnimation : DreambitAsset
 {
     // Allow a null draft while the asset is being authored. Runtime loading remains strict through
     // GetValidationErrors() in SpriteSheetAnimationLoader.
+    [DreambitSerialize]
     [JsonProperty("sprite_sheet", Required = Required.AllowNull)]
     public SpriteSheet SpriteSheet { get; set; }
 
+    [DreambitSerialize]
     [JsonProperty("frames", Required = Required.Always)]
     public List<SpriteAnimationFrame> Frames { get; set; } = [];
 
+    [DreambitSerialize]
     [JsonProperty("frames_per_second")]
     public float FramesPerSecond { get; set; } = 12f;
 
+    [DreambitSerialize]
     [JsonProperty("loop")]
     public bool Loop { get; set; } = true;
 
     /// <summary>
     /// The default pivot in sprite-local pixels. Individual frames can override it.
     /// </summary>
+    [DreambitSerialize]
     [JsonProperty("pivot")]
     public Vector2 Pivot { get; set; }
 
@@ -114,30 +121,36 @@ public class SpriteSheetAnimation : DreambitAsset
 [JsonConverter(typeof(SpriteAnimationFrameConverter))]
 public class SpriteAnimationFrame
 {
+    [DreambitSerialize]
     [JsonProperty("sprite", Required = Required.Always)]
     public int SpriteIndex { get; set; }
 
     /// <summary>
     /// Optional duration in seconds. When omitted, the animation's frame rate is used.
     /// </summary>
+    [DreambitSerialize]
     [JsonProperty("duration", NullValueHandling = NullValueHandling.Ignore)]
     public float? Duration { get; set; }
 
     /// <summary>
     /// Optional pivot in sprite-local pixels. When omitted, the animation pivot is used.
     /// </summary>
+    [DreambitSerialize]
     [JsonProperty("pivot", NullValueHandling = NullValueHandling.Ignore)]
     public Vector2? Pivot { get; set; }
 
+    [DreambitSerialize]
     [JsonProperty("event", NullValueHandling = NullValueHandling.Ignore)]
     public SpriteAnimationEvent Event { get; set; }
 }
 
 public class SpriteAnimationEvent
 {
+    [DreambitSerialize]
     [JsonProperty("name", Required = Required.Always)]
     public string Name { get; set; } = string.Empty;
 
+    [DreambitSerialize]
     [JsonProperty("args")]
     public Dictionary<string, string> Args { get; set; } = [];
 }

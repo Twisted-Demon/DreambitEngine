@@ -106,11 +106,39 @@ internal sealed class DreambitAssetDocument : IDisposable
         var merged = (JObject)_source.DeepClone();
         foreach (var member in _metadata.Get(AssetType, InspectorTargetKind.Asset))
         {
+            RemoveProperties(
+                merged,
+                DreambitSerializationRules.GetFormerNames(member.Member));
+            RemoveProperties(merged, [member.SerializedName]);
             var value = member.GetValue(Instance);
             merged[member.SerializedName] = SerializeValue(value, member.ValueType);
         }
+
+        if (DreambitAssetTypeRegistry.ShouldPersistTypeMetadata(AssetType))
+        {
+            RemoveProperties(merged, [DreambitAssetTypeRegistry.MetadataPropertyName]);
+            merged.AddFirst(new JProperty(
+                DreambitAssetTypeRegistry.MetadataPropertyName,
+                DreambitAssetTypeRegistry.GetTypeId(AssetType)));
+        }
         _source = merged;
         return merged.ToString(Newtonsoft.Json.Formatting.Indented);
+    }
+
+    private static void RemoveProperties(JObject document, IEnumerable<string> names)
+    {
+        var serializedNames = names
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (serializedNames.Count == 0)
+            return;
+
+        foreach (var property in document.Properties()
+                     .Where(property => serializedNames.Contains(property.Name))
+                     .ToArray())
+        {
+            property.Remove();
+        }
     }
 
     private static JToken SerializeValue(object? value, Type declaredType)

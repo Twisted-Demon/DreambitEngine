@@ -1,10 +1,12 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using System;
+using Dreambit.ECS;
 using Newtonsoft.Json;
 
 namespace Dreambit;
 
+[DreambitAssetType("dreambit.sprite")]
 public class Sprite : DreambitAsset
 {
     private const float MinimumPixelsPerUnit = 0.0001f;
@@ -13,12 +15,15 @@ public class Sprite : DreambitAsset
 
     [JsonIgnore] public Texture2D Texture => TextureAsset?.Texture;
 
+    [DreambitSerialize]
     [JsonProperty("texture")]
     public TextureAsset TextureAsset { get; set; }
 
 
+    [DreambitSerialize]
     [JsonProperty("source")] public Rectangle SourceRect { get; init; }
 
+    [DreambitSerialize]
     [JsonProperty("pixels_per_unit")]
     public float PixelsPerUnit
     {
