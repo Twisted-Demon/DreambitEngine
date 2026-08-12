@@ -89,12 +89,14 @@ public static class DreambitSerializationRules
     }
 
     /// <summary>
-    /// Returns whether a member is supported by component blueprint serialization: public,
-    /// writable, and explicitly marked [DreambitSerialize].
+    /// Returns whether a member is supported by component blueprint serialization: publicly
+    /// readable, writable, and explicitly marked <see cref="DreambitSerializeAttribute"/>.
+    /// A non-public setter is supported because the explicit attribute is the component
+    /// author's opt-in to blueprint persistence and editor mutation.
     /// </summary>
     public static bool ParticipatesInBlueprintSerialization(MemberInfo member)
     {
-        return IsExplicitlyDreambitSerialized(member) && IsPublicReadableWritable(member);
+        return IsExplicitlyDreambitSerialized(member) && IsBlueprintReadableWritable(member);
     }
 
     public static string GetSerializedName(MemberInfo member)
@@ -127,6 +129,26 @@ public static class DreambitSerializationRules
             PropertyInfo property =>
                 property.GetMethod?.IsPublic == true &&
                 property.SetMethod?.IsPublic == true &&
+                property.GetIndexParameters().Length == 0,
+            FieldInfo field =>
+                field.IsPublic && !field.IsStatic && !field.IsInitOnly && !field.IsLiteral,
+            _ => false
+        };
+    }
+
+    /// <summary>
+    /// Returns whether an explicitly serialized component member can participate in a blueprint.
+    /// Blueprint members must be publicly readable for the editor and serializer to capture them,
+    /// but may deliberately expose an internal or private setter.
+    /// </summary>
+    public static bool IsBlueprintReadableWritable(MemberInfo member)
+    {
+        return member switch
+        {
+            PropertyInfo property =>
+                property.GetMethod?.IsPublic == true &&
+                property.SetMethod is not null &&
+                !IsStatic(property) &&
                 property.GetIndexParameters().Length == 0,
             FieldInfo field =>
                 field.IsPublic && !field.IsStatic && !field.IsInitOnly && !field.IsLiteral,

@@ -39,6 +39,45 @@ public sealed class InspectorMetadataTests
     }
 
     [Fact]
+    public void SpriteDrawerExposesSerializedMembersWithNonPublicSetters()
+    {
+        var members = new InspectorMetadataCache().Get(
+            typeof(SpriteDrawer),
+            InspectorTargetKind.Component);
+
+        var pivot = Assert.Single(members, member => member.SerializedName == nameof(SpriteDrawer.Pivot));
+        Assert.Equal(typeof(Microsoft.Xna.Framework.Vector2), pivot.ValueType);
+        Assert.False(pivot.IsReadOnly);
+
+        var pivotType = Assert.Single(members, member => member.SerializedName == nameof(SpriteDrawer.PivotType));
+        Assert.Equal(typeof(PivotType), pivotType.ValueType);
+        Assert.False(pivotType.IsReadOnly);
+
+        Assert.Contains(members, member => member.SerializedName == nameof(SpriteDrawer.Tint));
+        Assert.Contains(members, member => member.SerializedName == nameof(SpriteDrawer.Opacity));
+        Assert.Contains(members, member => member.SerializedName == nameof(DrawableComponent.DrawLayer));
+    }
+
+    [Fact]
+    public void ComponentMetadataIncludesExplicitPrivateSetterMembers()
+    {
+        var cache = new InspectorMetadataCache();
+
+        var cameraMembers = cache.Get(typeof(Camera2D), InspectorTargetKind.Component);
+        Assert.False(Assert.Single(
+            cameraMembers,
+            member => member.SerializedName == nameof(Camera2D.TargetVerticalResolution)).IsReadOnly);
+
+        var rigidBodyMembers = cache.Get(typeof(RigidBody2D), InspectorTargetKind.Component);
+        Assert.False(Assert.Single(
+            rigidBodyMembers,
+            member => member.SerializedName == nameof(RigidBody2D.Collider)).IsReadOnly);
+        Assert.False(Assert.Single(
+            rigidBodyMembers,
+            member => member.SerializedName == nameof(RigidBody2D.InterestedTags)).IsReadOnly);
+    }
+
+    [Fact]
     public void AssetMetadataUsesJsonContractInsteadOfDreambitSerialize()
     {
         var cache = new InspectorMetadataCache();

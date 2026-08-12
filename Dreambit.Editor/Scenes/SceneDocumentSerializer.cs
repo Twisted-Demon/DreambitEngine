@@ -265,13 +265,11 @@ internal static class SceneDocumentSerializer
     private static IEnumerable<MemberInfo> GetBlueprintMembers(Type type)
     {
         foreach (var property in type.GetProperties(SerializableMemberFlags))
-            if (property.CanRead && property.CanWrite && property.GetIndexParameters().Length == 0 &&
-                property.GetCustomAttribute<DreambitSerializeAttribute>() is not null)
+            if (DreambitSerializationRules.ParticipatesInBlueprintSerialization(property))
                 yield return property;
 
         foreach (var field in type.GetFields(SerializableMemberFlags))
-            if (!field.IsInitOnly && !field.IsLiteral &&
-                field.GetCustomAttribute<DreambitSerializeAttribute>() is not null)
+            if (DreambitSerializationRules.ParticipatesInBlueprintSerialization(field))
                 yield return field;
     }
 

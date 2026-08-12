@@ -73,6 +73,41 @@ public sealed class SceneDocumentTests : IDisposable
     }
 
     [Fact]
+    public void SpriteDrawerMembersWithNonPublicSettersRoundTripThroughBlueprints()
+    {
+        var root = new EntityBlueprint
+        {
+            Name = "Sprite",
+            Guid = Guid.NewGuid(),
+            Components =
+            [
+                new ComponentBlueprint
+                {
+                    Type = nameof(SpriteDrawer),
+                    Properties = new Dictionary<string, JToken>
+                    {
+                        [nameof(SpriteDrawer.Pivot)] = new JArray(24f, 41f),
+                        [nameof(SpriteDrawer.PivotType)] = (int)PivotType.Custom
+                    }
+                }
+            ]
+        };
+        using var document = new SceneDocument(
+            new SceneBlueprint { Name = "Sprite", Entities = [root] },
+            null,
+            new SelectionService());
+
+        var entity = Assert.Single(document.Scene!.GetAllEntities());
+        var drawer = Assert.IsType<SpriteDrawer>(entity.GetComponent<SpriteDrawer>());
+        Assert.Equal(new Microsoft.Xna.Framework.Vector2(24f, 41f), drawer.Pivot);
+        Assert.Equal(PivotType.Custom, drawer.PivotType);
+
+        var serialized = Assert.Single(document.CaptureSingleRoot().Components).Properties;
+        Assert.Equal(new[] { 24f, 41f }, serialized[nameof(SpriteDrawer.Pivot)]!.Values<float>());
+        Assert.Equal((int)PivotType.Custom, serialized[nameof(SpriteDrawer.PivotType)]!.Value<int>());
+    }
+
+    [Fact]
     public void SpriteDrawerSaveMigratesLegacyPathToStableSpriteReference()
     {
         var entityId = Guid.NewGuid();
