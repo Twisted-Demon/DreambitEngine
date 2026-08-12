@@ -65,7 +65,8 @@ internal sealed class AssetBakeService : IDisposable
             "dreambit",
             "content.pak");
         CacheDirectory = Path.Combine(project.RootDirectory, ".cache", "dreambit", "bake");
-        if (!File.Exists(OutputPakPath))
+        if (!File.Exists(OutputPakPath) ||
+            !AssetBakePipeline.HasCurrentBuiltInContent(CacheDirectory))
             RequestBake(rebuildAll: false);
     }
 

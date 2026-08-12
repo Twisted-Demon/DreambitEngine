@@ -41,6 +41,9 @@ public sealed class AssetBakePipeline
 {
     public const string RuntimeRegistryLogicalPath = "__dreambit/asset-registry.jsonb";
 
+    public static bool HasCurrentBuiltInContent(string cacheDirectory) =>
+        BuiltInContentSource.IsCurrent(cacheDirectory);
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -182,6 +185,8 @@ public sealed class AssetBakePipeline
         progress?.Report(new AssetBakeProgress("Write", $"Writing {outputPak}"));
         pak.Save(outputPak);
         cache.Save();
+        if (request.IncludeBuiltInContent && !string.IsNullOrWhiteSpace(request.CacheDirectory))
+            BuiltInContentSource.MarkCurrent(request.CacheDirectory);
         stopwatch.Stop();
         var length = new FileInfo(outputPak).Length;
         progress?.Report(new AssetBakeProgress(

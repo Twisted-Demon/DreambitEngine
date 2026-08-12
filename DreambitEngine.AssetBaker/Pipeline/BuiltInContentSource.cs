@@ -7,9 +7,42 @@ namespace DreambitEngine.AssetBaker.Pipeline;
 internal static class BuiltInContentSource
 {
     private const string Marker = ".BuiltInContent.";
+    private const string VersionFileName = "builtins.version";
     private static readonly Lazy<string> Root = new(Materialize);
+    private static readonly Lazy<string> ContentVersion = new(ComputeContentVersion);
 
     public static string DirectoryPath => Root.Value;
+
+    public static bool IsCurrent(string cacheDirectory)
+    {
+        if (string.IsNullOrWhiteSpace(cacheDirectory))
+            return false;
+        try
+        {
+            var versionPath = Path.Combine(Path.GetFullPath(cacheDirectory), VersionFileName);
+            return File.Exists(versionPath) &&
+                   string.Equals(
+                       File.ReadAllText(versionPath).Trim(),
+                       ContentVersion.Value,
+                       StringComparison.Ordinal);
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    public static void MarkCurrent(string cacheDirectory)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(cacheDirectory);
+        var fullPath = Path.GetFullPath(cacheDirectory);
+        Directory.CreateDirectory(fullPath);
+        File.WriteAllText(Path.Combine(fullPath, VersionFileName), ContentVersion.Value);
+    }
 
     private static string Materialize()
     {
@@ -76,5 +109,20 @@ internal static class BuiltInContentSource
             }
         }
         return root;
+    }
+
+    private static string ComputeContentVersion()
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        foreach (var path in Directory.EnumerateFiles(DirectoryPath, "*", SearchOption.AllDirectories)
+                     .OrderBy(path => Path.GetRelativePath(DirectoryPath, path), StringComparer.Ordinal))
+        {
+            var relativePath = Path.GetRelativePath(DirectoryPath, path).Replace('\\', '/');
+            hash.AppendData(Encoding.UTF8.GetBytes(relativePath));
+            hash.AppendData([0]);
+            hash.AppendData(File.ReadAllBytes(path));
+            hash.AppendData([0]);
+        }
+        return Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
     }
 }

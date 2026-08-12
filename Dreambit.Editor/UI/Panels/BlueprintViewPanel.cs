@@ -22,6 +22,7 @@ internal sealed class BlueprintViewPanel : EditorPanel
     private readonly EditorWorkspaceState _workspace;
     private readonly SceneViewportRenderer _renderer;
     private readonly EditorIconService _icons;
+    private readonly EditorTransformGizmo _transformGizmo;
     private AssetRecord? _asset;
     private DateTimeOffset _sourceWriteUtc;
     private bool _needsRebuild;
@@ -45,6 +46,7 @@ internal sealed class BlueprintViewPanel : EditorPanel
         _workspace = workspace;
         _renderer = renderer;
         _icons = icons;
+        _transformGizmo = new EditorTransformGizmo(_blueprints.Selection, _workspace);
         _assetEditing.Changed += OnAssetDocumentChanged;
         _assetEditing.PreviewChanged += OnAssetPreviewChanged;
 
@@ -91,8 +93,9 @@ internal sealed class BlueprintViewPanel : EditorPanel
             DrawEmptyCanvas(canvasPosition, canvasSize, "No Blueprint is open", "Double-click a Blueprint in Project.");
             return;
         }
-        var scene = _blueprints.Current?.Scene;
-        if (scene is null)
+        var document = _blueprints.Current;
+        var scene = document?.Scene;
+        if (document is null || scene is null)
         {
             DrawEmptyCanvas(
                 canvasPosition,
@@ -127,7 +130,15 @@ internal sealed class BlueprintViewPanel : EditorPanel
         scene.DrawEditorGizmos(
             new PreviewGizmoContext(drawList, camera, canvasPosition),
             _blueprints.Selection.EntityIds.ToHashSet());
-        if (hovered && ImGui.IsMouseClicked(ImGuiMouseButton.Left) &&
+        _transformGizmo.DrawSelection(drawList, scene, camera, canvasPosition);
+        var gizmoConsumed = _transformGizmo.DrawAndHandle(
+            drawList,
+            document,
+            camera,
+            canvasPosition,
+            mouseLocal,
+            hovered);
+        if (!gizmoConsumed && hovered && ImGui.IsMouseClicked(ImGuiMouseButton.Left) &&
             !ImGui.IsMouseDragging(ImGuiMouseButton.Left))
         {
             var world = camera.ScreenToWorld(new XnaVector2(mouseLocal.X, mouseLocal.Y));
@@ -156,7 +167,17 @@ internal sealed class BlueprintViewPanel : EditorPanel
             ImGui.OpenPopup(ViewSettingsPopup);
             _viewSettingsRequested = false;
         }
-        ImGui.TextDisabled(_asset?.RelativePath ?? "Blueprint");
+        if (_icons.Button("BlueprintSelect", "mouse", "Select (Q)", _workspace.GizmoMode == 0))
+            _workspace.GizmoMode = 0;
+        ImGui.SameLine();
+        if (_icons.Button("BlueprintMove", "open_with", "Move (W)", _workspace.GizmoMode == 1))
+            _workspace.GizmoMode = 1;
+        ImGui.SameLine();
+        if (_icons.Button("BlueprintRotate", "rotate_right", "Rotate (E)", _workspace.GizmoMode == 2))
+            _workspace.GizmoMode = 2;
+        ImGui.SameLine();
+        if (_icons.Button("BlueprintScale", "aspect_ratio", "Scale (R)", _workspace.GizmoMode == 3))
+            _workspace.GizmoMode = 3;
         ImGui.SameLine();
         if (_icons.Button("FrameBlueprint", "center_focus_strong", "Frame Blueprint (F)"))
             FrameBlueprint();
@@ -164,11 +185,40 @@ internal sealed class BlueprintViewPanel : EditorPanel
         if (_icons.Button("BlueprintGrid", "grid_on", "Toggle grid", _workspace.ShowGrid))
             _workspace.ShowGrid = !_workspace.ShowGrid;
         ImGui.SameLine();
+        var snap = _workspace.SnapEnabled;
+        if (ImGui.Checkbox("Snap##Blueprint", ref snap))
+            _workspace.SnapEnabled = snap;
+        if (_workspace.SnapEnabled)
+        {
+            ImGui.SameLine();
+            ImGui.SetNextItemWidth(70f);
+            if (_workspace.GizmoMode == 2)
+            {
+                var value = _workspace.RotateSnapDegrees;
+                if (ImGui.DragFloat("##BlueprintSnapValue", ref value, 1f, 1f, 180f, "%.0f degrees"))
+                    _workspace.RotateSnapDegrees = value;
+            }
+            else if (_workspace.GizmoMode == 3)
+            {
+                var value = _workspace.ScaleSnap;
+                if (ImGui.DragFloat("##BlueprintSnapValue", ref value, 0.01f, 0.01f, 10f))
+                    _workspace.ScaleSnap = value;
+            }
+            else
+            {
+                var value = _workspace.MoveSnap;
+                if (ImGui.DragFloat("##BlueprintSnapValue", ref value, 0.1f, 0.01f, 1000f))
+                    _workspace.MoveSnap = value;
+            }
+        }
+        ImGui.SameLine();
         if (_icons.Button("BlueprintSettings", "settings", "Grid and snapping settings"))
             _viewSettingsRequested = true;
         EditorViewportUi.DrawSettingsPopup(ViewSettingsPopup, _workspace);
         ImGui.SameLine();
         ImGui.TextDisabled($"Zoom {_workspace.BlueprintCameraZoom:0.00}x");
+        ImGui.SameLine();
+        ImGui.TextDisabled(_asset?.RelativePath ?? "Blueprint");
     }
 
     private void HandleCameraInput(

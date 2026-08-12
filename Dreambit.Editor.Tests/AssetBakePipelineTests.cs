@@ -182,6 +182,7 @@ public sealed class AssetBakePipelineTests : IDisposable
     {
         var assets = Path.Combine(_root, "EmptyAssets");
         var output = Path.Combine(_root, "BuiltIns", "content.pak");
+        var cache = Path.Combine(_root, "BuiltIns", "cache");
         Directory.CreateDirectory(assets);
         var legacyEffects = Path.Combine(assets, "Effects");
         Directory.CreateDirectory(legacyEffects);
@@ -192,19 +193,23 @@ public sealed class AssetBakePipelineTests : IDisposable
         new AssetBakePipeline().BakePak(new AssetBakeRequest(
             assets,
             output,
+            CacheDirectory: cache,
             RebuildAll: true,
             TargetPlatform: "DesktopVK",
             IncludeBuiltInContent: true));
 
         using var pak = new PakReader(output);
         using var effect = pak.Open("effects/forwarddiffuse.fxb");
+        using var present = pak.Open("effects/present.fxb");
         using var deferred = pak.Open("effects/defferedrendercombine.fxb");
         using var tint = pak.Open("effects/tint.fxb");
         using var font = pak.Open("fonts/monogram.ttfb");
         Assert.True(effect.Length > 16);
+        Assert.True(present.Length > 16);
         Assert.True(deferred.Length > 16);
         Assert.True(tint.Length > 16);
         Assert.True(font.Length > 16);
+        Assert.True(AssetBakePipeline.HasCurrentBuiltInContent(cache));
     }
 
     public void Dispose()

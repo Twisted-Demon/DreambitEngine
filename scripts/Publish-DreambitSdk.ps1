@@ -12,6 +12,8 @@ param(
 
     [switch] $SkipTests,
 
+    [switch] $Push,
+
     [switch] $SkipPush,
 
     [switch] $SkipTemplateInstall
@@ -33,8 +35,8 @@ else {
     $OutputDirectory = [System.IO.Path]::GetFullPath($OutputDirectory)
 }
 
-if (-not $SkipPush -and [string]::IsNullOrWhiteSpace($ApiKey)) {
-    throw 'Publishing requires -ApiKey or the NUGET_API_KEY environment variable. Use -SkipPush for a local dry run.'
+if ($Push -and -not $SkipPush -and [string]::IsNullOrWhiteSpace($ApiKey)) {
+    throw 'Publishing requires -ApiKey or the NUGET_API_KEY environment variable.'
 }
 
 if (Get-Process -Name 'Dreambit.Editor' -ErrorAction SilentlyContinue) {
@@ -155,7 +157,7 @@ $packages = foreach ($packageId in $packageIds) {
     $path
 }
 
-if (-not $SkipPush) {
+if ($Push -and -not $SkipPush) {
     foreach ($package in $packages) {
         Invoke-DotNet @(
             'nuget', 'push', $package,
@@ -185,6 +187,6 @@ if (-not $SkipTemplateInstall) {
 
 Write-Host "Dreambit SDK $Version is ready." -ForegroundColor Green
 Write-Host "Packages: $OutputDirectory"
-if ($SkipPush) {
+if (-not $Push -or $SkipPush) {
     Write-Host 'NuGet push was skipped.' -ForegroundColor Yellow
 }

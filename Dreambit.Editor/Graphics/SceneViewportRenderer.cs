@@ -10,7 +10,8 @@ internal sealed class SceneViewportRenderer : IDisposable
     private readonly GraphicsDevice _device;
     private readonly ImGuiRenderer _imGui;
     private readonly List<DrawableComponent> _drawBuffer = new(512);
-    private RenderTarget2D? _target;
+    private RenderTarget2D? _sceneTarget;
+    private RenderTarget2D? _displayTarget;
     private nint _textureId;
     private bool _disposed;
 
@@ -20,7 +21,7 @@ internal sealed class SceneViewportRenderer : IDisposable
         _imGui = imGui;
     }
 
-    public RenderTarget2D? Target => _target;
+    public RenderTarget2D? Target => _displayTarget;
     public nint TextureId => _textureId;
     public string? LastError { get; private set; }
 
@@ -31,14 +32,15 @@ internal sealed class SceneViewportRenderer : IDisposable
         var camera = scene.EnsureEditorCamera();
         camera.Transform.Position = new Vector3(position, camera.Transform.Position.Z);
         camera.Zoom = EditorViewportUi.NormalizeZoom(zoom);
-        camera.ConfigureEditorViewport(_target!.Width, _target.Height);
+        camera.ConfigureEditorViewport(_sceneTarget!.Width, _sceneTarget.Height);
 
-        _device.SetRenderTarget(_target);
+        _device.SetRenderTarget(_sceneTarget);
         _device.Clear(scene.BackgroundColor);
         try
         {
             BuildDrawBuffer(scene);
             Draw(scene, camera.TransformMatrix);
+            Present(scene.RenderingOptions.SamplerState);
             LastError = null;
         }
         catch (Exception exception)
@@ -130,27 +132,56 @@ internal sealed class SceneViewportRenderer : IDisposable
             Core.SpriteBatch.End();
     }
 
+    private void Present(SamplerState samplerState)
+    {
+        var presentEffect = Resources.LoadAsset<Effect>("Effects/Present")
+                            ?? throw new InvalidOperationException(
+                                "The built-in scene presentation effect could not be loaded.");
+        _device.SetRenderTarget(_displayTarget);
+        _device.Clear(Color.Transparent);
+        Core.SpriteBatch.Begin(
+            SpriteSortMode.Deferred,
+            BlendState.Opaque,
+            samplerState,
+            DepthStencilState.None,
+            RasterizerState.CullNone,
+            presentEffect);
+        Core.SpriteBatch.Draw(_sceneTarget!, Vector2.Zero, Color.White);
+        Core.SpriteBatch.End();
+    }
+
     private void EnsureTarget(int width, int height)
     {
         width = Math.Clamp(width, 1, 8192);
         height = Math.Clamp(height, 1, 8192);
-        if (_target is not null && _target.Width == width && _target.Height == height)
+        if (_sceneTarget is not null && _sceneTarget.Width == width && _sceneTarget.Height == height)
             return;
 
         if (_textureId != 0)
             _imGui.UnbindTexture(_textureId);
-        _target?.Dispose();
-        _target = new RenderTarget2D(
+        _sceneTarget?.Dispose();
+        _displayTarget?.Dispose();
+        _sceneTarget = new RenderTarget2D(
             _device,
             width,
             height,
             false,
-            _device.PresentationParameters.BackBufferFormat,
+            RenderPipeline.SceneColorFormat,
             DepthFormat.None)
         {
-            Name = "Dreambit Editor Scene View"
+            Name = "Dreambit Editor Linear Scene View"
         };
-        _textureId = _imGui.BindTexture(_target);
+        _displayTarget = new RenderTarget2D(
+            _device,
+            width,
+            height,
+            false,
+            SurfaceFormat.Color,
+            DepthFormat.None)
+        {
+            Name = "Dreambit Editor Display Scene View"
+        };
+        _textureId = _imGui.BindTexture(_displayTarget);
     }
 
     public void Dispose()
@@ -159,8 +190,10 @@ internal sealed class SceneViewportRenderer : IDisposable
             return;
         if (_textureId != 0)
             _imGui.UnbindTexture(_textureId);
-        _target?.Dispose();
-        _target = null;
+        _sceneTarget?.Dispose();
+        _displayTarget?.Dispose();
+        _sceneTarget = null;
+        _displayTarget = null;
         _textureId = 0;
         _disposed = true;
     }
