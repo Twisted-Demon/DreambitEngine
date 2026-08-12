@@ -115,7 +115,8 @@ New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 
 Invoke-DotNet @(
     'restore',
-    [System.IO.Path]::Combine($repositoryRoot, 'DreambitEngine.sln'))
+    [System.IO.Path]::Combine($repositoryRoot, 'DreambitEngine.sln'),
+    '--ignore-failed-sources')
 
 if (-not $SkipTests) {
     Invoke-DotNet @(
