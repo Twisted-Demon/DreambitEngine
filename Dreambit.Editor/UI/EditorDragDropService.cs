@@ -25,4 +25,4 @@ internal sealed record ProjectItemDragPayload(
     bool IsFolder,
     AssetId AssetId,
     AssetKind Kind,
-    string? TypeName);
+    string? TypeId);

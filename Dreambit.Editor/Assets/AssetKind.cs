@@ -4,6 +4,7 @@ internal enum AssetKind
 {
     Unknown,
     Json,
+    DreambitAsset,
     Texture,
     Audio,
     Font,

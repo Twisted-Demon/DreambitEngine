@@ -33,7 +33,7 @@ public sealed class AssetDatabaseTests : IDisposable
                 snapshot.Assets,
                 asset => asset.RelativePath == "characters/hero.sprite.json");
             Assert.Equal(AssetKind.Sprite, sprite.Kind);
-            Assert.Equal("Dreambit.Sprite", sprite.TypeName);
+            Assert.Equal("dreambit.sprite", sprite.TypeId);
             Assert.Equal("characters/hero.sprite", sprite.LogicalAssetName);
             Assert.False(sprite.Id.IsEmpty);
             spriteId = sprite.Id;
@@ -41,7 +41,7 @@ public sealed class AssetDatabaseTests : IDisposable
                 snapshot.Assets,
                 asset => asset.RelativePath == "characters/hero.texture.png");
             Assert.Equal(AssetKind.Texture, texture.Kind);
-            Assert.Equal(typeof(TextureAsset).FullName, texture.TypeName);
+            Assert.Equal("dreambit.texture", texture.TypeId);
             Assert.True(File.Exists(database.RegistryPath));
         }
 
@@ -183,8 +183,109 @@ public sealed class AssetDatabaseTests : IDisposable
         Assert.Equal("sprites/legacy.sprite", JObject.Parse(legacyJson).Value<string>("Asset"));
     }
 
-    private AssetDatabase CreateDatabase(bool enableWatcher = false) =>
-        new(_root, ContentRoot, enableWatcher: enableWatcher);
+    [Fact]
+    public void GenericJsonClassificationPreservesRawDreambitTypeIdsAndOrdinaryJson()
+    {
+        WriteAsset(
+            "items/weapon.json",
+            "{\"$dreambitType\":\"game.weapon\",\"Damage\":25}");
+        WriteAsset(
+            "items/missing.json",
+            "{\"$dreambitType\":\"game.deleted-type\"}");
+        WriteAsset("data/settings.json", "{\"volume\":0.5}");
+        WriteAsset("data/list.json", "[1,2,3]");
+        WriteAsset("data/empty-type.json", "{\"$dreambitType\":\"\"}");
+        WriteAsset("data/malformed.json", "{ invalid json");
+        var diagnostics = new List<AssetDatabaseDiagnostic>();
+
+        using var database = CreateDatabase(reportDiagnostic: diagnostics.Add);
+        var assets = database.GetSnapshot().Assets.ToDictionary(asset => asset.RelativePath);
+
+        Assert.Equal(AssetKind.DreambitAsset, assets["items/weapon.json"].Kind);
+        Assert.Equal("game.weapon", assets["items/weapon.json"].TypeId);
+        Assert.Equal(AssetKind.DreambitAsset, assets["items/missing.json"].Kind);
+        Assert.Equal("game.deleted-type", assets["items/missing.json"].TypeId);
+        Assert.Equal(AssetKind.Json, assets["data/settings.json"].Kind);
+        Assert.Null(assets["data/settings.json"].TypeId);
+        Assert.Equal(AssetKind.Json, assets["data/list.json"].Kind);
+        Assert.Null(assets["data/list.json"].TypeId);
+        Assert.Equal(AssetKind.Json, assets["data/empty-type.json"].Kind);
+        Assert.Null(assets["data/empty-type.json"].TypeId);
+        Assert.Equal(AssetKind.Json, assets["data/malformed.json"].Kind);
+        Assert.Contains(diagnostics, diagnostic =>
+            diagnostic.Path == "data/empty-type.json" &&
+            diagnostic.Message.Contains("non-empty string", StringComparison.Ordinal));
+        Assert.Contains(diagnostics, diagnostic =>
+            diagnostic.Path == "data/malformed.json" &&
+            diagnostic.Message.Contains("Could not inspect JSON", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void CustomAssetTypeIdSurvivesRestartMoveRenameAndDuplication()
+    {
+        WriteAsset(
+            "items/weapon.json",
+            "{\"$dreambitType\":\"game.weapon\",\"Damage\":25}");
+        AssetId originalId;
+        using (var initial = CreateDatabase())
+        {
+            var original = Assert.Single(initial.GetSnapshot().Assets);
+            originalId = original.Id;
+            Assert.Equal("game.weapon", original.TypeId);
+        }
+
+        using var reopened = CreateDatabase();
+        Assert.True(reopened.TryRename("items/weapon.json", "rifle.json", out var renameError), renameError);
+        Assert.True(reopened.TryCreateFolder("", "equipment", out var folderError), folderError);
+        Assert.True(reopened.TryMove("items/rifle.json", "equipment", out var moveError), moveError);
+        Assert.True(reopened.TryGetAsset("equipment/rifle.json", out var moved));
+        Assert.Equal(originalId, moved!.Id);
+        Assert.Equal("game.weapon", moved.TypeId);
+
+        Assert.True(reopened.TryDuplicate(
+            "equipment/rifle.json",
+            out var duplicatePath,
+            out var duplicateError), duplicateError);
+        Assert.True(reopened.TryGetAsset(duplicatePath!, out var duplicate));
+        Assert.NotEqual(originalId, duplicate!.Id);
+        Assert.Equal("game.weapon", duplicate.TypeId);
+    }
+
+    [Fact]
+    public void UnchangedFilesReusePersistedClassificationWithoutReopeningJson()
+    {
+        WriteAsset(
+            "items/weapon.json",
+            "{\"$dreambitType\":\"game.weapon\",\"Damage\":25}");
+        using (var initial = CreateDatabase())
+            Assert.Equal("game.weapon", Assert.Single(initial.GetSnapshot().Assets).TypeId);
+
+        var path = Path.Combine(ContentRoot, "items", "weapon.json");
+        using var locked = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        using var reopened = CreateDatabase();
+        var asset = Assert.Single(reopened.GetSnapshot().Assets);
+        Assert.Equal(AssetKind.DreambitAsset, asset.Kind);
+        Assert.Equal("game.weapon", asset.TypeId);
+    }
+
+    [Fact]
+    public void ChangedGenericJsonRefreshesItsStoredTypeId()
+    {
+        WriteAsset("items/weapon.json", "{\"$dreambitType\":\"game.weapon\"}");
+        using var database = CreateDatabase();
+        Assert.Equal("game.weapon", Assert.Single(database.GetSnapshot().Assets).TypeId);
+
+        Thread.Sleep(20);
+        WriteAsset("items/weapon.json", "{\"$dreambitType\":\"game.weapon.v2\"}");
+        database.RefreshNow();
+
+        Assert.Equal("game.weapon.v2", Assert.Single(database.GetSnapshot().Assets).TypeId);
+    }
+
+    private AssetDatabase CreateDatabase(
+        bool enableWatcher = false,
+        Action<AssetDatabaseDiagnostic>? reportDiagnostic = null) =>
+        new(_root, ContentRoot, reportDiagnostic, enableWatcher);
 
     private void WriteAsset(string relativePath, string contents)
     {

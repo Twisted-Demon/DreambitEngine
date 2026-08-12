@@ -1,10 +1,12 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using System;
+using Dreambit.ECS;
 using Newtonsoft.Json;
 
 namespace Dreambit;
 
+[DreambitAssetType("dreambit.sprite-sheet")]
 public class SpriteSheet : DreambitAsset
 {
     [JsonIgnore] private static readonly Logger<SpriteSheet> Logger = new();
@@ -12,6 +14,7 @@ public class SpriteSheet : DreambitAsset
     private int _rows = 1;
     private Sprite _sourceSprite;
 
+    [DreambitSerialize]
     [JsonProperty("columns")]
     public int Columns
     {
@@ -25,6 +28,7 @@ public class SpriteSheet : DreambitAsset
         }
     }
 
+    [DreambitSerialize]
     [JsonProperty("rows")]
     public int Rows
     {
@@ -38,6 +42,7 @@ public class SpriteSheet : DreambitAsset
         }
     }
 
+    [DreambitSerialize]
     [JsonProperty("sprite")]
     public Sprite SourceSprite
     {

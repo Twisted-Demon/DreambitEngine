@@ -1,39 +1,94 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+
 namespace Dreambit.Editor.Assets;
 
-internal readonly record struct AssetTypeInfo(AssetKind Kind, string? TypeName);
+internal readonly record struct AssetTypeInfo(AssetKind Kind, string? TypeId);
 
 internal static class AssetTypeClassifier
 {
-    private static readonly (string Suffix, AssetKind Kind, string TypeName)[] JsonTypes =
+    public const int ClassificationVersion = 3;
+
+    private static readonly (string Suffix, AssetKind Kind, Type AssetType)[] JsonTypes =
     [
-        (".spritesheet.json", AssetKind.SpriteSheet, "Dreambit.SpriteSheet"),
-        (".animation.json", AssetKind.Animation, "Dreambit.SpriteSheetAnimation"),
-        (".blueprint.json", AssetKind.Blueprint, "Dreambit.EntityBlueprint"),
-        (".particlefx.json", AssetKind.ParticleEffect, "Dreambit.ParticleFxConfig"),
-        (".soundcue.json", AssetKind.SoundCue, "Dreambit.SoundCue"),
-        (".cutscene.json", AssetKind.Cutscene, "Dreambit.Scripting.Cutscene"),
-        (".sprite.json", AssetKind.Sprite, "Dreambit.Sprite"),
-        (".scene.json", AssetKind.Scene, "Dreambit.SceneBlueprint")
+        (".spritesheet.json", AssetKind.SpriteSheet, typeof(SpriteSheet)),
+        (".animation.json", AssetKind.Animation, typeof(SpriteSheetAnimation)),
+        (".blueprint.json", AssetKind.Blueprint, typeof(EntityBlueprint)),
+        (".particlefx.json", AssetKind.ParticleEffect, typeof(ParticleFxConfig)),
+        (".soundcue.json", AssetKind.SoundCue, typeof(SoundCue)),
+        (".cutscene.json", AssetKind.Cutscene, typeof(Dreambit.Scripting.Cutscene)),
+        (".sprite.json", AssetKind.Sprite, typeof(Sprite)),
+        (".scene.json", AssetKind.Scene, typeof(SceneBlueprint))
     ];
 
     public static AssetTypeInfo Classify(string relativePath)
     {
-        foreach (var (suffix, kind, typeName) in JsonTypes)
+        return Classify(relativePath, null, out _);
+    }
+
+    public static AssetTypeInfo Classify(
+        string relativePath,
+        string? json,
+        out string? diagnostic)
+    {
+        diagnostic = null;
+        foreach (var (suffix, kind, assetType) in JsonTypes)
             if (relativePath.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
-                return new AssetTypeInfo(kind, typeName);
+                return new AssetTypeInfo(kind, DreambitAssetTypeRegistry.GetTypeId(assetType));
+
+        if (Path.GetExtension(relativePath).Equals(".json", StringComparison.OrdinalIgnoreCase))
+        {
+            if (json is null)
+                return new AssetTypeInfo(AssetKind.Json, null);
+
+            try
+            {
+                var token = JToken.Parse(json);
+                if (token is not JObject document)
+                    return new AssetTypeInfo(AssetKind.Json, null);
+                if (!document.TryGetValue(
+                        DreambitAssetTypeRegistry.MetadataPropertyName,
+                        StringComparison.Ordinal,
+                        out var typeToken))
+                {
+                    return new AssetTypeInfo(AssetKind.Json, null);
+                }
+
+                if (typeToken.Type != JTokenType.String ||
+                    string.IsNullOrWhiteSpace(typeToken.Value<string>()))
+                {
+                    diagnostic =
+                        $"'{DreambitAssetTypeRegistry.MetadataPropertyName}' must be a non-empty string.";
+                    return new AssetTypeInfo(AssetKind.Json, null);
+                }
+
+                return new AssetTypeInfo(
+                    AssetKind.DreambitAsset,
+                    typeToken.Value<string>()!.Trim());
+            }
+            catch (JsonException exception)
+            {
+                diagnostic = $"Could not inspect JSON metadata. {exception.Message}";
+                return new AssetTypeInfo(AssetKind.Json, null);
+            }
+        }
 
         return Path.GetExtension(relativePath).ToLowerInvariant() switch
         {
-            ".json" => new AssetTypeInfo(AssetKind.Json, null),
             ".png" or ".jpg" or ".jpeg" or ".bmp" or ".gif" or ".tga" or ".webp" =>
-                new AssetTypeInfo(AssetKind.Texture, "Dreambit.TextureAsset"),
+                new AssetTypeInfo(AssetKind.Texture, DreambitAssetTypeRegistry.GetTypeId(typeof(TextureAsset))),
             ".wav" or ".ogg" or ".mp3" or ".flac" =>
                 new AssetTypeInfo(AssetKind.Audio, null),
-            ".ttf" => new AssetTypeInfo(AssetKind.Font, "Dreambit.FontAsset"),
-            ".fx" => new AssetTypeInfo(AssetKind.Effect, "Dreambit.EffectAsset"),
+            ".ttf" => new AssetTypeInfo(AssetKind.Font, DreambitAssetTypeRegistry.GetTypeId(typeof(FontAsset))),
+            ".fx" => new AssetTypeInfo(AssetKind.Effect, DreambitAssetTypeRegistry.GetTypeId(typeof(EffectAsset))),
             ".txt" or ".md" => new AssetTypeInfo(AssetKind.Text, null),
             ".ldtk" or ".ldtkl" => new AssetTypeInfo(AssetKind.Ldtk, null),
-            ".tmx" or ".tsx" => new AssetTypeInfo(AssetKind.TiledMap, null),
+            ".tmx" => new AssetTypeInfo(
+                AssetKind.TiledMap,
+                DreambitAssetTypeRegistry.GetTypeId(typeof(Dreambit.Tiled.TmxMap))),
+            ".tsx" => new AssetTypeInfo(
+                AssetKind.TiledMap,
+                DreambitAssetTypeRegistry.GetTypeId(typeof(Dreambit.Tiled.TmxTileset))),
             ".xml" or ".yaml" or ".yml" => new AssetTypeInfo(AssetKind.Data, null),
             _ => new AssetTypeInfo(AssetKind.Unknown, null)
         };
@@ -78,26 +133,10 @@ internal static class AssetTypeClassifier
             return true;
         if (asset.Kind == AssetKind.Effect && requestedType == typeof(EffectAsset))
             return true;
-        if (string.IsNullOrWhiteSpace(asset.TypeName))
+        if (string.IsNullOrWhiteSpace(asset.TypeId))
             return false;
 
-        var assetType = ResolveType(asset.TypeName);
-        return assetType is not null && requestedType.IsAssignableFrom(assetType);
-    }
-
-    private static Type? ResolveType(string typeName)
-    {
-        var type = Type.GetType(typeName, throwOnError: false, ignoreCase: true);
-        if (type is not null)
-            return type;
-
-        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-        {
-            type = assembly.GetType(typeName, throwOnError: false, ignoreCase: true);
-            if (type is not null)
-                return type;
-        }
-
-        return null;
+        return DreambitAssetTypeRegistry.TryResolve(asset.TypeId, out var assetType) &&
+               requestedType.IsAssignableFrom(assetType);
     }
 }

@@ -775,8 +775,6 @@ internal sealed class InspectorValueDrawerRegistry
 
     private sealed class NestedObjectValueDrawer : IInspectorValueDrawer
     {
-        private const BindingFlags Flags = BindingFlags.Instance | BindingFlags.Public;
-
         public int Priority => 10;
 
         public bool CanDraw(Type type)
@@ -865,18 +863,18 @@ internal sealed class InspectorValueDrawerRegistry
 
         private static IEnumerable<InspectorMemberMetadata> DiscoverMembers(Type type)
         {
-            foreach (var property in type.GetProperties(Flags))
+            var serializedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var serializedMembers = DreambitSerializationRules.GetSerializableMembers(type);
+            foreach (var property in serializedMembers.OfType<PropertyInfo>())
             {
-                if (property.GetMethod is null || property.GetIndexParameters().Length != 0 ||
-                    property.GetCustomAttribute<JsonIgnoreAttribute>() is not null ||
-                    property.GetCustomAttribute<HideInInspectorAttribute>() is not null)
+                if (property.GetCustomAttribute<HideInInspectorAttribute>() is not null)
                     continue;
                 var json = property.GetCustomAttribute<JsonPropertyAttribute>();
                 if (json is null && property.SetMethod?.IsPublic != true)
                     continue;
-                var serializedName = string.IsNullOrWhiteSpace(json?.PropertyName)
-                    ? property.Name
-                    : json!.PropertyName!;
+                var serializedName = DreambitSerializationRules.GetSerializedName(property);
+                if (!serializedNames.Add(serializedName))
+                    continue;
                 yield return CreateMetadata(
                     serializedName,
                     property.Name,
@@ -885,15 +883,13 @@ internal sealed class InspectorValueDrawerRegistry
                     property.SetMethod is not null);
             }
 
-            foreach (var field in type.GetFields(Flags))
+            foreach (var field in serializedMembers.OfType<FieldInfo>())
             {
-                if (field.IsStatic || field.GetCustomAttribute<JsonIgnoreAttribute>() is not null ||
-                    field.GetCustomAttribute<HideInInspectorAttribute>() is not null)
+                if (field.GetCustomAttribute<HideInInspectorAttribute>() is not null)
                     continue;
-                var json = field.GetCustomAttribute<JsonPropertyAttribute>();
-                var serializedName = string.IsNullOrWhiteSpace(json?.PropertyName)
-                    ? field.Name
-                    : json!.PropertyName!;
+                var serializedName = DreambitSerializationRules.GetSerializedName(field);
+                if (!serializedNames.Add(serializedName))
+                    continue;
                 yield return CreateMetadata(
                     serializedName,
                     field.Name,

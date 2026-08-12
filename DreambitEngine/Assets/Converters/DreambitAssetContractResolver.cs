@@ -9,7 +9,66 @@ namespace Dreambit;
 
 internal sealed class DreambitAssetContractResolver : DefaultContractResolver
 {
-    public static DreambitAssetContractResolver Instance { get; } = new();
+    protected override List<MemberInfo> GetSerializableMembers(Type objectType)
+    {
+        var usesOptIn = DreambitSerializationRules.UsesOptInSerialization(objectType);
+        return base.GetSerializableMembers(objectType)
+            .Where(member =>
+                DreambitSerializationRules.ParticipatesInSerialization(
+                    objectType,
+                    member,
+                    usesOptIn))
+            .ToList();
+    }
+
+    protected override IList<JsonProperty> CreateProperties(
+        Type type,
+        MemberSerialization memberSerialization)
+    {
+        var properties = base.CreateProperties(type, memberSerialization);
+        var members = GetSerializableMembers(type);
+        foreach (var member in members)
+        {
+            var formerNames = DreambitSerializationRules.GetFormerNames(member)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (formerNames.Length == 0)
+                continue;
+
+            var current = properties.FirstOrDefault(property =>
+                property.DeclaringType == member.DeclaringType &&
+                string.Equals(property.UnderlyingName, member.Name, StringComparison.Ordinal));
+            if (current is null)
+                continue;
+
+            foreach (var formerName in formerNames)
+            {
+                if (string.Equals(formerName, current.PropertyName, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (properties.Any(property =>
+                        string.Equals(
+                            property.PropertyName,
+                            formerName,
+                            StringComparison.OrdinalIgnoreCase)))
+                {
+                    throw new JsonSerializationException(
+                        $"Former serialized member name '{formerName}' on " +
+                        $"'{type.FullName}.{member.Name}' conflicts with another serialized member.");
+                }
+
+                var alias = CreateProperty(member, memberSerialization);
+                alias.PropertyName = formerName;
+                alias.Readable = false;
+                alias.Writable = current.Writable;
+                alias.Required = Required.Default;
+                alias.ShouldSerialize = _ => false;
+                properties.Add(alias);
+            }
+        }
+
+        return properties;
+    }
 
     protected override JsonProperty CreateProperty(
         MemberInfo member,

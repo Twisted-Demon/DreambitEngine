@@ -1,40 +1,62 @@
 ﻿using System.Collections.Generic;
 using Microsoft.Xna.Framework;
+using Dreambit.ECS;
 
 namespace Dreambit;
 
+[DreambitAssetType("dreambit.particle-fx-config")]
 public class ParticleFxConfig : DreambitAsset
 {
     // Emission
+    [DreambitSerialize]
     public EmissionMode EmissionMode;
+    [DreambitSerialize]
     public int EmissionRate { get; init; } = 200;
+    [DreambitSerialize]
     public List<Burst> Bursts { get; init; } = new();
 
     //Spawn
+    [DreambitSerialize]
     public ParticleSpawnType SpawnType { get; init; } = ParticleSpawnType.Point;
 
     //Initial Properties
+    [DreambitSerialize]
     public RangeF LifeTime { get; init; } = new(0.6f, 1.2f);
+    [DreambitSerialize]
     public RangeF StartSpeed { get; init; } = new(80f, 160f);
+    [DreambitSerialize]
     public Range2 StartSize { get; init; } = new(new Vector2(8, 8), new Vector2(24, 24));
+    [DreambitSerialize]
     public RangeF StartRotationDeg { get; init; } = new(0f, 360f);
+    [DreambitSerialize]
     public RangeF StartSpin { get; init; } = new(-2, 2f);
+    [DreambitSerialize]
     public Range2 VelocityJitter { get; init; } = new(new Vector2(20, 10), new Vector2(40, 20));
+    [DreambitSerialize]
     public Range2 PositionJitter { get; init; } = new(new Vector2(0, 0), new Vector2(0, 0));
+    [DreambitSerialize]
     public Range2 StartAcceleration { get; init; } = new(new Vector2(0, 0), new Vector2(0, 0));
+    [DreambitSerialize]
     public Color StartColor { get; init; } = Color.White;
 
     // Over-life curves
+    [DreambitSerialize]
     public Curve1D AlphaOverLife { get; init; } = Curve1D.FadeOut();
+    [DreambitSerialize]
     public Curve1D SizeOverLife { get; init; } = Curve1D.Bell();
+    [DreambitSerialize]
     public Curve1D SpeedOverLife { get; init; } = Curve1D.Flat(1f);
+    [DreambitSerialize]
     public Curve1D SpinOverLife { get; init; } = Curve1D.Flat(1f);
 
     //forces
+    [DreambitSerialize]
     public Vector2 Gravity { get; set; } = new(0, 200);
+    [DreambitSerialize]
     public float LinearDamping { get; set; } = 0.0f;
 
     // rendering
+    [DreambitSerialize]
     public TextureAsset Texture { get; set; }
 
     public void Validate()
@@ -94,15 +116,23 @@ public class ParticleFxConfig : DreambitAsset
     }
 }
 
-public record struct RangeF(float Min, float Max);
+public record struct RangeF(
+    [property: DreambitSerialize] float Min,
+    [property: DreambitSerialize] float Max);
 
-public record struct Range2(Vector2 Min, Vector2 Max);
+public record struct Range2(
+    [property: DreambitSerialize] Vector2 Min,
+    [property: DreambitSerialize] Vector2 Max);
 
 public sealed class Burst
 {
+    [DreambitSerialize]
     public int Count;
+    [DreambitSerialize]
     public int Cycles = 1;
+    [DreambitSerialize]
     public float Interval = 0.1f;
+    [DreambitSerialize]
     public float Time;
 }
 

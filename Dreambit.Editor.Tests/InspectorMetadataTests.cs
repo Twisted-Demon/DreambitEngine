@@ -253,7 +253,7 @@ public sealed class InspectorTestComponent : Component
 public sealed class InspectorTestAsset : DreambitAsset
 {
     [JsonProperty("title")] public string Title { get; set; } = string.Empty;
-    public int Count { get; set; }
+    [JsonProperty] public int Count { get; set; }
     [JsonIgnore] public string Ignored { get; set; } = string.Empty;
 }
 

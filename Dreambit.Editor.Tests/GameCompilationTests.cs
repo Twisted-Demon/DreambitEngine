@@ -48,6 +48,12 @@ public sealed class GameCompilationTests : IDisposable
         Assert.Contains(
             loaded.Types.CustomEditorTypes,
             type => type.FullName == typeof(ReloadTestCustomEditor).FullName);
+        Assert.Contains(
+            loaded.Types.AssetTypes,
+            type => type.FullName == typeof(TestCustomAsset).FullName);
+        Assert.Contains(
+            loaded.Types.AssetLoaderTypes,
+            type => type.FullName == typeof(TestCustomAssetLoader).FullName);
         Assert.NotEqual(
             Path.GetDirectoryName(typeof(GameCompilationTests).Assembly.Location),
             loaded.ShadowDirectory);
@@ -80,6 +86,21 @@ public sealed class GameCompilationTests : IDisposable
 
         Assert.True(registry.TryGet(target, out var editor));
         Assert.Equal(typeof(ReloadTestCustomEditor).FullName, editor!.GetType().FullName);
+    }
+
+    [Fact]
+    public void ReloadReleasesThePreviousCollectibleGameGeneration()
+    {
+        var messages = new List<GameCodeMessage>();
+        using var loader = new GameAssemblyLoadService(_root, messages.Add);
+        var assemblyPath = typeof(GameCompilationTests).Assembly.Location;
+
+        Assert.True(loader.TryLoad(assemblyPath, out var firstError), firstError);
+        Assert.True(loader.TryLoad(assemblyPath, out var secondError), secondError);
+
+        Assert.DoesNotContain(messages, message =>
+            message.Severity == GameCodeMessageSeverity.Warning &&
+            message.Message.Contains("still referenced after unload", StringComparison.Ordinal));
     }
 
     public void Dispose()

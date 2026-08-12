@@ -3,6 +3,7 @@ using Dreambit.Editor.Assets;
 using Dreambit.Editor.Projects;
 using DreambitEngine.AssetBaker.Pipeline;
 using DreambitEngine.AssetBaker.Pipeline.Textures;
+using Newtonsoft.Json.Linq;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 
@@ -78,6 +79,25 @@ public sealed class AssetBakePipelineTests : IDisposable
         File.WriteAllText(source, "{ invalid json");
         Assert.ThrowsAny<Exception>(() => pipeline.BakePak(request));
         Assert.Equal(goodBytes, File.ReadAllBytes(output));
+    }
+
+    [Fact]
+    public void GenericJsonBakePreservesDreambitTypeMetadata()
+    {
+        var assets = Path.Combine(_root, "CustomAssets");
+        var output = Path.Combine(_root, "CustomContent", "content.pak");
+        Directory.CreateDirectory(assets);
+        File.WriteAllText(
+            Path.Combine(assets, "weapon.json"),
+            "{\"$dreambitType\":\"test.custom-asset\",\"Health\":100}");
+
+        new AssetBakePipeline().BakePak(new AssetBakeRequest(assets, output, RebuildAll: true));
+
+        using var pak = new PakReader(output);
+        using var stream = pak.Open("weapon.jsonb");
+        var baked = JObject.Parse(JsnbLoader.GetJsonString(stream));
+        Assert.Equal("test.custom-asset", baked.Value<string>("$dreambitType"));
+        Assert.Equal(100, baked.Value<int>("Health"));
     }
 
     [Fact]

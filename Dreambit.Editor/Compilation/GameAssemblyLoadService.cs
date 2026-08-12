@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.Loader;
 using Dreambit;
 
@@ -53,6 +54,9 @@ internal sealed class GameAssemblyLoadService : IDisposable
             candidateContext = new CollectibleGameLoadContext(shadowAssemblyPath);
             var assembly = candidateContext.LoadFromAssemblyPath(shadowAssemblyPath);
             var catalog = GameTypeCatalog.Discover(assembly);
+            // Validate before replacing the last known good generation. Duplicate current/former
+            // IDs are a data-integrity error and must not depend on reflection order.
+            DreambitAssetTypeRegistry.Validate(catalog.AssetTypes);
             var loaded = new LoadedGameAssembly(
                 assembly,
                 catalog,
@@ -64,13 +68,22 @@ internal sealed class GameAssemblyLoadService : IDisposable
             UnloadCurrent();
             _loadContext = candidateContext;
             _current = loaded;
-            candidateContext = null;
-            DreambitAssemblyCaches.Refresh();
+            DreambitAssemblyCaches.Refresh(catalog.AssetTypes);
             Reloaded?.Invoke(loaded);
+            candidateContext = null;
             _report?.Invoke(new GameCodeMessage(
                 GameCodeMessageSeverity.Information,
                 $"Loaded game assembly generation {_generation}: " +
                 $"{catalog.ComponentTypes.Count} components, {catalog.AssetTypes.Count} custom assets."));
+            foreach (var assetType in catalog.AssetTypes.Where(type =>
+                         !DreambitAssetTypeRegistry.HasStableTypeId(type)))
+            {
+                _report?.Invoke(new GameCodeMessage(
+                    GameCodeMessageSeverity.Warning,
+                    $"{assetType.FullName} does not declare [DreambitAssetType]. " +
+                    "Its asset type identity uses the CLR full name and will break if the class " +
+                    "or namespace is renamed."));
+            }
             error = null;
             return true;
         }
@@ -78,6 +91,13 @@ internal sealed class GameAssemblyLoadService : IDisposable
         {
             if (candidateContext is not null)
             {
+                if (ReferenceEquals(_loadContext, candidateContext))
+                {
+                    if (_current is not null)
+                        DreambitAssemblyCaches.Release(_current.Assembly);
+                    _current = null;
+                    _loadContext = null;
+                }
                 var weakReference = new WeakReference(candidateContext);
                 candidateContext.Unload();
                 candidateContext = null;
@@ -118,16 +138,8 @@ internal sealed class GameAssemblyLoadService : IDisposable
         if (_loadContext is null || _current is null)
             return;
 
-        var assembly = _current.Assembly;
         var shadowDirectory = _current.ShadowDirectory;
-        var context = _loadContext;
-        var weakReference = new WeakReference(context, trackResurrection: false);
-        _current = null;
-        _loadContext = null;
-        DreambitAssemblyCaches.Release(assembly);
-        context.Unload();
-        assembly = null!;
-        context = null!;
+        var weakReference = BeginUnloadCurrentGeneration();
 
         for (var attempt = 0; attempt < 3 && weakReference.IsAlive; attempt++)
         {
@@ -147,6 +159,21 @@ internal sealed class GameAssemblyLoadService : IDisposable
         {
             TryDeleteDirectory(shadowDirectory);
         }
+    }
+
+    // Keep all strong references to the collectible assembly/context in a frame that has returned
+    // before the caller forces collection. Otherwise the JIT may conservatively keep a dead local
+    // alive through the GC loop and produce a false leak (or delay a real unload indefinitely).
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private WeakReference BeginUnloadCurrentGeneration()
+    {
+        var current = _current!;
+        var context = _loadContext!;
+        _current = null;
+        _loadContext = null;
+        DreambitAssemblyCaches.Release(current.Assembly);
+        context.Unload();
+        return new WeakReference(context, trackResurrection: false);
     }
 
     private static void CopyDirectory(string source, string destination)

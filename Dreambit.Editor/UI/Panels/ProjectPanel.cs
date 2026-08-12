@@ -329,14 +329,14 @@ internal sealed class ProjectPanel : EditorPanel
             false,
             asset.Id,
             asset.Kind,
-            asset.TypeName));
+            asset.TypeId));
         if (ImGui.IsItemHovered())
         {
             ImGui.BeginTooltip();
             ImGui.TextUnformatted(asset.RelativePath);
             ImGui.TextDisabled($"ID  {asset.Id}");
-            if (!string.IsNullOrWhiteSpace(asset.TypeName))
-                ImGui.TextDisabled(asset.TypeName);
+            if (!string.IsNullOrWhiteSpace(asset.TypeId))
+                ImGui.TextDisabled(asset.TypeId);
             ImGui.EndTooltip();
         }
 
@@ -789,6 +789,7 @@ internal sealed class ProjectPanel : EditorPanel
         AssetKind.SpriteSheet => "Sprite Sheet",
         AssetKind.SoundCue => "Sound Cue",
         AssetKind.ParticleEffect => "Particle Effect",
+        AssetKind.DreambitAsset => "Dreambit Asset",
         AssetKind.TiledMap => "Tiled Map",
         _ => kind.ToString()
     };

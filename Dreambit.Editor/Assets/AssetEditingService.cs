@@ -180,11 +180,21 @@ internal sealed class AssetEditingService : IDisposable
             return null;
         if (asset.Kind == AssetKind.Blueprint)
             return typeof(EntityBlueprint);
-        if (asset.Kind == AssetKind.Scene || string.IsNullOrWhiteSpace(asset.TypeName))
+        if (asset.Kind == AssetKind.Scene || string.IsNullOrWhiteSpace(asset.TypeId))
             return null;
-        return _types.AssetTypes.FirstOrDefault(type =>
-            string.Equals(type.FullName, asset.TypeName, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(type.Name, asset.TypeName, StringComparison.OrdinalIgnoreCase));
+        if (!DreambitAssetTypeRegistry.TryResolve(asset.TypeId, out var resolvedType))
+        {
+            if (asset.Kind == AssetKind.DreambitAsset)
+            {
+                _reportError?.Invoke(
+                    $"Could not inspect '{asset.RelativePath}'. No loaded Dreambit asset type " +
+                    $"claims ID '{asset.TypeId}'. The source file was preserved.",
+                    null);
+            }
+            return null;
+        }
+
+        return _types.AssetTypes.FirstOrDefault(type => type == resolvedType);
     }
 
     private void OnReloading(LoadedGameAssembly? assembly)
