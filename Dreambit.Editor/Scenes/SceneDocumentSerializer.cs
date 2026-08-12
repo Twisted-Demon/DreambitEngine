@@ -122,7 +122,8 @@ internal static class SceneDocumentSerializer
                 };
                 var referenceKey = GetReferenceKey(entity.Id, componentType, member.Name);
                 if (component.EditorSerializationFailures.Contains(member.Name) &&
-                    properties.ContainsKey(member.Name))
+                    (properties.ContainsKey(member.Name) ||
+                     HasFormerSerializedName(properties, member)))
                     continue;
                 var isReference = typeof(DreambitAsset).IsAssignableFrom(valueType) ||
                                   valueType == typeof(Entity) ||
@@ -130,6 +131,7 @@ internal static class SceneDocumentSerializer
                 if (value is null && isReference && properties.ContainsKey(member.Name) &&
                     explicitlyClearedReferences?.Contains(referenceKey) != true)
                     continue;
+                RemoveFormerSerializedNames(properties, member);
                 properties[member.Name] = SerializeValue(value, valueType);
             }
 
@@ -178,6 +180,27 @@ internal static class SceneDocumentSerializer
             if (!field.IsInitOnly && !field.IsLiteral &&
                 field.GetCustomAttribute<DreambitSerializeAttribute>() is not null)
                 yield return field;
+    }
+
+    private static void RemoveFormerSerializedNames(
+        IDictionary<string, JToken> properties,
+        MemberInfo member)
+    {
+        var attribute = member.GetCustomAttribute<DreambitSerializeAttribute>();
+        if (attribute is null)
+            return;
+
+        foreach (var formerName in attribute.FormerNames)
+            if (!string.IsNullOrWhiteSpace(formerName))
+                properties.Remove(formerName);
+    }
+
+    private static bool HasFormerSerializedName(
+        IReadOnlyDictionary<string, JToken> properties,
+        MemberInfo member)
+    {
+        var attribute = member.GetCustomAttribute<DreambitSerializeAttribute>();
+        return attribute is not null && attribute.FormerNames.Any(properties.ContainsKey);
     }
 
     private static JToken SerializeValue(object? value, Type declaredType)

@@ -9,5 +9,6 @@ public enum AssetType
     Json = 4,
     Yaml = 5,
     Text = 6,
-    Xml = 7
+    Xml = 7,
+    Effect = 8
 }

@@ -1,20 +1,10 @@
-texture AlbedoRT : register(t0);
-texture LightingRT : register(t1);
-
-sampler AlbedoS = sampler_state {
-    Texture = <AlbedoRT>;
-    MinFilter = Linear; MagFilter = Linear; MipFilter = Linear;
-    AddressU = Clamp; AddressV = Clamp;
-};
-
-sampler LightingS = sampler_state {
-    Texture = <LightingRT>;
-    MinFilter = Linear; MagFilter = Linear; MipFilter = Linear;
-    AddressU = Clamp; AddressV = Clamp;
-};
+Texture2D<float4> AlbedoRT : register(t0);
+Texture2D<float4> LightingRT : register(t1);
+SamplerState AlbedoS : register(s0);
+SamplerState LightingS : register(s1);
 
 struct VSIn  { float4 Position : POSITION0; float2 TexCoord : TEXCOORD0; };
-struct VSOut { float4 Position : POSITION0; float2 TexCoord : TEXCOORD0; };
+struct VSOut { float4 Position : SV_Position; float2 TexCoord : TEXCOORD0; };
 
 VSOut VS(VSIn i)
 {
@@ -24,10 +14,10 @@ VSOut VS(VSIn i)
     return o;
 }
 
-float4 PS(VSOut i) : COLOR0
+float4 PS(VSOut i) : SV_Target0
 {
-    float4 albedo   = tex2D(AlbedoS, i.TexCoord);     // linear color
-    float3 lighting = float3(1.0, 1.0, 1.0); // ambient + lights
+    float4 albedo   = AlbedoRT.Sample(AlbedoS, i.TexCoord);
+    float3 lighting = LightingRT.Sample(LightingS, i.TexCoord).rgb;
     float3 outRGB   = albedo.rgb * lighting;
     return float4(outRGB, albedo.a);
 }

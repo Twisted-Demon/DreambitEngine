@@ -159,14 +159,14 @@ internal static class AssetEditorSmokeTests
             Invoke(entityEditor, "RefreshDetails");
             await DrainUiAsync();
 
-            FindComponentField<TextBox>(entityEditor, "Sprite Path").Text = "sprites/player_idle";
+            FindComponentField<TextBox>(entityEditor, "Sprite").Text = "sprites/player_idle";
             FindComponentField<TextBox>(entityEditor, "Opacity").Text = "0.35";
             FindComponentField<CheckBox>(entityEditor, "Flip X").IsChecked = true;
             await DrainUiAsync();
 
             var spriteProperties = (JObject)spriteDrawerJson["properties"]!;
-            Require(spriteProperties.Value<string>("SpritePath") == "sprites/player_idle",
-                "Editing SpriteDrawer.SpritePath did not update component JSON.");
+            Require(spriteProperties.Value<string>("Sprite") == "sprites/player_idle",
+                "Editing SpriteDrawer.Sprite did not update component JSON.");
             Require(spriteProperties.Value<float>("Opacity") == 0.35f,
                 "Editing SpriteDrawer.Opacity did not update component JSON.");
             Require(spriteProperties.Value<bool>("FlipX"),
@@ -178,8 +178,8 @@ internal static class AssetEditorSmokeTests
 
             var savedSprite = (JObject)((JArray)JsonbFile.Load(jsonPath)["components"]!)[0]!;
             var savedSpriteProperties = (JObject)savedSprite["properties"]!;
-            Require(savedSpriteProperties.Value<string>("SpritePath") == "sprites/player_idle",
-                "Saved SpriteDrawer.SpritePath was not written to disk.");
+            Require(savedSpriteProperties.Value<string>("Sprite") == "sprites/player_idle",
+                "Saved SpriteDrawer.Sprite was not written to disk.");
             Require(savedSpriteProperties.Value<float>("Opacity") == 0.35f,
                 "Saved SpriteDrawer.Opacity was not written to disk.");
             Require(savedSpriteProperties.Value<bool>("FlipX"),

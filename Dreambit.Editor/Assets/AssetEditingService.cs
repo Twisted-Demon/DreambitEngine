@@ -176,7 +176,7 @@ internal sealed class AssetEditingService : IDisposable
 
     private Type? ResolveAssetType(AssetRecord asset)
     {
-        if (asset.Kind == AssetKind.Texture)
+        if (asset.Kind is AssetKind.Texture or AssetKind.Font or AssetKind.Effect)
             return null;
         if (asset.Kind == AssetKind.Blueprint)
             return typeof(EntityBlueprint);

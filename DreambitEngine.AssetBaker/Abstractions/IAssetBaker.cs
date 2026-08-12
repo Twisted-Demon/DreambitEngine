@@ -20,7 +20,8 @@ public sealed class BakeContext
     public bool GenerateMips { get; init; }
     public bool PremultiplyAlpha { get; init; }
     public int? MaxDimension { get; init; }
-    public bool MarkSRgb { get; init; }
+    public bool MarkSRgb { get; init; } = true;
+    public string TargetPlatform { get; init; } = "DesktopVK";
     
     public string? LogicalRoot { get; init; }
 }

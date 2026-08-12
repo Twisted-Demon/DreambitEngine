@@ -80,7 +80,7 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
             }
             catch (Exception exception)
             {
-                failures.Add(memberName);
+                failures.Add(member.Name);
                 errorList.Add(new InvalidOperationException(
                     $"Could not assign blueprint member " +
                     $"'{componentType.FullName}.{memberName}' from token '{token}'.",
@@ -120,10 +120,13 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
                 if (!property.CanWrite || property.GetIndexParameters().Length != 0)
                     continue;
 
-                if (property.GetCustomAttribute<DreambitSerializeAttribute>() is null)
+                var attribute = property.GetCustomAttribute<DreambitSerializeAttribute>();
+                if (attribute is null)
                     continue;
 
-                members[property.Name] = new BlueprintMember(property);
+                var member = new BlueprintMember(property);
+                members[property.Name] = member;
+                AddFormerNames(members, attribute, member);
             }
 
             foreach (var field in type.GetFields(flags))
@@ -131,15 +134,28 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
                 if (field.IsInitOnly || field.IsLiteral)
                     continue;
 
-                if (field.GetCustomAttribute<DreambitSerializeAttribute>() is null)
+                var attribute = field.GetCustomAttribute<DreambitSerializeAttribute>();
+                if (attribute is null)
                     continue;
 
                 // A writable property wins if a field has the same name.
-                members.TryAdd(field.Name, new BlueprintMember(field));
+                var member = new BlueprintMember(field);
+                if (members.TryAdd(field.Name, member))
+                    AddFormerNames(members, attribute, member);
             }
 
             return members;
         });
+    }
+
+    private static void AddFormerNames(
+        IDictionary<string, BlueprintMember> members,
+        DreambitSerializeAttribute attribute,
+        BlueprintMember member)
+    {
+        foreach (var formerName in attribute.FormerNames)
+            if (!string.IsNullOrWhiteSpace(formerName))
+                members.TryAdd(formerName, member);
     }
 
     public static Type ResolveComponentType(string typeName)
@@ -616,14 +632,18 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
         public BlueprintMember(PropertyInfo property)
         {
             _property = property;
+            Name = property.Name;
             ValueType = property.PropertyType;
         }
 
         public BlueprintMember(FieldInfo field)
         {
             _field = field;
+            Name = field.Name;
             ValueType = field.FieldType;
         }
+
+        public string Name { get; }
 
         public Type ValueType { get; }
 

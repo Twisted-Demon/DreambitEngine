@@ -15,7 +15,7 @@ namespace Dreambit.Editor.UI.Panels;
 
 internal sealed class InspectorPanel : EditorPanel
 {
-    private readonly SceneDocumentService _documents;
+    private readonly EditorDocumentContext _documentContext;
     private readonly InspectorMetadataCache _metadata;
     private readonly EditorTypeRegistry _types;
     private readonly AssetEditingService _assetEditing;
@@ -27,9 +27,10 @@ internal sealed class InspectorPanel : EditorPanel
     private string _componentSearch = string.Empty;
     private string _blueprintReferenceSearch = string.Empty;
     private string? _error;
+    private string? _lastUnhandledFailure;
 
     public InspectorPanel(
-        SceneDocumentService documents,
+        EditorDocumentContext documentContext,
         InspectorMetadataCache metadata,
         EditorTypeRegistry types,
         AssetEditingService assetEditing,
@@ -40,12 +41,12 @@ internal sealed class InspectorPanel : EditorPanel
         EditorLogService logs)
         : base(EditorPanelIds.Inspector, "Inspector")
     {
-        _documents = documents;
+        _documentContext = documentContext;
         _metadata = metadata;
         _types = types;
         _assetEditing = assetEditing;
         _assets = assets;
-        _drawers = new InspectorValueDrawerRegistry(assets, dragDrop, documents);
+        _drawers = new InspectorValueDrawerRegistry(assets, dragDrop, () => _documentContext.Current?.Scene);
         _previews = previews;
         _customEditors = customEditors;
         _logs = logs;
@@ -53,12 +54,38 @@ internal sealed class InspectorPanel : EditorPanel
 
     protected override void DrawContents()
     {
-        if (_assetEditing.Current is { } assetDocument)
+        try
+        {
+            DrawContentsCore();
+            _lastUnhandledFailure = null;
+        }
+        catch (Exception exception)
+        {
+            var failure = exception.ToString();
+            _error = $"Inspector could not draw this selection: {exception.Message}";
+            if (!string.Equals(_lastUnhandledFailure, failure, StringComparison.Ordinal))
+            {
+                _logs.Error(
+                    "Inspector",
+                    "An entity or asset could not be inspected. The Editor is still running.",
+                    exception);
+                _lastUnhandledFailure = failure;
+            }
+        }
+    }
+
+    private void DrawContentsCore()
+    {
+        var document = _documentContext.Current;
+        var entities = document?.Selection.Resolve(document.Scene) ?? [];
+        var inspectBlueprintEntity = _documentContext.IsBlueprint && entities.Count > 0;
+
+        if (!inspectBlueprintEntity && _assetEditing.Current is { } assetDocument)
         {
             DrawAssetDocument(assetDocument);
             return;
         }
-        if (_assetEditing.Selected is { } selectedAsset)
+        if (!inspectBlueprintEntity && _assetEditing.Selected is { } selectedAsset)
         {
             ImGui.TextUnformatted(selectedAsset.Name);
             ImGui.TextDisabled(selectedAsset.RelativePath);
@@ -91,7 +118,6 @@ internal sealed class InspectorPanel : EditorPanel
             return;
         }
 
-        var document = _documents.Current;
         if (document is null)
         {
             ImGui.TextDisabled("Nothing selected");
@@ -103,7 +129,6 @@ internal sealed class InspectorPanel : EditorPanel
         if (document.LDtkReference is not null)
             DrawLDtkImportOptions(document);
 
-        var entities = document.Selection.Resolve(document.Scene);
         if (entities.Count == 0)
         {
             ImGui.TextDisabled("No entity selected");
@@ -415,6 +440,16 @@ internal sealed class InspectorPanel : EditorPanel
         ComponentBlueprint component,
         Type componentType)
     {
+        Component? defaultComponent = null;
+        try
+        {
+            defaultComponent = Activator.CreateInstance(componentType) as Component;
+        }
+        catch
+        {
+            // Components with special constructors still retain their serialized data.
+        }
+
         foreach (var member in _metadata.Get(componentType, InspectorTargetKind.Component))
         {
             if (member.ValueType == typeof(Entity) ||
@@ -444,6 +479,10 @@ internal sealed class InspectorPanel : EditorPanel
                         $"{member.DisplayName}: serialized reference/value retained");
                     continue;
                 }
+            }
+            else if (defaultComponent is not null)
+            {
+                value = member.GetValue(defaultComponent);
             }
             else if (member.ValueType.IsValueType)
             {
@@ -712,52 +751,58 @@ internal sealed class InspectorPanel : EditorPanel
         if (!ImGui.CollapsingHeader("Transform", ImGuiTreeNodeFlags.DefaultOpen))
             return;
         ImGui.PushID("TransformInspector");
-        ImGui.TextDisabled("Drag to adjust. Double-click a number to type an exact value.");
-        var first = entities[0].Transform;
+        try
+        {
+            ImGui.TextDisabled("Drag to adjust. Double-click a number to type an exact value.");
+            var first = entities[0].Transform;
 
-        var position = new Vector3(first.Position.X, first.Position.Y, first.Position.Z);
-        var mixedPosition = entities.Skip(1).Any(entity => entity.Transform.Position != first.Position);
-        if (ImGui.DragFloat3("Position", ref position, 0.1f))
-            Apply(document, "Change Position", "Transform.Position", () =>
-            {
-                var value = new Microsoft.Xna.Framework.Vector3(position.X, position.Y, position.Z);
-                foreach (var entity in entities)
+            var position = new Vector3(first.Position.X, first.Position.Y, first.Position.Z);
+            var mixedPosition = entities.Skip(1).Any(entity => entity.Transform.Position != first.Position);
+            if (ImGui.DragFloat3("Position", ref position, 0.1f))
+                Apply(document, "Change Position", "Transform.Position", () =>
                 {
-                    entity.Transform.Position = value;
-                    document.RecordLDtkPosition(entity);
-                }
-            });
-        DrawMixedLabel("Position", mixedPosition);
+                    var value = new Microsoft.Xna.Framework.Vector3(position.X, position.Y, position.Z);
+                    foreach (var entity in entities)
+                    {
+                        entity.Transform.Position = value;
+                        document.RecordLDtkPosition(entity);
+                    }
+                });
+            DrawMixedLabel("Position", mixedPosition);
 
-        var rotation = MathHelper.ToDegrees(first.Rotation2D);
-        var mixedRotation = entities.Skip(1).Any(entity =>
-            MathF.Abs(entity.Transform.Rotation2D - first.Rotation2D) > 0.0001f);
-        if (ImGui.DragFloat("Rotation", ref rotation, 0.25f))
-            Apply(document, "Change Rotation", "Transform.Rotation", () =>
-            {
-                var value = MathHelper.ToRadians(rotation);
-                foreach (var entity in entities)
+            var rotation = MathHelper.ToDegrees(first.Rotation2D);
+            var mixedRotation = entities.Skip(1).Any(entity =>
+                MathF.Abs(entity.Transform.Rotation2D - first.Rotation2D) > 0.0001f);
+            if (ImGui.DragFloat("Rotation", ref rotation, 0.25f))
+                Apply(document, "Change Rotation", "Transform.Rotation", () =>
                 {
-                    entity.Transform.Rotation2D = value;
-                    document.RecordLDtkRotation(entity);
-                }
-            });
-        DrawMixedLabel("Rotation", mixedRotation);
+                    var value = MathHelper.ToRadians(rotation);
+                    foreach (var entity in entities)
+                    {
+                        entity.Transform.Rotation2D = value;
+                        document.RecordLDtkRotation(entity);
+                    }
+                });
+            DrawMixedLabel("Rotation", mixedRotation);
 
-        var scale = new Vector3(first.Scale.X, first.Scale.Y, first.Scale.Z);
-        var mixedScale = entities.Skip(1).Any(entity => entity.Transform.Scale != first.Scale);
-        if (ImGui.DragFloat3("Scale", ref scale, 0.01f))
-            Apply(document, "Change Scale", "Transform.Scale", () =>
-            {
-                var value = new Microsoft.Xna.Framework.Vector3(scale.X, scale.Y, scale.Z);
-                foreach (var entity in entities)
+            var scale = new Vector3(first.Scale.X, first.Scale.Y, first.Scale.Z);
+            var mixedScale = entities.Skip(1).Any(entity => entity.Transform.Scale != first.Scale);
+            if (ImGui.DragFloat3("Scale", ref scale, 0.01f))
+                Apply(document, "Change Scale", "Transform.Scale", () =>
                 {
-                    entity.Transform.Scale = value;
-                    document.RecordLDtkScale(entity);
-                }
-            });
-        DrawMixedLabel("Scale", mixedScale);
-        ImGui.PopID();
+                    var value = new Microsoft.Xna.Framework.Vector3(scale.X, scale.Y, scale.Z);
+                    foreach (var entity in entities)
+                    {
+                        entity.Transform.Scale = value;
+                        document.RecordLDtkScale(entity);
+                    }
+                });
+            DrawMixedLabel("Scale", mixedScale);
+        }
+        finally
+        {
+            ImGui.PopID();
+        }
     }
 
     private void DrawComponents(SceneDocument document, IReadOnlyList<Entity> entities)
@@ -836,25 +881,30 @@ internal sealed class InspectorPanel : EditorPanel
         var flags = ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.NoSavedSettings;
         if (!ImGui.BeginTable("##RemovableHeader", 2, flags))
             return (false, false);
-
-        ImGui.TableSetupColumn("##Title", ImGuiTableColumnFlags.WidthStretch);
-        ImGui.TableSetupColumn("##Remove", ImGuiTableColumnFlags.WidthFixed, ImGui.GetFrameHeight());
-        ImGui.TableNextRow();
-        ImGui.TableSetColumnIndex(0);
-        open = ImGui.CollapsingHeader(title, ImGuiTreeNodeFlags.DefaultOpen);
-        ImGui.TableSetColumnIndex(1);
-        if (allowRemove)
+        try
         {
-            if (ImGui.SmallButton("×"))
-                removeRequested = true;
-            if (ImGui.IsItemHovered())
-                ImGui.SetTooltip($"Remove {title}");
+            ImGui.TableSetupColumn("##Title", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn("##Remove", ImGuiTableColumnFlags.WidthFixed, ImGui.GetFrameHeight());
+            ImGui.TableNextRow();
+            ImGui.TableSetColumnIndex(0);
+            open = ImGui.CollapsingHeader(title, ImGuiTreeNodeFlags.DefaultOpen);
+            ImGui.TableSetColumnIndex(1);
+            if (allowRemove)
+            {
+                if (ImGui.SmallButton("×"))
+                    removeRequested = true;
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip($"Remove {title}");
+            }
+            else
+            {
+                ImGui.TextDisabled("LDtk");
+            }
         }
-        else
+        finally
         {
-            ImGui.TextDisabled("LDtk");
+            ImGui.EndTable();
         }
-        ImGui.EndTable();
         return (open, removeRequested);
     }
 

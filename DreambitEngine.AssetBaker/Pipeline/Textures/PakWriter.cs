@@ -23,6 +23,15 @@ public sealed class PakWriter
                 $"Two source assets produce the same case-insensitive PAK path '{path}'.");
     }
 
+    public void AddOrReplace(AssetBlob blob)
+    {
+        ArgumentNullException.ThrowIfNull(blob);
+        var path = Normalize(blob.LogicalPath);
+        if (path.Length == 0)
+            throw new InvalidOperationException("A PAK entry path cannot be empty.");
+        _entries[path] = new Entry(path, blob.Type, blob.Data, Crc32(blob.Data));
+    }
+
     public void Save(string outputPak)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(outputPak);

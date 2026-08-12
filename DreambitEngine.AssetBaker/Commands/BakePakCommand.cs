@@ -24,6 +24,12 @@ public class BakePakSettings : CommandSettings
     public bool PremultiplyAlpha { get; set; }
     [CommandOption("--max-size <N>")] public int? MaxSize { get; set; }
     [CommandOption("--srgb")] public bool SRgb { get; set; }
+    [CommandOption("--platform <PLATFORM>")]
+    [Description("MonoGame target platform used to compile .fx files (default: DesktopVK)")]
+    public string Platform { get; set; } = "DesktopVK";
+    [CommandOption("--no-builtins")]
+    [Description("Do not add Dreambit's built-in effects and default fonts")]
+    public bool NoBuiltIns { get; set; }
     [CommandOption("--registry <PATH>")]
     [Description("Dreambit .dreambit/assets.json registry to embed")]
     public string? AssetRegistryPath { get; set; }
@@ -62,7 +68,9 @@ public sealed class BakePakCommand : Command<BakePakSettings>
                     settings.GenerateMips,
                     settings.PremultiplyAlpha,
                     settings.MaxSize,
-                    settings.SRgb),
+                    settings.SRgb,
+                    settings.Platform,
+                    !settings.NoBuiltIns),
                 progress,
                 cancellationToken);
             AnsiConsole.MarkupLine(

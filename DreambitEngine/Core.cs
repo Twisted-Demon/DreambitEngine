@@ -15,6 +15,7 @@ public class Core : Game
     public Core(int width = 800, int height = 600, string title = "Dreambit Engine")
     {
         GraphicsDeviceManager = new GraphicsDeviceManager(this);
+        GraphicsDeviceManager.GraphicsProfile = GraphicsProfile.HiDef;
         Content.RootDirectory = "Content";
         IsMouseVisible = true;
         Instance = this;

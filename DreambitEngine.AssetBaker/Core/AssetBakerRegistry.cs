@@ -61,6 +61,12 @@ public sealed class AssetBakerRegistry
                 AssetType.Texture,
                 new Pipeline.Textures.TextureBaker())
             .Register(
+                AssetType.Font,
+                new Pipeline.Fonts.FontBaker())
+            .Register(
+                AssetType.Effect,
+                new Pipeline.Effects.EffectBaker())
+            .Register(
                 AssetType.Json,
                 new Pipeline.Docs.JsonbBaker())
             .Register(

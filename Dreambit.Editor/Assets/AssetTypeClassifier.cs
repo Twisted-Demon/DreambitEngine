@@ -29,7 +29,8 @@ internal static class AssetTypeClassifier
                 new AssetTypeInfo(AssetKind.Texture, "Dreambit.TextureAsset"),
             ".wav" or ".ogg" or ".mp3" or ".flac" =>
                 new AssetTypeInfo(AssetKind.Audio, null),
-            ".ttf" or ".otf" => new AssetTypeInfo(AssetKind.Font, null),
+            ".ttf" => new AssetTypeInfo(AssetKind.Font, "Dreambit.FontAsset"),
+            ".fx" => new AssetTypeInfo(AssetKind.Effect, "Dreambit.EffectAsset"),
             ".txt" or ".md" => new AssetTypeInfo(AssetKind.Text, null),
             ".ldtk" or ".ldtkl" => new AssetTypeInfo(AssetKind.Ldtk, null),
             ".tmx" or ".tsx" => new AssetTypeInfo(AssetKind.TiledMap, null),
@@ -72,6 +73,10 @@ internal static class AssetTypeClassifier
         ArgumentNullException.ThrowIfNull(requestedType);
 
         if (asset.Kind == AssetKind.Texture && requestedType == typeof(TextureAsset))
+            return true;
+        if (asset.Kind == AssetKind.Font && requestedType == typeof(FontAsset))
+            return true;
+        if (asset.Kind == AssetKind.Effect && requestedType == typeof(EffectAsset))
             return true;
         if (string.IsNullOrWhiteSpace(asset.TypeName))
             return false;

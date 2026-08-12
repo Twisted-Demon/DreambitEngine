@@ -23,4 +23,14 @@ public class FromRequiredAttribute : Attribute
     Inherited = true)]
 public sealed class DreambitSerializeAttribute : Attribute
 {
+    public DreambitSerializeAttribute(params string[] formerNames)
+    {
+        FormerNames = formerNames ?? [];
+    }
+
+    /// <summary>
+    /// Previous serialized member names accepted while loading older blueprints.
+    /// Saving writes only the member's current name.
+    /// </summary>
+    public string[] FormerNames { get; }
 }

@@ -6,7 +6,7 @@
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
 
     <PackageId>DreambitEngine.Build</PackageId>
-    <PackageVersion Condition="'$(PackageVersion)' == ''">0.1.6</PackageVersion>
+    <PackageVersion Condition="'$(PackageVersion)' == ''">0.1.7</PackageVersion>
     <Title>Dreambit Engine Build Integration</Title>
     <Authors>Dreambit Engine</Authors>
     <Description>MSBuild integration point for Dreambit content and asset tooling.</Description>
@@ -35,7 +35,7 @@
     </PropertyGroup>
     <MSBuild Projects="../DreambitEngine.AssetBaker/DreambitEngine.AssetBaker.csproj"
              Targets="Publish"
-             Properties="Configuration=$(Configuration);PublishDir=$(_AssetBakerPublishDirectory);UseAppHost=false;PublishReadyToRun=false"
+             Properties="Configuration=$(Configuration);PublishDir=$(_AssetBakerPublishDirectory);UseAppHost=false;PublishReadyToRun=false;NoRestore=true;Restore=false;RestoreIgnoreFailedSources=true;NuGetAudit=false"
              RemoveProperties="TargetFramework;RuntimeIdentifier;RuntimeIdentifiers;OutputPath;BaseOutputPath" />
     <ItemGroup>
       <TfmSpecificPackageFile Include="$(_AssetBakerPublishDirectory)**/*">

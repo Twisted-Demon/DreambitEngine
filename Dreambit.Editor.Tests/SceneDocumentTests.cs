@@ -17,6 +17,130 @@ public sealed class SceneDocumentTests : IDisposable
     public SceneDocumentTests() => Directory.CreateDirectory(_root);
 
     [Fact]
+    public void SingleRootDocumentCapturesBlueprintHierarchyEdits()
+    {
+        var root = new EntityBlueprint
+        {
+            Name = "Tree",
+            Guid = Guid.NewGuid(),
+            Children =
+            [
+                new EntityBlueprint { Name = "Leaves", Guid = Guid.NewGuid() }
+            ]
+        };
+        var selection = new SelectionService();
+        using var document = new SceneDocument(
+            new SceneBlueprint { Name = "Tree", Entities = [root] },
+            null,
+            selection);
+        var changed = 0;
+        document.Changed += _ => changed++;
+        var liveRoot = Assert.Single(
+            document.Scene!.GetAllEntities(),
+            entity => entity.Parent is null);
+
+        document.CreateEmpty("Shadow", liveRoot);
+        var captured = document.CaptureSingleRoot();
+
+        Assert.Equal(1, changed);
+        Assert.Equal(new[] { "Leaves", "Shadow" }, captured.Children.Select(child => child.Name));
+    }
+
+    [Fact]
+    public void NewSpriteDrawerDefaultsToOpaqueWhiteAndSerializesThoseDefaults()
+    {
+        var root = new EntityBlueprint
+        {
+            Name = "Sprite",
+            Guid = Guid.NewGuid(),
+            Components = [new ComponentBlueprint { Type = nameof(SpriteDrawer) }]
+        };
+        using var document = new SceneDocument(
+            new SceneBlueprint { Name = "Sprite", Entities = [root] },
+            null,
+            new SelectionService());
+
+        var entity = Assert.Single(document.Scene!.GetAllEntities());
+        var drawer = Assert.IsType<SpriteDrawer>(entity.GetComponent<SpriteDrawer>());
+        Assert.Equal(Microsoft.Xna.Framework.Color.White, drawer.Tint);
+        Assert.Equal(1f, drawer.Opacity);
+
+        var serialized = Assert.Single(document.CaptureSingleRoot().Components).Properties;
+        Assert.Equal(
+            new[] { 255, 255, 255, 255 },
+            serialized[nameof(SpriteDrawer.Tint)]!.Values<int>());
+        Assert.Equal(1f, serialized[nameof(SpriteDrawer.Opacity)]!.Value<float>());
+    }
+
+    [Fact]
+    public void SpriteDrawerSaveMigratesLegacyPathToStableSpriteReference()
+    {
+        var entityId = Guid.NewGuid();
+        var spriteId = AssetId.New();
+        var source = new SceneBlueprint
+        {
+            Name = "Legacy Sprite",
+            Entities =
+            [
+                new EntityBlueprint
+                {
+                    Name = "Sprite",
+                    Guid = entityId,
+                    Components =
+                    [
+                        new ComponentBlueprint
+                        {
+                            Type = nameof(SpriteDrawer),
+                            Properties = new Dictionary<string, JToken>
+                            {
+                                ["SpritePath"] = "sprites/tree"
+                            }
+                        }
+                    ]
+                }
+            ]
+        };
+        using var scene = new TestEditorScene();
+        var entity = scene.CreateEntity("Sprite", guidOverride: entityId);
+        entity.AttachComponent<SpriteDrawer>().Sprite = new Sprite
+        {
+            AssetId = spriteId,
+            AssetName = "sprites/tree"
+        };
+
+        var captured = SceneDocumentSerializer.Capture(scene, source, source.Name);
+        var properties = Assert.Single(Assert.Single(captured.Entities).Components).Properties;
+
+        Assert.DoesNotContain("SpritePath", properties.Keys);
+        Assert.True(DreambitAssetReferenceToken.TryRead(
+            properties[nameof(SpriteDrawer.Sprite)],
+            out var capturedId,
+            out var capturedPath));
+        Assert.Equal(spriteId, capturedId);
+        Assert.Equal("sprites/tree", capturedPath);
+    }
+
+    [Fact]
+    public void BlueprintRootLookupIgnoresTheParentlessEditorCamera()
+    {
+        var root = new EntityBlueprint { Name = "Tree", Guid = Guid.NewGuid() };
+        using var document = new SceneDocument(
+            new SceneBlueprint { Name = "Tree", Entities = [root] },
+            null,
+            new SelectionService());
+        document.Scene!.EnsureEditorCamera();
+
+        Assert.Equal(
+            2,
+            document.Scene.GetAllEntities().Count(entity => entity.Parent is null));
+        var authoredRoot = BlueprintEditingService.FindAuthoredRoot(document, root.Guid);
+
+        Assert.NotNull(authoredRoot);
+        Assert.Equal(root.Guid, authoredRoot.Id);
+        Assert.False(authoredRoot.IsEditorOnly);
+    }
+
+    [Fact]
     public void EditorSceneFlushesRealComponentsWithoutGameplayCallbacks()
     {
         EditorLifecycleTestComponent.Reset();

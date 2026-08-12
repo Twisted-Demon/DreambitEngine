@@ -23,6 +23,22 @@ public sealed class InspectorMetadataTests
     }
 
     [Fact]
+    public void SpriteDrawerExposesSpriteAssetReferenceInsteadOfSpritePath()
+    {
+        var members = new InspectorMetadataCache().Get(
+            typeof(SpriteDrawer),
+            InspectorTargetKind.Component);
+
+        var sprite = Assert.Single(
+            members,
+            member => member.SerializedName == nameof(SpriteDrawer.Sprite));
+        Assert.Equal(typeof(Sprite), sprite.ValueType);
+        Assert.DoesNotContain(
+            members,
+            member => member.SerializedName == "SpritePath");
+    }
+
+    [Fact]
     public void AssetMetadataUsesJsonContractInsteadOfDreambitSerialize()
     {
         var cache = new InspectorMetadataCache();

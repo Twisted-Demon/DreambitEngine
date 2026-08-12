@@ -35,28 +35,13 @@ public class TextureBaker : AssetBakerBase
             {
                 Size = new Size(nw, nh),
                 Sampler = KnownResamplers.Lanczos3,
-                Mode = ResizeMode.Stretch
+                Mode = ResizeMode.Stretch,
+                Compand = ctx.MarkSRgb
             }));
         }
         
         if (ctx.PremultiplyAlpha)
-        {
-            img.ProcessPixelRows(a =>
-            {
-                for (var y = 0; y < a.Height; y++)
-                {
-                    var row = a.GetRowSpan(y);
-                    for (var x = 0; x < row.Length; x++)
-                    {
-                        ref var p = ref row[x];
-                        var af = p.A / 255f;
-                        p.R = (byte)(p.R * af);
-                        p.G = (byte)(p.G * af);
-                        p.B = (byte)(p.B * af);
-                    }
-                }
-            });
-        }
+            PremultiplyAlpha(img, ctx.MarkSRgb);
         
         var mips = new List<(int w, int h, byte[] data)>
         {
@@ -76,7 +61,8 @@ public class TextureBaker : AssetBakerBase
                 {
                     Size = new Size(w, h),
                     Sampler = KnownResamplers.Box,
-                    Mode = ResizeMode.Stretch
+                    Mode = ResizeMode.Stretch,
+                    Compand = ctx.MarkSRgb
                 }));
                 mips.Add((w, h, DumpRgba(mip)));
             }
@@ -102,28 +88,13 @@ public class TextureBaker : AssetBakerBase
             {
                 Size = new Size(nw, nh),
                 Sampler = KnownResamplers.Lanczos3,
-                Mode = ResizeMode.Stretch
+                Mode = ResizeMode.Stretch,
+                Compand = ctx.MarkSRgb
             }));
         }
 
         if (ctx.PremultiplyAlpha)
-        {
-            img.ProcessPixelRows(a =>
-            {
-                for (var y = 0; y < a.Height; y++)
-                {
-                    var row = a.GetRowSpan(y);
-                    for (var x = 0; x < row.Length; x++)
-                    {
-                        ref var p = ref row[x];
-                        var af = p.A / 255f;
-                        p.R = (byte)(p.R * af);
-                        p.G = (byte)(p.G * af);
-                        p.B = (byte)(p.B * af);
-                    }
-                }
-            });
-        }
+            PremultiplyAlpha(img, ctx.MarkSRgb);
 
         var mips = new List<(int w,int h,byte[] data)>
         {
@@ -141,7 +112,8 @@ public class TextureBaker : AssetBakerBase
                 {
                     Size = new Size(w, h),
                     Sampler = KnownResamplers.Box,
-                    Mode = ResizeMode.Stretch
+                    Mode = ResizeMode.Stretch,
+                    Compand = ctx.MarkSRgb
                 }));
                 mips.Add((w, h, DumpRgba(mip)));
             }
@@ -158,6 +130,44 @@ public class TextureBaker : AssetBakerBase
         var logical = GetLogicalPath(ctx, ".texb");
         return new AssetBlob(logical, AssetType.Texture, OutputExtension, data);
     }
+
+    private static void PremultiplyAlpha(Image<Rgba32> image, bool srgb)
+    {
+        image.ProcessPixelRows(accessor =>
+        {
+            for (var y = 0; y < accessor.Height; y++)
+            {
+                var row = accessor.GetRowSpan(y);
+                for (var x = 0; x < row.Length; x++)
+                {
+                    ref var pixel = ref row[x];
+                    var alpha = pixel.A / 255f;
+                    pixel.R = PremultiplyChannel(pixel.R, alpha, srgb);
+                    pixel.G = PremultiplyChannel(pixel.G, alpha, srgb);
+                    pixel.B = PremultiplyChannel(pixel.B, alpha, srgb);
+                }
+            }
+        });
+    }
+
+    private static byte PremultiplyChannel(byte channel, float alpha, bool srgb)
+    {
+        var encoded = channel / 255f;
+        if (!srgb)
+            return ToByte(encoded * alpha);
+
+        var linear = encoded <= 0.04045f
+            ? encoded / 12.92f
+            : MathF.Pow((encoded + 0.055f) / 1.055f, 2.4f);
+        linear *= alpha;
+        var premultiplied = linear <= 0.0031308f
+            ? linear * 12.92f
+            : 1.055f * MathF.Pow(linear, 1f / 2.4f) - 0.055f;
+        return ToByte(premultiplied);
+    }
+
+    private static byte ToByte(float value) =>
+        (byte)Math.Clamp((int)MathF.Round(value * 255f), 0, 255);
     
     private static byte[] DumpRgba(Image<Rgba32> img)
     {

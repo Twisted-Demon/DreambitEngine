@@ -7,8 +7,15 @@ namespace Dreambit;
 
 public sealed class RenderPipeline(Scene scene) : IDisposable
 {
+    /// <summary>
+    /// HDR scene color is retained until presentation so future post-process passes
+    /// such as bloom can inspect values above display white.
+    /// </summary>
+    public static SurfaceFormat SceneColorFormat => SurfaceFormat.HdrBlendable;
+
     private readonly List<RenderPass> _renderers = [];
     private bool _disposed;
+    private Effect _presentEffect;
 
     public RenderTarget2D SceneRenderTarget { get; set; }
 
@@ -23,6 +30,12 @@ public sealed class RenderPipeline(Scene scene) : IDisposable
 
         _renderers.Clear();
 
+        if (_presentEffect is not null)
+        {
+            Resources.UnloadAsset(_presentEffect.Name);
+            _presentEffect = null;
+        }
+
         _disposed = true;
 
         GC.SuppressFinalize(this);
@@ -32,6 +45,7 @@ public sealed class RenderPipeline(Scene scene) : IDisposable
     {
         Window.WindowResized += OnWindowResized;
         SceneRenderTarget = CreateRenderTarget();
+        _presentEffect = Resources.LoadAsset<Effect>("Effects/Present");
     }
 
     public void AddRenderPass<T>() where T : RenderPass, new()
@@ -73,8 +87,11 @@ public sealed class RenderPipeline(Scene scene) : IDisposable
 
         Core.SpriteBatch.Begin(
             SpriteSortMode.Deferred,
-            BlendState.AlphaBlend,
-            scene.RenderingOptions.SamplerState);
+            BlendState.Opaque,
+            scene.RenderingOptions.SamplerState,
+            DepthStencilState.None,
+            RasterizerState.CullNone,
+            _presentEffect);
 
         Core.SpriteBatch.Draw(
             SceneRenderTarget,
@@ -97,7 +114,7 @@ public sealed class RenderPipeline(Scene scene) : IDisposable
             Window.Width,
             Window.Height,
             false,
-            Core.Instance.GraphicsDevice.PresentationParameters.BackBufferFormat,
+            SceneColorFormat,
             DepthFormat.None
         );
 
@@ -111,7 +128,7 @@ public sealed class RenderPipeline(Scene scene) : IDisposable
             width,
             height,
             false,
-            Core.Instance.GraphicsDevice.PresentationParameters.BackBufferFormat,
+            SceneColorFormat,
             DepthFormat.None
         );
 
@@ -125,7 +142,7 @@ public sealed class RenderPipeline(Scene scene) : IDisposable
             size.X,
             size.Y,
             false,
-            Core.Instance.GraphicsDevice.PresentationParameters.BackBufferFormat,
+            SceneColorFormat,
             DepthFormat.None
         );
 

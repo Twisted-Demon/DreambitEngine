@@ -2,6 +2,9 @@ using Dreambit;
 using Dreambit.Editor.Assets;
 using Dreambit.Editor.Projects;
 using DreambitEngine.AssetBaker.Pipeline;
+using DreambitEngine.AssetBaker.Pipeline.Textures;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace Dreambit.Editor.Tests;
 
@@ -147,6 +150,61 @@ public sealed class AssetBakePipelineTests : IDisposable
         Assert.Equal(
             Path.Combine(_root, ".cache", "dreambit", "bake"),
             baking.CacheDirectory);
+    }
+
+    [Fact]
+    public void TextureBakeDefaultsToLinearPremultipliedSrgbPixels()
+    {
+        var assets = Path.Combine(_root, "TextureAssets");
+        Directory.CreateDirectory(assets);
+        var source = Path.Combine(assets, "pixel.png");
+        using (var image = new Image<Rgba32>(1, 1))
+        {
+            image[0, 0] = new Rgba32(200, 100, 50, 128);
+            image.SaveAsPng(source);
+        }
+
+        var blob = new TextureBaker().BakeToBytes(new DreambitEngine.AssetBaker.Abstractions.BakeContext
+        {
+            InputPath = source,
+            OutputPath = string.Empty,
+            LogicalRoot = assets,
+            PremultiplyAlpha = true
+        });
+
+        Assert.Equal("pixel.texb", blob.LogicalPath);
+        Assert.Equal(3u, BitConverter.ToUInt32(blob.Data, 12));
+        Assert.Equal(new byte[] { 147, 72, 34, 128 }, blob.Data[20..24]);
+    }
+
+    [Fact]
+    public void BuiltInEffectsAndFontAreCompiledIntoThePak()
+    {
+        var assets = Path.Combine(_root, "EmptyAssets");
+        var output = Path.Combine(_root, "BuiltIns", "content.pak");
+        Directory.CreateDirectory(assets);
+        var legacyEffects = Path.Combine(assets, "Effects");
+        Directory.CreateDirectory(legacyEffects);
+        File.WriteAllText(
+            Path.Combine(legacyEffects, "Tint.fx"),
+            "This copied legacy engine effect must never be compiled.");
+
+        new AssetBakePipeline().BakePak(new AssetBakeRequest(
+            assets,
+            output,
+            RebuildAll: true,
+            TargetPlatform: "DesktopVK",
+            IncludeBuiltInContent: true));
+
+        using var pak = new PakReader(output);
+        using var effect = pak.Open("effects/forwarddiffuse.fxb");
+        using var deferred = pak.Open("effects/defferedrendercombine.fxb");
+        using var tint = pak.Open("effects/tint.fxb");
+        using var font = pak.Open("fonts/monogram.ttfb");
+        Assert.True(effect.Length > 16);
+        Assert.True(deferred.Length > 16);
+        Assert.True(tint.Length > 16);
+        Assert.True(font.Length > 16);
     }
 
     public void Dispose()

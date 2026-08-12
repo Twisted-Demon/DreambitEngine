@@ -63,6 +63,26 @@ internal sealed class DreambitAssetDocument : IDisposable
         Changed?.Invoke(this);
     }
 
+    public void ReplaceBlueprint(string name, EntityBlueprint blueprint)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(blueprint);
+        if (AssetType != typeof(EntityBlueprint))
+            throw new InvalidOperationException("Only Entity Blueprint documents can accept a hierarchy snapshot.");
+
+        var before = CaptureJson();
+        var after = DreambitJson.Serialize(blueprint);
+        if (string.Equals(before, after, StringComparison.Ordinal))
+            return;
+
+        ReplaceInstance(after);
+        IsDirty = true;
+        LastChangedUtc = DateTimeOffset.UtcNow;
+        Undo.Record(new AssetSnapshotCommand(name, this, before, after));
+        Changed?.Invoke(this);
+    }
+
     public void Save(string path)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -160,6 +180,14 @@ internal sealed class DreambitAssetDocument : IDisposable
 
     private void Restore(string json, bool dirty)
     {
+        ReplaceInstance(json);
+        IsDirty = dirty;
+        LastChangedUtc = DateTimeOffset.UtcNow;
+        Changed?.Invoke(this);
+    }
+
+    private void ReplaceInstance(string json)
+    {
         _source = JObject.Parse(json);
         var replacement = DreambitJson.Deserialize(json, AssetType) as DreambitAsset
                           ?? throw new InvalidDataException("Could not restore the asset snapshot.");
@@ -167,9 +195,6 @@ internal sealed class DreambitAssetDocument : IDisposable
         replacement.AssetName = Asset.LogicalAssetName;
         Instance.Dispose();
         Instance = replacement;
-        IsDirty = dirty;
-        LastChangedUtc = DateTimeOffset.UtcNow;
-        Changed?.Invoke(this);
     }
 
     internal void RestoreReloadSnapshot(string json, bool dirty) => Restore(json, dirty);

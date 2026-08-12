@@ -12,7 +12,10 @@ are useful for enemies, projectiles, pickups, and other repeatable game objects.
     {
       "type": "Dreambit.ECS.SpriteDrawer, Dreambit",
       "properties": {
-        "SpritePath": "Sprites/player"
+        "Sprite": {
+          "$dreambitAsset": "8ca024dd-4fda-4fc9-82e3-f900db8ac6fa",
+          "path": "Sprites/player"
+        }
       }
     },
     {

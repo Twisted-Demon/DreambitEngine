@@ -45,10 +45,10 @@ internal sealed class InspectorValueDrawerRegistry
     public InspectorValueDrawerRegistry(
         AssetDatabase? assets = null,
         EditorDragDropService? dragDrop = null,
-        SceneDocumentService? scenes = null)
+        Func<Scene?>? sceneProvider = null)
     {
-        if (assets is not null && dragDrop is not null && scenes is not null)
-            Register(new ObjectReferenceValueDrawer(assets, dragDrop, scenes));
+        if (assets is not null && dragDrop is not null && sceneProvider is not null)
+            Register(new ObjectReferenceValueDrawer(assets, dragDrop, sceneProvider));
         Register(new NullableValueDrawer());
         Register(new BooleanValueDrawer());
         Register(new EnumValueDrawer());
@@ -64,7 +64,7 @@ internal sealed class InspectorValueDrawerRegistry
     private sealed class ObjectReferenceValueDrawer(
         AssetDatabase assets,
         EditorDragDropService dragDrop,
-        SceneDocumentService scenes) : IInspectorValueDrawer
+        Func<Scene?> sceneProvider) : IInspectorValueDrawer
     {
         private string _search = string.Empty;
 
@@ -137,7 +137,7 @@ internal sealed class InspectorValueDrawerRegistry
                 {
                     var payload = ImGui.AcceptDragDropPayload(EditorDragDropService.HierarchyEntityPayloadType);
                     if (payload.NativePtr != null && dragDrop.HierarchyEntityId is { } id &&
-                        scenes.Current?.Scene?.FindEntity(id) is { } entity)
+                        sceneProvider()?.FindEntity(id) is { } entity)
                     {
                         object? candidate = type == typeof(Entity) ? entity : entity.GetComponent(type);
                         if (candidate is not null && type.IsInstanceOfType(candidate))
@@ -189,7 +189,7 @@ internal sealed class InspectorValueDrawerRegistry
                             }
                         }
                     }
-                    else if (scenes.Current?.Scene is { } scene)
+                    else if (sceneProvider() is { } scene)
                     {
                         foreach (var entity in scene.GetAllEntities().Where(entity => !entity.IsEditorOnly))
                         {

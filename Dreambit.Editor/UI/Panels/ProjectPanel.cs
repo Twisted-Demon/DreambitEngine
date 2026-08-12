@@ -251,19 +251,22 @@ internal sealed class ProjectPanel : EditorPanel
         ImGui.TableNextRow();
         ImGui.TableSetColumnIndex(0);
         var selected = _selectedIsFolder && PathEquals(_selectedPath, folder.RelativePath);
-        if (ImGui.Selectable(
+        var activated = ImGui.Selectable(
                 $"    {folder.Name}##folder:{folder.RelativePath}",
                 selected,
-                ImGuiSelectableFlags.SpanAllColumns | ImGuiSelectableFlags.AllowDoubleClick))
+                ImGuiSelectableFlags.SpanAllColumns | ImGuiSelectableFlags.AllowDoubleClick);
+        var open = ImGui.IsItemHovered() &&
+                   ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left);
+        if (activated)
         {
             _selectedPath = folder.RelativePath;
             _selectedIsFolder = true;
             _workspace.LastSelectionKind = "asset";
-            if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
-            {
-                _currentFolder = folder.RelativePath;
-                ClearSelection();
-            }
+        }
+        if (open)
+        {
+            _currentFolder = folder.RelativePath;
+            ClearSelection();
         }
         DrawRowIcon("folder", new Vector4(0.95f, 0.72f, 0.28f, 1f));
 
@@ -284,22 +287,28 @@ internal sealed class ProjectPanel : EditorPanel
         ImGui.TableNextRow();
         ImGui.TableSetColumnIndex(0);
         var selected = !_selectedIsFolder && PathEquals(_selectedPath, asset.RelativePath);
-        if (ImGui.Selectable(
+        var activated = ImGui.Selectable(
                 $"    {asset.Name}##asset:{asset.Id}",
                 selected,
-                ImGuiSelectableFlags.SpanAllColumns | ImGuiSelectableFlags.AllowDoubleClick))
+                ImGuiSelectableFlags.SpanAllColumns | ImGuiSelectableFlags.AllowDoubleClick);
+        var open = ImGui.IsItemHovered() &&
+                   ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left);
+        if (activated)
         {
             _selectedPath = asset.RelativePath;
             _selectedIsFolder = false;
             _workspace.LastSelectionKind = "asset";
             _scenes.Selection.Clear();
             _assetEditing.Select(asset);
-            if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left) && asset.Kind == AssetKind.Blueprint)
+        }
+        if (open)
+        {
+            if (asset.Kind == AssetKind.Blueprint)
             {
                 _openBlueprint(asset);
                 _error = null;
             }
-            else if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left) && asset.Kind == AssetKind.Scene)
+            else if (asset.Kind == AssetKind.Scene)
             {
                 try
                 {
@@ -358,6 +367,8 @@ internal sealed class ProjectPanel : EditorPanel
         AssetKind.Blueprint => "view_in_ar",
         AssetKind.Scene => "layers",
         AssetKind.Texture => "image",
+        AssetKind.Font => "font_download",
+        AssetKind.Effect => "auto_fix_high",
         AssetKind.Sprite => "palette",
         AssetKind.SpriteSheet => "image",
         AssetKind.Animation => "animation",

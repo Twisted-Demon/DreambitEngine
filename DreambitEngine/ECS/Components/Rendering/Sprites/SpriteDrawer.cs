@@ -8,8 +8,6 @@ namespace Dreambit.ECS;
 public class SpriteDrawer :
     DrawableComponent<SpriteDrawer>
 {
-    private string _spritePath;
-
     [DreambitSerialize]
     public Color Tint { get; internal set; } =
         Color.White;
@@ -30,23 +28,23 @@ public class SpriteDrawer :
     public PivotType PivotType { get; internal set; } =
         PivotType.Center;
 
+    [DreambitSerialize("SpritePath")]
     public Sprite Sprite { get; set; }
 
-    [DreambitSerialize]
+    /// <summary>
+    /// Legacy source compatibility. Blueprints serialize <see cref="Sprite"/> as
+    /// an asset reference and never write this path property.
+    /// </summary>
+    [Obsolete("Use Sprite. SpritePath is accepted only as a legacy blueprint name.")]
     public string SpritePath
     {
-        get => _spritePath;
-
+        get => Sprite?.AssetName ?? string.Empty;
         set
         {
-            if (_spritePath == value)
-                return;
-
-            _spritePath = value;
-
             Sprite =
-                Resources.LoadAsset<Sprite>(
-                    _spritePath);
+                string.IsNullOrWhiteSpace(value)
+                    ? null
+                    : Resources.LoadAsset<Sprite>(value);
         }
     }
 
@@ -110,7 +108,9 @@ public class SpriteDrawer :
     public SpriteDrawer WithSprite(
         string assetPath)
     {
+#pragma warning disable CS0618
         SpritePath = assetPath;
+#pragma warning restore CS0618
 
         return this;
     }
@@ -175,12 +175,25 @@ public class SpriteDrawer :
             Sprite.Texture,
             GetDrawPosition(),
             Sprite.SourceRect,
-            Tint * Opacity,
+            GetPremultipliedTint(),
             GetDrawRotation(),
             // SpriteBatch applies the draw scale to this pixel-space origin.
             GetOriginToUse(),
             GetSpriteDrawScale(),
             GetSpriteEffects());
+    }
+
+    private Color GetPremultipliedTint()
+    {
+        // SpriteBatch's default blend state expects premultiplied colors. Color's
+        // scalar operator does not premultiply an explicitly authored alpha into RGB.
+        // Without this, (255,255,255,0) appears additive instead of transparent.
+        var alpha = Math.Clamp(Tint.A / 255f * Opacity, 0f, 1f);
+        return new Color(
+            Tint.R / 255f * alpha,
+            Tint.G / 255f * alpha,
+            Tint.B / 255f * alpha,
+            alpha);
     }
 
     protected virtual Vector2 GetDrawPosition()

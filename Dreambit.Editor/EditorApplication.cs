@@ -102,17 +102,23 @@ internal sealed class EditorApplication : IDisposable
         if (_project is not null)
         {
             var session = _projectManager.CurrentSession!;
+            var blueprintEditing = new BlueprintEditingService(
+                session.Assets,
+                session.AssetEditing,
+                session.GameCode.Assemblies,
+                LogSceneError);
+            var documentContext = new EditorDocumentContext(session.Scenes, blueprintEditing);
             var blueprintDockLayoutMissing =
                 !_workspaceState.PanelVisibility.ContainsKey(EditorPanelIds.Blueprint);
             _panels.Register(new HierarchyPanel(
-                session.Scenes,
-                session.Scenes.Selection,
+                documentContext,
                 _dragDrop,
                 session.Assets,
                 _workspaceState,
                 _icons));
             _panels.Register(new ScenePanel(
                 session.Scenes,
+                documentContext,
                 session.Scenes.Selection,
                 _workspaceState,
                 new SceneViewportRenderer(Core.Instance.GraphicsDevice, imGuiRenderer),
@@ -122,13 +128,14 @@ internal sealed class EditorApplication : IDisposable
             var blueprintView = new BlueprintViewPanel(
                 session.Assets,
                 session.AssetEditing,
-                session.GameCode.Assemblies,
+                blueprintEditing,
+                documentContext,
                 _workspaceState,
                 new SceneViewportRenderer(Core.Instance.GraphicsDevice, imGuiRenderer),
                 _icons);
             _panels.Register(blueprintView);
             _panels.Register(new InspectorPanel(
-                session.Scenes,
+                documentContext,
                 session.InspectorMetadata,
                 session.EditorTypes,
                 session.AssetEditing,

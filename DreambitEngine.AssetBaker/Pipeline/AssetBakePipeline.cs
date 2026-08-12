@@ -19,7 +19,9 @@ public sealed record AssetBakeRequest(
     bool GenerateMips = false,
     bool PremultiplyAlpha = true,
     int? MaxDimension = null,
-    bool MarkSrgb = true);
+    bool MarkSrgb = true,
+    string TargetPlatform = "DesktopVK",
+    bool IncludeBuiltInContent = false);
 
 public sealed record AssetBakeProgress(
     string Stage,
@@ -73,62 +75,99 @@ public sealed class AssetBakePipeline
         var unsupportedCount = 0;
         var optionSignature = CreateOptionSignature(request);
         var liveCacheKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var builtInEffectPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        var files = Directory.EnumerateFiles(inputRoot, "*", new EnumerationOptions
+        var roots = request.IncludeBuiltInContent
+            ? new[]
             {
-                RecurseSubdirectories = true,
-                IgnoreInaccessible = false,
-                AttributesToSkip = FileAttributes.ReparsePoint | FileAttributes.System,
-                ReturnSpecialDirectories = false
-            })
-            .OrderBy(path => Path.GetRelativePath(inputRoot, path), StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+                new BakeRoot(BuiltInContentSource.DirectoryPath, "builtin", true, true),
+                new BakeRoot(inputRoot, "project", false, false)
+            }
+            : [new BakeRoot(inputRoot, "project", false, false)];
 
-        foreach (var file in files)
+        foreach (var bakeRoot in roots)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var baker = bakerRegistry.GetByExt(Path.GetExtension(file));
-            if (baker is null)
-            {
-                unsupportedCount++;
-                continue;
-            }
-
-            var relativePath = NormalizeRelativePath(Path.GetRelativePath(inputRoot, file));
-            var sourceHash = ComputeHash(file);
-            var cacheKey = relativePath.ToLowerInvariant();
-            liveCacheKeys.Add(cacheKey);
-            AssetBlob blob;
-            if (cache.TryRead(cacheKey, sourceHash, optionSignature, out blob))
-            {
-                cacheHitCount++;
-                progress?.Report(new AssetBakeProgress(
-                    "Cache",
-                    $"Reused {relativePath}",
-                    relativePath,
-                    true));
-            }
-            else
-            {
-                progress?.Report(new AssetBakeProgress(
-                    "Bake",
-                    $"Baking {relativePath}",
-                    relativePath));
-                blob = baker.BakeToBytes(new BakeContext
+            var producedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var files = Directory.EnumerateFiles(bakeRoot.Path, "*", new EnumerationOptions
                 {
-                    InputPath = file,
-                    OutputPath = string.Empty,
-                    GenerateMips = request.GenerateMips,
-                    PremultiplyAlpha = request.PremultiplyAlpha,
-                    MaxDimension = request.MaxDimension,
-                    MarkSRgb = request.MarkSrgb,
-                    LogicalRoot = inputRoot
-                });
-                cache.Write(cacheKey, sourceHash, optionSignature, blob);
-                bakedCount++;
-            }
+                    RecurseSubdirectories = true,
+                    IgnoreInaccessible = false,
+                    AttributesToSkip = FileAttributes.ReparsePoint | FileAttributes.System,
+                    ReturnSpecialDirectories = false
+                })
+                .OrderBy(path => Path.GetRelativePath(bakeRoot.Path, path), StringComparer.OrdinalIgnoreCase)
+                .ToArray();
 
-            pak.Add(blob);
+            foreach (var file in files)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var baker = bakerRegistry.GetByExt(Path.GetExtension(file));
+                if (baker is null)
+                {
+                    unsupportedCount++;
+                    continue;
+                }
+
+                var relativePath = NormalizeRelativePath(Path.GetRelativePath(bakeRoot.Path, file));
+                var expectedLogicalPath = Path.ChangeExtension(relativePath, baker.OutputExtension)
+                    .Replace('\\', '/')
+                    .ToLowerInvariant();
+                if (!bakeRoot.IsBuiltIn && builtInEffectPaths.Contains(expectedLogicalPath))
+                {
+                    // Engine effects are reserved. Older projects copied these files
+                    // into Assets; ignoring those stale copies lets upgraded projects
+                    // receive the current embedded shader without losing custom .fx
+                    // support at every other logical path.
+                    progress?.Report(new AssetBakeProgress(
+                        "BuiltIn",
+                        $"Using the engine effect for {relativePath}",
+                        relativePath));
+                    continue;
+                }
+                var sourceHash = ComputeHash(file);
+                var cacheKey = $"{bakeRoot.CachePrefix}/{relativePath}".ToLowerInvariant();
+                liveCacheKeys.Add(cacheKey);
+                AssetBlob blob;
+                if (cache.TryRead(cacheKey, sourceHash, optionSignature, out blob))
+                {
+                    cacheHitCount++;
+                    progress?.Report(new AssetBakeProgress(
+                        "Cache",
+                        $"Reused {relativePath}",
+                        relativePath,
+                        true));
+                }
+                else
+                {
+                    progress?.Report(new AssetBakeProgress(
+                        "Bake",
+                        $"Baking {relativePath}",
+                        relativePath));
+                    blob = baker.BakeToBytes(new BakeContext
+                    {
+                        InputPath = file,
+                        OutputPath = string.Empty,
+                        GenerateMips = request.GenerateMips,
+                        PremultiplyAlpha = request.PremultiplyAlpha,
+                        MaxDimension = request.MaxDimension,
+                        MarkSRgb = request.MarkSrgb,
+                        TargetPlatform = request.TargetPlatform,
+                        LogicalRoot = bakeRoot.Path
+                    });
+                    cache.Write(cacheKey, sourceHash, optionSignature, blob);
+                    bakedCount++;
+                }
+
+                if (!producedPaths.Add(blob.LogicalPath))
+                    throw new InvalidOperationException(
+                        $"Two {bakeRoot.CachePrefix} source assets produce '{blob.LogicalPath}'.");
+                if (bakeRoot.IsBuiltIn && blob.Type == AssetType.Effect)
+                    builtInEffectPaths.Add(blob.LogicalPath);
+                if (bakeRoot.AllowProjectOverride)
+                    pak.Add(blob);
+                else
+                    pak.AddOrReplace(blob);
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(request.AssetRegistryPath) &&
@@ -191,8 +230,9 @@ public sealed class AssetBakePipeline
     }
 
     private static string CreateOptionSignature(AssetBakeRequest request) =>
-        $"v1;mips={request.GenerateMips};premul={request.PremultiplyAlpha};" +
-        $"max={request.MaxDimension?.ToString() ?? "none"};srgb={request.MarkSrgb}";
+        $"v2;mips={request.GenerateMips};premul={request.PremultiplyAlpha};" +
+        $"max={request.MaxDimension?.ToString() ?? "none"};srgb={request.MarkSrgb};" +
+        $"platform={request.TargetPlatform}";
 
     private static string ComputeHash(string path)
     {
@@ -208,6 +248,12 @@ public sealed class AssetBakePipeline
 
     private static string NormalizeRelativePath(string path) =>
         path.Replace('\\', '/').TrimStart('/');
+
+    private sealed record BakeRoot(
+        string Path,
+        string CachePrefix,
+        bool AllowProjectOverride,
+        bool IsBuiltIn);
 
     private sealed class SourceAssetRegistry
     {

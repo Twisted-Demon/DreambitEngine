@@ -43,4 +43,14 @@ public sealed class EditorPathsTests
         Assert.Equal(first.ProjectLockPath, second.ProjectLockPath);
         Assert.DoesNotContain(project, first.ProjectLockPath);
     }
+
+    [Fact]
+    public void CrashLogUsesTheConfiguredSettingsDirectory()
+    {
+        var settings = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+
+        var paths = EditorPaths.Create(new EditorLaunchOptions(null, settings, false));
+
+        Assert.Equal(Path.Combine(Path.GetFullPath(settings), "crash.log"), paths.CrashLogPath);
+    }
 }

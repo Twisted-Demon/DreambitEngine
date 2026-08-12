@@ -1,17 +1,14 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.IO;
 using FontStashSharp;
+
+using System.IO;
 
 namespace Dreambit;
 
 public class SpriteFontBaseLoader : AssetLoaderBase<SpriteFontBaseLoader>
 {
-    private readonly Dictionary<string, FontSystem> _byName = new(32);
-
-    private readonly List<FontSystem> _fontSystems = new(32);
-    public override string Extension { get; } = ".ttf";
-    public override bool AddToDisposableList { get; } = true;
+    public override string Extension { get; } = ".ttfb";
+    public override bool AddToDisposableList { get; } = false;
     public override Type TargetType { get; } = typeof(SpriteFontBase);
 
 
@@ -23,22 +20,11 @@ public class SpriteFontBaseLoader : AssetLoaderBase<SpriteFontBaseLoader>
 
     public SpriteFontBase LoadFont(string assetName, string contentPath, float fontSize)
     {
-        FontSystemDefaults.FontResolutionFactor = 6.0f;
-        FontSystemDefaults.KernelWidth = 2;
-        FontSystemDefaults.KernelHeight = 2;
-
-        if (!_byName.TryGetValue(assetName, out var value))
-        {
-            var fontSystem = new FontSystem();
-            var path = Path.Combine(contentPath + @"\Fonts", assetName + Extension);
-            var ttf = File.ReadAllBytes(path);
-            fontSystem.AddFont(ttf);
-            value = fontSystem;
-            _byName.Add(assetName, value);
-        }
-
-        var font = value.GetFont(fontSize);
-
-        return font;
+        var normalized = assetName.Replace('\\', '/').Trim().TrimEnd('/');
+        if (!normalized.Contains('/'))
+            normalized = "Fonts/" + normalized;
+        var fontAsset = Resources.LoadAsset<FontAsset>(normalized)
+                        ?? throw new FileNotFoundException($"Font asset '{normalized}' was not found.");
+        return fontAsset.GetFont(fontSize);
     }
 }

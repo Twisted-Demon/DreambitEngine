@@ -7,6 +7,7 @@ internal enum AssetKind
     Texture,
     Audio,
     Font,
+    Effect,
     Text,
     Blueprint,
     Scene,

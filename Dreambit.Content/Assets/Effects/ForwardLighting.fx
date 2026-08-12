@@ -9,7 +9,8 @@ struct PS_INPUT
     float2 TexCoord : TEXCOORD0;
 };
 
-sampler2D TextureSampler : register(s0);
+Texture2D<float4> TextureSampler : register(t0);
+SamplerState TextureSamplerState : register(s0);
 
 // Light data
 float Lights[7 * MAX_LIGHTS]; // Each light has 7 floats
@@ -19,7 +20,7 @@ int LightCount;
 float4 MainPS(PS_INPUT input) : SV_TARGET
 {
     // Sample the texture
-    float4 color = tex2D(TextureSampler, input.TexCoord) * input.Color;
+    float4 color = TextureSampler.Sample(TextureSamplerState, input.TexCoord) * input.Color;
 
 
     // Convert pixel position to normalized screen coordinates (0 to 1)

@@ -135,7 +135,10 @@ internal sealed class AssetBakeService : IDisposable
                 OutputPakPath,
                 _assets.RegistryPath,
                 CacheDirectory,
-                rebuildAll),
+                rebuildAll,
+                MarkSrgb: true,
+                TargetPlatform: _project.Metadata.TargetRenderer,
+                IncludeBuiltInContent: true),
             progress,
             _lifetime.Token);
     }

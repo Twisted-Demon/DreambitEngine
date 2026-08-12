@@ -7,6 +7,8 @@ namespace Dreambit;
 
 public static class TexbLoader
 {
+    private const uint FlagSrgb = 1u << 1;
+
     public static Texture2D LoadTexture(Stream s)
     {
         Span<byte> head = stackalloc byte[16];
@@ -29,7 +31,10 @@ public static class TexbLoader
         s.ReadExactly(head[..4]);
         var flags = BinaryPrimitives.ReadUInt32LittleEndian(head[..4]);
 
-        var tex = new Texture2D(Graphics.Device, w, h, mips > 1, SurfaceFormat.Color);
+        var surfaceFormat = (flags & FlagSrgb) != 0
+            ? SurfaceFormat.ColorSRgb
+            : SurfaceFormat.Color;
+        var tex = new Texture2D(Graphics.Device, w, h, mips > 1, surfaceFormat);
 
         for (var mip = 0; mip < mips; mip++)
         {

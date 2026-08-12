@@ -1,6 +1,7 @@
 <Project>
   <PropertyGroup>
     <DreambitAssetBakerDll Condition="'$(DreambitAssetBakerDll)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/net8.0/any/AssetBaker.dll'))</DreambitAssetBakerDll>
+    <DreambitContentCacheRoot Condition="'$(DreambitContentCacheRoot)' == '' and '$(DreambitProjectRoot)' != ''">$([System.IO.Path]::GetFullPath('$(DreambitProjectRoot)/.cache/dreambit'))</DreambitContentCacheRoot>
     <DreambitContentCacheRoot Condition="'$(DreambitContentCacheRoot)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/.cache/dreambit'))</DreambitContentCacheRoot>
     <DreambitContentPak Condition="'$(DreambitContentPak)' == ''">$(DreambitContentCacheRoot)/content.pak</DreambitContentPak>
     <DreambitAssetCache Condition="'$(DreambitAssetCache)' == ''">$(DreambitContentCacheRoot)/bake</DreambitAssetCache>
@@ -22,6 +23,8 @@
            Text="DreambitContentRoot must point to the project's raw Content/Assets directory." />
     <Error Condition="!Exists('$(DreambitAssetBakerDll)')"
            Text="Dreambit AssetBaker was not found at '$(DreambitAssetBakerDll)'. Restore DreambitEngine.Build again." />
+    <Error Condition="'$(MonoGamePlatform)' == ''"
+           Text="MonoGamePlatform must be set by the executable project." />
   </Target>
 
   <Target Name="BuildDreambitAssets"
@@ -31,9 +34,9 @@
           Inputs="@(_DreambitRawAsset);$(DreambitAssetRegistry);$(DreambitAssetBakerDll)"
           Outputs="$(DreambitContentPak)">
     <MakeDir Directories="$(DreambitContentCacheRoot);$(DreambitAssetCache)" />
-    <Exec Command="dotnet &quot;$(DreambitAssetBakerDll)&quot; bake-pak &quot;$(DreambitContentRoot)&quot; &quot;$(DreambitContentPak)&quot; --registry &quot;$(DreambitAssetRegistry)&quot; --cache &quot;$(DreambitAssetCache)&quot; --premul --srgb"
+    <Exec Command="dotnet &quot;$(DreambitAssetBakerDll)&quot; bake-pak &quot;$(DreambitContentRoot)&quot; &quot;$(DreambitContentPak)&quot; --registry &quot;$(DreambitAssetRegistry)&quot; --cache &quot;$(DreambitAssetCache)&quot; --platform &quot;$(MonoGamePlatform)&quot; --premul --srgb"
           Condition="Exists('$(DreambitAssetRegistry)')" />
-    <Exec Command="dotnet &quot;$(DreambitAssetBakerDll)&quot; bake-pak &quot;$(DreambitContentRoot)&quot; &quot;$(DreambitContentPak)&quot; --cache &quot;$(DreambitAssetCache)&quot; --premul --srgb"
+    <Exec Command="dotnet &quot;$(DreambitAssetBakerDll)&quot; bake-pak &quot;$(DreambitContentRoot)&quot; &quot;$(DreambitContentPak)&quot; --cache &quot;$(DreambitAssetCache)&quot; --platform &quot;$(MonoGamePlatform)&quot; --premul --srgb"
           Condition="!Exists('$(DreambitAssetRegistry)')" />
   </Target>
 
@@ -41,9 +44,9 @@
           DependsOnTargets="ValidateDreambitAssetBuild"
           Condition="'$(DreambitContentBuildEnabled)' == 'true'">
     <MakeDir Directories="$(DreambitContentCacheRoot);$(DreambitAssetCache)" />
-    <Exec Command="dotnet &quot;$(DreambitAssetBakerDll)&quot; bake-pak &quot;$(DreambitContentRoot)&quot; &quot;$(DreambitContentPak)&quot; --registry &quot;$(DreambitAssetRegistry)&quot; --cache &quot;$(DreambitAssetCache)&quot; --rebuild --premul --srgb"
+    <Exec Command="dotnet &quot;$(DreambitAssetBakerDll)&quot; bake-pak &quot;$(DreambitContentRoot)&quot; &quot;$(DreambitContentPak)&quot; --registry &quot;$(DreambitAssetRegistry)&quot; --cache &quot;$(DreambitAssetCache)&quot; --platform &quot;$(MonoGamePlatform)&quot; --rebuild --premul --srgb"
           Condition="Exists('$(DreambitAssetRegistry)')" />
-    <Exec Command="dotnet &quot;$(DreambitAssetBakerDll)&quot; bake-pak &quot;$(DreambitContentRoot)&quot; &quot;$(DreambitContentPak)&quot; --cache &quot;$(DreambitAssetCache)&quot; --rebuild --premul --srgb"
+    <Exec Command="dotnet &quot;$(DreambitAssetBakerDll)&quot; bake-pak &quot;$(DreambitContentRoot)&quot; &quot;$(DreambitContentPak)&quot; --cache &quot;$(DreambitAssetCache)&quot; --platform &quot;$(MonoGamePlatform)&quot; --rebuild --premul --srgb"
           Condition="!Exists('$(DreambitAssetRegistry)')" />
   </Target>
 

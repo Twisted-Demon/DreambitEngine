@@ -44,6 +44,7 @@ internal sealed class SceneDocument : IDisposable
     public bool IsDirty { get; private set; }
     public bool HasLiveScene => Scene is not null;
     public LDtkSceneReference? LDtkReference => _source.LDtk;
+    public event Action<SceneDocument>? Changed;
 
     public static SceneDocument CreateNew(
         string name,
@@ -157,6 +158,7 @@ internal sealed class SceneDocument : IDisposable
             afterSelection,
             wasDirty,
             true));
+        Changed?.Invoke(this);
     }
 
     public SceneEditTransaction BeginTransaction(string name)
@@ -534,6 +536,23 @@ internal sealed class SceneDocument : IDisposable
         return SceneDocumentSerializer.Serialize(_source);
     }
 
+    /// <summary>
+    /// Captures the only authored root in this document. Blueprint editing uses a
+    /// SceneDocument so hierarchy, inspector, undo, and reference handling stay
+    /// identical to scene editing.
+    /// </summary>
+    public EntityBlueprint CaptureSingleRoot()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (Scene is not null)
+            CaptureSource();
+        if (_source.Entities.Count != 1)
+            throw new InvalidOperationException(
+                $"A Blueprint document must contain exactly one root entity, but contains {_source.Entities.Count}.");
+        return DreambitJson.Deserialize<EntityBlueprint>(DreambitJson.Serialize(_source.Entities[0]))
+               ?? throw new InvalidDataException("Could not capture the Blueprint root.");
+    }
+
     private void CaptureSource()
     {
         _source = SceneDocumentSerializer.Capture(
@@ -554,6 +573,7 @@ internal sealed class SceneDocument : IDisposable
         Selection.RemoveMissing(Scene);
         IsDirty = dirty;
         _lastChangeTimestamp = Stopwatch.GetTimestamp();
+        Changed?.Invoke(this);
     }
 
     private void RebuildLiveScene()
@@ -715,6 +735,7 @@ internal sealed class SceneDocument : IDisposable
                     _document.Selection.EntityIds.ToArray(),
                     _beforeDirty,
                     true));
+                _document.Changed?.Invoke(_document);
             }
             _finished = true;
         }

@@ -1,7 +1,6 @@
 using System.Numerics;
 using Dreambit.ECS;
 using Dreambit.Editor.Assets;
-using Dreambit.Editor.Compilation;
 using Dreambit.Editor.Graphics;
 using Dreambit.Editor.Persistence;
 using Dreambit.Editor.Scenes;
@@ -18,22 +17,22 @@ internal sealed class BlueprintViewPanel : EditorPanel
     private const string ViewSettingsPopup = "Blueprint View Settings##Dreambit.Editor.BlueprintView";
     private readonly AssetDatabase _assets;
     private readonly AssetEditingService _assetEditing;
-    private readonly GameAssemblyLoadService _assemblies;
+    private readonly BlueprintEditingService _blueprints;
+    private readonly EditorDocumentContext _documentContext;
     private readonly EditorWorkspaceState _workspace;
     private readonly SceneViewportRenderer _renderer;
     private readonly EditorIconService _icons;
     private AssetRecord? _asset;
-    private EditorScene? _scene;
     private DateTimeOffset _sourceWriteUtc;
     private bool _needsRebuild;
-    private bool _assemblyReloading;
     private bool _viewSettingsRequested;
     private string? _error;
 
     public BlueprintViewPanel(
         AssetDatabase assets,
         AssetEditingService assetEditing,
-        GameAssemblyLoadService assemblies,
+        BlueprintEditingService blueprints,
+        EditorDocumentContext documentContext,
         EditorWorkspaceState workspace,
         SceneViewportRenderer renderer,
         EditorIconService icons)
@@ -41,14 +40,13 @@ internal sealed class BlueprintViewPanel : EditorPanel
     {
         _assets = assets;
         _assetEditing = assetEditing;
-        _assemblies = assemblies;
+        _blueprints = blueprints;
+        _documentContext = documentContext;
         _workspace = workspace;
         _renderer = renderer;
         _icons = icons;
         _assetEditing.Changed += OnAssetDocumentChanged;
         _assetEditing.PreviewChanged += OnAssetPreviewChanged;
-        _assemblies.Reloading += OnAssemblyReloading;
-        _assemblies.Reloaded += OnAssemblyReloaded;
 
         if (!string.IsNullOrWhiteSpace(workspace.LastBlueprintPath) &&
             assets.TryGetAsset(workspace.LastBlueprintPath, out var restored) &&
@@ -76,8 +74,9 @@ internal sealed class BlueprintViewPanel : EditorPanel
 
     protected override void DrawContents()
     {
+        _documentContext.ActivateBlueprint();
         RefreshAssetRecord();
-        if (_needsRebuild && !_assemblyReloading)
+        if (_needsRebuild)
             RebuildPreview();
 
         DrawToolbar();
@@ -92,19 +91,20 @@ internal sealed class BlueprintViewPanel : EditorPanel
             DrawEmptyCanvas(canvasPosition, canvasSize, "No Blueprint is open", "Double-click a Blueprint in Project.");
             return;
         }
-        if (_scene is null)
+        var scene = _blueprints.Current?.Scene;
+        if (scene is null)
         {
             DrawEmptyCanvas(
                 canvasPosition,
                 canvasSize,
                 "Blueprint preview unavailable",
-                _error ?? "The preview will return after game code reloads.");
+                _blueprints.Error ?? _error ?? "The preview will return after game code reloads.");
             return;
         }
 
-        _scene.EditorTick();
+        scene.EditorTick();
         var camera = _renderer.Render(
-            _scene,
+            scene,
             (int)MathF.Ceiling(canvasSize.X),
             (int)MathF.Ceiling(canvasSize.Y),
             new XnaVector2(_workspace.BlueprintCameraX, _workspace.BlueprintCameraY),
@@ -124,9 +124,15 @@ internal sealed class BlueprintViewPanel : EditorPanel
                 canvasSize,
                 _workspace.GridSize);
         }
-        _scene.DrawEditorGizmos(
+        scene.DrawEditorGizmos(
             new PreviewGizmoContext(drawList, camera, canvasPosition),
-            new HashSet<Guid>());
+            _blueprints.Selection.EntityIds.ToHashSet());
+        if (hovered && ImGui.IsMouseClicked(ImGuiMouseButton.Left) &&
+            !ImGui.IsMouseDragging(ImGuiMouseButton.Left))
+        {
+            var world = camera.ScreenToWorld(new XnaVector2(mouseLocal.X, mouseLocal.Y));
+            _blueprints.Selection.Set(_renderer.Pick(scene, world), ImGui.GetIO().KeyCtrl);
+        }
         HandleCameraInput(camera, mouseLocal, canvasSize, hovered, active);
 
         var renderError = _renderer.LastError ?? _error;
@@ -201,9 +207,17 @@ internal sealed class BlueprintViewPanel : EditorPanel
 
     private void FrameBlueprint()
     {
-        if (_scene is null)
+        var scene = _blueprints.Current?.Scene;
+        if (scene is null)
             return;
-        var roots = _scene.GetAllEntities().Where(entity => entity.Parent is null).ToArray();
+        var selected = _blueprints.Selection.GetActive(scene);
+        if (selected is not null)
+        {
+            _workspace.BlueprintCameraX = selected.Transform.WorldPosition.X;
+            _workspace.BlueprintCameraY = selected.Transform.WorldPosition.Y;
+            return;
+        }
+        var roots = scene.GetAllEntities().Where(entity => entity.Parent is null).ToArray();
         if (roots.Length == 0)
             return;
         var center = roots.Aggregate(XnaVector2.Zero, (sum, entity) => sum + entity.Transform.WorldPosition2D) /
@@ -234,51 +248,12 @@ internal sealed class BlueprintViewPanel : EditorPanel
             return;
         try
         {
-            string json;
-            if (_assetEditing.Current is { } current && current.Asset.Id == _asset.Id &&
-                current.Instance is EntityBlueprint)
-            {
-                json = current.CaptureJson();
-            }
-            else
-            {
-                var path = Path.Combine(
-                    _assets.ContentRoot,
-                    _asset.RelativePath.Replace('/', Path.DirectorySeparatorChar));
-                json = File.ReadAllText(path);
-            }
-
-            var blueprint = DreambitJson.Deserialize<EntityBlueprint>(json)
-                            ?? throw new InvalidDataException("The Blueprint file is empty.");
-            blueprint.AssetId = _asset.Id;
-            blueprint.AssetName = _asset.LogicalAssetName;
-            var replacement = new EditorScene();
-            try
-            {
-                replacement.LoadIntoSelf(
-                    new SceneBlueprint
-                    {
-                        Name = blueprint.Name,
-                        Entities = [blueprint]
-                    },
-                    SceneBlueprintLoadOptions.Editor);
-                replacement.FlushStructuralChanges();
-            }
-            catch
-            {
-                replacement.Dispose();
-                throw;
-            }
-
-            _scene?.Dispose();
-            _scene = replacement;
+            _blueprints.Open(_asset);
             _sourceWriteUtc = _asset.LastWriteUtc;
             _error = null;
         }
         catch (Exception exception)
         {
-            _scene?.Dispose();
-            _scene = null;
             _error = exception.Message;
         }
     }
@@ -293,19 +268,6 @@ internal sealed class BlueprintViewPanel : EditorPanel
     {
         if (document.Asset.Id == _asset?.Id)
             _needsRebuild = true;
-    }
-
-    private void OnAssemblyReloading(LoadedGameAssembly? _)
-    {
-        _assemblyReloading = true;
-        _scene?.Dispose();
-        _scene = null;
-    }
-
-    private void OnAssemblyReloaded(LoadedGameAssembly _)
-    {
-        _assemblyReloading = false;
-        _needsRebuild = true;
     }
 
     private static void DrawEmptyCanvas(Vector2 position, Vector2 size, string title, string detail)
@@ -324,9 +286,7 @@ internal sealed class BlueprintViewPanel : EditorPanel
     {
         _assetEditing.Changed -= OnAssetDocumentChanged;
         _assetEditing.PreviewChanged -= OnAssetPreviewChanged;
-        _assemblies.Reloading -= OnAssemblyReloading;
-        _assemblies.Reloaded -= OnAssemblyReloaded;
-        _scene?.Dispose();
+        _blueprints.Dispose();
         _renderer.Dispose();
     }
 

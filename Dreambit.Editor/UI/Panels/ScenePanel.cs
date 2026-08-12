@@ -15,6 +15,7 @@ internal sealed class ScenePanel : EditorPanel
 {
     private const string ViewSettingsPopup = "Scene View Settings##Dreambit.Editor.Scene";
     private readonly SceneDocumentService _documents;
+    private readonly EditorDocumentContext _documentContext;
     private readonly SelectionService _selection;
     private readonly EditorWorkspaceState _workspace;
     private readonly SceneViewportRenderer _renderer;
@@ -28,6 +29,7 @@ internal sealed class ScenePanel : EditorPanel
 
     public ScenePanel(
         SceneDocumentService documents,
+        EditorDocumentContext documentContext,
         SelectionService selection,
         EditorWorkspaceState workspace,
         SceneViewportRenderer renderer,
@@ -37,6 +39,7 @@ internal sealed class ScenePanel : EditorPanel
         : base(EditorPanelIds.Scene, "Scene")
     {
         _documents = documents;
+        _documentContext = documentContext;
         _selection = selection;
         _workspace = workspace;
         _renderer = renderer;
@@ -51,6 +54,7 @@ internal sealed class ScenePanel : EditorPanel
 
     protected override void DrawContents()
     {
+        _documentContext.ActivateScene();
         DrawToolbar();
         ImGui.Separator();
 
