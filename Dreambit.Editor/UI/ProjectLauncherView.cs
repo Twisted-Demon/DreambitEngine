@@ -92,8 +92,10 @@ internal sealed class ProjectLauncherView
                 ImGuiChildFlags.None);
             if (childVisible)
             {
-                foreach (var project in _globalState.RecentProjects)
+                for (var i = 0; i < _globalState.RecentProjects.Count; i++)
                 {
+                    var project = _globalState.RecentProjects[i];
+
                     var displayName = string.IsNullOrWhiteSpace(project.Name)
                         ? Path.GetFileName(project.Path)
                         : project.Name;
@@ -105,11 +107,16 @@ internal sealed class ProjectLauncherView
                         ? $"{displayName}  (Missing)\n{project.Path}##Recent:{project.Path}"
                         : $"{displayName}  |  {sdk}\n{project.Path}##Recent:{project.Path}";
 
-                    if (ImGui.Selectable(label))
-                    {
-                        _projectPath = project.Path;
-                        _error = launchProject(project.Path) ? null : _error;
-                    }
+                    if (!ImGui.Selectable(label))
+                        continue;
+
+                    _projectPath = project.Path;
+                    _error = launchProject(project.Path) ? null : _error;
+
+                    // The launch callback may reorder RecentProjects by moving the
+                    // selected project to the front. Do not inspect the collection
+                    // again during this frame.
+                    break;
                 }
             }
 

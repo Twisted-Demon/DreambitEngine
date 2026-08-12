@@ -50,6 +50,7 @@ internal sealed class EditorApplication : IDisposable
     private LDtkImportOptions _newLdtkImportOptions = new();
     private string? _sceneOperationError;
     private bool _rebuildDockLayout;
+    private bool _exitAfterProjectLaunch;
     private bool _disposed;
     private Task<ProjectCreationResult>? _projectCreationTask;
     private ProjectCreationStatus _projectCreationStatus = new(false);
@@ -185,13 +186,14 @@ internal sealed class EditorApplication : IDisposable
     public void Draw()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+
         UpdateProjectCreation();
         DrawDockHost();
 
         if (_project is null)
         {
             _projectLauncher.Draw(
-                TryLaunchProject,
+                TryLaunchProjectFromLauncher,
                 BeginCreateProject,
                 _projectCreationStatus);
         }
@@ -202,10 +204,12 @@ internal sealed class EditorApplication : IDisposable
             _projectManager.CurrentSession.GameCode.Update();
             _projectManager.CurrentSession.Scenes.Update(
                 _workspaceState.AutoSave,
-                TimeSpan.FromSeconds(Math.Clamp(_workspaceState.AutoSaveDelaySeconds, 0.25, 60)));
+                TimeSpan.FromSeconds(
+                    Math.Clamp(_workspaceState.AutoSaveDelaySeconds, 0.25, 60)));
             _projectManager.CurrentSession.AssetEditing.Update(
                 _workspaceState.AutoSave,
-                TimeSpan.FromSeconds(Math.Clamp(_workspaceState.AutoSaveDelaySeconds, 0.25, 60)));
+                TimeSpan.FromSeconds(
+                    Math.Clamp(_workspaceState.AutoSaveDelaySeconds, 0.25, 60)));
             _panels.DrawPanels();
             CaptureWorkspaceSelection(_projectManager.CurrentSession);
         }
@@ -214,6 +218,9 @@ internal sealed class EditorApplication : IDisposable
         DrawAboutPopup();
         DrawScenePopups();
         HandleShortcuts();
+
+        if (_exitAfterProjectLaunch)
+            _requestExit();
     }
 
     public void CaptureWindowBounds(int x, int y, int width, int height)
@@ -846,6 +853,15 @@ internal sealed class EditorApplication : IDisposable
         ImGui.EndPopup();
     }
 
+    private bool TryLaunchProjectFromLauncher(string projectPath)
+    {
+        if (!TryLaunchProject(projectPath))
+            return false;
+
+        _exitAfterProjectLaunch = true;
+        return true;
+    }
+
     private bool TryLaunchProject(string projectPath)
     {
         var validation = _projectManager.Validate(projectPath);
@@ -929,23 +945,37 @@ internal sealed class EditorApplication : IDisposable
         }
         catch (Exception exception)
         {
-            _logs.Error("Project", "Project creation failed unexpectedly.", exception);
-            result = new ProjectCreationResult(false, null, exception.Message);
+            _logs.Error(
+                "Project",
+                "Project creation failed unexpectedly.",
+                exception);
+
+            result = new ProjectCreationResult(
+                false,
+                null,
+                exception.Message);
         }
 
         _projectCreationTask = null;
-        if (!result.Succeeded || string.IsNullOrWhiteSpace(result.ProjectRoot))
+
+        if (!result.Succeeded ||
+            string.IsNullOrWhiteSpace(result.ProjectRoot))
         {
-            _projectCreationStatus = new ProjectCreationStatus(false, result.Message, true);
+            _projectCreationStatus = new ProjectCreationStatus(
+                false,
+                result.Message,
+                true);
+
             return;
         }
 
-        if (!TryLaunchProject(result.ProjectRoot))
+        if (!TryLaunchProjectFromLauncher(result.ProjectRoot))
         {
             _projectCreationStatus = new ProjectCreationStatus(
                 false,
                 $"{result.Message} The project was created, but the Editor process could not be launched.",
                 true);
+
             return;
         }
 
