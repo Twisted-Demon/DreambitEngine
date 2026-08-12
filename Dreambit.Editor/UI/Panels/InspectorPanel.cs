@@ -807,9 +807,13 @@ internal sealed class InspectorPanel : EditorPanel
 
     private void DrawComponents(SceneDocument document, IReadOnlyList<Entity> entities)
     {
-        var commonTypes = entities[0].GetAllComponents()
+        var commonTypes = entities[0]
+            .GetAllComponents()
             .Select(component => component.GetType())
-            .Where(type => entities.Skip(1).All(entity => entity.GetComponent(type) is not null))
+            .Distinct()
+            .Where(type =>
+                entities.Skip(1).All(entity =>
+                    entity.GetComponent(type) is not null))
             .OrderBy(type => type.Name)
             .ToArray();
 

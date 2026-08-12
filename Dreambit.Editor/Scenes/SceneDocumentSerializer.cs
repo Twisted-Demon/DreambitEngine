@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Reflection;
 using Dreambit.ECS;
+using Microsoft.Xna.Framework;
 using Newtonsoft.Json.Linq;
 
 namespace Dreambit.Editor.Scenes;
@@ -9,11 +10,16 @@ internal static class SceneDocumentSerializer
 {
     private const BindingFlags SerializableMemberFlags = BindingFlags.Instance | BindingFlags.Public;
 
-    public static SceneBlueprint Deserialize(string json) =>
-        DreambitJson.Deserialize<SceneBlueprint>(json)
-        ?? throw new InvalidDataException("The scene file did not contain a Dreambit scene.");
+    public static SceneBlueprint Deserialize(string json)
+    {
+        return DreambitJson.Deserialize<SceneBlueprint>(json)
+               ?? throw new InvalidDataException("The scene file did not contain a Dreambit scene.");
+    }
 
-    public static string Serialize(SceneBlueprint blueprint) => DreambitJson.Serialize(blueprint);
+    public static string Serialize(SceneBlueprint blueprint)
+    {
+        return DreambitJson.Serialize(blueprint);
+    }
 
     public static SceneBlueprint Capture(
         Scene scene,
@@ -58,8 +64,8 @@ internal static class SceneDocumentSerializer
         {
             entity.Guid = remap[entity.Guid];
             foreach (var component in entity.Components)
-                foreach (var key in component.Properties.Keys.ToArray())
-                    component.Properties[key] = RemapReferences(component.Properties[key], remap);
+            foreach (var key in component.Properties.Keys.ToArray())
+                component.Properties[key] = RemapReferences(component.Properties[key], remap);
         }
 
         clone.Name = MakeCopyName(clone.Name);
@@ -72,15 +78,18 @@ internal static class SceneDocumentSerializer
         IReadOnlySet<string>? explicitlyClearedReferences)
     {
         sourceEntities.TryGetValue(entity.Id, out var source);
+
         if (source?.BlueprintInstance is { } instance)
-        {
             return new EntityBlueprint
             {
                 Name = entity.Name,
                 Guid = entity.Id,
                 Enabled = entity.LocallyEnabled,
                 Position = entity.Transform.Position,
-                Rotation = new Microsoft.Xna.Framework.Vector3(0f, 0f, entity.Transform.Rotation2D),
+                Rotation = new Vector3(
+                    0f,
+                    0f,
+                    entity.Transform.Rotation2D),
                 Scale = entity.Transform.Scale,
                 BlueprintInstance = new BlueprintInstanceReference
                 {
@@ -88,19 +97,41 @@ internal static class SceneDocumentSerializer
                     AssetName = instance.AssetName
                 }
             };
-        }
 
         var sourceComponents = source?.Components ?? [];
         var liveComponents = entity.GetAllComponents().ToArray();
-        var capturedComponents = new List<ComponentBlueprint>(liveComponents.Length + sourceComponents.Count);
+
+        var capturedComponents =
+            new List<ComponentBlueprint>(
+                liveComponents.Length + sourceComponents.Count);
+
+        // Tracks which source component supplied the serialized state for a
+        // live component. Components are intended to be unique by type.
+        var matchedSourceComponents = new HashSet<ComponentBlueprint>();
 
         foreach (var component in liveComponents)
         {
             var componentType = component.GetType();
+            var componentTypeId = GetComponentTypeId(componentType);
+
+            // IMPORTANT:
+            // Match by stable serialized type ID FIRST.
+            //
+            // A hot-reloaded game assembly can contain a logically identical
+            // component Type with a different System.Type identity.
             var original = sourceComponents.FirstOrDefault(candidate =>
-                BlueprintResolver.ResolveComponentType(candidate.Type) == componentType);
+                !matchedSourceComponents.Contains(candidate) &&
+                ComponentTypeMatches(
+                    candidate,
+                    componentType,
+                    componentTypeId));
+
+            if (original is not null)
+                matchedSourceComponents.Add(original);
+
             var properties = original is null
-                ? new Dictionary<string, JToken>(StringComparer.OrdinalIgnoreCase)
+                ? new Dictionary<string, JToken>(
+                    StringComparer.OrdinalIgnoreCase)
                 : original.Properties.ToDictionary(
                     pair => pair.Key,
                     pair => pair.Value.DeepClone(),
@@ -114,41 +145,78 @@ internal static class SceneDocumentSerializer
                     FieldInfo field => field.GetValue(component),
                     _ => null
                 };
+
                 var valueType = member switch
                 {
                     PropertyInfo property => property.PropertyType,
                     FieldInfo field => field.FieldType,
                     _ => typeof(object)
                 };
-                var referenceKey = GetReferenceKey(entity.Id, componentType, member.Name);
+
+                var referenceKey = GetReferenceKey(
+                    entity.Id,
+                    componentType,
+                    member.Name);
+
                 if (component.EditorSerializationFailures.Contains(member.Name) &&
                     (properties.ContainsKey(member.Name) ||
                      HasFormerSerializedName(properties, member)))
                     continue;
-                var isReference = typeof(DreambitAsset).IsAssignableFrom(valueType) ||
-                                  valueType == typeof(Entity) ||
-                                  typeof(Component).IsAssignableFrom(valueType);
-                if (value is null && isReference && properties.ContainsKey(member.Name) &&
+
+                var isReference =
+                    typeof(DreambitAsset).IsAssignableFrom(valueType) ||
+                    valueType == typeof(Entity) ||
+                    typeof(Component).IsAssignableFrom(valueType);
+
+                // If a reference temporarily failed to resolve in the editor,
+                // preserve its existing serialized value unless the user
+                // explicitly cleared it.
+                if (value is null &&
+                    isReference &&
+                    properties.ContainsKey(member.Name) &&
                     explicitlyClearedReferences?.Contains(referenceKey) != true)
                     continue;
+
                 RemoveFormerSerializedNames(properties, member);
-                properties[member.Name] = SerializeValue(value, valueType);
+
+                properties[member.Name] =
+                    SerializeValue(value, valueType);
             }
 
             capturedComponents.Add(new ComponentBlueprint
             {
-                Type = original?.Type ?? GetComponentTypeId(componentType),
+                Type = original?.Type ?? componentTypeId,
                 Enabled = component.Enabled,
                 Properties = properties
             });
         }
 
-        // Unknown game components remain as untouched JSON until their assembly returns.
+        // Preserve ONLY genuinely unknown components.
+        //
+        // If the type resolves but isn't on the live entity, that means the
+        // user removed it. Do NOT resurrect it from the previous source JSON.
+        //
+        // Also, any additional serialized copies of a known component are
+        // discarded here. This lets old corrupted blueprints self-heal.
         foreach (var missing in sourceComponents)
         {
-            var resolvedType = BlueprintResolver.ResolveComponentType(missing.Type);
-            if (resolvedType is not null && liveComponents.Any(component => component.GetType() == resolvedType))
+            if (matchedSourceComponents.Contains(missing))
                 continue;
+
+            var resolvedType =
+                BlueprintResolver.ResolveComponentType(missing.Type);
+
+            if (resolvedType is not null)
+                // Known type + not represented by a live component:
+                //
+                // 1. It was deliberately removed, or
+                // 2. It is a duplicate left by an old broken capture.
+                //
+                // Either way, don't preserve it.
+                continue;
+
+            // Truly unknown component. Its assembly isn't currently available,
+            // so keep the JSON untouched until that assembly returns.
             capturedComponents.Add(CloneComponent(missing));
         }
 
@@ -156,17 +224,42 @@ internal static class SceneDocumentSerializer
         {
             Name = entity.Name,
             Guid = entity.Id,
-            Tags = new HashSet<string>(entity.Tags, StringComparer.OrdinalIgnoreCase),
+            Tags = new HashSet<string>(
+                entity.Tags,
+                StringComparer.OrdinalIgnoreCase),
             Enabled = entity.LocallyEnabled,
             Position = entity.Transform.Position,
-            Rotation = new Microsoft.Xna.Framework.Vector3(0f, 0f, entity.Transform.Rotation2D),
+            Rotation = new Vector3(
+                0f,
+                0f,
+                entity.Transform.Rotation2D),
             Scale = entity.Transform.Scale,
             Components = capturedComponents,
             Children = entity.Children
                 .Where(child => !child.IsEditorOnly)
-                .Select(child => CaptureEntity(child, sourceEntities, explicitlyClearedReferences))
+                .Select(child => CaptureEntity(
+                    child,
+                    sourceEntities,
+                    explicitlyClearedReferences))
                 .ToList()
         };
+    }
+
+    private static bool ComponentTypeMatches(
+        ComponentBlueprint source,
+        Type liveType,
+        string liveTypeId)
+    {
+        // Stable serialized identity is more important than System.Type
+        // identity because game assemblies are hot-reloaded into new ALCs.
+        if (string.Equals(
+                source.Type,
+                liveTypeId,
+                StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // Retain compatibility with older/full-name component identifiers.
+        return BlueprintResolver.ResolveComponentType(source.Type) == liveType;
     }
 
     private static IEnumerable<MemberInfo> GetBlueprintMembers(Type type)
@@ -225,6 +318,7 @@ internal static class SceneDocumentSerializer
                 result[Convert.ToString(entry.Key) ?? string.Empty] = SerializeValue(entry.Value, valueType);
             return result;
         }
+
         if (value is IEnumerable sequence && value is not string)
         {
             var elementType = declaredType.IsArray
@@ -249,18 +343,23 @@ internal static class SceneDocumentSerializer
             : explicitId;
     }
 
-    private static ComponentBlueprint CloneComponent(ComponentBlueprint source) => new()
+    private static ComponentBlueprint CloneComponent(ComponentBlueprint source)
     {
-        Type = source.Type,
-        Enabled = source.Enabled,
-        Properties = source.Properties.ToDictionary(
-            pair => pair.Key,
-            pair => pair.Value.DeepClone(),
-            StringComparer.OrdinalIgnoreCase)
-    };
+        return new ComponentBlueprint
+        {
+            Type = source.Type,
+            Enabled = source.Enabled,
+            Properties = source.Properties.ToDictionary(
+                pair => pair.Key,
+                pair => pair.Value.DeepClone(),
+                StringComparer.OrdinalIgnoreCase)
+        };
+    }
 
-    public static string GetReferenceKey(Guid entityId, Type componentType, string memberName) =>
-        $"{entityId:N}|{componentType.AssemblyQualifiedName}|{memberName}";
+    public static string GetReferenceKey(Guid entityId, Type componentType, string memberName)
+    {
+        return $"{entityId:N}|{componentType.AssemblyQualifiedName}|{memberName}";
+    }
 
     private static JToken RemapReferences(JToken token, IReadOnlyDictionary<Guid, Guid> remap)
     {
@@ -279,6 +378,8 @@ internal static class SceneDocumentSerializer
         return clone;
     }
 
-    private static string MakeCopyName(string name) =>
-        name.EndsWith(" Copy", StringComparison.OrdinalIgnoreCase) ? name + " 2" : name + " Copy";
+    private static string MakeCopyName(string name)
+    {
+        return name.EndsWith(" Copy", StringComparison.OrdinalIgnoreCase) ? name + " 2" : name + " Copy";
+    }
 }
