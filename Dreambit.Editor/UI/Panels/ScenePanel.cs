@@ -11,7 +11,7 @@ using XnaVector2 = Microsoft.Xna.Framework.Vector2;
 
 namespace Dreambit.Editor.UI.Panels;
 
-internal sealed class ScenePanel : EditorPanel
+internal sealed class   ScenePanel : EditorPanel
 {
     private const string ViewSettingsPopup = "Scene View Settings##Dreambit.Editor.Scene";
     private readonly SceneDocumentService _documents;
@@ -93,7 +93,12 @@ internal sealed class ScenePanel : EditorPanel
         scene.DrawEditorGizmos(
             new ImGuiEditorGizmoContext(drawList, camera, canvasPosition),
             document.Selection.EntityIds.ToHashSet());
-        DrawSelection(drawList, camera, canvasPosition, canvasSize);
+        DrawSelection(
+            drawList,
+            document,
+            camera,
+            canvasPosition,
+            canvasSize);
         var componentConsumed = DrawComponentHandles(
             drawList,
             document,
@@ -109,6 +114,7 @@ internal sealed class ScenePanel : EditorPanel
             mouseLocal,
             hovered);
         HandleCameraInput(
+            document,
             scene,
             camera,
             mouseLocal,
@@ -164,49 +170,80 @@ internal sealed class ScenePanel : EditorPanel
     }
 
     private void HandleCameraInput(
-        Scene scene,
-        Camera2D camera,
-        Vector2 mouseLocal,
-        Vector2 canvasSize,
-        bool hovered,
-        bool active,
-        bool allowSelection)
+    SceneDocument document,
+    Scene scene,
+    Camera2D camera,
+    Vector2 mouseLocal,
+    Vector2 canvasSize,
+    bool hovered,
+    bool active,
+    bool allowSelection)
+{
+    if (!hovered && !active)
+        return;
+
+    var io = ImGui.GetIO();
+
+    if (hovered && MathF.Abs(io.MouseWheel) > float.Epsilon)
     {
-        if (!hovered && !active)
-            return;
-        var io = ImGui.GetIO();
-        if (hovered && MathF.Abs(io.MouseWheel) > float.Epsilon)
-        {
-            var previousWorld = camera.ScreenToWorld(new XnaVector2(mouseLocal.X, mouseLocal.Y));
-            var nextZoom = EditorViewportUi.ApplyZoomWheel(_workspace.SceneCameraZoom, io.MouseWheel);
-            var nextScale = camera.Scale *
-                            (nextZoom / EditorViewportUi.NormalizeZoom(_workspace.SceneCameraZoom));
-            var offset = new XnaVector2(
-                mouseLocal.X - canvasSize.X * 0.5f,
-                mouseLocal.Y - canvasSize.Y * 0.5f) / nextScale;
-            var nextPosition = previousWorld - offset;
-            _workspace.SceneCameraX = nextPosition.X;
-            _workspace.SceneCameraY = nextPosition.Y;
-            _workspace.SceneCameraZoom = nextZoom;
-        }
+        var previousWorld = camera.ScreenToWorld(
+            new XnaVector2(mouseLocal.X, mouseLocal.Y));
 
-        if (ImGui.IsMouseDragging(ImGuiMouseButton.Middle) ||
-            ImGui.IsMouseDragging(ImGuiMouseButton.Right))
-        {
-            _workspace.SceneCameraX -= io.MouseDelta.X / camera.Scale;
-            _workspace.SceneCameraY -= io.MouseDelta.Y / camera.Scale;
-        }
+        var nextZoom = EditorViewportUi.ApplyZoomWheel(
+            _workspace.SceneCameraZoom,
+            io.MouseWheel);
 
-        if (allowSelection && hovered && ImGui.IsMouseClicked(ImGuiMouseButton.Left) &&
-            !ImGui.IsMouseDragging(ImGuiMouseButton.Left))
-        {
-            var world = camera.ScreenToWorld(new XnaVector2(mouseLocal.X, mouseLocal.Y));
-            _selection.Set(_renderer.Pick(scene, world), io.KeyCtrl);
-        }
+        var nextScale = camera.Scale *
+                        (nextZoom /
+                         EditorViewportUi.NormalizeZoom(
+                             _workspace.SceneCameraZoom));
 
-        if (hovered && ImGui.IsKeyPressed(ImGuiKey.F))
-            FrameSelected();
+        var offset = new XnaVector2(
+            mouseLocal.X - canvasSize.X * 0.5f,
+            mouseLocal.Y - canvasSize.Y * 0.5f) / nextScale;
+
+        var nextPosition = previousWorld - offset;
+
+        _workspace.SceneCameraX = nextPosition.X;
+        _workspace.SceneCameraY = nextPosition.Y;
+        _workspace.SceneCameraZoom = nextZoom;
     }
+
+    if (ImGui.IsMouseDragging(ImGuiMouseButton.Middle) ||
+        ImGui.IsMouseDragging(ImGuiMouseButton.Right))
+    {
+        _workspace.SceneCameraX -= io.MouseDelta.X / camera.Scale;
+        _workspace.SceneCameraY -= io.MouseDelta.Y / camera.Scale;
+    }
+
+    if (allowSelection &&
+        hovered &&
+        ImGui.IsMouseClicked(ImGuiMouseButton.Left) &&
+        !ImGui.IsMouseDragging(ImGuiMouseButton.Left))
+    {
+        var world = camera.ScreenToWorld(
+            new XnaVector2(mouseLocal.X, mouseLocal.Y));
+
+        var picked = _renderer.Pick(scene, world);
+
+        // A boxed Blueprint is treated as one editor object.
+        // If the renderer picked one of the resolved entities inside the
+        // Blueprint instance, promote the selection to the boxed root.
+        if (picked is not null &&
+            document.TryGetBlueprintInstanceRoot(
+                picked,
+                out var blueprintRoot,
+                out _))
+        {
+            picked = blueprintRoot;
+        }
+
+        _selection.Set(picked, io.KeyCtrl);
+    }
+
+    if (hovered && ImGui.IsKeyPressed(ImGuiKey.F))
+        FrameSelected();
+}
 
     private void DrawToolbar()
     {
@@ -280,41 +317,119 @@ internal sealed class ScenePanel : EditorPanel
 
     private void DrawSelection(
         ImDrawListPtr drawList,
+        SceneDocument document,
         Camera2D camera,
         Vector2 canvasPosition,
         Vector2 canvasSize)
     {
-        var color = ImGui.GetColorU32(new Vector4(0.24f, 0.65f, 1f, 1f));
-        foreach (var entity in _selection.Resolve(_documents.Current?.Scene))
+        var color = ImGui.GetColorU32(
+            new Vector4(0.24f, 0.65f, 1f, 1f));
+
+        foreach (var entity in _selection.Resolve(document.Scene))
         {
-            RectangleF? bounds = null;
-            foreach (var drawable in entity.GetAllComponents().OfType<DrawableComponent>())
+            RectangleF? bounds;
+
+            if (document.IsBlueprintInstanceRoot(entity))
             {
-                try
-                {
-                    bounds = bounds is null ? drawable.Bounds : RectangleF.Union(bounds.Value, drawable.Bounds);
-                }
-                catch
-                {
-                }
+                // Boxed Blueprints behave as a single editor object, so include
+                // all of the resolved child drawables in the selection bounds.
+                bounds = GetHierarchyDrawableBounds(entity);
             }
+            else
+            {
+                bounds = GetEntityDrawableBounds(entity);
+            }
+
             if (bounds is null)
             {
-                var center = camera.WorldToScreen(entity.Transform.WorldPosition2D);
-                var point = canvasPosition + new Vector2(center.X, center.Y);
-                drawList.AddCircle(point, 6f, color, 16, 2f);
+                var center = camera.WorldToScreen(
+                    entity.Transform.WorldPosition2D);
+
+                var point = canvasPosition +
+                            new Vector2(center.X, center.Y);
+
+                drawList.AddCircle(
+                    point,
+                    6f,
+                    color,
+                    16,
+                    2f);
+
                 continue;
             }
-            var topLeft = camera.WorldToScreen(new XnaVector2(bounds.Value.Left, bounds.Value.Top));
-            var bottomRight = camera.WorldToScreen(new XnaVector2(bounds.Value.Right, bounds.Value.Bottom));
+
+            var topLeft = camera.WorldToScreen(
+                new XnaVector2(
+                    bounds.Value.Left,
+                    bounds.Value.Top));
+
+            var bottomRight = camera.WorldToScreen(
+                new XnaVector2(
+                    bounds.Value.Right,
+                    bounds.Value.Bottom));
+
             drawList.AddRect(
-                canvasPosition + new Vector2(topLeft.X, topLeft.Y),
-                canvasPosition + new Vector2(bottomRight.X, bottomRight.Y),
+                canvasPosition +
+                new Vector2(topLeft.X, topLeft.Y),
+
+                canvasPosition +
+                new Vector2(bottomRight.X, bottomRight.Y),
+
                 color,
                 0f,
                 ImDrawFlags.None,
                 2f);
         }
+    }
+
+    private static RectangleF? GetEntityDrawableBounds(Entity entity)
+    {
+        RectangleF? bounds = null;
+
+        foreach (var drawable in entity
+                     .GetAllComponents()
+                     .OfType<DrawableComponent>())
+        {
+            try
+            {
+                var drawableBounds = drawable.Bounds;
+
+                bounds = bounds is null
+                    ? drawableBounds
+                    : RectangleF.Union(
+                        bounds.Value,
+                        drawableBounds);
+            }
+            catch
+            {
+                // Custom DrawableComponents are allowed to provide their own
+                // bounds implementation. Ignore one bad component rather than
+                // breaking editor selection rendering.
+            }
+        }
+
+        return bounds;
+    }
+
+    private static RectangleF? GetHierarchyDrawableBounds(Entity entity)
+    {
+        var bounds = GetEntityDrawableBounds(entity);
+
+        foreach (var child in entity.Children)
+        {
+            var childBounds = GetHierarchyDrawableBounds(child);
+
+            if (childBounds is null)
+                continue;
+
+            bounds = bounds is null
+                ? childBounds
+                : RectangleF.Union(
+                    bounds.Value,
+                    childBounds.Value);
+        }
+
+        return bounds;
     }
 
     private bool DrawAndHandleGizmo(
