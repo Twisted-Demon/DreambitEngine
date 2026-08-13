@@ -129,6 +129,137 @@ public sealed class InspectorMetadataTests
     }
 
     [Fact]
+    public void AssetDirtyStateTracksTheLastSuccessfulSaveAcrossUndoAndRedo()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"asset-dirty-{Guid.NewGuid():N}.json");
+        try
+        {
+            File.WriteAllText(path, "{\"editable\":1}");
+            var file = new FileInfo(path);
+            var record = new AssetRecord(
+                AssetId.New(),
+                file.Name,
+                file.Name,
+                string.Empty,
+                Path.GetFileNameWithoutExtension(file.Name),
+                AssetKind.Json,
+                typeof(InspectorCircularRuntimeAsset).FullName,
+                file.Length,
+                file.LastWriteTimeUtc);
+            using var document = DreambitAssetDocument.Open(
+                record,
+                path,
+                typeof(InspectorCircularRuntimeAsset),
+                new InspectorMetadataCache());
+
+            document.Apply("Edit", asset =>
+                ((InspectorCircularRuntimeAsset)asset).Editable = 2);
+            Assert.True(document.IsDirty);
+            document.Save(path);
+            Assert.False(document.IsDirty);
+
+            Assert.True(document.Undo.Undo());
+            Assert.True(document.IsDirty);
+            Assert.Equal(1, ((InspectorCircularRuntimeAsset)document.Instance).Editable);
+
+            Assert.True(document.Undo.Redo());
+            Assert.False(document.IsDirty);
+            Assert.Equal(2, ((InspectorCircularRuntimeAsset)document.Instance).Editable);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void ContinuousAssetAppliesWithSameKeyUndoToTheFirstSnapshot()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"asset-merge-{Guid.NewGuid():N}.json");
+        try
+        {
+            File.WriteAllText(path, "{\"editable\":0}");
+            var file = new FileInfo(path);
+            var record = new AssetRecord(
+                AssetId.New(),
+                file.Name,
+                file.Name,
+                string.Empty,
+                Path.GetFileNameWithoutExtension(file.Name),
+                AssetKind.Json,
+                typeof(InspectorCircularRuntimeAsset).FullName,
+                file.Length,
+                file.LastWriteTimeUtc);
+            using var document = DreambitAssetDocument.Open(
+                record,
+                path,
+                typeof(InspectorCircularRuntimeAsset),
+                new InspectorMetadataCache());
+
+            foreach (var value in new[] { 1, 2, 3 })
+            {
+                document.Apply(
+                    "Change Editable",
+                    asset => ((InspectorCircularRuntimeAsset)asset).Editable = value,
+                    "Asset.Editable");
+            }
+
+            Assert.True(document.Undo.Undo());
+            Assert.Equal(0, ((InspectorCircularRuntimeAsset)document.Instance).Editable);
+            Assert.False(document.Undo.CanUndo);
+            Assert.True(document.Undo.Redo());
+            Assert.Equal(3, ((InspectorCircularRuntimeAsset)document.Instance).Editable);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void FailedAssetMutationRestoresThePreviousSnapshotWithoutHistory()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"asset-atomic-{Guid.NewGuid():N}.json");
+        try
+        {
+            File.WriteAllText(path, "{\"editable\":1}");
+            var file = new FileInfo(path);
+            var record = new AssetRecord(
+                AssetId.New(),
+                file.Name,
+                file.Name,
+                string.Empty,
+                Path.GetFileNameWithoutExtension(file.Name),
+                AssetKind.Json,
+                typeof(InspectorCircularRuntimeAsset).FullName,
+                file.Length,
+                file.LastWriteTimeUtc);
+            using var document = DreambitAssetDocument.Open(
+                record,
+                path,
+                typeof(InspectorCircularRuntimeAsset),
+                new InspectorMetadataCache());
+            var changed = 0;
+            document.Changed += _ => changed++;
+
+            Assert.Throws<InvalidOperationException>(() => document.Apply("Fail", asset =>
+            {
+                ((InspectorCircularRuntimeAsset)asset).Editable = 2;
+                throw new InvalidOperationException("Mutation failed.");
+            }));
+
+            Assert.Equal(1, ((InspectorCircularRuntimeAsset)document.Instance).Editable);
+            Assert.False(document.IsDirty);
+            Assert.False(document.Undo.CanUndo);
+            Assert.Equal(0, changed);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void AnimationAndSpriteSheetAssetsUseRecognizableSemanticSuffixes()
     {
         Assert.Equal(".animation.json", AssetTypeClassifier.GetFileSuffix(typeof(SpriteSheetAnimation)));

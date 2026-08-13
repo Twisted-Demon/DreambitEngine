@@ -80,24 +80,45 @@ internal sealed class DreambitEditorGame : Core
 
     protected override void OnExiting(object sender, ExitingEventArgs args)
     {
-        if (_application is not null)
+        try
         {
-            var bounds = Window.ClientBounds;
-            var position = Window.Position;
-            _application.CaptureWindowBounds(
-                position.X,
-                position.Y,
-                bounds.Width,
-                bounds.Height);
+            TryShutdownStep(CaptureWindowBounds, "Could not capture the editor window bounds.");
+            TryShutdownStep(() => _imGuiRenderer?.SaveLayout(), "Could not save the editor layout.");
+            TryShutdownStep(() => _application?.Dispose(), "Could not dispose the editor application.");
+            TryShutdownStep(() => _imGuiRenderer?.Dispose(), "Could not dispose the UI renderer.");
         }
+        finally
+        {
+            _application = null;
+            _imGuiRenderer = null;
+            base.OnExiting(sender, args);
+        }
+    }
 
-        _imGuiRenderer?.SaveLayout();
-        _application?.Dispose();
-        _imGuiRenderer?.Dispose();
-        _application = null;
-        _imGuiRenderer = null;
+    private void CaptureWindowBounds()
+    {
+        if (_application is null)
+            return;
 
-        base.OnExiting(sender, args);
+        var bounds = Window.ClientBounds;
+        var position = Window.Position;
+        _application.CaptureWindowBounds(
+            position.X,
+            position.Y,
+            bounds.Width,
+            bounds.Height);
+    }
+
+    private static void TryShutdownStep(Action action, string message)
+    {
+        try
+        {
+            action();
+        }
+        catch (Exception exception)
+        {
+            Console.Error.WriteLine($"{message} {exception}");
+        }
     }
 
     private void RestoreWindowPosition()

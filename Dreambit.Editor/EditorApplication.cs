@@ -103,29 +103,27 @@ internal sealed class EditorApplication : IDisposable
         if (_project is not null)
         {
             var session = _projectManager.CurrentSession!;
-            var blueprintEditing = new BlueprintEditingService(
-                session.Assets,
-                session.AssetEditing,
-                session.GameCode.Assemblies,
-                LogSceneError);
-            var documentContext = new EditorDocumentContext(session.Scenes, blueprintEditing);
+            var blueprintEditing = session.Blueprints;
+            var documentContext = session.Documents;
             var blueprintDockLayoutMissing =
                 !_workspaceState.PanelVisibility.ContainsKey(EditorPanelIds.Blueprint);
             _panels.Register(new HierarchyPanel(
                 documentContext,
                 _dragDrop,
                 session.Assets,
+                session.BlueprintSources,
                 _workspaceState,
                 _icons));
             _panels.Register(new ScenePanel(
                 session.Scenes,
                 documentContext,
-                session.Scenes.Selection,
                 _workspaceState,
                 new SceneViewportRenderer(Core.Instance.GraphicsDevice, imGuiRenderer),
                 _dragDrop,
                 session.Assets,
-                _icons));
+                session.BlueprintSources,
+                _icons,
+                LogSceneError));
             var blueprintView = new BlueprintViewPanel(
                 session.Assets,
                 session.AssetEditing,
@@ -133,7 +131,8 @@ internal sealed class EditorApplication : IDisposable
                 documentContext,
                 _workspaceState,
                 new SceneViewportRenderer(Core.Instance.GraphicsDevice, imGuiRenderer),
-                _icons);
+                _icons,
+                LogSceneError);
             _panels.Register(blueprintView);
             _panels.Register(new InspectorPanel(
                 documentContext,
@@ -155,6 +154,7 @@ internal sealed class EditorApplication : IDisposable
                 _dragDrop,
                 session.AssetEditing,
                 session.Scenes,
+                documentContext,
                 session.EditorTypes,
                 _workspaceState,
                 _icons,
@@ -202,6 +202,7 @@ internal sealed class EditorApplication : IDisposable
             _projectManager.CurrentSession!.Assets.Update();
             _projectManager.CurrentSession.AssetBaking.Update();
             _projectManager.CurrentSession.GameCode.Update();
+            _projectManager.CurrentSession.Blueprints.Update();
             _projectManager.CurrentSession.Scenes.Update(
                 _workspaceState.AutoSave,
                 TimeSpan.FromSeconds(
@@ -315,15 +316,14 @@ internal sealed class EditorApplication : IDisposable
 
         if (ImGui.BeginMenu("Edit"))
         {
-            var undo = _projectManager.CurrentSession?.AssetEditing.Current?.Undo ??
-                       _projectManager.CurrentSession?.Scenes.Current?.Undo;
+            var undo = _projectManager.CurrentSession?.Documents.Undo;
             ImGui.BeginDisabled(undo?.CanUndo != true);
             if (ImGui.MenuItem(undo?.UndoName is { } undoName ? $"Undo {undoName}" : "Undo", "Ctrl+Z"))
-                undo!.Undo();
+                TryChangeHistory(redo: false);
             ImGui.EndDisabled();
             ImGui.BeginDisabled(undo?.CanRedo != true);
             if (ImGui.MenuItem(undo?.RedoName is { } redoName ? $"Redo {redoName}" : "Redo", "Ctrl+Y"))
-                undo!.Redo();
+                TryChangeHistory(redo: true);
             ImGui.EndDisabled();
             ImGui.Separator();
             var autoSave = _workspaceState.AutoSave;
@@ -362,10 +362,20 @@ internal sealed class EditorApplication : IDisposable
 
         if (ImGui.BeginMenu("Entity"))
         {
-            var document = _projectManager.CurrentSession?.Scenes.Current;
+            var session = _projectManager.CurrentSession;
+            var document = session is null || session.Documents.IsAsset
+                ? null
+                : session.Documents.Current;
             ImGui.BeginDisabled(document is null);
             if (ImGui.MenuItem("Create Empty"))
-                document!.CreateEmpty();
+            {
+                TryEditActiveDocument(
+                    document!,
+                    () => document!.CreateEmpty(
+                        "Entity",
+                        session!.Documents.IsBlueprint ? session.Blueprints.Root : null),
+                    "Could not create the entity.");
+            }
             if (ImGui.MenuItem("Create From Blueprint"))
             {
                 _blueprintSearch = string.Empty;
@@ -438,36 +448,70 @@ internal sealed class EditorApplication : IDisposable
     private void HandleShortcuts()
     {
         var io = ImGui.GetIO();
-        if (io.KeyCtrl && io.KeyShift && ImGui.IsKeyPressed(ImGuiKey.O) && _project is not null)
+        if (!io.KeyCtrl)
+            return;
+
+        // Save remains global so a focused text field can be committed without first
+        // changing focus. Navigation and history shortcuts must not also act on the
+        // document while ImGui owns keyboard text input.
+        if (ImGui.IsKeyPressed(ImGuiKey.S))
+        {
+            if (_project is not null && io.KeyShift)
+                RequestSaveSceneAs();
+            else if (_project is not null)
+                SaveCurrentDocument();
+        }
+
+        if (!ShouldHandleDocumentShortcut(io.WantTextInput))
+            return;
+        if (io.KeyShift && ImGui.IsKeyPressed(ImGuiKey.O) && _project is not null)
             _openScenePopupRequested = true;
-        else if (io.KeyCtrl && ImGui.IsKeyPressed(ImGuiKey.O))
+        else if (ImGui.IsKeyPressed(ImGuiKey.O))
             _openProjectPopupRequested = true;
-        if (_project is null || !io.KeyCtrl)
+        if (_project is null)
             return;
         if (ImGui.IsKeyPressed(ImGuiKey.N))
             _newScenePopupRequested = true;
-        if (ImGui.IsKeyPressed(ImGuiKey.S))
-        {
-            if (io.KeyShift)
-                RequestSaveSceneAs();
-            else
-                SaveCurrentDocument();
-        }
-        var undo = _projectManager.CurrentSession?.AssetEditing.Current?.Undo ??
-                   _projectManager.CurrentSession?.Scenes.Current?.Undo;
         if (ImGui.IsKeyPressed(ImGuiKey.Z))
-            undo?.Undo();
+            TryChangeHistory(redo: false);
         if (ImGui.IsKeyPressed(ImGuiKey.Y))
-            undo?.Redo();
+            TryChangeHistory(redo: true);
+    }
+
+    internal static bool ShouldHandleDocumentShortcut(bool wantTextInput) => !wantTextInput;
+
+    private void TryChangeHistory(bool redo)
+    {
+        var undo = _projectManager.CurrentSession?.Documents.Undo;
+        if (undo is null)
+            return;
+
+        try
+        {
+            if (redo)
+                undo.Redo();
+            else
+                undo.Undo();
+        }
+        catch (Exception exception)
+        {
+            _logs.Error(
+                "Undo",
+                redo ? "Could not redo the editor change." : "Could not undo the editor change.",
+                exception);
+        }
     }
 
     private string BuildProjectStatus()
     {
         var project = $"{_project!.Metadata.Name}  |  SDK {_project.Metadata.Sdk.Version}";
-        var assetDocument = _projectManager.CurrentSession?.AssetEditing.Current;
+        var session = _projectManager.CurrentSession!;
+        var assetDocument = session.Documents.AssetDocument;
         if (assetDocument is not null)
             return $"{project}  |  {assetDocument.Asset.Name}{(assetDocument.IsDirty ? " *" : string.Empty)}";
-        var document = _projectManager.CurrentSession?.Scenes.Current;
+        var document = session.Documents.ActiveKind == EditorDocumentKind.Scene
+            ? session.Scenes.Current
+            : null;
         return document is null
             ? project
             : $"{project}  |  {document.DisplayName}{(document.IsDirty ? " *" : string.Empty)}";
@@ -511,10 +555,21 @@ internal sealed class EditorApplication : IDisposable
         ImGui.InputText("Name", ref _newSceneName, 128);
         if (ImGui.Button("Create", new Vector2(90f, 0f)) && !string.IsNullOrWhiteSpace(_newSceneName))
         {
-            _projectManager.CurrentSession!.Scenes.New(_newSceneName.Trim());
-            _sceneOperationError = null;
-            ImGui.CloseCurrentPopup();
+            try
+            {
+                _projectManager.CurrentSession!.Scenes.New(_newSceneName.Trim());
+                _projectManager.CurrentSession.Documents.ActivateScene();
+                _sceneOperationError = null;
+                ImGui.CloseCurrentPopup();
+            }
+            catch (Exception exception)
+            {
+                _sceneOperationError = exception.Message;
+                _logs.Error("Scene", "Could not create the scene.", exception);
+            }
         }
+        if (!string.IsNullOrWhiteSpace(_sceneOperationError))
+            ImGui.TextColored(new Vector4(0.96f, 0.34f, 0.36f, 1f), _sceneOperationError);
         ImGui.SameLine();
         if (ImGui.Button("Cancel", new Vector2(90f, 0f)))
             ImGui.CloseCurrentPopup();
@@ -578,12 +633,18 @@ internal sealed class EditorApplication : IDisposable
                     var label = $"{asset.RelativePath}  /  {world.DisplayName}##{asset.Id.Value:N}-{world.WorldIid:N}";
                     if (!ImGui.Selectable(label))
                         continue;
+                    if (!session.AssetEditing.Clear())
+                    {
+                        _sceneOperationError =
+                            "Could not create the LDtk scene because the current asset could not be saved.";
+                        continue;
+                    }
                     session.Scenes.NewFromLDtk(
                         asset,
                         world.WorldIid,
                         world.DisplayName,
                         _newLdtkImportOptions);
-                    session.AssetEditing.Clear();
+                    session.Documents.ActivateScene();
                     _sceneOperationError = null;
                     ImGui.CloseCurrentPopup();
                 }
@@ -616,7 +677,9 @@ internal sealed class EditorApplication : IDisposable
             return;
 
         var session = _projectManager.CurrentSession!;
-        var document = session.Scenes.Current;
+        var document = session.Documents.IsAsset
+            ? null
+            : session.Documents.Current;
         ImGui.SetNextItemWidth(460f);
         ImGui.InputTextWithHint("##BlueprintSearch", "Search Blueprints", ref _blueprintSearch, 256);
         ImGui.BeginChild("##BlueprintResults", new Vector2(460f, 300f), ImGuiChildFlags.Borders);
@@ -633,14 +696,10 @@ internal sealed class EditorApplication : IDisposable
                 continue;
             try
             {
-                var path = Path.Combine(
-                    session.Assets.ContentRoot,
-                    blueprint.RelativePath.Replace('/', Path.DirectorySeparatorChar));
-                var source = DreambitJson.Deserialize<EntityBlueprint>(File.ReadAllText(path))
-                             ?? throw new InvalidDataException("Blueprint file is empty.");
-                source.AssetId = blueprint.Id;
-                source.AssetName = blueprint.LogicalAssetName;
-                document!.InstantiateBlueprint(source);
+                using var source = session.BlueprintSources.Load(blueprint);
+                document!.InstantiateBlueprint(
+                    source,
+                    parent: session.Documents.IsBlueprint ? session.Blueprints.Root : null);
                 _sceneOperationError = null;
                 ImGui.CloseCurrentPopup();
             }
@@ -655,6 +714,23 @@ internal sealed class EditorApplication : IDisposable
         if (ImGui.Button("Cancel", new Vector2(90f, 0f)))
             ImGui.CloseCurrentPopup();
         ImGui.EndPopup();
+    }
+
+    private void TryEditActiveDocument(
+        SceneDocument document,
+        Action mutation,
+        string failureMessage)
+    {
+        try
+        {
+            mutation();
+            _sceneOperationError = null;
+        }
+        catch (Exception exception)
+        {
+            _sceneOperationError = exception.Message;
+            _logs.Error(document.Name, failureMessage, exception);
+        }
     }
 
     private void DrawScenePathPopup(string popupName, string action, Func<string, bool> execute)
@@ -683,6 +759,7 @@ internal sealed class EditorApplication : IDisposable
         try
         {
             _projectManager.CurrentSession!.Scenes.Open(path);
+            _projectManager.CurrentSession.Documents.ActivateScene();
             _workspaceState.LastScenePath = _projectManager.CurrentSession.Scenes.Current!.Path;
             if (string.Equals(_workspaceState.LastSelectionKind, "entity", StringComparison.OrdinalIgnoreCase))
             {
@@ -709,20 +786,28 @@ internal sealed class EditorApplication : IDisposable
             string.IsNullOrWhiteSpace(_workspaceState.LastSelectedAssetPath))
             return;
         if (session.Assets.TryGetAsset(_workspaceState.LastSelectedAssetPath, out var asset))
-            session.AssetEditing.Select(asset);
+        {
+            if (session.AssetEditing.Select(asset))
+                session.Documents.ActivateAsset();
+        }
     }
 
     private void CaptureWorkspaceSelection(DreambitProjectSession session)
     {
-        if (session.AssetEditing.Selected is { } asset)
+        if (session.Documents.ActiveKind is EditorDocumentKind.Asset or EditorDocumentKind.Blueprint)
         {
-            _workspaceState.LastSelectedAssetPath = asset.RelativePath;
-            _workspaceState.LastSelectedAssetIsFolder = false;
-            _workspaceState.LastSelectionKind = "asset";
+            if (session.AssetEditing.Selected is { } asset)
+            {
+                _workspaceState.LastSelectedAssetPath = asset.RelativePath;
+                _workspaceState.LastSelectedAssetIsFolder = false;
+                _workspaceState.LastSelectionKind = "asset";
+            }
             return;
         }
-        if (session.Scenes.Selection.EntityIds.Count == 0)
-            return;
+
+        // Scene focus owns the persisted selection even when that selection is empty.
+        // Otherwise a retained asset document can remain the apparent startup focus
+        // after the user deliberately returned to the scene and deselected everything.
         _workspaceState.LastSelectedEntityIds = session.Scenes.Selection.EntityIds.ToList();
         _workspaceState.LastSelectionKind = "entity";
     }
@@ -742,11 +827,12 @@ internal sealed class EditorApplication : IDisposable
 
     private void SaveCurrentDocument()
     {
-        if (_projectManager.CurrentSession?.AssetEditing.Current is { } assetDocument)
+        var session = _projectManager.CurrentSession;
+        if (session?.Documents.AssetDocument is { } assetDocument)
         {
             try
             {
-                _projectManager.CurrentSession.AssetEditing.Save();
+                session.AssetEditing.Save();
                 _logs.Info("Assets", $"Saved '{assetDocument.Asset.RelativePath}'.");
             }
             catch (Exception exception)
@@ -755,12 +841,16 @@ internal sealed class EditorApplication : IDisposable
             }
             return;
         }
-        SaveCurrentScene();
+        if (session?.Documents.ActiveKind == EditorDocumentKind.Scene)
+            SaveCurrentScene();
     }
 
     private void RequestSaveSceneAs()
     {
-        var document = _projectManager.CurrentSession?.Scenes.Current;
+        var session = _projectManager.CurrentSession;
+        if (session?.Documents.ActiveKind != EditorDocumentKind.Scene)
+            return;
+        var document = session.Scenes.Current;
         if (document is null)
             return;
         _scenePath = document.Path ?? $"Scenes/{document.DisplayName}.scene.json";
@@ -1085,23 +1175,36 @@ internal sealed class EditorApplication : IDisposable
         if (_disposed)
             return;
 
+        _disposed = true;
+
         foreach (var panel in _panels.Panels)
             _workspaceState.PanelVisibility[panel.Id] = panel.IsOpen;
 
         if (_projectManager.CurrentSession?.Scenes.Current?.Path is { } scenePath)
             _workspaceState.LastScenePath = scenePath;
 
-        _panels.Dispose();
-        _icons.Dispose();
-        _projectCreationLifetime.Cancel();
-        _projectCreationLifetime.Dispose();
-        _projectManager.Dispose();
+        RunShutdownStep(_panels.Dispose, "Could not dispose all editor panels.");
+        RunShutdownStep(_icons.Dispose, "Could not dispose editor icons.");
+        RunShutdownStep(_projectCreationLifetime.Cancel, "Could not cancel project creation.");
+        RunShutdownStep(_projectCreationLifetime.Dispose, "Could not dispose project creation state.");
+        RunShutdownStep(_projectManager.Dispose, "Could not dispose the active project session.");
 
         if (!_stateStore.TrySaveGlobalState(_globalState, out var globalError))
             Console.Error.WriteLine(globalError);
         if (!_stateStore.TrySaveWorkspaceState(_workspaceState, out var workspaceError))
             Console.Error.WriteLine(workspaceError);
+    }
 
-        _disposed = true;
+    private void RunShutdownStep(Action action, string message)
+    {
+        try
+        {
+            action();
+        }
+        catch (Exception exception)
+        {
+            _logs.Error("Shutdown", message, exception);
+            Console.Error.WriteLine($"{message} {exception}");
+        }
     }
 }

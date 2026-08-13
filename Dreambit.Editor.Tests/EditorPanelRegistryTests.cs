@@ -48,16 +48,37 @@ public sealed class EditorPanelRegistryTests
         Assert.Equal(["second", "first"], disposeOrder);
     }
 
+    [Fact]
+    public void ContinuesDisposingPanelsAfterOneFails()
+    {
+        var disposeOrder = new List<string>();
+        var registry = new EditorPanelRegistry(new EditorWorkspaceState());
+        registry.Register(new TestPanel("first", disposeOrder));
+        registry.Register(new TestPanel("failing", disposeOrder, throwOnDispose: true));
+        registry.Register(new TestPanel("last", disposeOrder));
+
+        var exception = Assert.Throws<AggregateException>(registry.Dispose);
+
+        Assert.Equal(["last", "failing", "first"], disposeOrder);
+        Assert.Single(exception.InnerExceptions);
+    }
+
     private sealed class TestPanel : IEditorPanel
     {
         private readonly List<string>? _disposeOrder;
 
-        public TestPanel(string id, List<string>? disposeOrder = null)
+        private readonly bool _throwOnDispose;
+
+        public TestPanel(
+            string id,
+            List<string>? disposeOrder = null,
+            bool throwOnDispose = false)
         {
             Id = id;
             Title = id;
             WindowName = id;
             _disposeOrder = disposeOrder;
+            _throwOnDispose = throwOnDispose;
         }
 
         public string Id { get; }
@@ -72,6 +93,8 @@ public sealed class EditorPanelRegistryTests
         public void Dispose()
         {
             _disposeOrder?.Add(Id);
+            if (_throwOnDispose)
+                throw new InvalidOperationException("Dispose failed for testing.");
         }
     }
 }

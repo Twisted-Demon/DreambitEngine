@@ -30,7 +30,15 @@ internal sealed class GameAssemblyLoadService : IDisposable
     }
 
     public LoadedGameAssembly? Current => _current;
+
+    // Reloading is the preparation phase. Documents use it to capture source state and dispose
+    // live game objects while reflection metadata for the outgoing generation is still available.
     public event Action<LoadedGameAssembly?>? Reloading;
+
+    // Unloading runs after all preparation callbacks and immediately before the old load context
+    // is released. Subscribers must drop caches that retain collectible types in this phase.
+    public event Action<LoadedGameAssembly>? Unloading;
+
     public event Action<LoadedGameAssembly>? Reloaded;
 
     public bool TryLoad(string assemblyPath, out string? error)
@@ -64,21 +72,21 @@ internal sealed class GameAssemblyLoadService : IDisposable
                 candidateShadowDirectory,
                 _generation);
 
-            Reloading?.Invoke(_current);
+            PrepareCurrentGenerationForUnload("preparation", "cache release");
             UnloadCurrent();
             _loadContext = candidateContext;
             _current = loaded;
             DreambitAssemblyCaches.Refresh(catalog.AssetTypes, catalog.AssetLoaderTypes);
-            Reloaded?.Invoke(loaded);
+            NotifySubscribers(Reloaded, loaded, "activation");
             candidateContext = null;
-            _report?.Invoke(new GameCodeMessage(
+            Report(new GameCodeMessage(
                 GameCodeMessageSeverity.Information,
                 $"Loaded game assembly generation {_generation}: " +
                 $"{catalog.ComponentTypes.Count} components, {catalog.AssetTypes.Count} custom assets."));
             foreach (var assetType in catalog.AssetTypes.Where(type =>
                          !DreambitAssetTypeRegistry.HasStableTypeId(type)))
             {
-                _report?.Invoke(new GameCodeMessage(
+                Report(new GameCodeMessage(
                     GameCodeMessageSeverity.Warning,
                     $"{assetType.FullName} does not declare [DreambitAssetType]. " +
                     "Its asset type identity uses the CLR full name and will break if the class " +
@@ -111,7 +119,7 @@ internal sealed class GameAssemblyLoadService : IDisposable
             if (candidateShadowDirectory is not null)
                 TryDeleteDirectory(candidateShadowDirectory);
             error = $"Could not load game assembly. {exception.Message}";
-            _report?.Invoke(new GameCodeMessage(
+            Report(new GameCodeMessage(
                 GameCodeMessageSeverity.Error,
                 error,
                 exception));
@@ -150,7 +158,7 @@ internal sealed class GameAssemblyLoadService : IDisposable
 
         if (weakReference.IsAlive)
         {
-            _report?.Invoke(new GameCodeMessage(
+            Report(new GameCodeMessage(
                 GameCodeMessageSeverity.Warning,
                 "The previous game assembly is still referenced after unload. " +
                 "The shadow copy was retained for diagnostics."));
@@ -200,13 +208,81 @@ internal sealed class GameAssemblyLoadService : IDisposable
         }
     }
 
+    private void NotifySubscribers<T>(Action<T>? subscribers, T argument, string phase)
+    {
+        if (subscribers is null)
+            return;
+
+        // GetInvocationList gives this transition a stable subscriber snapshot. Each callback is
+        // isolated so one editor subsystem cannot prevent the remaining documents and caches from
+        // completing their side of the reload protocol.
+        foreach (var subscriber in subscribers.GetInvocationList().Cast<Action<T>>())
+        {
+            try
+            {
+                subscriber(argument);
+            }
+            catch (Exception exception)
+            {
+                Report(new GameCodeMessage(
+                    GameCodeMessageSeverity.Error,
+                    $"Game assembly reload {phase} callback '{DescribeSubscriber(subscriber)}' failed. " +
+                    "The reload continued so other editor subsystems could complete their lifecycle work.",
+                    exception));
+            }
+        }
+    }
+
+    // The outgoing assembly must not remain in a local on the TryLoad/Dispose frame while
+    // UnloadCurrent forces collection. Keeping this phase in a returned, non-inlined frame avoids
+    // a conservative JIT root producing a false collectible-context leak.
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void PrepareCurrentGenerationForUnload(string preparationPhase, string releasePhase)
+    {
+        var current = _current;
+        NotifySubscribers(Reloading, current, preparationPhase);
+        if (current is not null)
+            NotifySubscribers(Unloading, current, releasePhase);
+    }
+
+    private static string DescribeSubscriber(Delegate subscriber)
+    {
+        var declaringType = subscriber.Method.DeclaringType?.FullName;
+        return string.IsNullOrWhiteSpace(declaringType)
+            ? subscriber.Method.Name
+            : $"{declaringType}.{subscriber.Method.Name}";
+    }
+
+    private void Report(GameCodeMessage message)
+    {
+        try
+        {
+            _report?.Invoke(message);
+        }
+        catch
+        {
+            // Reporting is an observer boundary. A broken log sink must not change which game
+            // assembly generation is active or interrupt the cache-release protocol.
+        }
+    }
+
     public void Dispose()
     {
         if (_disposed)
             return;
-        Reloading?.Invoke(_current);
-        UnloadCurrent();
-        _disposed = true;
+
+        try
+        {
+            PrepareCurrentGenerationForUnload("shutdown preparation", "shutdown cache release");
+            UnloadCurrent();
+        }
+        finally
+        {
+            Reloading = null;
+            Unloading = null;
+            Reloaded = null;
+            _disposed = true;
+        }
     }
 
     private sealed class CollectibleGameLoadContext : AssemblyLoadContext

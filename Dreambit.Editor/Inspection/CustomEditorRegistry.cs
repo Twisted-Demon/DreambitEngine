@@ -16,7 +16,7 @@ internal sealed class CustomEditorRegistry : IDisposable
     {
         _assemblies = assemblies;
         _reportError = reportError;
-        _assemblies.Reloading += OnReloading;
+        _assemblies.Unloading += OnUnloading;
         _assemblies.Reloaded += OnReloaded;
         if (_assemblies.Current is { } current)
             Rebuild(current);
@@ -26,7 +26,7 @@ internal sealed class CustomEditorRegistry : IDisposable
     {
         if (_disposed)
             return;
-        _assemblies.Reloading -= OnReloading;
+        _assemblies.Unloading -= OnUnloading;
         _assemblies.Reloaded -= OnReloaded;
         Clear();
         _disposed = true;
@@ -46,7 +46,7 @@ internal sealed class CustomEditorRegistry : IDisposable
         return false;
     }
 
-    private void OnReloading(LoadedGameAssembly? _)
+    private void OnUnloading(LoadedGameAssembly _)
     {
         Clear();
     }
@@ -84,17 +84,41 @@ internal sealed class CustomEditorRegistry : IDisposable
             }
             catch (Exception exception)
             {
-                _reportError?.Invoke($"Could not load custom Editor '{editorType.FullName}'.", exception);
+                ReportError($"Could not load custom Editor '{editorType.FullName}'.", exception);
             }
         }
     }
 
     private void Clear()
     {
-        foreach (var editor in _entries.Select(entry => entry.Editor).Distinct())
-            if (editor is IDisposable disposable)
-                disposable.Dispose();
+        var editors = _entries.Select(entry => entry.Editor).Distinct().ToArray();
         _entries.Clear();
+        foreach (var editor in editors)
+        {
+            if (editor is not IDisposable disposable)
+                continue;
+            try
+            {
+                disposable.Dispose();
+            }
+            catch (Exception exception)
+            {
+                ReportError($"Could not dispose custom Editor '{editor.GetType().FullName}'.", exception);
+            }
+        }
+    }
+
+    private void ReportError(string message, Exception exception)
+    {
+        try
+        {
+            _reportError?.Invoke(message, exception);
+        }
+        catch
+        {
+            // Error reporting is outside registry ownership. It must not prevent the registry
+            // from releasing collectible editor instances and target types.
+        }
     }
 
     private sealed record Entry(

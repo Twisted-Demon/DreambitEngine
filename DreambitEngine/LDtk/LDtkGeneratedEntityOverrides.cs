@@ -37,6 +37,11 @@ internal static class LDtkGeneratedEntityOverrides
                 entity.Name = entityOverride.Name;
             if (entityOverride.Enabled.HasValue)
                 entity.Enabled = entityOverride.Enabled.Value;
+            if (entityOverride.Tags is not null)
+            {
+                entity.Tags.Clear();
+                entity.Tags.UnionWith(entityOverride.Tags);
+            }
             if (entityOverride.Position.HasValue)
                 entity.Transform.Position = entityOverride.Position.Value;
             if (entityOverride.Rotation2D.HasValue)

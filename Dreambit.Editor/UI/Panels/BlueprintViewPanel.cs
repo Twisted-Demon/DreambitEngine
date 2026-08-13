@@ -1,33 +1,27 @@
-using System.Numerics;
-using Dreambit.ECS;
 using Dreambit.Editor.Assets;
 using Dreambit.Editor.Graphics;
 using Dreambit.Editor.Persistence;
 using Dreambit.Editor.Scenes;
+using Dreambit.Editor.UI.Viewport;
 using ImGuiNET;
-using Microsoft.Xna.Framework;
-using Vector2 = System.Numerics.Vector2;
-using Vector4 = System.Numerics.Vector4;
-using XnaVector2 = Microsoft.Xna.Framework.Vector2;
 
 namespace Dreambit.Editor.UI.Panels;
 
-internal sealed class BlueprintViewPanel : EditorPanel
+/// <summary>
+/// Blueprint-specific viewport policy. Picks remain exact so authored children are directly
+/// selectable; Blueprint source/preview lifecycle stays in BlueprintEditingService.
+/// </summary>
+internal sealed class BlueprintViewPanel : SceneViewportPanel
 {
-    private const string ViewSettingsPopup = "Blueprint View Settings##Dreambit.Editor.BlueprintView";
     private readonly AssetDatabase _assets;
     private readonly AssetEditingService _assetEditing;
     private readonly BlueprintEditingService _blueprints;
     private readonly EditorDocumentContext _documentContext;
     private readonly EditorWorkspaceState _workspace;
-    private readonly SceneViewportRenderer _renderer;
-    private readonly EditorIconService _icons;
-    private readonly EditorTransformGizmo _transformGizmo;
     private AssetRecord? _asset;
+    private long _observedAssetVersion = -1;
     private DateTimeOffset _sourceWriteUtc;
     private bool _needsRebuild;
-    private bool _viewSettingsRequested;
-    private ColliderDrag? _colliderDrag;
     private string? _error;
 
     public BlueprintViewPanel(
@@ -37,17 +31,22 @@ internal sealed class BlueprintViewPanel : EditorPanel
         EditorDocumentContext documentContext,
         EditorWorkspaceState workspace,
         SceneViewportRenderer renderer,
-        EditorIconService icons)
-        : base(EditorPanelIds.Blueprint, "Blueprint View", isOpenByDefault: false)
+        EditorIconService icons,
+        Action<string, Exception?>? reportError = null)
+        : base(
+            EditorPanelIds.Blueprint,
+            "Blueprint View",
+            false,
+            workspace,
+            renderer,
+            icons,
+            reportError)
     {
         _assets = assets;
         _assetEditing = assetEditing;
         _blueprints = blueprints;
         _documentContext = documentContext;
         _workspace = workspace;
-        _renderer = renderer;
-        _icons = icons;
-        _transformGizmo = new EditorTransformGizmo(_blueprints.Selection, _workspace);
         _assetEditing.Changed += OnAssetDocumentChanged;
         _assetEditing.PreviewChanged += OnAssetPreviewChanged;
 
@@ -60,317 +59,128 @@ internal sealed class BlueprintViewPanel : EditorPanel
         }
     }
 
-    protected override ImGuiWindowFlags WindowFlags =>
-        ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse;
+    protected override string EmptyTitle =>
+        _asset is null ? "No Blueprint is open" : "Blueprint preview unavailable";
+    protected override string EmptyDetail =>
+        _asset is null
+            ? _error ?? "Double-click a Blueprint in Project."
+            : _blueprints.Error ?? _error ?? "The preview will return after game code reloads.";
+    protected override string? ViewportError => _blueprints.Error ?? _error;
+    protected override float CameraX
+    {
+        get => _workspace.BlueprintCameraX;
+        set => _workspace.BlueprintCameraX = value;
+    }
+    protected override float CameraY
+    {
+        get => _workspace.BlueprintCameraY;
+        set => _workspace.BlueprintCameraY = value;
+    }
+    protected override float CameraZoom
+    {
+        get => _workspace.BlueprintCameraZoom;
+        set => _workspace.BlueprintCameraZoom = value;
+    }
 
     public void Open(AssetRecord asset)
     {
         ArgumentNullException.ThrowIfNull(asset);
         if (asset.Kind != AssetKind.Blueprint)
             return;
+        if (!_assetEditing.Select(asset))
+        {
+            _error = $"Could not open '{asset.RelativePath}'. The current asset remains open.";
+            return;
+        }
         _asset = asset;
+        _observedAssetVersion = -1;
         _workspace.LastBlueprintPath = asset.RelativePath;
         IsOpen = true;
         _needsRebuild = true;
-        _assetEditing.Select(asset);
-    }
-
-    protected override void DrawContents()
-    {
+        // Opening a Blueprint is a document-context action even when its preview
+        // cannot be constructed until a pending assembly reload finishes.
         _documentContext.ActivateBlueprint();
-        RefreshAssetRecord();
-        if (_needsRebuild)
-            RebuildPreview();
-
-        DrawToolbar();
-        ImGui.Separator();
-        var canvasPosition = ImGui.GetCursorScreenPos();
-        var canvasSize = ImGui.GetContentRegionAvail();
-        canvasSize.X = MathF.Max(1f, canvasSize.X);
-        canvasSize.Y = MathF.Max(1f, canvasSize.Y);
-
-        if (_asset is null)
-        {
-            DrawEmptyCanvas(canvasPosition, canvasSize, "No Blueprint is open", "Double-click a Blueprint in Project.");
-            return;
-        }
-        var document = _blueprints.Current;
-        var scene = document?.Scene;
-        if (document is null || scene is null)
-        {
-            DrawEmptyCanvas(
-                canvasPosition,
-                canvasSize,
-                "Blueprint preview unavailable",
-                _blueprints.Error ?? _error ?? "The preview will return after game code reloads.");
-            return;
-        }
-
-        scene.EditorTick();
-        var camera = _renderer.Render(
-            scene,
-            (int)MathF.Ceiling(canvasSize.X),
-            (int)MathF.Ceiling(canvasSize.Y),
-            new XnaVector2(_workspace.BlueprintCameraX, _workspace.BlueprintCameraY),
-            EditorViewportUi.NormalizeZoom(_workspace.BlueprintCameraZoom));
-        ImGui.Image(_renderer.TextureId, canvasSize);
-
-        var hovered = ImGui.IsItemHovered();
-        var active = ImGui.IsItemActive();
-        var mouseLocal = ImGui.GetMousePos() - canvasPosition;
-        var drawList = ImGui.GetWindowDrawList();
-        if (_workspace.ShowGrid)
-        {
-            EditorViewportUi.DrawGrid(
-                drawList,
-                camera,
-                canvasPosition,
-                canvasSize,
-                _workspace.GridSize);
-        }
-        scene.DrawEditorGizmos(
-            new PreviewGizmoContext(drawList, camera, canvasPosition),
-            _blueprints.Selection.EntityIds.ToHashSet());
-        var colliderConsumed = DrawColliderHandles(
-            drawList,
-            document,
-            scene,
-            camera,
-            canvasPosition,
-            mouseLocal,
-            hovered);
-        _transformGizmo.DrawSelection(drawList, scene, camera, canvasPosition);
-        var gizmoConsumed = _transformGizmo.DrawAndHandle(
-            drawList,
-            document,
-            camera,
-            canvasPosition,
-            mouseLocal,
-            hovered && !colliderConsumed);
-        if (!gizmoConsumed && hovered && ImGui.IsMouseClicked(ImGuiMouseButton.Left) &&
-            !ImGui.IsMouseDragging(ImGuiMouseButton.Left))
-        {
-            var world = camera.ScreenToWorld(new XnaVector2(mouseLocal.X, mouseLocal.Y));
-            _blueprints.Selection.Set(_renderer.Pick(scene, world), ImGui.GetIO().KeyCtrl);
-        }
-        HandleCameraInput(camera, mouseLocal, canvasSize, hovered, active);
-
-        var renderError = _renderer.LastError ?? _error;
-        if (!string.IsNullOrWhiteSpace(renderError))
-        {
-            drawList.AddRectFilled(
-                canvasPosition + new Vector2(8f),
-                canvasPosition + new Vector2(canvasSize.X - 8f, 38f),
-                ImGui.GetColorU32(new Vector4(0.25f, 0.06f, 0.07f, 0.92f)));
-            drawList.AddText(
-                canvasPosition + new Vector2(16f, 15f),
-                ImGui.GetColorU32(new Vector4(1f, 0.55f, 0.58f, 1f)),
-                renderError);
-        }
     }
 
-    private void DrawToolbar()
+    protected override void BeforeDocumentResolution()
     {
-        if (_viewSettingsRequested)
+        RefreshAssetRecord();
+        var focused = ImGui.IsWindowFocused(ImGuiFocusedFlags.RootAndChildWindows);
+        if (_asset is not null && focused)
         {
-            ImGui.OpenPopup(ViewSettingsPopup);
-            _viewSettingsRequested = false;
-        }
-        if (_icons.Button("BlueprintSelect", "mouse", "Select (Q)", _workspace.GizmoMode == 0))
-            _workspace.GizmoMode = 0;
-        ImGui.SameLine();
-        if (_icons.Button("BlueprintMove", "open_with", "Move (W)", _workspace.GizmoMode == 1))
-            _workspace.GizmoMode = 1;
-        ImGui.SameLine();
-        if (_icons.Button("BlueprintRotate", "rotate_right", "Rotate (E)", _workspace.GizmoMode == 2))
-            _workspace.GizmoMode = 2;
-        ImGui.SameLine();
-        if (_icons.Button("BlueprintScale", "aspect_ratio", "Scale (R)", _workspace.GizmoMode == 3))
-            _workspace.GizmoMode = 3;
-        ImGui.SameLine();
-        if (_icons.Button("FrameBlueprint", "center_focus_strong", "Frame Blueprint (F)"))
-            FrameBlueprint();
-        ImGui.SameLine();
-        if (_icons.Button("BlueprintGrid", "grid_on", "Toggle grid", _workspace.ShowGrid))
-            _workspace.ShowGrid = !_workspace.ShowGrid;
-        ImGui.SameLine();
-        var snap = _workspace.SnapEnabled;
-        if (ImGui.Checkbox("Snap##Blueprint", ref snap))
-            _workspace.SnapEnabled = snap;
-        if (_workspace.SnapEnabled)
-        {
-            ImGui.SameLine();
-            ImGui.SetNextItemWidth(70f);
-            if (_workspace.GizmoMode == 2)
+            // Preview construction and document focus are independent. In particular,
+            // focusing an unavailable preview must not expose the normal scene through
+            // the shared Hierarchy and Inspector.
+            _documentContext.ActivateBlueprint();
+            if (_blueprints.Current is null &&
+                _assetEditing.Current?.Asset.Id != _asset.Id)
             {
-                var value = _workspace.RotateSnapDegrees;
-                if (ImGui.DragFloat("##BlueprintSnapValue", ref value, 1f, 1f, 180f, "%.0f degrees"))
-                    _workspace.RotateSnapDegrees = value;
-            }
-            else if (_workspace.GizmoMode == 3)
-            {
-                var value = _workspace.ScaleSnap;
-                if (ImGui.DragFloat("##BlueprintSnapValue", ref value, 0.01f, 0.01f, 10f))
-                    _workspace.ScaleSnap = value;
-            }
-            else
-            {
-                var value = _workspace.MoveSnap;
-                if (ImGui.DragFloat("##BlueprintSnapValue", ref value, 0.1f, 0.01f, 1000f))
-                    _workspace.MoveSnap = value;
+                _needsRebuild = true;
             }
         }
-        ImGui.SameLine();
-        if (_icons.Button("BlueprintSettings", "settings", "Grid and snapping settings"))
-            _viewSettingsRequested = true;
-        EditorViewportUi.DrawSettingsPopup(ViewSettingsPopup, _workspace);
-        ImGui.SameLine();
-        ImGui.TextDisabled($"Zoom {_workspace.BlueprintCameraZoom:0.00}x");
+        if (_needsRebuild && _blueprints.Current is not null &&
+            _assetEditing.Current?.Asset.Id == _asset?.Id)
+        {
+            // The service may already have rebuilt synchronously from the same asset
+            // notification. Avoid replacing that fresh preview a second time.
+            _needsRebuild = false;
+        }
+        // A background/restored Blueprint window must not steal the single asset
+        // document from a Scene or generic asset the user currently owns. Explicit
+        // Open() activates Blueprint context; reload recovery keeps that context too.
+        if (_needsRebuild && (focused || _documentContext.IsBlueprint))
+            RebuildPreview();
+    }
+
+    protected override SceneDocument? ResolveDocument() => _blueprints.Current;
+
+    protected override void ActivateDocument(SceneDocument document) =>
+        _documentContext.ActivateBlueprint();
+
+    protected override void PrepareScene(SceneDocument document, EditorScene scene) =>
+        scene.EditorTick();
+
+    protected override void FrameDocument(SceneDocument document)
+    {
+        var entity = document.Selection.GetActive(document.Scene) ?? _blueprints.Root;
+        if (entity is null)
+            return;
+        CameraX = entity.Transform.WorldPosition.X;
+        CameraY = entity.Transform.WorldPosition.Y;
+    }
+
+    protected override void DrawToolbarSuffix(SceneDocument? document)
+    {
         ImGui.SameLine();
         ImGui.TextDisabled(_asset?.RelativePath ?? "Blueprint");
-    }
-
-    private void HandleCameraInput(
-        Camera2D camera,
-        Vector2 mouseLocal,
-        Vector2 canvasSize,
-        bool hovered,
-        bool active)
-    {
-        if (!hovered && !active)
-            return;
-        var io = ImGui.GetIO();
-        if (hovered && MathF.Abs(io.MouseWheel) > float.Epsilon)
-        {
-            var previousWorld = camera.ScreenToWorld(new XnaVector2(mouseLocal.X, mouseLocal.Y));
-            var nextZoom = EditorViewportUi.ApplyZoomWheel(_workspace.BlueprintCameraZoom, io.MouseWheel);
-            var nextScale = camera.Scale *
-                            (nextZoom / EditorViewportUi.NormalizeZoom(_workspace.BlueprintCameraZoom));
-            var offset = new XnaVector2(
-                mouseLocal.X - canvasSize.X * 0.5f,
-                mouseLocal.Y - canvasSize.Y * 0.5f) / nextScale;
-            var nextPosition = previousWorld - offset;
-            _workspace.BlueprintCameraX = nextPosition.X;
-            _workspace.BlueprintCameraY = nextPosition.Y;
-            _workspace.BlueprintCameraZoom = nextZoom;
-        }
-        if (ImGui.IsMouseDragging(ImGuiMouseButton.Middle) ||
-            ImGui.IsMouseDragging(ImGuiMouseButton.Right))
-        {
-            _workspace.BlueprintCameraX -= io.MouseDelta.X / camera.Scale;
-            _workspace.BlueprintCameraY -= io.MouseDelta.Y / camera.Scale;
-        }
-        if (hovered && ImGui.IsKeyPressed(ImGuiKey.F))
-            FrameBlueprint();
-    }
-
-    private void FrameBlueprint()
-    {
-        var scene = _blueprints.Current?.Scene;
-        if (scene is null)
-            return;
-        var selected = _blueprints.Selection.GetActive(scene);
-        if (selected is not null)
-        {
-            _workspace.BlueprintCameraX = selected.Transform.WorldPosition.X;
-            _workspace.BlueprintCameraY = selected.Transform.WorldPosition.Y;
-            return;
-        }
-        var roots = scene.GetAllEntities().Where(entity => entity.Parent is null).ToArray();
-        if (roots.Length == 0)
-            return;
-        var center = roots.Aggregate(XnaVector2.Zero, (sum, entity) => sum + entity.Transform.WorldPosition2D) /
-                     roots.Length;
-        _workspace.BlueprintCameraX = center.X;
-        _workspace.BlueprintCameraY = center.Y;
-    }
-
-    private bool DrawColliderHandles(
-        ImDrawListPtr drawList,
-        SceneDocument document,
-        Scene scene,
-        Camera2D camera,
-        Vector2 canvasPosition,
-        Vector2 mouseLocal,
-        bool hovered)
-    {
-        var color = ImGui.GetColorU32(new Vector4(0.32f, 0.92f, 0.55f, 0.95f));
-        foreach (var entity in _blueprints.Selection.Resolve(scene))
-        {
-            foreach (var collider in entity.GetAllComponents().OfType<Collider>())
-            {
-                if (collider is not BoxCollider || collider.Bounds is not Box2D localBox)
-                    continue;
-
-                var vertices = collider.WorldPolygon2D.Vertices;
-                for (var index = 0; index < vertices.Length; index++)
-                {
-                    var screen = camera.WorldToScreen(vertices[index]);
-                    var handle = canvasPosition + new Vector2(screen.X, screen.Y);
-                    drawList.AddRectFilled(handle - new Vector2(4f), handle + new Vector2(4f), color);
-                    if (_colliderDrag is null && hovered &&
-                        Vector2.Distance(canvasPosition + mouseLocal, handle) <= 9f &&
-                        ImGui.IsMouseClicked(ImGuiMouseButton.Left))
-                    {
-                        _colliderDrag = new ColliderDrag(
-                            entity.Id,
-                            index switch
-                            {
-                                0 => localBox.BottomRight,
-                                1 => localBox.BottomLeft,
-                                2 => localBox.TopLeft,
-                                _ => localBox.TopRight
-                            },
-                            document.BeginTransaction("Resize Box Collider"));
-                    }
-                }
-            }
-        }
-
-        if (_colliderDrag is null)
-            return false;
-        if (!ImGui.IsMouseDown(ImGuiMouseButton.Left))
-        {
-            _colliderDrag.Transaction.Commit();
-            _colliderDrag = null;
-            return true;
-        }
-
-        var world = camera.ScreenToWorld(new XnaVector2(mouseLocal.X, mouseLocal.Y));
-        var drag = _colliderDrag;
-        drag.Transaction.Update(currentScene =>
-        {
-            var entity = currentScene.FindEntity(drag.EntityId);
-            if (entity?.GetComponent<BoxCollider>() is not { } collider)
-                return;
-            var local = entity.Transform.InverseTransformPoint2D(world);
-            if (_workspace.SnapEnabled)
-            {
-                var snap = MathF.Max(0.001f, _workspace.MoveSnap);
-                local.X = MathF.Round(local.X / snap) * snap;
-                local.Y = MathF.Round(local.Y / snap) * snap;
-            }
-            var center = (local + drag.OppositeLocal) * 0.5f;
-            var halfWidth = MathF.Max(0.001f, MathF.Abs(local.X - drag.OppositeLocal.X) * 0.5f);
-            var halfHeight = MathF.Max(0.001f, MathF.Abs(local.Y - drag.OppositeLocal.Y) * 0.5f);
-            collider.SetShape(Box2D.CreateRectangle(center, halfWidth, halfHeight));
-        });
-        return true;
     }
 
     private void RefreshAssetRecord()
     {
         if (_asset is null)
             return;
-        var current = _assets.GetSnapshot().Assets.FirstOrDefault(asset => asset.Id == _asset.Id);
-        if (current is null)
+        var snapshot = _assets.GetSnapshot();
+        if (snapshot.Version == _observedAssetVersion)
             return;
+        _observedAssetVersion = snapshot.Version;
+        var current = snapshot.Assets.FirstOrDefault(asset => asset.Id == _asset.Id);
+        if (current is null)
+        {
+            _asset = null;
+            _needsRebuild = false;
+            _workspace.LastBlueprintPath = string.Empty;
+            _error = "The open Blueprint was removed from the project.";
+            return;
+        }
         if (current.LastWriteUtc != _sourceWriteUtc &&
             _assetEditing.Current?.Asset.Id != current.Id)
         {
             _needsRebuild = true;
         }
         _asset = current;
+        // The database preserves identity across moves and renames. Persist its
+        // current path rather than leaving the workspace pointed at the old name.
+        _workspace.LastBlueprintPath = current.RelativePath;
     }
 
     private void RebuildPreview()
@@ -380,7 +190,11 @@ internal sealed class BlueprintViewPanel : EditorPanel
             return;
         try
         {
-            _blueprints.Open(_asset);
+            if (!_blueprints.Open(_asset))
+            {
+                _error = $"Could not open '{_asset.RelativePath}'. The current asset remains open.";
+                return;
+            }
             _sourceWriteUtc = _asset.LastWriteUtc;
             _error = null;
         }
@@ -392,74 +206,28 @@ internal sealed class BlueprintViewPanel : EditorPanel
 
     private void OnAssetDocumentChanged()
     {
+        // This notification also covers removal of the currently open asset while
+        // the panel is hidden, so keep its persisted identity from going stale.
+        RefreshAssetRecord();
         if (_assetEditing.Current?.Asset.Id == _asset?.Id)
             _needsRebuild = true;
     }
 
     private void OnAssetPreviewChanged(DreambitAssetDocument document)
     {
+        // BeforeDocumentResolution distinguishes a synchronous service rebuild from a
+        // failed/suspended preview, independent of event-subscriber ordering.
         if (document.Asset.Id == _asset?.Id)
             _needsRebuild = true;
     }
 
-    private static void DrawEmptyCanvas(Vector2 position, Vector2 size, string title, string detail)
+    protected override void DisposeViewport()
     {
-        ImGui.InvisibleButton("##BlueprintCanvas", size);
-        var drawList = ImGui.GetWindowDrawList();
-        drawList.AddRectFilled(position, position + size, ImGui.GetColorU32(new Vector4(0.075f, 0.082f, 0.095f, 1f)));
-        var center = position + size * 0.5f;
-        var titleSize = ImGui.CalcTextSize(title);
-        var detailSize = ImGui.CalcTextSize(detail);
-        drawList.AddText(center - new Vector2(titleSize.X * 0.5f, 18f), ImGui.GetColorU32(new Vector4(0.82f, 0.84f, 0.88f, 1f)), title);
-        drawList.AddText(center - new Vector2(detailSize.X * 0.5f, -6f), ImGui.GetColorU32(new Vector4(0.50f, 0.53f, 0.59f, 1f)), detail);
-    }
-
-    protected override void DisposeCore()
-    {
+        // Asset database rename notifications do not reopen/reselect the asset document.
+        // Resolve the stable asset ID one final time so a hidden panel also persists the
+        // latest path (or clears a Blueprint that was removed) during shutdown.
+        RefreshAssetRecord();
         _assetEditing.Changed -= OnAssetDocumentChanged;
         _assetEditing.PreviewChanged -= OnAssetPreviewChanged;
-        _blueprints.Dispose();
-        _renderer.Dispose();
-    }
-
-    private sealed record ColliderDrag(
-        Guid EntityId,
-        XnaVector2 OppositeLocal,
-        SceneDocument.SceneEditTransaction Transaction);
-
-    private sealed class PreviewGizmoContext(
-        ImDrawListPtr drawList,
-        Camera2D camera,
-        Vector2 canvasPosition) : IEditorGizmoContext
-    {
-        public void Line(XnaVector2 from, XnaVector2 to, Color color, float thickness = 1f) =>
-            drawList.AddLine(Screen(from), Screen(to), ColorU32(color), MathF.Max(1f, thickness));
-
-        public void Circle(XnaVector2 center, float radius, Color color, float thickness = 1f) =>
-            drawList.AddCircle(Screen(center), MathF.Abs(radius * camera.Scale), ColorU32(color), 48, MathF.Max(1f, thickness));
-
-        public void Rectangle(RectangleF rectangle, Color color, float thickness = 1f) =>
-            drawList.AddRect(
-                Screen(new XnaVector2(rectangle.Left, rectangle.Top)),
-                Screen(new XnaVector2(rectangle.Right, rectangle.Bottom)),
-                ColorU32(color),
-                0f,
-                ImDrawFlags.None,
-                MathF.Max(1f, thickness));
-
-        public void Label(XnaVector2 position, string text, Color color)
-        {
-            if (!string.IsNullOrWhiteSpace(text))
-                drawList.AddText(Screen(position), ColorU32(color), text);
-        }
-
-        private Vector2 Screen(XnaVector2 world)
-        {
-            var screen = camera.WorldToScreen(world);
-            return canvasPosition + new Vector2(screen.X, screen.Y);
-        }
-
-        private static uint ColorU32(Color color) => ImGui.GetColorU32(
-            new Vector4(color.R / 255f, color.G / 255f, color.B / 255f, color.A / 255f));
     }
 }

@@ -16,9 +16,12 @@ internal sealed class GameCodeService : IDisposable
     private readonly IProcessRunner _processRunner;
     private readonly Action<GameCodeMessage>? _report;
     private readonly CancellationTokenSource _lifetime;
-    private readonly List<string> _sourceRoots;
+    private readonly List<string> _sourceRoots = [];
     private readonly List<FileSystemWatcher> _sourceWatchers = [];
-    private Dictionary<string, SourceFileStamp> _sourceFiles;
+    private Dictionary<string, SourceFileStamp> _sourceFiles = new(
+        OperatingSystem.IsWindows()
+            ? StringComparer.OrdinalIgnoreCase
+            : StringComparer.Ordinal);
     private readonly object _watcherSync = new();
     private Task<GameBuildResult>? _activeBuild;
     private GameBuildStatus _status = new(GameBuildState.Idle, "Game code is up to date.");
@@ -38,32 +41,42 @@ internal sealed class GameCodeService : IDisposable
         _report = report;
         _processRunner = processRunner ?? new ProcessRunner();
         _lifetime = CancellationTokenSource.CreateLinkedTokenSource(projectLifetime);
-        Assemblies = new GameAssemblyLoadService(project.RootDirectory, report);
-        _sourceRoots = DiscoverSourceRoots(project);
-        _sourceFiles = CaptureSourceFiles(_sourceRoots);
-        foreach (var sourceRoot in _sourceRoots)
+        try
         {
-            var watcher = new FileSystemWatcher(sourceRoot)
+            Assemblies = new GameAssemblyLoadService(project.RootDirectory, report);
+            _sourceRoots.AddRange(DiscoverSourceRoots(project));
+            _sourceFiles = CaptureSourceFiles(_sourceRoots);
+            foreach (var sourceRoot in _sourceRoots)
             {
-                IncludeSubdirectories = true,
-                NotifyFilter = NotifyFilters.FileName |
-                               NotifyFilters.DirectoryName |
-                               NotifyFilters.LastWrite |
-                               NotifyFilters.Size,
-                EnableRaisingEvents = false
-            };
-            watcher.Created += OnSourceChanged;
-            watcher.Changed += OnSourceChanged;
-            watcher.Deleted += OnSourceChanged;
-            watcher.Renamed += OnSourceRenamed;
-            watcher.Error += OnWatcherError;
-            watcher.EnableRaisingEvents = true;
-            _sourceWatchers.Add(watcher);
+                var watcher = new FileSystemWatcher(sourceRoot)
+                {
+                    IncludeSubdirectories = true,
+                    NotifyFilter = NotifyFilters.FileName |
+                                   NotifyFilters.DirectoryName |
+                                   NotifyFilters.LastWrite |
+                                   NotifyFilters.Size,
+                    EnableRaisingEvents = false
+                };
+                _sourceWatchers.Add(watcher);
+                watcher.Created += OnSourceChanged;
+                watcher.Changed += OnSourceChanged;
+                watcher.Deleted += OnSourceChanged;
+                watcher.Renamed += OnSourceRenamed;
+                watcher.Error += OnWatcherError;
+                watcher.EnableRaisingEvents = true;
+            }
+            RequestBuild(rebuild: false, immediate: true);
         }
-        RequestBuild(rebuild: false, immediate: true);
+        catch
+        {
+            DisposeWatchers();
+            Assemblies?.Dispose();
+            _lifetime.Dispose();
+            throw;
+        }
     }
 
-    public GameAssemblyLoadService Assemblies { get; }
+    public GameAssemblyLoadService Assemblies { get; private set; } = null!;
     public GameBuildStatus Status => _status;
     public bool IsRunning => _activeBuild is not null;
 
@@ -372,30 +385,78 @@ internal sealed class GameCodeService : IDisposable
     {
         if (_disposed)
             return;
-        foreach (var watcher in _sourceWatchers)
-        {
-            watcher.EnableRaisingEvents = false;
-            watcher.Created -= OnSourceChanged;
-            watcher.Changed -= OnSourceChanged;
-            watcher.Deleted -= OnSourceChanged;
-            watcher.Renamed -= OnSourceRenamed;
-            watcher.Error -= OnWatcherError;
-            watcher.Dispose();
-        }
-        _sourceWatchers.Clear();
+
+        _disposed = true;
+        DisposeWatchers();
         _lifetime.Cancel();
-        if (_activeBuild is not null)
-        {
-            _ = _activeBuild.ContinueWith(
-                static task => _ = task.Exception,
-                CancellationToken.None,
-                TaskContinuationOptions.OnlyOnFaulted |
-                TaskContinuationOptions.ExecuteSynchronously,
-                TaskScheduler.Default);
-        }
+        DrainActiveBuild();
         Assemblies.Dispose();
         _lifetime.Dispose();
-        _disposed = true;
+    }
+
+    private void DisposeWatchers()
+    {
+        foreach (var watcher in _sourceWatchers)
+        {
+            try
+            {
+                watcher.EnableRaisingEvents = false;
+                watcher.Created -= OnSourceChanged;
+                watcher.Changed -= OnSourceChanged;
+                watcher.Deleted -= OnSourceChanged;
+                watcher.Renamed -= OnSourceRenamed;
+                watcher.Error -= OnWatcherError;
+                watcher.Dispose();
+            }
+            catch (Exception exception)
+            {
+                ReportCleanupFailure("A game source watcher could not be disposed.", exception);
+            }
+        }
+        _sourceWatchers.Clear();
+    }
+
+    private void DrainActiveBuild()
+    {
+        var build = _activeBuild;
+        _activeBuild = null;
+        if (build is null)
+            return;
+
+        try
+        {
+            if (!build.Wait(TimeSpan.FromSeconds(5)))
+            {
+                ReportCleanupFailure(
+                    "The canceled game build did not stop before the project closed.",
+                    null);
+            }
+        }
+        catch (AggregateException exception) when (
+            exception.Flatten().InnerExceptions.All(inner => inner is OperationCanceledException))
+        {
+        }
+        catch (Exception exception)
+        {
+            ReportCleanupFailure("The canceled game build failed during shutdown.", exception);
+        }
+    }
+
+    private void ReportCleanupFailure(string message, Exception? exception)
+    {
+        try
+        {
+            _report?.Invoke(new GameCodeMessage(
+                exception is null
+                    ? GameCodeMessageSeverity.Warning
+                    : GameCodeMessageSeverity.Error,
+                message,
+                exception));
+        }
+        catch
+        {
+            Console.Error.WriteLine($"{message} {exception}");
+        }
     }
 
     private readonly record struct SourceFileStamp(long LastWriteTicks, long Length);

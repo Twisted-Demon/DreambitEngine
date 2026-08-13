@@ -18,10 +18,11 @@ internal sealed class ProjectInstanceLease : IDisposable
         out ProjectInstanceLease? lease,
         out string? error)
     {
+        FileStream? stream = null;
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(lockPath)!);
-            var stream = new FileStream(
+            stream = new FileStream(
                 lockPath,
                 FileMode.OpenOrCreate,
                 FileAccess.ReadWrite,
@@ -45,14 +46,19 @@ internal sealed class ProjectInstanceLease : IDisposable
             error = null;
             return true;
         }
-        catch (IOException)
+        catch (IOException exception)
         {
+            var opened = stream is not null;
+            stream?.Dispose();
             lease = null;
-            error = $"The project '{projectRoot}' is already open in another Dreambit Editor process.";
+            error = opened
+                ? $"Could not initialize the project session lock. {exception.Message}"
+                : $"The project '{projectRoot}' is already open in another Dreambit Editor process.";
             return false;
         }
         catch (UnauthorizedAccessException exception)
         {
+            stream?.Dispose();
             lease = null;
             error = $"Could not create the project session lock. {exception.Message}";
             return false;

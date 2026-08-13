@@ -28,16 +28,17 @@ internal sealed class SceneViewportRenderer : IDisposable
     public Camera2D Render(Scene scene, int width, int height, Vector2 position, float zoom)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        EnsureTarget(width, height);
-        var camera = scene.EnsureEditorCamera();
-        camera.Transform.Position = new Vector3(position, camera.Transform.Position.Z);
-        camera.Zoom = EditorViewportUi.NormalizeZoom(zoom);
-        camera.ConfigureEditorViewport(_sceneTarget!.Width, _sceneTarget.Height);
+        Camera2D? camera = null;
 
-        _device.SetRenderTarget(_sceneTarget);
-        _device.Clear(scene.BackgroundColor);
         try
         {
+            camera = scene.EnsureEditorCamera();
+            EnsureTarget(width, height);
+            camera.Transform.Position = new Vector3(position, camera.Transform.Position.Z);
+            camera.Zoom = EditorViewportUi.NormalizeZoom(zoom);
+            camera.ConfigureEditorViewport(_sceneTarget!.Width, _sceneTarget.Height);
+            _device.SetRenderTarget(_sceneTarget);
+            _device.Clear(scene.BackgroundColor);
             BuildDrawBuffer(scene);
             Draw(scene, camera.TransformMatrix);
             Present(scene.RenderingOptions.SamplerState);
@@ -49,41 +50,67 @@ internal sealed class SceneViewportRenderer : IDisposable
         }
         finally
         {
-            _device.SetRenderTarget(null);
+            _drawBuffer.Clear();
+            try
+            {
+                _device.SetRenderTarget(null);
+            }
+            catch (Exception exception)
+            {
+                LastError ??= exception.Message;
+            }
         }
+        // EnsureEditorCamera is the only operation above that can leave this unset. It
+        // is an engine invariant for an editor scene, so preserve that failure rather
+        // than returning an invalid camera to interaction code.
+        if (camera is null)
+            throw new InvalidOperationException(
+                $"The editor camera for '{scene.GetType().FullName}' could not be created. {LastError}");
         return camera;
     }
 
     public Entity? Pick(Scene scene, Vector2 worldPosition)
     {
-        BuildDrawBuffer(scene);
-        for (var index = _drawBuffer.Count - 1; index >= 0; index--)
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        try
         {
-            var drawable = _drawBuffer[index];
-            try
+            BuildDrawBuffer(scene);
+            for (var index = _drawBuffer.Count - 1; index >= 0; index--)
             {
-                if (drawable.Bounds.Contains(worldPosition))
-                    return drawable.Entity;
+                var drawable = _drawBuffer[index];
+                try
+                {
+                    if (drawable.Bounds.Contains(worldPosition))
+                        return drawable.Entity;
+                }
+                catch (Exception exception)
+                {
+                    // A custom bounds implementation is an extension boundary. Keep
+                    // picking other drawables, but surface the fault in the viewport.
+                    LastError ??=
+                        $"{drawable.GetType().FullName ?? drawable.GetType().Name} " +
+                        $"could not provide picking bounds: {exception.Message}";
+                }
             }
-            catch
-            {
-                // A custom bounds implementation is an extension boundary; keep picking others.
-            }
-        }
 
-        Entity? nearest = null;
-        var nearestDistanceSquared = 100f;
-        foreach (var entity in scene.GetAllEntities())
-        {
-            if (entity.IsEditorOnly && !entity.IsLDtkGenerated)
-                continue;
-            var distanceSquared = Vector2.DistanceSquared(entity.Transform.WorldPosition2D, worldPosition);
-            if (distanceSquared >= nearestDistanceSquared)
-                continue;
-            nearest = entity;
-            nearestDistanceSquared = distanceSquared;
+            Entity? nearest = null;
+            var nearestDistanceSquared = 100f;
+            foreach (var entity in scene.GetAllEntities())
+            {
+                if (entity.IsEditorOnly && !entity.IsLDtkGenerated)
+                    continue;
+                var distanceSquared = Vector2.DistanceSquared(entity.Transform.WorldPosition2D, worldPosition);
+                if (distanceSquared >= nearestDistanceSquared)
+                    continue;
+                nearest = entity;
+                nearestDistanceSquared = distanceSquared;
+            }
+            return nearest;
         }
-        return nearest;
+        finally
+        {
+            _drawBuffer.Clear();
+        }
     }
 
     private void BuildDrawBuffer(Scene scene)
@@ -108,28 +135,32 @@ internal sealed class SceneViewportRenderer : IDisposable
     {
         Effect? activeEffect = null;
         var batchStarted = false;
-        foreach (var drawable in _drawBuffer)
+        try
         {
-            var effect = drawable.Effect;
-            if (!batchStarted || !ReferenceEquals(activeEffect, effect))
+            foreach (var drawable in _drawBuffer)
             {
-                if (batchStarted)
-                    Core.SpriteBatch.End();
-                Core.SpriteBatch.Begin(
-                    SpriteSortMode.Deferred,
-                    scene.RenderingOptions.BlendState,
-                    scene.RenderingOptions.SamplerState,
-                    DepthStencilState.None,
-                    RasterizerState.CullNone,
-                    effect,
-                    transform);
-                activeEffect = effect;
-                batchStarted = true;
+                var effect = drawable.Effect;
+                if (!batchStarted || !ReferenceEquals(activeEffect, effect))
+                {
+                    EndBatch(ref batchStarted);
+                    Core.SpriteBatch.Begin(
+                        SpriteSortMode.Deferred,
+                        scene.RenderingOptions.BlendState,
+                        scene.RenderingOptions.SamplerState,
+                        DepthStencilState.None,
+                        RasterizerState.CullNone,
+                        effect,
+                        transform);
+                    activeEffect = effect;
+                    batchStarted = true;
+                }
+                drawable.Draw();
             }
-            drawable.Draw();
         }
-        if (batchStarted)
-            Core.SpriteBatch.End();
+        finally
+        {
+            EndBatch(ref batchStarted);
+        }
     }
 
     private void Present(SamplerState samplerState)
@@ -139,14 +170,30 @@ internal sealed class SceneViewportRenderer : IDisposable
                                 "The built-in scene presentation effect could not be loaded.");
         _device.SetRenderTarget(_displayTarget);
         _device.Clear(Color.Transparent);
-        Core.SpriteBatch.Begin(
-            SpriteSortMode.Deferred,
-            BlendState.Opaque,
-            samplerState,
-            DepthStencilState.None,
-            RasterizerState.CullNone,
-            presentEffect);
-        Core.SpriteBatch.Draw(_sceneTarget!, Vector2.Zero, Color.White);
+        var batchStarted = false;
+        try
+        {
+            Core.SpriteBatch.Begin(
+                SpriteSortMode.Deferred,
+                BlendState.Opaque,
+                samplerState,
+                DepthStencilState.None,
+                RasterizerState.CullNone,
+                presentEffect);
+            batchStarted = true;
+            Core.SpriteBatch.Draw(_sceneTarget!, Vector2.Zero, Color.White);
+        }
+        finally
+        {
+            EndBatch(ref batchStarted);
+        }
+    }
+
+    private static void EndBatch(ref bool batchStarted)
+    {
+        if (!batchStarted)
+            return;
+        batchStarted = false;
         Core.SpriteBatch.End();
     }
 
@@ -154,47 +201,130 @@ internal sealed class SceneViewportRenderer : IDisposable
     {
         width = Math.Clamp(width, 1, 8192);
         height = Math.Clamp(height, 1, 8192);
-        if (_sceneTarget is not null && _sceneTarget.Width == width && _sceneTarget.Height == height)
+        if (_sceneTarget is not null &&
+            _displayTarget is not null &&
+            _textureId != 0 &&
+            _sceneTarget.Width == width &&
+            _sceneTarget.Height == height &&
+            _displayTarget.Width == width &&
+            _displayTarget.Height == height)
+        {
             return;
+        }
 
-        if (_textureId != 0)
-            _imGui.UnbindTexture(_textureId);
-        _sceneTarget?.Dispose();
-        _displayTarget?.Dispose();
-        _sceneTarget = new RenderTarget2D(
-            _device,
-            width,
-            height,
-            false,
-            RenderPipeline.SceneColorFormat,
-            DepthFormat.None)
+        RenderTarget2D? replacementScene = null;
+        RenderTarget2D? replacementDisplay = null;
+        nint replacementTextureId = 0;
+        try
         {
-            Name = "Dreambit Editor Linear Scene View"
-        };
-        _displayTarget = new RenderTarget2D(
-            _device,
-            width,
-            height,
-            false,
-            SurfaceFormat.Color,
-            DepthFormat.None)
+            replacementScene = new RenderTarget2D(
+                _device,
+                width,
+                height,
+                false,
+                RenderPipeline.SceneColorFormat,
+                DepthFormat.None)
+            {
+                Name = "Dreambit Editor Linear Scene View"
+            };
+            replacementDisplay = new RenderTarget2D(
+                _device,
+                width,
+                height,
+                false,
+                SurfaceFormat.Color,
+                DepthFormat.None)
+            {
+                Name = "Dreambit Editor Display Scene View"
+            };
+            replacementTextureId = _imGui.BindTexture(replacementDisplay);
+        }
+        catch (Exception allocationFailure)
         {
-            Name = "Dreambit Editor Display Scene View"
-        };
-        _textureId = _imGui.BindTexture(_displayTarget);
+            List<Exception>? cleanupFailures = null;
+            TryCleanup(
+                () =>
+                {
+                    if (replacementTextureId != 0)
+                        _imGui.UnbindTexture(replacementTextureId);
+                },
+                ref cleanupFailures);
+            TryCleanup(() => replacementScene?.Dispose(), ref cleanupFailures);
+            TryCleanup(() => replacementDisplay?.Dispose(), ref cleanupFailures);
+            if (cleanupFailures is not null)
+            {
+                cleanupFailures.Insert(0, allocationFailure);
+                throw new AggregateException(
+                    "Could not allocate or clean up replacement viewport targets.",
+                    cleanupFailures);
+            }
+            throw;
+        }
+
+        // Publish only a complete target pair and binding. If allocation failed, the
+        // previous renderer state above remains usable on the next frame.
+        var previousScene = _sceneTarget;
+        var previousDisplay = _displayTarget;
+        var previousTextureId = _textureId;
+        _sceneTarget = replacementScene;
+        _displayTarget = replacementDisplay;
+        _textureId = replacementTextureId;
+
+        List<Exception>? replacementCleanupFailures = null;
+        TryCleanup(
+            () =>
+            {
+                if (previousTextureId != 0)
+                    _imGui.UnbindTexture(previousTextureId);
+            },
+            ref replacementCleanupFailures);
+        TryCleanup(() => previousScene?.Dispose(), ref replacementCleanupFailures);
+        TryCleanup(() => previousDisplay?.Dispose(), ref replacementCleanupFailures);
+        if (replacementCleanupFailures is not null)
+        {
+            throw new AggregateException(
+                "The new viewport targets were installed, but the previous targets could not be fully released.",
+                replacementCleanupFailures);
+        }
+    }
+
+    private static void TryCleanup(Action cleanup, ref List<Exception>? failures)
+    {
+        try
+        {
+            cleanup();
+        }
+        catch (Exception exception)
+        {
+            (failures ??= []).Add(exception);
+        }
     }
 
     public void Dispose()
     {
         if (_disposed)
             return;
-        if (_textureId != 0)
-            _imGui.UnbindTexture(_textureId);
-        _sceneTarget?.Dispose();
-        _displayTarget?.Dispose();
+
+        var sceneTarget = _sceneTarget;
+        var displayTarget = _displayTarget;
+        var textureId = _textureId;
+        _drawBuffer.Clear();
         _sceneTarget = null;
         _displayTarget = null;
         _textureId = 0;
         _disposed = true;
+
+        List<Exception>? failures = null;
+        TryCleanup(
+            () =>
+            {
+                if (textureId != 0)
+                    _imGui.UnbindTexture(textureId);
+            },
+            ref failures);
+        TryCleanup(() => sceneTarget?.Dispose(), ref failures);
+        TryCleanup(() => displayTarget?.Dispose(), ref failures);
+        if (failures is not null)
+            throw new AggregateException("Could not fully dispose the scene viewport renderer.", failures);
     }
 }

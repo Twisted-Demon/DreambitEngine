@@ -77,11 +77,29 @@ internal sealed class EditorPanelRegistry : IDisposable
         if (_disposed)
             return;
 
-        for (var index = _panels.Count - 1; index >= 0; index--)
-            _panels[index].Dispose();
+        List<Exception>? errors = null;
+        try
+        {
+            for (var index = _panels.Count - 1; index >= 0; index--)
+            {
+                try
+                {
+                    _panels[index].Dispose();
+                }
+                catch (Exception exception)
+                {
+                    (errors ??= []).Add(exception);
+                }
+            }
+        }
+        finally
+        {
+            _panels.Clear();
+            _panelsById.Clear();
+            _disposed = true;
+        }
 
-        _panels.Clear();
-        _panelsById.Clear();
-        _disposed = true;
+        if (errors is not null)
+            throw new AggregateException("One or more editor panels failed to dispose.", errors);
     }
 }

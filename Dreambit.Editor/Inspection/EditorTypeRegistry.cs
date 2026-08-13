@@ -14,7 +14,7 @@ internal sealed class EditorTypeRegistry : IDisposable
     {
         _assemblies = assemblies;
         _metadata = metadata;
-        _assemblies.Reloading += OnReloading;
+        _assemblies.Unloading += OnUnloading;
         _assemblies.Reloaded += OnReloaded;
         Rebuild();
     }
@@ -27,7 +27,7 @@ internal sealed class EditorTypeRegistry : IDisposable
     {
         if (_disposed)
             return;
-        _assemblies.Reloading -= OnReloading;
+        _assemblies.Unloading -= OnUnloading;
         _assemblies.Reloaded -= OnReloaded;
         ComponentTypes = [];
         AssetTypes = [];
@@ -37,12 +37,11 @@ internal sealed class EditorTypeRegistry : IDisposable
 
     public event Action? Changed;
 
-    private void OnReloading(LoadedGameAssembly? assembly)
+    private void OnUnloading(LoadedGameAssembly assembly)
     {
-        if (assembly is not null)
-            _metadata.ReleaseAssembly(assembly.Assembly);
-        ComponentTypes = ComponentTypes.Where(type => type.Assembly != assembly?.Assembly).ToArray();
-        AssetTypes = AssetTypes.Where(type => type.Assembly != assembly?.Assembly).ToArray();
+        _metadata.ReleaseAssembly(assembly.Assembly);
+        ComponentTypes = ComponentTypes.Where(type => type.Assembly != assembly.Assembly).ToArray();
+        AssetTypes = AssetTypes.Where(type => type.Assembly != assembly.Assembly).ToArray();
     }
 
     private void OnReloaded(LoadedGameAssembly _)

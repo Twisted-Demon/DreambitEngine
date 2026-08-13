@@ -62,6 +62,9 @@ public sealed class LDtkGeneratedEntityOverride
     [JsonProperty("enabled", NullValueHandling = NullValueHandling.Ignore)]
     public bool? Enabled { get; set; }
 
+    [JsonProperty("tags", NullValueHandling = NullValueHandling.Ignore)]
+    public HashSet<string> Tags { get; set; }
+
     [JsonProperty("position", NullValueHandling = NullValueHandling.Ignore)]
     [JsonConverter(typeof(Vector3Converter))]
     public Vector3? Position { get; set; }

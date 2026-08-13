@@ -8,7 +8,11 @@ namespace Dreambit.Editor.Assets;
 internal sealed class DreambitAssetDocument : IDisposable
 {
     private readonly InspectorMetadataCache _metadata;
+    private readonly Action<string, Exception?>? _reportError;
     private JObject _source;
+    private string _savedSnapshot;
+    private Type? _assetType;
+    private DreambitAsset? _instance;
     private bool _disposed;
 
     private DreambitAssetDocument(
@@ -16,19 +20,22 @@ internal sealed class DreambitAssetDocument : IDisposable
         Type assetType,
         DreambitAsset instance,
         JObject source,
-        InspectorMetadataCache metadata)
+        InspectorMetadataCache metadata,
+        Action<string, Exception?>? reportError)
     {
         Asset = asset;
-        AssetType = assetType;
-        Instance = instance;
+        _assetType = assetType;
+        _instance = instance;
         _source = source;
         _metadata = metadata;
+        _reportError = reportError;
         Undo = new UndoService();
+        _savedSnapshot = CaptureJson();
     }
 
-    public AssetRecord Asset { get; }
-    public Type AssetType { get; }
-    public DreambitAsset Instance { get; private set; }
+    public AssetRecord Asset { get; private set; }
+    public Type AssetType => _assetType ?? throw new ObjectDisposedException(nameof(DreambitAssetDocument));
+    public DreambitAsset Instance => _instance ?? throw new ObjectDisposedException(nameof(DreambitAssetDocument));
     public UndoService Undo { get; }
     public bool IsDirty { get; private set; }
     public DateTimeOffset LastChangedUtc { get; private set; }
@@ -38,7 +45,8 @@ internal sealed class DreambitAssetDocument : IDisposable
         AssetRecord asset,
         string path,
         Type assetType,
-        InspectorMetadataCache metadata)
+        InspectorMetadataCache metadata,
+        Action<string, Exception?>? reportError = null)
     {
         var json = File.ReadAllText(path);
         var source = JObject.Parse(json);
@@ -46,24 +54,44 @@ internal sealed class DreambitAssetDocument : IDisposable
                        ?? throw new InvalidDataException($"'{asset.RelativePath}' is not a {assetType.FullName} asset.");
         instance.AssetId = asset.Id;
         instance.AssetName = asset.LogicalAssetName;
-        return new DreambitAssetDocument(asset, assetType, instance, source, metadata);
+        return new DreambitAssetDocument(asset, assetType, instance, source, metadata, reportError);
     }
 
-    public void Apply(string name, Action<DreambitAsset> mutation)
+    public void Apply(
+        string name,
+        Action<DreambitAsset> mutation,
+        string? mergeKey = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(mutation);
         var before = CaptureJson();
-        mutation(Instance);
-        var after = CaptureJson();
+        string after;
+        try
+        {
+            mutation(Instance);
+            after = CaptureJson();
+        }
+        catch (Exception exception)
+        {
+            RollBackFailedMutation(before, exception);
+            throw;
+        }
         if (string.Equals(before, after, StringComparison.Ordinal))
+        {
+            UpdateDirtyState(after);
             return;
-        IsDirty = true;
+        }
+        UpdateDirtyState(after);
         LastChangedUtc = DateTimeOffset.UtcNow;
-        Undo.Record(new AssetSnapshotCommand(name, this, before, after));
+        Undo.Record(new AssetSnapshotCommand(name, this, before, after, mergeKey));
         Changed?.Invoke(this);
     }
 
-    public void ReplaceBlueprint(string name, EntityBlueprint blueprint)
+    public void ReplaceBlueprint(
+        string name,
+        EntityBlueprint blueprint,
+        string? mergeKey = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -74,12 +102,15 @@ internal sealed class DreambitAssetDocument : IDisposable
         var before = CaptureJson();
         var after = DreambitJson.Serialize(blueprint);
         if (string.Equals(before, after, StringComparison.Ordinal))
+        {
+            UpdateDirtyState(after);
             return;
+        }
 
         ReplaceInstance(after);
-        IsDirty = true;
+        UpdateDirtyState(after);
         LastChangedUtc = DateTimeOffset.UtcNow;
-        Undo.Record(new AssetSnapshotCommand(name, this, before, after));
+        Undo.Record(new AssetSnapshotCommand(name, this, before, after, mergeKey));
         Changed?.Invoke(this);
     }
 
@@ -98,6 +129,7 @@ internal sealed class DreambitAssetDocument : IDisposable
             if (File.Exists(temporary))
                 File.Delete(temporary);
         }
+        _savedSnapshot = json;
         IsDirty = false;
     }
 
@@ -206,43 +238,124 @@ internal sealed class DreambitAssetDocument : IDisposable
         }
     }
 
-    private void Restore(string json, bool dirty)
+    private void Restore(string json, bool notifyChanged = true)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         ReplaceInstance(json);
-        IsDirty = dirty;
+        UpdateDirtyState(json);
         LastChangedUtc = DateTimeOffset.UtcNow;
-        Changed?.Invoke(this);
+        if (notifyChanged)
+            Changed?.Invoke(this);
     }
 
     private void ReplaceInstance(string json)
     {
-        _source = JObject.Parse(json);
+        var source = JObject.Parse(json);
         var replacement = DreambitJson.Deserialize(json, AssetType) as DreambitAsset
                           ?? throw new InvalidDataException("Could not restore the asset snapshot.");
         replacement.AssetId = Asset.Id;
         replacement.AssetName = Asset.LogicalAssetName;
-        Instance.Dispose();
-        Instance = replacement;
+        var previous = Instance;
+        _source = source;
+        _instance = replacement;
+        var cleanupFailure = EditorDisposal.TryDispose(previous);
+        if (cleanupFailure is not null)
+        {
+            _reportError?.Invoke(
+                $"Could not dispose the previous editor instance for '{Asset.RelativePath}'. " +
+                "The replacement remains active.\n" + cleanupFailure,
+                null);
+        }
     }
 
-    internal void RestoreReloadSnapshot(string json, bool dirty) => Restore(json, dirty);
+    private void UpdateDirtyState(string snapshot) =>
+        IsDirty = !string.Equals(_savedSnapshot, snapshot, StringComparison.Ordinal);
+
+    private void RollBackFailedMutation(string before, Exception mutationException)
+    {
+        try
+        {
+            Restore(before, notifyChanged: false);
+        }
+        catch (Exception rollbackException)
+        {
+            throw new AggregateException(
+                "The asset mutation failed and its previous snapshot could not be restored.",
+                mutationException,
+                rollbackException);
+        }
+    }
+
+    internal void RestoreReloadSnapshot(string json, bool dirty)
+    {
+        _ = dirty;
+        Restore(json);
+    }
+
+    internal void RebindAsset(AssetRecord asset)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(asset);
+        if (asset.Id != Asset.Id)
+            throw new ArgumentException("An open asset document can only be rebound to the same asset ID.", nameof(asset));
+        Asset = asset;
+        Instance.AssetId = asset.Id;
+        Instance.AssetName = asset.LogicalAssetName;
+    }
+
+    /// <summary>
+    /// Releases references to a collectible asset generation without invoking game cleanup.
+    /// Cleanup already ran during reload preparation; this is a final ownership barrier before GC.
+    /// </summary>
+    internal void ReleaseCollectibleReferences()
+    {
+        _instance = null;
+        _assetType = null;
+        Undo.Clear();
+        Changed = null;
+    }
 
     public void Dispose()
     {
         if (_disposed)
             return;
-        Instance.Dispose();
-        Undo.Clear();
         _disposed = true;
+        var instance = _instance;
+        _instance = null;
+        _assetType = null;
+        Undo.Clear();
+        Changed = null;
+        instance?.Dispose();
     }
 
-    private sealed record AssetSnapshotCommand(
-        string Name,
-        DreambitAssetDocument Document,
-        string Before,
-        string After) : IUndoableEditorCommand
+    private sealed class AssetSnapshotCommand(
+        string name,
+        DreambitAssetDocument document,
+        string before,
+        string after,
+        string? mergeKey) : IUndoableEditorCommand
     {
-        public void Undo() => Document.Restore(Before, false);
-        public void Redo() => Document.Restore(After, true);
+        public string Name { get; } = name;
+        public string? MergeKey { get; } = mergeKey;
+        private DreambitAssetDocument Document { get; } = document;
+        private string Before { get; } = before;
+        private string After { get; set; } = after;
+        public bool IsNoOp => string.Equals(Before, After, StringComparison.Ordinal);
+
+        public bool TryMerge(IUndoableEditorCommand subsequent)
+        {
+            if (subsequent is not AssetSnapshotCommand next ||
+                !ReferenceEquals(Document, next.Document) ||
+                !string.Equals(MergeKey, next.MergeKey, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            After = next.After;
+            return true;
+        }
+
+        public void Undo() => Document.Restore(Before);
+        public void Redo() => Document.Restore(After);
     }
 }

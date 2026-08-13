@@ -72,6 +72,17 @@ internal sealed class InspectorPanel : EditorPanel
                 _lastUnhandledFailure = failure;
             }
         }
+        finally
+        {
+            // A merge key is valid only for one continuous ImGui interaction.
+            // Once no item is active, a later edit of the same property must create
+            // a separate undo step.
+            if (!ImGui.IsAnyItemActive())
+            {
+                _documentContext.Current?.Undo.EndMergeGroup();
+                _assetEditing.Current?.Undo.EndMergeGroup();
+            }
+        }
     }
 
     private void DrawContentsCore()
@@ -79,13 +90,16 @@ internal sealed class InspectorPanel : EditorPanel
         var document = _documentContext.Current;
         var entities = document?.Selection.Resolve(document.Scene) ?? [];
         var inspectBlueprintEntity = _documentContext.IsBlueprint && entities.Count > 0;
+        var inspectAsset = _documentContext.IsAsset ||
+                           (_documentContext.IsBlueprint && entities.Count == 0);
 
-        if (!inspectBlueprintEntity && _assetEditing.Current is { } assetDocument)
+        if (inspectAsset && !inspectBlueprintEntity && _assetEditing.Current is { } assetDocument)
         {
             DrawAssetDocument(assetDocument);
             return;
         }
-        if (!inspectBlueprintEntity && _assetEditing.Selected is { } selectedAsset)
+        if (_documentContext.IsAsset && !inspectBlueprintEntity &&
+            _assetEditing.Selected is { } selectedAsset)
         {
             ImGui.TextUnformatted(selectedAsset.Name);
             ImGui.TextDisabled(selectedAsset.RelativePath);
@@ -206,20 +220,42 @@ internal sealed class InspectorPanel : EditorPanel
         var renderBackgroundImage = edited.RenderLevelBackgroundImage;
         var includeInvisibleLayers = edited.IncludeInvisibleLayers;
         var changed = false;
+        string? mergeKey = null;
         DrawPropertyRow("LDtk.PixelsPerUnit", "Pixels Per Unit", () =>
-            changed |= ImGui.DragFloat("##Value", ref pixelsPerUnit, 0.1f, 0.001f, 100000f));
+        {
+            if (ImGui.DragFloat("##Value", ref pixelsPerUnit, 0.1f, 0.001f, 100000f))
+                (changed, mergeKey) = (true, "LDtk.PixelsPerUnit");
+        });
         DrawPropertyRow("LDtk.BaseDrawLayer", "Base Draw Layer", () =>
-            changed |= ImGui.DragInt("##Value", ref baseDrawLayer, 1f));
+        {
+            if (ImGui.DragInt("##Value", ref baseDrawLayer, 1f))
+                (changed, mergeKey) = (true, "LDtk.BaseDrawLayer");
+        });
         DrawPropertyRow("LDtk.DrawLayerStep", "Draw Layer Step", () =>
-            changed |= ImGui.DragInt("##Value", ref drawLayerStep, 1f, 1, 100000));
+        {
+            if (ImGui.DragInt("##Value", ref drawLayerStep, 1f, 1, 100000))
+                (changed, mergeKey) = (true, "LDtk.DrawLayerStep");
+        });
         DrawPropertyRow("LDtk.WorldDepthStride", "World Depth Stride", () =>
-            changed |= ImGui.DragInt("##Value", ref worldDepthStride, 1f, 1, int.MaxValue));
+        {
+            if (ImGui.DragInt("##Value", ref worldDepthStride, 1f, 1, int.MaxValue))
+                (changed, mergeKey) = (true, "LDtk.WorldDepthStride");
+        });
         DrawPropertyRow("LDtk.RenderBackgroundColor", "Render Background Color", () =>
-            changed |= ImGui.Checkbox("##Value", ref renderBackgroundColor));
+        {
+            if (ImGui.Checkbox("##Value", ref renderBackgroundColor))
+                (changed, mergeKey) = (true, "LDtk.RenderBackgroundColor");
+        });
         DrawPropertyRow("LDtk.RenderBackgroundImage", "Render Background Image", () =>
-            changed |= ImGui.Checkbox("##Value", ref renderBackgroundImage));
+        {
+            if (ImGui.Checkbox("##Value", ref renderBackgroundImage))
+                (changed, mergeKey) = (true, "LDtk.RenderBackgroundImage");
+        });
         DrawPropertyRow("LDtk.IncludeInvisibleLayers", "Include Invisible Layers", () =>
-            changed |= ImGui.Checkbox("##Value", ref includeInvisibleLayers));
+        {
+            if (ImGui.Checkbox("##Value", ref includeInvisibleLayers))
+                (changed, mergeKey) = (true, "LDtk.IncludeInvisibleLayers");
+        });
 
         edited.PixelsPerUnit = pixelsPerUnit;
         edited.BaseDrawLayer = baseDrawLayer;
@@ -242,7 +278,7 @@ internal sealed class InspectorPanel : EditorPanel
                     options.RenderLevelBackgroundColor = edited.RenderLevelBackgroundColor;
                     options.RenderLevelBackgroundImage = edited.RenderLevelBackgroundImage;
                     options.IncludeInvisibleLayers = edited.IncludeInvisibleLayers;
-                });
+                }, mergeKey);
                 _error = null;
             }
             catch (Exception exception)
@@ -322,7 +358,10 @@ internal sealed class InspectorPanel : EditorPanel
                         false,
                         member.IsReadOnly));
                 if (result.Changed && !member.IsReadOnly)
-                    document.Apply($"Change {member.DisplayName}", asset => member.SetValue(asset, result.Value));
+                    document.Apply(
+                        $"Change {member.DisplayName}",
+                        asset => member.SetValue(asset, result.Value),
+                        $"Asset.{document.Asset.Id}.{member.SerializedName}");
             }
             catch (Exception exception)
             {
@@ -338,13 +377,19 @@ internal sealed class InspectorPanel : EditorPanel
         DrawPropertyRow("Blueprint.Name", "Name", () =>
         {
             if (ImGui.InputText("##Value", ref name, 256))
-                document.Apply("Rename Blueprint", asset => ((EntityBlueprint)asset).Name = name);
+                document.Apply(
+                    "Rename Blueprint",
+                    asset => ((EntityBlueprint)asset).Name = name,
+                    $"Blueprint.{blueprint.Guid:N}.Name");
         });
         var enabled = blueprint.Enabled;
         DrawPropertyRow("Blueprint.Enabled", "Enabled", () =>
         {
             if (ImGui.Checkbox("##Value", ref enabled))
-                document.Apply("Set Blueprint Enabled", asset => ((EntityBlueprint)asset).Enabled = enabled);
+                document.Apply(
+                    "Set Blueprint Enabled",
+                    asset => ((EntityBlueprint)asset).Enabled = enabled,
+                    $"Blueprint.{blueprint.Guid:N}.Enabled");
         });
 
         ImGui.TextDisabled("Drag to adjust. Double-click a number to type an exact value.");
@@ -352,22 +397,31 @@ internal sealed class InspectorPanel : EditorPanel
         DrawPropertyRow("Blueprint.Position", "Position", () =>
         {
             if (ImGui.DragFloat3("##Value", ref position, 0.1f))
-                document.Apply("Change Blueprint Position", asset =>
-                    ((EntityBlueprint)asset).Position = new Microsoft.Xna.Framework.Vector3(position.X, position.Y, position.Z));
+                document.Apply(
+                    "Change Blueprint Position",
+                    asset => ((EntityBlueprint)asset).Position =
+                        new Microsoft.Xna.Framework.Vector3(position.X, position.Y, position.Z),
+                    $"Blueprint.{blueprint.Guid:N}.Position");
         });
         var rotation = new Vector3(blueprint.Rotation.X, blueprint.Rotation.Y, blueprint.Rotation.Z);
         DrawPropertyRow("Blueprint.Rotation", "Rotation", () =>
         {
             if (ImGui.DragFloat3("##Value", ref rotation, 0.01f))
-                document.Apply("Change Blueprint Rotation", asset =>
-                    ((EntityBlueprint)asset).Rotation = new Microsoft.Xna.Framework.Vector3(rotation.X, rotation.Y, rotation.Z));
+                document.Apply(
+                    "Change Blueprint Rotation",
+                    asset => ((EntityBlueprint)asset).Rotation =
+                        new Microsoft.Xna.Framework.Vector3(rotation.X, rotation.Y, rotation.Z),
+                    $"Blueprint.{blueprint.Guid:N}.Rotation");
         });
         var scale = new Vector3(blueprint.Scale.X, blueprint.Scale.Y, blueprint.Scale.Z);
         DrawPropertyRow("Blueprint.Scale", "Scale", () =>
         {
             if (ImGui.DragFloat3("##Value", ref scale, 0.01f))
-                document.Apply("Change Blueprint Scale", asset =>
-                    ((EntityBlueprint)asset).Scale = new Microsoft.Xna.Framework.Vector3(scale.X, scale.Y, scale.Z));
+                document.Apply(
+                    "Change Blueprint Scale",
+                    asset => ((EntityBlueprint)asset).Scale =
+                        new Microsoft.Xna.Framework.Vector3(scale.X, scale.Y, scale.Z),
+                    $"Blueprint.{blueprint.Guid:N}.Scale");
         });
 
         ImGui.SeparatorText("Components");
@@ -390,7 +444,10 @@ internal sealed class InspectorPanel : EditorPanel
                     DrawPropertyRow("BlueprintComponent.Enabled", "Enabled", () =>
                     {
                         if (ImGui.Checkbox("##Value", ref componentEnabled))
-                            document.Apply("Set Component Enabled", _ => component.Enabled = componentEnabled);
+                            document.Apply(
+                                "Set Component Enabled",
+                                _ => component.Enabled = componentEnabled,
+                                $"Blueprint.{blueprint.Guid:N}.{component.Type}.Enabled");
                     });
                     if (componentType is null)
                     {
@@ -509,8 +566,10 @@ internal sealed class InspectorPanel : EditorPanel
                     false,
                     member.IsReadOnly));
             if (result.Changed && !member.IsReadOnly)
-                document.Apply($"Change {member.DisplayName}", _ =>
-                    component.Properties[member.SerializedName] = DreambitJson.ToToken(result.Value));
+                document.Apply(
+                    $"Change {member.DisplayName}",
+                    _ => component.Properties[member.SerializedName] = DreambitJson.ToToken(result.Value),
+                    $"Blueprint.{blueprint.Guid:N}.{component.Type}.{member.SerializedName}");
         }
     }
 
@@ -842,6 +901,7 @@ internal sealed class InspectorPanel : EditorPanel
                     {
                         entity.Tags.Clear();
                         entity.Tags.UnionWith(updatedTags);
+                        document.RecordLDtkEntityTags(entity);
                     }
                 });
             }
@@ -965,7 +1025,6 @@ internal sealed class InspectorPanel : EditorPanel
                 Apply(
                     document,
                     $"Remove {componentType.Name}",
-                    $"Component.Remove.{componentType.FullName}",
                     () =>
                     {
                         foreach (var entity in entities)
@@ -1242,7 +1301,7 @@ internal sealed class InspectorPanel : EditorPanel
                 ImGui.BeginDisabled();
             if (ImGui.Selectable(type.FullName ?? type.Name))
             {
-                Apply(document, $"Add {type.Name}", $"Component.Add.{type.FullName}", () =>
+                Apply(document, $"Add {type.Name}", () =>
                 {
                     foreach (var entity in entities)
                         entity.AttachComponent(type);
@@ -1260,6 +1319,22 @@ internal sealed class InspectorPanel : EditorPanel
     {
         try
         {
+            document.Apply(
+                name,
+                _ => mutation(),
+                BuildSceneMergeKey(document, mergeKey));
+            _error = null;
+        }
+        catch (Exception exception)
+        {
+            _error = exception.Message;
+        }
+    }
+
+    private void Apply(SceneDocument document, string name, Action mutation)
+    {
+        try
+        {
             document.Apply(name, _ => mutation());
             _error = null;
         }
@@ -1267,6 +1342,16 @@ internal sealed class InspectorPanel : EditorPanel
         {
             _error = exception.Message;
         }
+    }
+
+    private static string BuildSceneMergeKey(SceneDocument document, string propertyKey)
+    {
+        var selection = string.Join(
+            ",",
+            document.Selection.EntityIds
+                .OrderBy(static id => id)
+                .Select(static id => id.ToString("N")));
+        return $"{propertyKey}|{selection}";
     }
 
     private static bool ValuesEqual(object? left, object? right) =>

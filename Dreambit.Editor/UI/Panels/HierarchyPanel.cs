@@ -13,6 +13,7 @@ internal sealed class HierarchyPanel : EditorPanel
     private readonly EditorDocumentContext _documentContext;
     private readonly EditorDragDropService _dragDrop;
     private readonly AssetDatabase _assets;
+    private readonly BlueprintSourceService _blueprintSources;
     private readonly EditorWorkspaceState _workspace;
     private readonly EditorIconService _icons;
     private string _search = string.Empty;
@@ -28,6 +29,7 @@ internal sealed class HierarchyPanel : EditorPanel
         EditorDocumentContext documentContext,
         EditorDragDropService dragDrop,
         AssetDatabase assets,
+        BlueprintSourceService blueprintSources,
         EditorWorkspaceState workspace,
         EditorIconService icons)
         : base(EditorPanelIds.Hierarchy, "Hierarchy")
@@ -35,6 +37,7 @@ internal sealed class HierarchyPanel : EditorPanel
         _documentContext = documentContext;
         _dragDrop = dragDrop;
         _assets = assets;
+        _blueprintSources = blueprintSources;
         _workspace = workspace;
         _icons = icons;
     }
@@ -42,6 +45,11 @@ internal sealed class HierarchyPanel : EditorPanel
     protected override void DrawContents()
     {
         var document = _documentContext.Current;
+        if (document is not null &&
+            ImGui.IsWindowFocused(ImGuiFocusedFlags.RootAndChildWindows))
+        {
+            _documentContext.Activate(document);
+        }
         if (_icons.Button("HierarchyCreate", "add", "Create entity"))
             ImGui.OpenPopup("Create Entity##Hierarchy");
 
@@ -142,9 +150,11 @@ internal sealed class HierarchyPanel : EditorPanel
             return;
         ImGui.BeginDisabled(document is null);
         if (ImGui.MenuItem("Create Empty"))
-            document!.CreateEmpty(
+        {
+            TryEdit(() => document!.CreateEmpty(
                 "Entity",
-                _documentContext.IsBlueprint ? _documentContext.Blueprints.Root : null);
+                _documentContext.IsBlueprint ? _documentContext.Blueprints.Root : null));
+        }
         if (ImGui.MenuItem("Create From Blueprint"))
         {
             _blueprintSearch = string.Empty;
@@ -170,7 +180,7 @@ internal sealed class HierarchyPanel : EditorPanel
         }
         ImGui.BeginDisabled(linked || entity.IsLDtkGenerated);
         if (ImGui.MenuItem("Create Child"))
-            document.CreateEmpty("Entity", entity);
+            TryEdit(() => document.CreateEmpty("Entity", entity));
         ImGui.EndDisabled();
         ImGui.BeginDisabled(linked);
         if (ImGui.MenuItem("Rename", "F2"))
@@ -178,14 +188,14 @@ internal sealed class HierarchyPanel : EditorPanel
         ImGui.EndDisabled();
         ImGui.BeginDisabled(isBlueprintRoot || entity.IsLDtkGenerated || (linked && !isInstanceRoot));
         if (ImGui.MenuItem("Duplicate", "Ctrl+D"))
-            document.Duplicate(entity);
+            TryEdit(() => document.Duplicate(entity));
         ImGui.EndDisabled();
         if (linked)
         {
             ImGui.Separator();
             ImGui.TextDisabled(instance.AssetName);
             if (ImGui.MenuItem("Unbox Blueprint Instance"))
-                document.UnboxBlueprint(instanceRoot);
+                TryEdit(() => document.UnboxBlueprint(instanceRoot));
         }
         ImGui.Separator();
         ImGui.BeginDisabled(isBlueprintRoot || entity.IsLDtkGenerated || (linked && !isInstanceRoot));
@@ -250,15 +260,7 @@ internal sealed class HierarchyPanel : EditorPanel
 
     private void TryReparent(SceneDocument document, Entity entity, Entity? parent)
     {
-        try
-        {
-            document.Reparent(entity, parent);
-            _error = null;
-        }
-        catch (Exception exception)
-        {
-            _error = exception.Message;
-        }
+        TryEdit(() => document.Reparent(entity, parent));
     }
 
     private void RequestRename(Entity entity)
@@ -277,8 +279,8 @@ internal sealed class HierarchyPanel : EditorPanel
         var entity = _renameEntityId is { } id ? document.Scene?.FindEntity(id) : null;
         if ((submit || ImGui.Button("Rename")) && entity is not null && !string.IsNullOrWhiteSpace(_rename))
         {
-            document.Rename(entity, _rename);
-            ImGui.CloseCurrentPopup();
+            if (TryEdit(() => document.Rename(entity, _rename)))
+                ImGui.CloseCurrentPopup();
         }
         ImGui.SameLine();
         if (ImGui.Button("Cancel"))
@@ -314,13 +316,7 @@ internal sealed class HierarchyPanel : EditorPanel
                 continue;
             try
             {
-                var path = Path.Combine(
-                    _assets.ContentRoot,
-                    blueprint.RelativePath.Replace('/', Path.DirectorySeparatorChar));
-                var source = DreambitJson.Deserialize<EntityBlueprint>(File.ReadAllText(path))
-                             ?? throw new InvalidDataException("Blueprint file is empty.");
-                source.AssetId = blueprint.Id;
-                source.AssetName = blueprint.LogicalAssetName;
+                using var source = _blueprintSources.Load(blueprint);
                 document.InstantiateBlueprint(
                     source,
                     parent: _documentContext.IsBlueprint ? _documentContext.Blueprints.Root : null);
@@ -365,9 +361,11 @@ internal sealed class HierarchyPanel : EditorPanel
         ImGui.Spacing();
         if (ImGui.Button("Delete", new Vector2(90f, 0f)))
         {
-            document.Delete(entities);
-            _pendingDeleteIds = [];
-            ImGui.CloseCurrentPopup();
+            if (TryEdit(() => document.Delete(entities)))
+            {
+                _pendingDeleteIds = [];
+                ImGui.CloseCurrentPopup();
+            }
         }
         ImGui.SameLine();
         if (ImGui.Button("Cancel", new Vector2(90f, 0f)))
@@ -399,6 +397,21 @@ internal sealed class HierarchyPanel : EditorPanel
         if (ImGui.GetIO().KeyCtrl && ImGui.IsKeyPressed(ImGuiKey.D) && selected.Count == 1 &&
             !includesBlueprintRoot &&
             !hasLockedBlueprintChild && !hasLDtkGeneratedEntity)
-            document.Duplicate(selected[0]);
+            TryEdit(() => document.Duplicate(selected[0]));
+    }
+
+    private bool TryEdit(Action edit)
+    {
+        try
+        {
+            edit();
+            _error = null;
+            return true;
+        }
+        catch (Exception exception)
+        {
+            _error = exception.Message;
+            return false;
+        }
     }
 }

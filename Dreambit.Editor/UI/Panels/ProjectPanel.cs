@@ -24,6 +24,7 @@ internal sealed class ProjectPanel : EditorPanel
     private readonly EditorDragDropService _dragDrop;
     private readonly AssetEditingService _assetEditing;
     private readonly SceneDocumentService _scenes;
+    private readonly EditorDocumentContext _documentContext;
     private readonly EditorTypeRegistry _types;
     private readonly EditorWorkspaceState _workspace;
     private readonly EditorIconService _icons;
@@ -42,7 +43,8 @@ internal sealed class ProjectPanel : EditorPanel
     private bool _requestMovePopup;
     private bool _requestDeletePopup;
     private bool _requestCreateAssetPopup;
-    private Type? _createAssetType;
+    private string? _createAssetTypeId;
+    private string _createAssetTypeName = "Asset";
     private string _createAssetPath = string.Empty;
     private bool _restoreWorkspaceSelection;
 
@@ -53,6 +55,7 @@ internal sealed class ProjectPanel : EditorPanel
         EditorDragDropService dragDrop,
         AssetEditingService assetEditing,
         SceneDocumentService scenes,
+        EditorDocumentContext documentContext,
         EditorTypeRegistry types,
         EditorWorkspaceState workspace,
         EditorIconService icons,
@@ -65,6 +68,7 @@ internal sealed class ProjectPanel : EditorPanel
         _dragDrop = dragDrop;
         _assetEditing = assetEditing;
         _scenes = scenes;
+        _documentContext = documentContext;
         _types = types;
         _workspace = workspace;
         _icons = icons;
@@ -259,11 +263,19 @@ internal sealed class ProjectPanel : EditorPanel
                    ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left);
         if (activated)
         {
-            _selectedPath = folder.RelativePath;
-            _selectedIsFolder = true;
-            _workspace.LastSelectionKind = "asset";
+            if (_assetEditing.Clear())
+            {
+                _selectedPath = folder.RelativePath;
+                _selectedIsFolder = true;
+                _workspace.LastSelectionKind = "asset";
+                _error = null;
+            }
+            else
+            {
+                SetError("Could not leave the current asset because it could not be saved.");
+            }
         }
-        if (open)
+        if (open && _selectedIsFolder && PathEquals(_selectedPath, folder.RelativePath))
         {
             _currentFolder = folder.RelativePath;
             ClearSelection();
@@ -293,15 +305,10 @@ internal sealed class ProjectPanel : EditorPanel
                 ImGuiSelectableFlags.SpanAllColumns | ImGuiSelectableFlags.AllowDoubleClick);
         var open = ImGui.IsItemHovered() &&
                    ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left);
-        if (activated)
-        {
-            _selectedPath = asset.RelativePath;
-            _selectedIsFolder = false;
-            _workspace.LastSelectionKind = "asset";
-            _scenes.Selection.Clear();
-            _assetEditing.Select(asset);
-        }
-        if (open)
+        var selectionAccepted = false;
+        if (activated || open)
+            selectionAccepted = TrySelectAsset(asset);
+        if (open && selectionAccepted)
         {
             if (asset.Kind == AssetKind.Blueprint)
             {
@@ -312,8 +319,13 @@ internal sealed class ProjectPanel : EditorPanel
             {
                 try
                 {
+                    if (!_assetEditing.Clear())
+                    {
+                        SetError("Could not open the scene because the current asset could not be saved.");
+                        return;
+                    }
                     _scenes.Open(asset.RelativePath);
-                    _assetEditing.Clear();
+                    _documentContext.ActivateScene();
                     _error = null;
                 }
                 catch (Exception exception)
@@ -383,8 +395,12 @@ internal sealed class ProjectPanel : EditorPanel
         if (!ImGui.BeginPopupContextItem($"ProjectItemContext##{path}"))
             return;
 
-        _selectedPath = path;
-        _selectedIsFolder = isFolder;
+        if (!TrySelectProjectItem(path, isFolder))
+        {
+            ImGui.CloseCurrentPopup();
+            ImGui.EndPopup();
+            return;
+        }
 
         if (isFolder && ImGui.MenuItem("Open"))
         {
@@ -412,9 +428,16 @@ internal sealed class ProjectPanel : EditorPanel
                 SetError(error ?? "Could not duplicate the selection.");
             else
             {
-                _selectedPath = duplicatedPath;
-                _selectedIsFolder = isFolder;
-                _error = null;
+                if (isFolder)
+                {
+                    _selectedPath = duplicatedPath;
+                    _selectedIsFolder = true;
+                    _error = null;
+                }
+                else if (_assets.TryGetAsset(duplicatedPath!, out var duplicated))
+                {
+                    TrySelectAsset(duplicated!);
+                }
             }
         }
 
@@ -479,6 +502,7 @@ internal sealed class ProjectPanel : EditorPanel
             {
                 _selectedPath = JoinPath(destinationFolder, Path.GetFileName(payload.RelativePath));
                 _selectedIsFolder = payload.IsFolder;
+                _assetEditing.RefreshFromDatabase();
                 _error = null;
             }
 
@@ -500,7 +524,8 @@ internal sealed class ProjectPanel : EditorPanel
 
     public void RequestCreateAsset(Type type)
     {
-        _createAssetType = type;
+        _createAssetTypeId = DreambitAssetTypeRegistry.GetTypeId(type);
+        _createAssetTypeName = type.Name;
         var suffix = AssetTypeClassifier.GetFileSuffix(type);
         _createAssetPath = JoinPath(_currentFolder, $"New {type.Name}{suffix}");
         _requestCreateAssetPopup = true;
@@ -512,16 +537,20 @@ internal sealed class ProjectPanel : EditorPanel
                 "Create Asset##Dreambit.Editor.Project",
                 ImGuiWindowFlags.AlwaysAutoResize))
             return;
-        ImGui.TextUnformatted($"Create {_createAssetType?.Name ?? "Asset"}");
+        var createAssetType = ResolveCreateAssetType();
+        ImGui.TextUnformatted($"Create {_createAssetTypeName}");
         ImGui.SetNextItemWidth(480f);
         var submit = ImGui.InputText("Path", ref _createAssetPath, 1024, ImGuiInputTextFlags.EnterReturnsTrue);
-        if ((submit || ImGui.Button("Create", new Vector2(90, 0))) && _createAssetType is not null)
+        ImGui.BeginDisabled(createAssetType is null);
+        if ((submit || ImGui.Button("Create", new Vector2(90, 0))) && createAssetType is not null)
         {
-            if (_assetEditing.TryCreate(_createAssetType, _createAssetPath, out var error))
+            if (_assetEditing.TryCreate(createAssetType, _createAssetPath, out var error))
             {
                 _selectedPath = _createAssetPath;
                 _selectedIsFolder = false;
                 _error = null;
+                _documentContext.ActivateAsset();
+                ClearCreateAssetRequest();
                 ImGui.CloseCurrentPopup();
             }
             else
@@ -529,9 +558,15 @@ internal sealed class ProjectPanel : EditorPanel
                 SetError(error ?? "Could not create asset.");
             }
         }
+        ImGui.EndDisabled();
+        if (createAssetType is null)
+            ImGui.TextDisabled("This asset type is unavailable until game code finishes reloading.");
         ImGui.SameLine();
         if (ImGui.Button("Cancel", new Vector2(90, 0)))
+        {
+            ClearCreateAssetRequest();
             ImGui.CloseCurrentPopup();
+        }
         ImGui.EndPopup();
     }
 
@@ -602,6 +637,7 @@ internal sealed class ProjectPanel : EditorPanel
             if (_assets.TryRename(_selectedPath, _renameName, out var error))
             {
                 _selectedPath = JoinPath(GetParentPath(_selectedPath), _renameName.Trim());
+                _assetEditing.RefreshFromDatabase();
                 _error = null;
                 ImGui.CloseCurrentPopup();
             }
@@ -629,6 +665,7 @@ internal sealed class ProjectPanel : EditorPanel
             if (_assets.TryMove(_selectedPath, _moveDestination, out var error))
             {
                 _selectedPath = JoinPath(_moveDestination.Trim().Replace('\\', '/').Trim('/'), name);
+                _assetEditing.RefreshFromDatabase();
                 _error = null;
                 ImGui.CloseCurrentPopup();
             }
@@ -654,6 +691,7 @@ internal sealed class ProjectPanel : EditorPanel
         {
             if (_assets.TryDelete(_pendingDeletePath, out var error))
             {
+                _assetEditing.RefreshFromDatabase();
                 ClearSelection();
                 _pendingDeletePath = null;
                 _error = null;
@@ -741,7 +779,12 @@ internal sealed class ProjectPanel : EditorPanel
         if (_selectedPath is null || _selectedIsFolder)
             return;
         if (_assets.TryGetAsset(_selectedPath, out var asset))
-            _assetEditing.Select(asset);
+        {
+            if (_assetEditing.Select(asset))
+                _documentContext.ActivateAsset();
+            else
+                ClearSelection();
+        }
         else
             ClearSelection();
     }
@@ -761,6 +804,52 @@ internal sealed class ProjectPanel : EditorPanel
         _logs.Warning("Assets", message);
     }
 
+    private bool TrySelectAsset(AssetRecord asset)
+    {
+        if (!_assetEditing.Select(asset))
+        {
+            SetError($"Could not select '{asset.RelativePath}'. The current asset remains open.");
+            return false;
+        }
+
+        _selectedPath = asset.RelativePath;
+        _selectedIsFolder = false;
+        _workspace.LastSelectionKind = "asset";
+        _scenes.Selection.Clear();
+        _documentContext.ActivateAsset();
+        _error = null;
+        return true;
+    }
+
+    private bool TrySelectProjectItem(string path, bool isFolder)
+    {
+        if (isFolder)
+        {
+            if (_selectedIsFolder && PathEquals(_selectedPath, path) &&
+                _assetEditing.Selected is null)
+            {
+                return true;
+            }
+            if (!_assetEditing.Clear())
+            {
+                SetError("Could not leave the current asset because it could not be saved.");
+                return false;
+            }
+
+            _selectedPath = path;
+            _selectedIsFolder = true;
+            _workspace.LastSelectionKind = "asset";
+            _error = null;
+            return true;
+        }
+
+        if (_assets.TryGetAsset(path, out var asset))
+            return TrySelectAsset(asset!);
+
+        SetError($"Could not select '{path}' because it is no longer in the project.");
+        return false;
+    }
+
     private void DrawPopupError()
     {
         if (string.IsNullOrWhiteSpace(_error))
@@ -769,6 +858,23 @@ internal sealed class ProjectPanel : EditorPanel
         ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.96f, 0.44f, 0.38f, 1f));
         ImGui.TextWrapped(_error);
         ImGui.PopStyleColor();
+    }
+
+    private Type? ResolveCreateAssetType()
+    {
+        if (string.IsNullOrWhiteSpace(_createAssetTypeId))
+            return null;
+        return _types.AssetTypes.FirstOrDefault(type =>
+            string.Equals(
+                DreambitAssetTypeRegistry.GetTypeId(type),
+                _createAssetTypeId,
+                StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void ClearCreateAssetRequest()
+    {
+        _createAssetTypeId = null;
+        _createAssetTypeName = "Asset";
     }
 
     private static string GetParentPath(string path)

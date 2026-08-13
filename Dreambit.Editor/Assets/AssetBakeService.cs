@@ -185,18 +185,49 @@ internal sealed class AssetBakeService : IDisposable
     {
         if (_disposed)
             return;
+
+        _disposed = true;
         _lifetime.Cancel();
-        if (_activeBake is not null)
+        var bake = _activeBake;
+        _activeBake = null;
+        if (bake is not null)
         {
-            _ = _activeBake.ContinueWith(
-                static task => _ = task.Exception,
-                CancellationToken.None,
-                TaskContinuationOptions.OnlyOnFaulted |
-                TaskContinuationOptions.ExecuteSynchronously,
-                TaskScheduler.Default);
+            try
+            {
+                if (!bake.Wait(TimeSpan.FromSeconds(5)))
+                {
+                    ReportCleanupFailure(
+                        "The canceled asset bake did not stop before the project closed.",
+                        null);
+                }
+            }
+            catch (AggregateException exception) when (
+                exception.Flatten().InnerExceptions.All(inner => inner is OperationCanceledException))
+            {
+            }
+            catch (Exception exception)
+            {
+                ReportCleanupFailure("The canceled asset bake failed during shutdown.", exception);
+            }
         }
         _lifetime.Dispose();
-        _disposed = true;
+    }
+
+    private void ReportCleanupFailure(string message, Exception? exception)
+    {
+        try
+        {
+            _report?.Invoke(new AssetBakeMessage(
+                exception is null
+                    ? AssetBakeMessageSeverity.Warning
+                    : AssetBakeMessageSeverity.Error,
+                message,
+                exception));
+        }
+        catch
+        {
+            Console.Error.WriteLine($"{message} {exception}");
+        }
     }
 
     private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>
