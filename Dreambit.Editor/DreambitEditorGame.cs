@@ -35,7 +35,7 @@ internal sealed class DreambitEditorGame : Core
         GraphicsDeviceManager.PreferredBackBufferWidth = _workspaceState.WindowWidth;
         GraphicsDeviceManager.PreferredBackBufferHeight = _workspaceState.WindowHeight;
         GraphicsDeviceManager.SynchronizeWithVerticalRetrace = true;
-        IsFixedTimeStep = false;
+        IsFixedTimeStep = true;
         Window.AllowUserResizing = true;
     }
 

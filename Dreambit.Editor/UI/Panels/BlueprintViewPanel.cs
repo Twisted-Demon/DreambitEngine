@@ -27,6 +27,7 @@ internal sealed class BlueprintViewPanel : EditorPanel
     private DateTimeOffset _sourceWriteUtc;
     private bool _needsRebuild;
     private bool _viewSettingsRequested;
+    private ColliderDrag? _colliderDrag;
     private string? _error;
 
     public BlueprintViewPanel(
@@ -130,6 +131,14 @@ internal sealed class BlueprintViewPanel : EditorPanel
         scene.DrawEditorGizmos(
             new PreviewGizmoContext(drawList, camera, canvasPosition),
             _blueprints.Selection.EntityIds.ToHashSet());
+        var colliderConsumed = DrawColliderHandles(
+            drawList,
+            document,
+            scene,
+            camera,
+            canvasPosition,
+            mouseLocal,
+            hovered);
         _transformGizmo.DrawSelection(drawList, scene, camera, canvasPosition);
         var gizmoConsumed = _transformGizmo.DrawAndHandle(
             drawList,
@@ -137,7 +146,7 @@ internal sealed class BlueprintViewPanel : EditorPanel
             camera,
             canvasPosition,
             mouseLocal,
-            hovered);
+            hovered && !colliderConsumed);
         if (!gizmoConsumed && hovered && ImGui.IsMouseClicked(ImGuiMouseButton.Left) &&
             !ImGui.IsMouseDragging(ImGuiMouseButton.Left))
         {
@@ -276,6 +285,79 @@ internal sealed class BlueprintViewPanel : EditorPanel
         _workspace.BlueprintCameraY = center.Y;
     }
 
+    private bool DrawColliderHandles(
+        ImDrawListPtr drawList,
+        SceneDocument document,
+        Scene scene,
+        Camera2D camera,
+        Vector2 canvasPosition,
+        Vector2 mouseLocal,
+        bool hovered)
+    {
+        var color = ImGui.GetColorU32(new Vector4(0.32f, 0.92f, 0.55f, 0.95f));
+        foreach (var entity in _blueprints.Selection.Resolve(scene))
+        {
+            foreach (var collider in entity.GetAllComponents().OfType<Collider>())
+            {
+                if (collider is not BoxCollider || collider.Bounds is not Box2D localBox)
+                    continue;
+
+                var vertices = collider.WorldPolygon2D.Vertices;
+                for (var index = 0; index < vertices.Length; index++)
+                {
+                    var screen = camera.WorldToScreen(vertices[index]);
+                    var handle = canvasPosition + new Vector2(screen.X, screen.Y);
+                    drawList.AddRectFilled(handle - new Vector2(4f), handle + new Vector2(4f), color);
+                    if (_colliderDrag is null && hovered &&
+                        Vector2.Distance(canvasPosition + mouseLocal, handle) <= 9f &&
+                        ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+                    {
+                        _colliderDrag = new ColliderDrag(
+                            entity.Id,
+                            index switch
+                            {
+                                0 => localBox.BottomRight,
+                                1 => localBox.BottomLeft,
+                                2 => localBox.TopLeft,
+                                _ => localBox.TopRight
+                            },
+                            document.BeginTransaction("Resize Box Collider"));
+                    }
+                }
+            }
+        }
+
+        if (_colliderDrag is null)
+            return false;
+        if (!ImGui.IsMouseDown(ImGuiMouseButton.Left))
+        {
+            _colliderDrag.Transaction.Commit();
+            _colliderDrag = null;
+            return true;
+        }
+
+        var world = camera.ScreenToWorld(new XnaVector2(mouseLocal.X, mouseLocal.Y));
+        var drag = _colliderDrag;
+        drag.Transaction.Update(currentScene =>
+        {
+            var entity = currentScene.FindEntity(drag.EntityId);
+            if (entity?.GetComponent<BoxCollider>() is not { } collider)
+                return;
+            var local = entity.Transform.InverseTransformPoint2D(world);
+            if (_workspace.SnapEnabled)
+            {
+                var snap = MathF.Max(0.001f, _workspace.MoveSnap);
+                local.X = MathF.Round(local.X / snap) * snap;
+                local.Y = MathF.Round(local.Y / snap) * snap;
+            }
+            var center = (local + drag.OppositeLocal) * 0.5f;
+            var halfWidth = MathF.Max(0.001f, MathF.Abs(local.X - drag.OppositeLocal.X) * 0.5f);
+            var halfHeight = MathF.Max(0.001f, MathF.Abs(local.Y - drag.OppositeLocal.Y) * 0.5f);
+            collider.SetShape(Box2D.CreateRectangle(center, halfWidth, halfHeight));
+        });
+        return true;
+    }
+
     private void RefreshAssetRecord()
     {
         if (_asset is null)
@@ -339,6 +421,11 @@ internal sealed class BlueprintViewPanel : EditorPanel
         _blueprints.Dispose();
         _renderer.Dispose();
     }
+
+    private sealed record ColliderDrag(
+        Guid EntityId,
+        XnaVector2 OppositeLocal,
+        SceneDocument.SceneEditTransaction Transaction);
 
     private sealed class PreviewGizmoContext(
         ImDrawListPtr drawList,

@@ -170,6 +170,7 @@ internal sealed class InspectorPanel : EditorPanel
         }
 
         DrawEntityHeader(document, entities);
+        DrawEntityTags(document, entities);
         if (entities.Any(entity => entity.IsLDtkGenerated))
         {
             ImGui.TextColored(new Vector4(0.42f, 0.78f, 1f, 1f), "LDtk-generated visualization");
@@ -205,34 +206,20 @@ internal sealed class InspectorPanel : EditorPanel
         var renderBackgroundImage = edited.RenderLevelBackgroundImage;
         var includeInvisibleLayers = edited.IncludeInvisibleLayers;
         var changed = false;
-        changed |= ImGui.DragFloat(
-            "Pixels Per Unit##LDtk",
-            ref pixelsPerUnit,
-            0.1f,
-            0.001f,
-            100000f);
-        changed |= ImGui.DragInt("Base Draw Layer##LDtk", ref baseDrawLayer, 1f);
-        changed |= ImGui.DragInt(
-            "Draw Layer Step##LDtk",
-            ref drawLayerStep,
-            1f,
-            1,
-            100000);
-        changed |= ImGui.DragInt(
-            "World Depth Stride##LDtk",
-            ref worldDepthStride,
-            1f,
-            1,
-            int.MaxValue);
-        changed |= ImGui.Checkbox(
-            "Render Background Color##LDtk",
-            ref renderBackgroundColor);
-        changed |= ImGui.Checkbox(
-            "Render Background Image##LDtk",
-            ref renderBackgroundImage);
-        changed |= ImGui.Checkbox(
-            "Include Invisible Layers##LDtk",
-            ref includeInvisibleLayers);
+        DrawPropertyRow("LDtk.PixelsPerUnit", "Pixels Per Unit", () =>
+            changed |= ImGui.DragFloat("##Value", ref pixelsPerUnit, 0.1f, 0.001f, 100000f));
+        DrawPropertyRow("LDtk.BaseDrawLayer", "Base Draw Layer", () =>
+            changed |= ImGui.DragInt("##Value", ref baseDrawLayer, 1f));
+        DrawPropertyRow("LDtk.DrawLayerStep", "Draw Layer Step", () =>
+            changed |= ImGui.DragInt("##Value", ref drawLayerStep, 1f, 1, 100000));
+        DrawPropertyRow("LDtk.WorldDepthStride", "World Depth Stride", () =>
+            changed |= ImGui.DragInt("##Value", ref worldDepthStride, 1f, 1, int.MaxValue));
+        DrawPropertyRow("LDtk.RenderBackgroundColor", "Render Background Color", () =>
+            changed |= ImGui.Checkbox("##Value", ref renderBackgroundColor));
+        DrawPropertyRow("LDtk.RenderBackgroundImage", "Render Background Image", () =>
+            changed |= ImGui.Checkbox("##Value", ref renderBackgroundImage));
+        DrawPropertyRow("LDtk.IncludeInvisibleLayers", "Include Invisible Layers", () =>
+            changed |= ImGui.Checkbox("##Value", ref includeInvisibleLayers));
 
         edited.PixelsPerUnit = pixelsPerUnit;
         edited.BaseDrawLayer = baseDrawLayer;
@@ -348,25 +335,40 @@ internal sealed class InspectorPanel : EditorPanel
     private void DrawBlueprintDocument(DreambitAssetDocument document, EntityBlueprint blueprint)
     {
         var name = blueprint.Name;
-        if (ImGui.InputText("Name", ref name, 256))
-            document.Apply("Rename Blueprint", asset => ((EntityBlueprint)asset).Name = name);
+        DrawPropertyRow("Blueprint.Name", "Name", () =>
+        {
+            if (ImGui.InputText("##Value", ref name, 256))
+                document.Apply("Rename Blueprint", asset => ((EntityBlueprint)asset).Name = name);
+        });
         var enabled = blueprint.Enabled;
-        if (ImGui.Checkbox("Enabled", ref enabled))
-            document.Apply("Set Blueprint Enabled", asset => ((EntityBlueprint)asset).Enabled = enabled);
+        DrawPropertyRow("Blueprint.Enabled", "Enabled", () =>
+        {
+            if (ImGui.Checkbox("##Value", ref enabled))
+                document.Apply("Set Blueprint Enabled", asset => ((EntityBlueprint)asset).Enabled = enabled);
+        });
 
         ImGui.TextDisabled("Drag to adjust. Double-click a number to type an exact value.");
         var position = new Vector3(blueprint.Position.X, blueprint.Position.Y, blueprint.Position.Z);
-        if (ImGui.DragFloat3("Position", ref position, 0.1f))
-            document.Apply("Change Blueprint Position", asset =>
-                ((EntityBlueprint)asset).Position = new Microsoft.Xna.Framework.Vector3(position.X, position.Y, position.Z));
+        DrawPropertyRow("Blueprint.Position", "Position", () =>
+        {
+            if (ImGui.DragFloat3("##Value", ref position, 0.1f))
+                document.Apply("Change Blueprint Position", asset =>
+                    ((EntityBlueprint)asset).Position = new Microsoft.Xna.Framework.Vector3(position.X, position.Y, position.Z));
+        });
         var rotation = new Vector3(blueprint.Rotation.X, blueprint.Rotation.Y, blueprint.Rotation.Z);
-        if (ImGui.DragFloat3("Rotation", ref rotation, 0.01f))
-            document.Apply("Change Blueprint Rotation", asset =>
-                ((EntityBlueprint)asset).Rotation = new Microsoft.Xna.Framework.Vector3(rotation.X, rotation.Y, rotation.Z));
+        DrawPropertyRow("Blueprint.Rotation", "Rotation", () =>
+        {
+            if (ImGui.DragFloat3("##Value", ref rotation, 0.01f))
+                document.Apply("Change Blueprint Rotation", asset =>
+                    ((EntityBlueprint)asset).Rotation = new Microsoft.Xna.Framework.Vector3(rotation.X, rotation.Y, rotation.Z));
+        });
         var scale = new Vector3(blueprint.Scale.X, blueprint.Scale.Y, blueprint.Scale.Z);
-        if (ImGui.DragFloat3("Scale", ref scale, 0.01f))
-            document.Apply("Change Blueprint Scale", asset =>
-                ((EntityBlueprint)asset).Scale = new Microsoft.Xna.Framework.Vector3(scale.X, scale.Y, scale.Z));
+        DrawPropertyRow("Blueprint.Scale", "Scale", () =>
+        {
+            if (ImGui.DragFloat3("##Value", ref scale, 0.01f))
+                document.Apply("Change Blueprint Scale", asset =>
+                    ((EntityBlueprint)asset).Scale = new Microsoft.Xna.Framework.Vector3(scale.X, scale.Y, scale.Z));
+        });
 
         ImGui.SeparatorText("Components");
         foreach (var component in blueprint.Components.ToArray())
@@ -385,8 +387,11 @@ internal sealed class InspectorPanel : EditorPanel
                 if (open)
                 {
                     var componentEnabled = component.Enabled;
-                    if (ImGui.Checkbox("Enabled", ref componentEnabled))
-                        document.Apply("Set Component Enabled", _ => component.Enabled = componentEnabled);
+                    DrawPropertyRow("BlueprintComponent.Enabled", "Enabled", () =>
+                    {
+                        if (ImGui.Checkbox("##Value", ref componentEnabled))
+                            document.Apply("Set Component Enabled", _ => component.Enabled = componentEnabled);
+                    });
                     if (componentType is null)
                     {
                         ImGui.TextColored(
@@ -539,20 +544,18 @@ internal sealed class InspectorPanel : EditorPanel
                               : "Invalid inline asset");
         var pickerId = $"BlueprintAsset.{component.Type}.{member.SerializedName}";
 
-        ImGui.TextUnformatted(member.DisplayName);
-        ImGui.SameLine(110f);
-        ImGui.SetNextItemWidth(-32f);
-        if (ImGui.Button($"{display}##{pickerId}", new System.Numerics.Vector2(-32f, 0f)))
-        {
-            _blueprintReferenceSearch = string.Empty;
-            ImGui.OpenPopup($"Blueprint Asset Picker##{pickerId}");
-        }
-        ImGui.SameLine();
-        ImGui.BeginDisabled(token is null || member.IsReadOnly);
-        if (ImGui.SmallButton($"×##{pickerId}.Clear"))
-            document.Apply($"Clear {member.DisplayName}", _ =>
-                component.Properties.Remove(member.SerializedName));
-        ImGui.EndDisabled();
+        DrawBlueprintReferenceRow(
+            pickerId,
+            member.DisplayName,
+            display,
+            token is null || member.IsReadOnly,
+            () =>
+            {
+                _blueprintReferenceSearch = string.Empty;
+                ImGui.OpenPopup($"Blueprint Asset Picker##{pickerId}");
+            },
+            () => document.Apply($"Clear {member.DisplayName}", _ =>
+                component.Properties.Remove(member.SerializedName)));
 
         if (!ImGui.BeginPopup($"Blueprint Asset Picker##{pickerId}"))
             return;
@@ -632,20 +635,18 @@ internal sealed class InspectorPanel : EditorPanel
                 : "None";
         var pickerId = $"BlueprintReference.{component.Type}.{member.SerializedName}";
 
-        ImGui.TextUnformatted(member.DisplayName);
-        ImGui.SameLine(110f);
-        ImGui.SetNextItemWidth(-32f);
-        if (ImGui.Button($"{display}##{pickerId}", new System.Numerics.Vector2(-32f, 0f)))
-        {
-            _blueprintReferenceSearch = string.Empty;
-            ImGui.OpenPopup($"Blueprint Reference Picker##{pickerId}");
-        }
-        ImGui.SameLine();
-        ImGui.BeginDisabled(!hasReference || member.IsReadOnly);
-        if (ImGui.SmallButton($"×##{pickerId}.Clear"))
-            document.Apply($"Clear {member.DisplayName}", _ =>
-                component.Properties.Remove(member.SerializedName));
-        ImGui.EndDisabled();
+        DrawBlueprintReferenceRow(
+            pickerId,
+            member.DisplayName,
+            display,
+            !hasReference || member.IsReadOnly,
+            () =>
+            {
+                _blueprintReferenceSearch = string.Empty;
+                ImGui.OpenPopup($"Blueprint Reference Picker##{pickerId}");
+            },
+            () => document.Apply($"Clear {member.DisplayName}", _ =>
+                component.Properties.Remove(member.SerializedName)));
 
         if (!ImGui.BeginPopup($"Blueprint Reference Picker##{pickerId}"))
             return;
@@ -694,6 +695,70 @@ internal sealed class InspectorPanel : EditorPanel
         finally
         {
             ImGui.EndPopup();
+        }
+    }
+
+    private static void DrawPropertyRow(string id, string label, Action drawValue)
+    {
+        var availableWidth = MathF.Max(1f, ImGui.GetContentRegionAvail().X);
+        var labelWidth = Math.Clamp(availableWidth * 0.35f, 120f, 190f);
+        var flags = ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.NoSavedSettings;
+        if (!ImGui.BeginTable($"##PropertyRow.{id}", 2, flags))
+            return;
+
+        try
+        {
+            ImGui.TableSetupColumn("##Label", ImGuiTableColumnFlags.WidthFixed, labelWidth);
+            ImGui.TableSetupColumn("##Value", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableNextRow();
+            ImGui.TableSetColumnIndex(0);
+            ImGui.AlignTextToFramePadding();
+            ImGui.TextUnformatted(label);
+            ImGui.TableSetColumnIndex(1);
+            ImGui.SetNextItemWidth(-1f);
+            drawValue();
+        }
+        finally
+        {
+            ImGui.EndTable();
+        }
+    }
+
+    private static void DrawBlueprintReferenceRow(
+        string id,
+        string label,
+        string value,
+        bool clearDisabled,
+        Action select,
+        Action clear)
+    {
+        var availableWidth = MathF.Max(1f, ImGui.GetContentRegionAvail().X);
+        var labelWidth = Math.Clamp(availableWidth * 0.35f, 120f, 190f);
+        var flags = ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.NoSavedSettings;
+        if (!ImGui.BeginTable($"##BlueprintPropertyRow.{id}", 3, flags))
+            return;
+
+        try
+        {
+            ImGui.TableSetupColumn("##Label", ImGuiTableColumnFlags.WidthFixed, labelWidth);
+            ImGui.TableSetupColumn("##Value", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn("##Clear", ImGuiTableColumnFlags.WidthFixed, ImGui.GetFrameHeight());
+            ImGui.TableNextRow();
+            ImGui.TableSetColumnIndex(0);
+            ImGui.AlignTextToFramePadding();
+            ImGui.TextUnformatted(label);
+            ImGui.TableSetColumnIndex(1);
+            if (ImGui.Button($"{value}##{id}", new System.Numerics.Vector2(-1f, 0f)))
+                select();
+            ImGui.TableSetColumnIndex(2);
+            ImGui.BeginDisabled(clearDisabled);
+            if (ImGui.SmallButton($"×##{id}.Clear"))
+                clear();
+            ImGui.EndDisabled();
+        }
+        finally
+        {
+            ImGui.EndTable();
         }
     }
 
@@ -752,6 +817,43 @@ internal sealed class InspectorPanel : EditorPanel
             });
     }
 
+    private void DrawEntityTags(SceneDocument document, IReadOnlyList<Entity> entities)
+    {
+        var firstTags = entities[0].Tags.OrderBy(tag => tag, StringComparer.OrdinalIgnoreCase).ToArray();
+        var mixed = entities.Skip(1).Any(entity =>
+            !entity.Tags.SetEquals(entities[0].Tags));
+        var tags = mixed ? string.Empty : string.Join(", ", firstTags);
+
+        DrawPropertyRow("Entity.Tags", "Tags", () =>
+        {
+            if (ImGui.InputTextWithHint(
+                    "##Value",
+                    "Comma-separated tags",
+                    ref tags,
+                    1024,
+                    ImGuiInputTextFlags.EnterReturnsTrue))
+            {
+                var updatedTags = tags
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                Apply(document, "Change Entity Tags", "Entity.Tags", () =>
+                {
+                    foreach (var entity in entities)
+                    {
+                        entity.Tags.Clear();
+                        entity.Tags.UnionWith(updatedTags);
+                    }
+                });
+            }
+
+            if (mixed)
+            {
+                ImGui.SameLine();
+                ImGui.TextDisabled("Multiple values");
+            }
+        });
+    }
+
     private void DrawTransform(SceneDocument document, IReadOnlyList<Entity> entities)
     {
         if (!ImGui.CollapsingHeader("Transform", ImGuiTreeNodeFlags.DefaultOpen))
@@ -764,46 +866,55 @@ internal sealed class InspectorPanel : EditorPanel
 
             var position = new Vector3(first.Position.X, first.Position.Y, first.Position.Z);
             var mixedPosition = entities.Skip(1).Any(entity => entity.Transform.Position != first.Position);
-            if (ImGui.DragFloat3("Position", ref position, 0.1f))
-                Apply(document, "Change Position", "Transform.Position", () =>
-                {
-                    var value = new Microsoft.Xna.Framework.Vector3(position.X, position.Y, position.Z);
-                    foreach (var entity in entities)
+            DrawPropertyRow("Transform.Position", "Position", () =>
+            {
+                if (ImGui.DragFloat3("##Value", ref position, 0.1f))
+                    Apply(document, "Change Position", "Transform.Position", () =>
                     {
-                        entity.Transform.Position = value;
-                        document.RecordLDtkPosition(entity);
-                    }
-                });
-            DrawMixedLabel("Position", mixedPosition);
+                        var value = new Microsoft.Xna.Framework.Vector3(position.X, position.Y, position.Z);
+                        foreach (var entity in entities)
+                        {
+                            entity.Transform.Position = value;
+                            document.RecordLDtkPosition(entity);
+                        }
+                    });
+                DrawMixedLabel("Position", mixedPosition);
+            });
 
             var rotation = MathHelper.ToDegrees(first.Rotation2D);
             var mixedRotation = entities.Skip(1).Any(entity =>
                 MathF.Abs(entity.Transform.Rotation2D - first.Rotation2D) > 0.0001f);
-            if (ImGui.DragFloat("Rotation", ref rotation, 0.25f))
-                Apply(document, "Change Rotation", "Transform.Rotation", () =>
-                {
-                    var value = MathHelper.ToRadians(rotation);
-                    foreach (var entity in entities)
+            DrawPropertyRow("Transform.Rotation", "Rotation", () =>
+            {
+                if (ImGui.DragFloat("##Value", ref rotation, 0.25f))
+                    Apply(document, "Change Rotation", "Transform.Rotation", () =>
                     {
-                        entity.Transform.Rotation2D = value;
-                        document.RecordLDtkRotation(entity);
-                    }
-                });
-            DrawMixedLabel("Rotation", mixedRotation);
+                        var value = MathHelper.ToRadians(rotation);
+                        foreach (var entity in entities)
+                        {
+                            entity.Transform.Rotation2D = value;
+                            document.RecordLDtkRotation(entity);
+                        }
+                    });
+                DrawMixedLabel("Rotation", mixedRotation);
+            });
 
             var scale = new Vector3(first.Scale.X, first.Scale.Y, first.Scale.Z);
             var mixedScale = entities.Skip(1).Any(entity => entity.Transform.Scale != first.Scale);
-            if (ImGui.DragFloat3("Scale", ref scale, 0.01f))
-                Apply(document, "Change Scale", "Transform.Scale", () =>
-                {
-                    var value = new Microsoft.Xna.Framework.Vector3(scale.X, scale.Y, scale.Z);
-                    foreach (var entity in entities)
+            DrawPropertyRow("Transform.Scale", "Scale", () =>
+            {
+                if (ImGui.DragFloat3("##Value", ref scale, 0.01f))
+                    Apply(document, "Change Scale", "Transform.Scale", () =>
                     {
-                        entity.Transform.Scale = value;
-                        document.RecordLDtkScale(entity);
-                    }
-                });
-            DrawMixedLabel("Scale", mixedScale);
+                        var value = new Microsoft.Xna.Framework.Vector3(scale.X, scale.Y, scale.Z);
+                        foreach (var entity in entities)
+                        {
+                            entity.Transform.Scale = value;
+                            document.RecordLDtkScale(entity);
+                        }
+                    });
+                DrawMixedLabel("Scale", mixedScale);
+            });
         }
         finally
         {

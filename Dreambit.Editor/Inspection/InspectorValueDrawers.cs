@@ -59,6 +59,7 @@ internal sealed class InspectorValueDrawerRegistry
         Register(new StringValueDrawer());
         Register(new VectorValueDrawer());
         Register(new ColorValueDrawer());
+        Register(new DictionaryValueDrawer());
         Register(new CollectionValueDrawer());
         Register(new NestedObjectValueDrawer());
         Register(new UnsupportedValueDrawer());
@@ -79,12 +80,62 @@ internal sealed class InspectorValueDrawerRegistry
         var drawer = _drawers.First(candidate => candidate.CanDraw(type));
         if (context.ReadOnly)
             ImGui.BeginDisabled();
-        var result = drawer.Draw(this, label, type, value, context);
-        if (context.ReadOnly)
-            ImGui.EndDisabled();
-        if (!string.IsNullOrWhiteSpace(context.Metadata.Tooltip) && ImGui.IsItemHovered())
-            ImGui.SetTooltip(context.Metadata.Tooltip);
-        return result;
+        try
+        {
+            // Containers own a tree of child controls. Rendering one inside a
+            // value cell would make every child start in that already-narrow
+            // column, so draw their header full-width and let children begin
+            // fresh property rows below it.
+            var isContainer = drawer is DictionaryValueDrawer ||
+                              drawer is CollectionValueDrawer ||
+                              drawer is NestedObjectValueDrawer ||
+                              drawer is NullableValueDrawer ||
+                              drawer is EnumValueDrawer &&
+                              type.GetCustomAttributes(typeof(FlagsAttribute), true).Length > 0;
+            if (isContainer)
+            {
+                var result = drawer.Draw(this, label, type, value, context);
+                if (!string.IsNullOrWhiteSpace(context.Metadata.Tooltip) && ImGui.IsItemHovered())
+                    ImGui.SetTooltip(context.Metadata.Tooltip);
+                return result;
+            }
+
+            // Keep generated properties in a predictable label/value layout.
+            // Drawers get an ID-only label so controls do not add a second label.
+            var availableWidth = MathF.Max(1f, ImGui.GetContentRegionAvail().X);
+            var labelWidth = Math.Clamp(availableWidth * 0.35f, 120f, 190f);
+            var flags = ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.NoSavedSettings;
+            if (!ImGui.BeginTable($"##PropertyRow.{context.Id}", 2, flags))
+                return drawer.Draw(this, $"##{context.Id}", type, value, context);
+
+            try
+            {
+                ImGui.TableSetupColumn("##Label", ImGuiTableColumnFlags.WidthFixed, labelWidth);
+                ImGui.TableSetupColumn("##Value", ImGuiTableColumnFlags.WidthStretch);
+                ImGui.TableNextRow();
+                ImGui.TableSetColumnIndex(0);
+                ImGui.AlignTextToFramePadding();
+                ImGui.TextUnformatted(label);
+                if (!string.IsNullOrWhiteSpace(context.Metadata.Tooltip) && ImGui.IsItemHovered())
+                    ImGui.SetTooltip(context.Metadata.Tooltip);
+
+                ImGui.TableSetColumnIndex(1);
+                ImGui.SetNextItemWidth(-1f);
+                var result = drawer.Draw(this, $"##{context.Id}", type, value, context);
+                if (!string.IsNullOrWhiteSpace(context.Metadata.Tooltip) && ImGui.IsItemHovered())
+                    ImGui.SetTooltip(context.Metadata.Tooltip);
+                return result;
+            }
+            finally
+            {
+                ImGui.EndTable();
+            }
+        }
+        finally
+        {
+            if (context.ReadOnly)
+                ImGui.EndDisabled();
+        }
     }
 
     private sealed class ObjectReferenceValueDrawer(
@@ -121,76 +172,30 @@ internal sealed class InspectorValueDrawerRegistry
             var changedValue = value;
             var changed = false;
 
-            var availableWidth = MathF.Max(1f, ImGui.GetContentRegionAvail().X);
-            var labelWidth = Math.Clamp(
-                availableWidth * 0.32f,
-                120f,
-                190f);
+            var clearWidth = ImGui.GetFrameHeight();
+            var fieldWidth = MathF.Max(
+                1f,
+                ImGui.GetContentRegionAvail().X - clearWidth - ImGui.GetStyle().ItemSpacing.X);
+            if (ImGui.Button($"{display}##{context.Id}", new Vector2(fieldWidth, 0f)))
+            {
+                _search = string.Empty;
+                ImGui.OpenPopup($"Object Picker##{context.Id}");
+            }
 
-            var tableFlags =
-                ImGuiTableFlags.SizingStretchProp |
-                ImGuiTableFlags.NoSavedSettings;
+            // This must remain immediately after the field because ImGui uses
+            // the previously drawn item as the drag-drop target.
+            if (AcceptDrop(type, ref changedValue))
+                changed = true;
 
-            if (ImGui.BeginTable(
-                    $"##ObjectReferenceRow.{context.Id}",
-                    3,
-                    tableFlags))
-                try
-                {
-                    ImGui.TableSetupColumn(
-                        "##Label",
-                        ImGuiTableColumnFlags.WidthFixed,
-                        labelWidth);
+            ImGui.SameLine();
+            if (ImGui.SmallButton($"×##{context.Id}.Clear"))
+            {
+                changedValue = null;
+                changed = true;
+            }
 
-                    ImGui.TableSetupColumn(
-                        "##Value",
-                        ImGuiTableColumnFlags.WidthStretch);
-
-                    ImGui.TableSetupColumn(
-                        "##Clear",
-                        ImGuiTableColumnFlags.WidthFixed,
-                        ImGui.GetFrameHeight());
-
-                    ImGui.TableNextRow();
-
-                    // Property name
-                    ImGui.TableSetColumnIndex(0);
-                    ImGui.AlignTextToFramePadding();
-                    ImGui.TextUnformatted(label);
-
-                    // Object reference field
-                    ImGui.TableSetColumnIndex(1);
-
-                    if (ImGui.Button(
-                            $"{display}##{context.Id}",
-                            new Vector2(-1f, 0f)))
-                    {
-                        _search = string.Empty;
-                        ImGui.OpenPopup($"Object Picker##{context.Id}");
-                    }
-
-                    // AcceptDrop must remain immediately after the field because
-                    // BeginDragDropTarget operates on the previously drawn item.
-                    if (AcceptDrop(type, ref changedValue))
-                        changed = true;
-
-                    // Clear button
-                    ImGui.TableSetColumnIndex(2);
-
-                    if (ImGui.SmallButton($"×##{context.Id}.Clear"))
-                    {
-                        changedValue = null;
-                        changed = true;
-                    }
-
-                    // Keep this inside the same table/ID scope as OpenPopup.
-                    if (DrawPicker(type, context.Id, ref changedValue))
-                        changed = true;
-                }
-                finally
-                {
-                    ImGui.EndTable();
-                }
+            if (DrawPicker(type, context.Id, ref changedValue))
+                changed = true;
 
             return new InspectorValueDrawResult(
                 changed,
@@ -630,6 +635,132 @@ internal sealed class InspectorValueDrawerRegistry
         }
     }
 
+    private sealed class DictionaryValueDrawer : IInspectorValueDrawer
+    {
+        public int Priority => 65;
+
+        public bool CanDraw(Type type) => GetDictionaryTypes(type) is not null;
+
+        public InspectorValueDrawResult Draw(
+            InspectorValueDrawerRegistry registry,
+            string label,
+            Type type,
+            object? value,
+            InspectorValueDrawContext context)
+        {
+            var types = GetDictionaryTypes(type)!.Value;
+            var entries = value is IEnumerable enumerable
+                ? enumerable.Cast<object?>().Select(entry => new DictionaryEntryValue(
+                    entry?.GetType().GetProperty("Key")?.GetValue(entry),
+                    entry?.GetType().GetProperty("Value")?.GetValue(entry))).ToList()
+                : [];
+            var changed = false;
+
+            if (!ImGui.TreeNodeEx($"{label} ({entries.Count})##{context.Id}", ImGuiTreeNodeFlags.SpanAvailWidth))
+                return InspectorValueDrawResult.Unchanged(value);
+
+            try
+            {
+                int? removeIndex = null;
+                for (var index = 0; index < entries.Count; index++)
+                {
+                    ImGui.PushID($"{context.Id}.{index}");
+                    try
+                    {
+                        var entry = entries[index];
+                        var keyResult = registry.Draw("Key", types.Key, entry.Key, context with
+                        {
+                            Id = $"{context.Id}.{index}.Key", Mixed = false, Depth = context.Depth + 1
+                        });
+                        var valueResult = registry.Draw("Value", types.Value, entry.Value, context with
+                        {
+                            Id = $"{context.Id}.{index}.Value", Mixed = false, Depth = context.Depth + 1
+                        });
+                        if (keyResult.Changed || valueResult.Changed)
+                        {
+                            entries[index] = new DictionaryEntryValue(
+                                keyResult.Changed ? keyResult.Value : entry.Key,
+                                valueResult.Changed ? valueResult.Value : entry.Value);
+                            changed = true;
+                        }
+
+                        if (ImGui.SmallButton("Remove") && !context.ReadOnly)
+                            removeIndex = index;
+                    }
+                    finally
+                    {
+                        ImGui.PopID();
+                    }
+                }
+
+                if (removeIndex.HasValue)
+                {
+                    entries.RemoveAt(removeIndex.Value);
+                    changed = true;
+                }
+
+                if (ImGui.SmallButton($"+ Add##{context.Id}") && !context.ReadOnly)
+                {
+                    entries.Add(new DictionaryEntryValue(CreateKey(types.Key, entries), CreateDefault(types.Value)));
+                    changed = true;
+                }
+            }
+            finally
+            {
+                ImGui.TreePop();
+            }
+
+            return changed
+                ? new InspectorValueDrawResult(true, BuildDictionary(type, types, entries))
+                : InspectorValueDrawResult.Unchanged(value);
+        }
+
+        private static (Type Key, Type Value)? GetDictionaryTypes(Type type)
+        {
+            var dictionary = type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IDictionary<,>)
+                ? type
+                : type.GetInterfaces().FirstOrDefault(candidate =>
+                    candidate.IsGenericType && candidate.GetGenericTypeDefinition() == typeof(IDictionary<,>));
+            return dictionary is null ? null : (dictionary.GetGenericArguments()[0], dictionary.GetGenericArguments()[1]);
+        }
+
+        private static object? CreateKey(Type type, IReadOnlyList<DictionaryEntryValue> entries)
+        {
+            if (type != typeof(string))
+                return CreateDefault(type);
+            var existing = entries.Select(entry => entry.Key as string).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var key = "New Key";
+            for (var suffix = 2; existing.Contains(key); suffix++)
+                key = $"New Key {suffix}";
+            return key;
+        }
+
+        private static object? CreateDefault(Type type) => type == typeof(string)
+            ? string.Empty
+            : type.IsValueType || type.GetConstructor(Type.EmptyTypes) is not null
+                ? Activator.CreateInstance(type)
+                : null;
+
+        private static object BuildDictionary(
+            Type targetType,
+            (Type Key, Type Value) types,
+            IReadOnlyList<DictionaryEntryValue> entries)
+        {
+            var concreteType = targetType.IsInterface || targetType.IsAbstract
+                ? typeof(Dictionary<,>).MakeGenericType(types.Key, types.Value)
+                : targetType;
+            var dictionary = Activator.CreateInstance(concreteType)
+                             ?? throw new InvalidOperationException($"Could not create dictionary '{concreteType.FullName}'.");
+            var add = concreteType.GetMethod("Add", [types.Key, types.Value])
+                      ?? typeof(IDictionary<,>).MakeGenericType(types.Key, types.Value).GetMethod("Add")!;
+            foreach (var entry in entries)
+                add.Invoke(dictionary, [entry.Key, entry.Value]);
+            return dictionary;
+        }
+
+        private readonly record struct DictionaryEntryValue(object? Key, object? Value);
+    }
+
     private sealed class CollectionValueDrawer : IInspectorValueDrawer
     {
         public int Priority => 60;
@@ -660,12 +791,12 @@ internal sealed class InspectorValueDrawerRegistry
             if (ImGui.TreeNodeEx(
                     $"{label} ({items.Count})##{context.Id}",
                     ImGuiTreeNodeFlags.SpanAvailWidth))
+            try
             {
                 int? removeIndex = null;
                 for (var index = 0; index < items.Count; index++)
                 {
                     ImGui.PushID($"{context.Id}.{index}");
-                    ImGui.SetNextItemWidth(-30f);
                     var result = registry.Draw(
                         $"Element {index}",
                         elementType,
@@ -682,8 +813,9 @@ internal sealed class InspectorValueDrawerRegistry
                         changed = true;
                     }
 
-                    ImGui.SameLine();
-                    if (ImGui.SmallButton("-") && !context.ReadOnly)
+                    // Keep destructive actions beneath the element instead of
+                    // attempting to append them after a full-width row.
+                    if (ImGui.SmallButton("Remove") && !context.ReadOnly)
                         removeIndex = index;
                     ImGui.PopID();
                 }
@@ -700,8 +832,8 @@ internal sealed class InspectorValueDrawerRegistry
                     changed = true;
                 }
 
-                ImGui.TreePop();
             }
+            finally { ImGui.TreePop(); }
 
             return changed
                 ? new InspectorValueDrawResult(true, BuildCollection(type, elementType, items))
@@ -822,34 +954,39 @@ internal sealed class InspectorValueDrawerRegistry
             var editable = value;
             var cloned = false;
             var changed = false;
-            foreach (var member in DiscoverMembers(type))
+            try
             {
-                var memberValue = member.GetValue(editable);
-                var result = registry.Draw(
-                    member.DisplayName,
-                    member.ValueType,
-                    memberValue,
-                    context with
-                    {
-                        Id = $"{context.Id}.{member.SerializedName}",
-                        Metadata = member,
-                        Mixed = false,
-                        ReadOnly = context.ReadOnly || member.IsReadOnly,
-                        Depth = context.Depth + 1
-                    });
-                if (!result.Changed || member.IsReadOnly)
-                    continue;
-                if (!cloned)
+                foreach (var member in DiscoverMembers(type))
                 {
-                    editable = Clone(value, type);
-                    cloned = true;
+                    var memberValue = member.GetValue(editable);
+                    var result = registry.Draw(
+                        member.DisplayName,
+                        member.ValueType,
+                        memberValue,
+                        context with
+                        {
+                            Id = $"{context.Id}.{member.SerializedName}",
+                            Metadata = member,
+                            Mixed = false,
+                            ReadOnly = context.ReadOnly || member.IsReadOnly,
+                            Depth = context.Depth + 1
+                        });
+                    if (!result.Changed || member.IsReadOnly)
+                        continue;
+                    if (!cloned)
+                    {
+                        editable = Clone(value, type);
+                        cloned = true;
+                    }
+
+                    member.SetValue(editable!, result.Value);
+                    changed = true;
                 }
-
-                member.SetValue(editable!, result.Value);
-                changed = true;
             }
-
-            ImGui.TreePop();
+            finally
+            {
+                ImGui.TreePop();
+            }
             return changed
                 ? new InspectorValueDrawResult(true, editable)
                 : InspectorValueDrawResult.Unchanged(value);
