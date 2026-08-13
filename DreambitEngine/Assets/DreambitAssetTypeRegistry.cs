@@ -50,6 +50,19 @@ public static class DreambitAssetTypeRegistry
         return assetType.Assembly != typeof(DreambitAsset).Assembly;
     }
 
+    /// <summary>
+    /// Returns whether an asset can use the engine's generic JSONB loader. Engine-owned assets
+    /// retain their semantic loaders and formats; game-owned concrete assets use JSONB unless a
+    /// custom loader is registered for them.
+    /// </summary>
+    public static bool CanUseGenericJsonLoader(Type assetType)
+    {
+        ValidateAssetType(assetType);
+        return assetType.Assembly != typeof(DreambitAsset).Assembly &&
+               !assetType.IsAbstract &&
+               !assetType.ContainsGenericParameters;
+    }
+
     public static bool TryResolve(string typeId, out Type assetType)
     {
         assetType = null;

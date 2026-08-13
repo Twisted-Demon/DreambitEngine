@@ -3,6 +3,9 @@ using Dreambit.Editor.Assets;
 using Dreambit.Editor.Compilation;
 using Dreambit.Editor.Inspection;
 using Dreambit.Editor.Projects;
+using DreambitEngine.AssetBaker.Abstractions;
+using DreambitEngine.AssetBaker.Pipeline;
+using DreambitEngine.AssetBaker.Pipeline.Docs;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Runtime.CompilerServices;
@@ -402,6 +405,91 @@ public sealed class CustomDreambitAssetTests
     }
 
     [Fact]
+    public void GameDefinedAssetsLoadAutomaticallyFromPakAndLooseJsonbWhileExplicitLoadersWin()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "Dreambit.AutomaticAssetLoaderTests", Guid.NewGuid().ToString("N"));
+        var source = Path.Combine(root, "Assets");
+        var content = Path.Combine(root, "Content");
+        var assetId = AssetId.New();
+        var originalUsePak = Resources.UsePak;
+        var originalPakName = Resources.PakName;
+        var originalRegistry = Resources.AssetRegistry;
+        Directory.CreateDirectory(Path.Combine(source, "Config"));
+        Directory.CreateDirectory(content);
+        try
+        {
+            File.WriteAllText(
+                Path.Combine(source, "Config", "BasicEnemy.json"),
+                DreambitJson.Serialize(new AutomaticEnemyConfig { MaxHealth = 150, BaseDamage = 25 }));
+            File.WriteAllText(
+                Path.Combine(source, "Config", "SpecialEnemy.json"),
+                DreambitJson.Serialize(new ExplicitOverrideEnemyConfig { MaxHealth = 10 }));
+
+            new AssetBakePipeline().BakePak(new AssetBakeRequest(
+                source,
+                Path.Combine(content, "content.pak"),
+                RebuildAll: true));
+            new JsonbBaker().Bake(new BakeContext
+            {
+                InputPath = Path.Combine(source, "Config", "BasicEnemy.json"),
+                OutputPath = Path.Combine(content, "Config", "BasicEnemy.jsonb"),
+                LogicalRoot = source
+            });
+
+            DreambitAssemblyCaches.Refresh(
+                [typeof(AutomaticEnemyConfig), typeof(ExplicitOverrideEnemyConfig)]);
+            Resources.SetContentSource(content);
+            Resources.PakName = "content.pak";
+            Resources.AssetRegistry = new TestAssetRegistry(assetId, "Config/BasicEnemy");
+            Resources.UsePak = true;
+
+            var fromPak = Resources.LoadAsset<AutomaticEnemyConfig>("Config/BasicEnemy");
+            Assert.NotNull(fromPak);
+            Assert.Equal(150, fromPak.MaxHealth);
+            Assert.Equal(25, fromPak.BaseDamage);
+            Assert.Equal("Config/BasicEnemy", fromPak.AssetName);
+            Assert.Equal(assetId, fromPak.AssetId);
+            Resources.UnloadAsset("Config/BasicEnemy");
+
+            var fromId = Assert.IsType<AutomaticEnemyConfig>(
+                Resources.LoadDreambitAsset(assetId, string.Empty, typeof(AutomaticEnemyConfig)));
+            Assert.Equal(150, fromId.MaxHealth);
+            Assert.Equal(assetId, fromId.AssetId);
+            Resources.UnloadAsset("Config/BasicEnemy");
+
+            ExplicitOverrideEnemyConfigLoader.LoadCount = 0;
+            var custom = Resources.LoadAsset<ExplicitOverrideEnemyConfig>("Config/SpecialEnemy");
+            Assert.NotNull(custom);
+            Assert.Equal(1, ExplicitOverrideEnemyConfigLoader.LoadCount);
+            Assert.Equal(999, custom.MaxHealth);
+            Resources.UnloadAsset("Config/SpecialEnemy");
+
+            Resources.RefreshContent();
+            Resources.UsePak = false;
+            var fromLooseFile = Resources.LoadAsset<AutomaticEnemyConfig>("Config/BasicEnemy");
+            Assert.NotNull(fromLooseFile);
+            Assert.Equal(150, fromLooseFile.MaxHealth);
+            Assert.Equal(25, fromLooseFile.BaseDamage);
+            Assert.Equal("Config/BasicEnemy", fromLooseFile.AssetName);
+        }
+        finally
+        {
+            Resources.RefreshContent();
+            Resources.UsePak = originalUsePak;
+            Resources.PakName = originalPakName;
+            Resources.AssetRegistry = originalRegistry;
+            try
+            {
+                if (Directory.Exists(root))
+                    Directory.Delete(root, true);
+            }
+            catch (IOException)
+            {
+            }
+        }
+    }
+
+    [Fact]
     public void LoadedGameAssetAppearsInEditorTypesCreatesJsonAndOpensInDefaultInspector()
     {
         var root = Path.Combine(
@@ -546,6 +634,52 @@ public sealed class TestCustomAssetLoader : AssetLoaderBase<TestCustomAsset>
         var asset = JsnbLoader.Deserialize<TestCustomAsset>(stream);
         asset.AssetName = assetName;
         return asset;
+    }
+}
+
+[DreambitAssetType("test.automatic-enemy")]
+public sealed class AutomaticEnemyConfig : DreambitAsset
+{
+    [DreambitSerialize] public float MaxHealth;
+    [DreambitSerialize] public float BaseDamage;
+}
+
+[DreambitAssetType("test.explicit-override-enemy")]
+public sealed class ExplicitOverrideEnemyConfig : DreambitAsset
+{
+    [DreambitSerialize] public float MaxHealth;
+}
+
+public sealed class ExplicitOverrideEnemyConfigLoader : AssetLoaderBase<ExplicitOverrideEnemyConfig>
+{
+    public static int LoadCount { get; set; }
+    public override string Extension => ".jsonb";
+    public override bool AddToDisposableList => true;
+    public override Type TargetType => typeof(ExplicitOverrideEnemyConfig);
+
+    public override object Load(
+        string assetName,
+        string pakName,
+        bool usePak,
+        string contentDirectory)
+    {
+        LoadCount++;
+        return new ExplicitOverrideEnemyConfig { AssetName = assetName, MaxHealth = 999 };
+    }
+}
+
+internal sealed class TestAssetRegistry(AssetId assetId, string assetName) : IAssetRegistry
+{
+    public bool TryResolveAssetName(AssetId requestedAssetId, out string resolvedAssetName)
+    {
+        resolvedAssetName = assetName;
+        return requestedAssetId == assetId;
+    }
+
+    public bool TryGetAssetId(string requestedAssetName, out AssetId resolvedAssetId)
+    {
+        resolvedAssetId = assetId;
+        return string.Equals(requestedAssetName, assetName, StringComparison.OrdinalIgnoreCase);
     }
 }
 

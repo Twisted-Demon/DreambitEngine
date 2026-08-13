@@ -10,9 +10,18 @@ public static class JsnbLoader
 {
     public static T Deserialize<T>(Stream s)
     {
-        return JsonConvert.DeserializeObject<T>(
-            GetJsonString(s),
-            PropertyConverterRegistry.CreateSerializerSettings());
+        return (T)Deserialize(s, typeof(T));
+    }
+
+    /// <summary>Deserializes a JSNB document to a type known only at runtime.</summary>
+    public static object Deserialize(Stream s, Type type)
+    {
+        ArgumentNullException.ThrowIfNull(s);
+        ArgumentNullException.ThrowIfNull(type);
+
+        return DreambitJson.Deserialize(GetJsonString(s), type)
+               ?? throw new JsonSerializationException(
+                   $"The JSNB document could not be deserialized as '{type.FullName}'.");
     }
 
     public static string GetJsonString(Stream s)

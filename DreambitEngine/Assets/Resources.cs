@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.Loader;
 using FontStashSharp;
 using Microsoft.Xna.Framework.Content;
 
@@ -10,7 +11,10 @@ namespace Dreambit;
 
 public class Resources : Singleton<Resources>
 {
-    private static readonly Dictionary<Type, IAssetLoader> Loaders = [];
+    // Explicit loaders are discovered once per engine/game assembly generation. Generic loaders
+    // are created lazily only for eligible game asset types and are released with that assembly.
+    private static readonly Dictionary<Type, IAssetLoader> ExplicitLoaders = [];
+    private static readonly Dictionary<Type, IAssetLoader> GenericDreambitLoaders = [];
     private readonly Dictionary<string, PakReader> _pakReaders =
         new(StringComparer.OrdinalIgnoreCase);
     private DreambitXnbReader _xnbReader;
@@ -87,7 +91,8 @@ public class Resources : Singleton<Resources>
             var ownsAsset = false;
             IReadOnlyList<IDisposable> ownedDisposables = null;
 
-            if (Loaders.TryGetValue(typeof(T), out var loader))
+            var loader = ResolveLoader(typeof(T));
+            if (loader is not null)
             {
                 asset = loader.Load(assetName, PakName, UsePak, ContentDirectory);
                 ownsAsset = loader.AddToDisposableList;
@@ -102,6 +107,8 @@ public class Resources : Singleton<Resources>
             if (asset is not T typedAsset)
                 throw new ContentLoadException(
                     $"The loader for '{assetName}' did not return {typeof(T).FullName}.");
+
+            AssignDreambitAssetIdentity(typedAsset, assetName);
 
             Instance.ContentCollection.TryAdd(
                 assetName,
@@ -138,7 +145,8 @@ public class Resources : Singleton<Resources>
         {
             Instance.Logger.Trace("Loading {0} - {1}", type.Name, assetName);
 
-            if (!Loaders.TryGetValue(type, out var loader))
+            var loader = ResolveLoader(type);
+            if (loader is null)
                 throw new ContentLoadException($"No Dreambit loader is registered for {type.FullName}.");
 
             var asset = loader.Load(assetName, PakName, UsePak, ContentDirectory);
@@ -152,11 +160,7 @@ public class Resources : Singleton<Resources>
                 asset,
                 loader.AddToDisposableList);
 
-            if (asset is DreambitAsset dreambitAsset &&
-                AssetRegistry?.TryGetAssetId(assetName, out var assetId) == true)
-            {
-                dreambitAsset.AssetId = assetId;
-            }
+            AssignDreambitAssetIdentity(asset, assetName);
 
             return asset;
         }
@@ -177,15 +181,29 @@ public class Resources : Singleton<Resources>
 
     internal static void RefreshLoaders()
     {
-        Loaders.Clear();
-        var loaderTypes = ReflectionUtils.GetAllTypesAssignableFrom(
-            typeof(IAssetLoader),
-            true);
+        RefreshLoaders(null);
+    }
+
+    internal static void RefreshLoaders(IEnumerable<Type>? additionalLoaderTypes)
+    {
+        ExplicitLoaders.Clear();
+        GenericDreambitLoaders.Clear();
+        var loaderTypes = ReflectionUtils.GetAllTypesAssignableFrom(typeof(IAssetLoader), true)
+            .Where(type => AssemblyLoadContext.GetLoadContext(type.Assembly)?.IsCollectible != true);
+        if (additionalLoaderTypes is not null)
+        {
+            loaderTypes = loaderTypes.Concat(additionalLoaderTypes.Where(type =>
+                typeof(IAssetLoader).IsAssignableFrom(type) &&
+                !type.IsAbstract &&
+                !type.IsGenericType &&
+                type.GetConstructor(Type.EmptyTypes) is not null));
+        }
+
         foreach (var type in loaderTypes)
         {
             var instance = (IAssetLoader)Activator.CreateInstance(type);
             if (instance is not null)
-                Loaders[instance.TargetType] = instance;
+                ExplicitLoaders[instance.TargetType] = instance;
         }
     }
 
@@ -259,7 +277,7 @@ public class Resources : Singleton<Resources>
             Instance.Logger.Trace("Loading SpriteFontBase - {0}", cacheName);
 
             SpriteFontBase font;
-            if (Loaders.TryGetValue(typeof(SpriteFontBase), out var loader))
+            if (ResolveLoader(typeof(SpriteFontBase)) is { } loader)
             {
                 var sfLoader = (SpriteFontBaseLoader)loader;
 
@@ -316,14 +334,21 @@ public class Resources : Singleton<Resources>
 
     internal static void ReleaseAssembly(Assembly assembly)
     {
-        foreach (var type in Loaders
+        foreach (var type in ExplicitLoaders
                      .Where(pair =>
                          pair.Key.Assembly == assembly ||
                          pair.Value.GetType().Assembly == assembly)
                      .Select(pair => pair.Key)
                      .ToArray())
         {
-            Loaders.Remove(type);
+            ExplicitLoaders.Remove(type);
+        }
+
+        foreach (var type in GenericDreambitLoaders.Keys
+                     .Where(type => type.Assembly == assembly)
+                     .ToArray())
+        {
+            GenericDreambitLoaders.Remove(type);
         }
 
         Instance.ReleaseEntries(Instance.ContentCollection.RemoveAssembly(assembly));
@@ -350,5 +375,37 @@ public class Resources : Singleton<Resources>
                 disposed.Add(entry.Asset))
                 disposable.Dispose();
         }
+    }
+
+    private static IAssetLoader? ResolveLoader(Type type)
+    {
+        if (ExplicitLoaders.TryGetValue(type, out var explicitLoader))
+            return explicitLoader;
+
+        if (!typeof(DreambitAsset).IsAssignableFrom(type) ||
+            !DreambitAssetTypeRegistry.CanUseGenericJsonLoader(type))
+        {
+            return null;
+        }
+
+        if (!GenericDreambitLoaders.TryGetValue(type, out var genericLoader))
+        {
+            genericLoader = new GenericDreambitAssetLoader(type);
+            GenericDreambitLoaders.Add(type, genericLoader);
+        }
+
+        return genericLoader;
+    }
+
+    private static void AssignDreambitAssetIdentity(object asset, string requestedAssetName)
+    {
+        if (asset is not DreambitAsset dreambitAsset)
+            return;
+
+        if (string.IsNullOrWhiteSpace(dreambitAsset.AssetName))
+            dreambitAsset.AssetName = requestedAssetName;
+
+        if (AssetRegistry?.TryGetAssetId(dreambitAsset.AssetName, out var assetId) == true)
+            dreambitAsset.AssetId = assetId;
     }
 }
