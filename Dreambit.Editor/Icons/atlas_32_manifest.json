@@ -385,7 +385,7 @@
     },
     {
       "index": 29,
-      "icon": "view_in_ar",
+      "icon": "up_arrow",
       "category": "04_Hierarchy_Browser",
       "x": 160,
       "y": 96,
@@ -398,7 +398,7 @@
     },
     {
       "index": 30,
-      "icon": "visibility",
+      "icon": "view_in_ar",
       "category": "04_Hierarchy_Browser",
       "x": 192,
       "y": 96,
@@ -411,7 +411,7 @@
     },
     {
       "index": 31,
-      "icon": "visibility_off",
+      "icon": "visibility",
       "category": "04_Hierarchy_Browser",
       "x": 224,
       "y": 96,
@@ -424,8 +424,8 @@
     },
     {
       "index": 32,
-      "icon": "animation",
-      "category": "05_Assets",
+      "icon": "visibility_off",
+      "category": "04_Hierarchy_Browser",
       "x": 0,
       "y": 128,
       "width": 32,
@@ -437,7 +437,7 @@
     },
     {
       "index": 33,
-      "icon": "audiotrack",
+      "icon": "animation",
       "category": "05_Assets",
       "x": 32,
       "y": 128,
@@ -450,7 +450,7 @@
     },
     {
       "index": 34,
-      "icon": "code",
+      "icon": "audiotrack",
       "category": "05_Assets",
       "x": 64,
       "y": 128,
@@ -463,7 +463,7 @@
     },
     {
       "index": 35,
-      "icon": "data_object",
+      "icon": "code",
       "category": "05_Assets",
       "x": 96,
       "y": 128,
@@ -476,7 +476,7 @@
     },
     {
       "index": 36,
-      "icon": "extension",
+      "icon": "data_object",
       "category": "05_Assets",
       "x": 128,
       "y": 128,
@@ -489,7 +489,7 @@
     },
     {
       "index": 37,
-      "icon": "gradient",
+      "icon": "extension",
       "category": "05_Assets",
       "x": 160,
       "y": 128,
@@ -502,7 +502,7 @@
     },
     {
       "index": 38,
-      "icon": "image",
+      "icon": "gradient",
       "category": "05_Assets",
       "x": 192,
       "y": 128,
@@ -515,7 +515,7 @@
     },
     {
       "index": 39,
-      "icon": "inventory_2",
+      "icon": "image",
       "category": "05_Assets",
       "x": 224,
       "y": 128,
@@ -528,7 +528,7 @@
     },
     {
       "index": 40,
-      "icon": "movie",
+      "icon": "inventory_2",
       "category": "05_Assets",
       "x": 0,
       "y": 160,
@@ -541,7 +541,7 @@
     },
     {
       "index": 41,
-      "icon": "palette",
+      "icon": "movie",
       "category": "05_Assets",
       "x": 32,
       "y": 160,
@@ -554,7 +554,7 @@
     },
     {
       "index": 42,
-      "icon": "text_fields",
+      "icon": "palette",
       "category": "05_Assets",
       "x": 64,
       "y": 160,
@@ -567,8 +567,8 @@
     },
     {
       "index": 43,
-      "icon": "camera_alt",
-      "category": "06_Components",
+      "icon": "text_fields",
+      "category": "05_Assets",
       "x": 96,
       "y": 160,
       "width": 32,
@@ -580,7 +580,7 @@
     },
     {
       "index": 44,
-      "icon": "crop_free",
+      "icon": "camera_alt",
       "category": "06_Components",
       "x": 128,
       "y": 160,
@@ -593,7 +593,7 @@
     },
     {
       "index": 45,
-      "icon": "light_mode",
+      "icon": "crop_free",
       "category": "06_Components",
       "x": 160,
       "y": 160,
@@ -606,7 +606,7 @@
     },
     {
       "index": 46,
-      "icon": "science",
+      "icon": "light_bulb",
       "category": "06_Components",
       "x": 192,
       "y": 160,
@@ -619,7 +619,7 @@
     },
     {
       "index": 47,
-      "icon": "settings",
+      "icon": "light_mode",
       "category": "06_Components",
       "x": 224,
       "y": 160,
@@ -632,8 +632,8 @@
     },
     {
       "index": 48,
-      "icon": "analytics",
-      "category": "07_Dev_Tools",
+      "icon": "science",
+      "category": "06_Components",
       "x": 0,
       "y": 192,
       "width": 32,
@@ -645,8 +645,8 @@
     },
     {
       "index": 49,
-      "icon": "bug_report",
-      "category": "07_Dev_Tools",
+      "icon": "settings",
+      "category": "06_Components",
       "x": 32,
       "y": 192,
       "width": 32,
@@ -658,7 +658,7 @@
     },
     {
       "index": 50,
-      "icon": "build",
+      "icon": "analytics",
       "category": "07_Dev_Tools",
       "x": 64,
       "y": 192,
@@ -671,7 +671,7 @@
     },
     {
       "index": 51,
-      "icon": "check_circle",
+      "icon": "bug_report",
       "category": "07_Dev_Tools",
       "x": 96,
       "y": 192,
@@ -684,7 +684,7 @@
     },
     {
       "index": 52,
-      "icon": "download",
+      "icon": "build",
       "category": "07_Dev_Tools",
       "x": 128,
       "y": 192,
@@ -697,7 +697,7 @@
     },
     {
       "index": 53,
-      "icon": "error",
+      "icon": "check_circle",
       "category": "07_Dev_Tools",
       "x": 160,
       "y": 192,
@@ -710,7 +710,7 @@
     },
     {
       "index": 54,
-      "icon": "info",
+      "icon": "download",
       "category": "07_Dev_Tools",
       "x": 192,
       "y": 192,
@@ -723,7 +723,7 @@
     },
     {
       "index": 55,
-      "icon": "terminal",
+      "icon": "error",
       "category": "07_Dev_Tools",
       "x": 224,
       "y": 192,
@@ -736,7 +736,7 @@
     },
     {
       "index": 56,
-      "icon": "upload_file",
+      "icon": "info",
       "category": "07_Dev_Tools",
       "x": 0,
       "y": 224,
@@ -749,7 +749,7 @@
     },
     {
       "index": 57,
-      "icon": "warning",
+      "icon": "terminal",
       "category": "07_Dev_Tools",
       "x": 32,
       "y": 224,
@@ -758,6 +758,32 @@
       "u0": 0.125,
       "v0": 0.875,
       "u1": 0.25,
+      "v1": 1.0
+    },
+    {
+      "index": 58,
+      "icon": "upload_file",
+      "category": "07_Dev_Tools",
+      "x": 64,
+      "y": 224,
+      "width": 32,
+      "height": 32,
+      "u0": 0.25,
+      "v0": 0.875,
+      "u1": 0.375,
+      "v1": 1.0
+    },
+    {
+      "index": 59,
+      "icon": "warning",
+      "category": "07_Dev_Tools",
+      "x": 96,
+      "y": 224,
+      "width": 32,
+      "height": 32,
+      "u0": 0.375,
+      "v0": 0.875,
+      "u1": 0.5,
       "v1": 1.0
     }
   ]

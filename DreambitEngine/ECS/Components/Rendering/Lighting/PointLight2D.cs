@@ -6,17 +6,16 @@ namespace Dreambit.ECS;
 [BlueprintType($"{nameof(PointLight2D)}")]
 public class PointLight2D : Light2D
 {
-    [DreambitSerialize]
-    public float Radius { get; set; }
+    [DreambitSerialize] public float Radius { get; set; } = 1f;
 
     public override RectangleF Bounds
     {
         get
         {
             var r = MathF.Max(0f, Radius); // safety
-            var left = MathF.Floor(Position.X - r);
-            var top = MathF.Floor(Position.Y - r);
-            var size = MathF.Ceiling(r * 2f);
+            var left = Position.X - r;
+            var top = Position.Y - r;
+            var size = r * 2f;
             return new RectangleF(left, top, size, size);
         }
     }
@@ -26,11 +25,20 @@ public class PointLight2D : Light2D
         Core.SpriteBatch.DrawHollowRectangle(Bounds, Color.White);
     }
 
+    public override void OnEditorDrawGizmos(IEditorGizmoContext context)
+    {
+        context.ShowIcon("light_mode", Position, Color, 24f);
+    }
+
     public override void OnEditorDrawGizmosSelected(IEditorGizmoContext context)
     {
-        var radius = MathF.Max(0f, Radius);
         var color = new Color(255, 196, 64, 230);
-        context.Circle(Position, radius, color, 2f);
-        context.Line(Position, Position + Vector2.UnitX * radius, color, 1.5f);
+
+        context.RadiusHandle(
+            this,
+            nameof(Radius),
+            Position,
+            color,
+            2f);
     }
 }

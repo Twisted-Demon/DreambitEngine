@@ -114,7 +114,7 @@ internal sealed class ProjectPanel : EditorPanel
     private void DrawToolbar()
     {
         ImGui.BeginDisabled(_currentFolder.Length == 0);
-        if (_icons.Button("ProjectUp", "folder_open", "Up one folder"))
+        if (_icons.Button("ProjectUp", "up_arrow", "Up one folder"))
         {
             _currentFolder = GetParentPath(_currentFolder);
             ClearSelection();

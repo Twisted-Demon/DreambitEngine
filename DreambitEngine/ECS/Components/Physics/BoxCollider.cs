@@ -17,11 +17,20 @@ public class BoxCollider : Collider
         EnsureBoxBounds();
     }
 
+    public override void OnEditorDrawGizmosSelected(IEditorGizmoContext context)
+    {
+        context.BoxHandle(
+            this,
+            nameof(Bounds),
+            new Color(82, 235, 140, 230),
+            1.5f);
+    }
+
     public void SetShape(Box2D shape)
     {
         Bounds = shape;
     }
-
+    
     private void EnsureBoxBounds()
     {
 

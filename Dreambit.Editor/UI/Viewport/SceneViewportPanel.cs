@@ -165,8 +165,16 @@ internal abstract class SceneViewportPanel : EditorPanel
         _selectedIds.Clear();
         foreach (var id in document.Selection.EntityIds)
             _selectedIds.Add(id);
+
+        _componentGizmos.BeginFrame();
+
         scene.DrawEditorGizmos(
-            new ImGuiEditorGizmoContext(drawList, camera, canvasPosition),
+            new ImGuiEditorGizmoContext(
+                drawList,
+                camera,
+                canvasPosition,
+                _componentGizmos,
+                _icons),
             _selectedIds);
 
         SelectionOverlay.Draw(

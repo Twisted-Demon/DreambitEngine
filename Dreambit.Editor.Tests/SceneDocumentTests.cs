@@ -4,6 +4,7 @@ using Dreambit.Editor.Scenes;
 using Dreambit.Editor.UI;
 using Dreambit.Editor.UI.Viewport;
 using Dreambit.LDtk;
+using Microsoft.Xna.Framework;
 using Newtonsoft.Json.Linq;
 
 namespace Dreambit.Editor.Tests;
@@ -1450,6 +1451,20 @@ public sealed class SceneDocumentTests : IDisposable
         }
         public void Rectangle(RectangleF rectangle, Microsoft.Xna.Framework.Color color, float thickness = 1) { }
         public void Label(Microsoft.Xna.Framework.Vector2 position, string text, Microsoft.Xna.Framework.Color color) { }
+        public void ShowIcon(string icon, Vector2 position, Color color, float size = 24)
+        {
+            
+        }
+
+        public void RadiusHandle(Component component, string memberName, Vector2 center, Color color, float thickness = 1)
+        {
+            
+        }
+
+        public void BoxHandle(Component component, string memberName, Color color, float thickness = 1)
+        {
+            
+        }
     }
 }
 

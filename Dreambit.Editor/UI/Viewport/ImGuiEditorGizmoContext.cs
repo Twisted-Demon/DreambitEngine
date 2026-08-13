@@ -11,7 +11,9 @@ namespace Dreambit.Editor.UI.Viewport;
 internal sealed class ImGuiEditorGizmoContext(
     ImDrawListPtr drawList,
     Camera2D camera,
-    Vector2 canvasPosition) : IEditorGizmoContext
+    Vector2 canvasPosition,
+    EditorComponentGizmoSystem componentGizmos,
+    EditorIconService icons) : IEditorGizmoContext
 {
     public void Line(XnaVector2 from, XnaVector2 to, Color color, float thickness = 1f) =>
         drawList.AddLine(Screen(from), Screen(to), ColorU32(color), MathF.Max(1f, thickness));
@@ -37,6 +39,49 @@ internal sealed class ImGuiEditorGizmoContext(
     {
         if (!string.IsNullOrWhiteSpace(text))
             drawList.AddText(Screen(position), ColorU32(color), text);
+    }
+
+    public void ShowIcon(string icon, XnaVector2 position, Color color, float size = 24)
+    {
+        if (string.IsNullOrWhiteSpace(icon))
+            return;
+
+        if (!float.IsFinite(size) || size <= 0f)
+            return;
+
+        var center = Screen(position);
+        var iconSize = new Vector2(size, size);
+        var minimum = center - iconSize * 0.5f;
+        
+        icons.DrawAt(
+            drawList,
+            icon,
+            minimum,
+            iconSize,
+            new Vector4(
+                color.R / 255f,
+                color.G / 255f,
+                color.B / 255f,
+                color.A / 255f));
+    }
+
+    public void RadiusHandle(Component component, string memberName, XnaVector2 center, Color color, float thickness = 1)
+    {
+        componentGizmos.RegisterRadiusHandle(
+            component,
+            memberName,
+            center,
+            color,
+            thickness);
+    }
+
+    public void BoxHandle(Component component, string memberName, Color color, float thickness = 1)
+    {
+        componentGizmos.RegisterBoxHandle(
+            component,
+            memberName,
+            color,
+            thickness);
     }
 
     private Vector2 Screen(XnaVector2 world)
