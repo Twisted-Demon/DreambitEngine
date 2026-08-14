@@ -97,7 +97,7 @@ internal sealed class SceneViewportRenderer : IDisposable
             var nearestDistanceSquared = 100f;
             foreach (var entity in scene.GetAllEntities())
             {
-                if (entity.IsEditorOnly && !entity.IsLDtkGenerated)
+                if (entity.IsEditorOnly && !entity.IsImportedMapGenerated)
                     continue;
                 var distanceSquared = Vector2.DistanceSquared(entity.Transform.WorldPosition2D, worldPosition);
                 if (distanceSquared >= nearestDistanceSquared)

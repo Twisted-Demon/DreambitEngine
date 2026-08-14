@@ -6,7 +6,9 @@ using Newtonsoft.Json;
 
 namespace Dreambit;
 
-[DreambitAssetType("dreambit.audio.sound-cue")]
+[DreambitAssetType(
+    "dreambit.audio.sound-cue",
+    FileExtension = DreambitAssetFileExtensions.SoundCue)]
 public class SoundCue : DreambitAsset
 {
     [DreambitSerialize]

@@ -4,7 +4,7 @@ using Newtonsoft.Json;
 namespace Dreambit;
 
 /// <summary>Dreambit asset-system handle for compiled MonoGame Effect bytecode.</summary>
-[DreambitAssetType("dreambit.effect")]
+[DreambitAssetType("dreambit.effect", FileExtension = ".fx")]
 public sealed class EffectAsset : DreambitAsset
 {
     private readonly bool _ownsEffect;

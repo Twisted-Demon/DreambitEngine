@@ -6,7 +6,7 @@ namespace Dreambit.Scripting;
 /// <summary>
 ///     Reusable cutscene data loaded through <see cref="Resources"/>.
 /// </summary>
-[DreambitAssetType("dreambit.cutscene")]
+[DreambitAssetType("dreambit.cutscene", FileExtension = DreambitAssetFileExtensions.Cutscene)]
 public sealed class Cutscene : DreambitAsset
 {
     private readonly List<CutsceneGroup> _groups;

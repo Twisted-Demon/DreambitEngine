@@ -4,7 +4,9 @@ using Dreambit.ECS;
 
 namespace Dreambit;
 
-[DreambitAssetType("dreambit.particle-fx-config")]
+[DreambitAssetType(
+    "dreambit.particle-fx-config",
+    FileExtension = DreambitAssetFileExtensions.ParticleFx)]
 public class ParticleFxConfig : DreambitAsset
 {
     // Emission

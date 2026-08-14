@@ -1,6 +1,6 @@
 ﻿namespace Dreambit;
 
-[DreambitAssetType("dreambit.tileset")]
+[DreambitAssetType("dreambit.tileset", FileExtension = DreambitAssetFileExtensions.Tileset)]
 public class Tileset : DreambitAsset
 {
     [Dreambit.ECS.DreambitSerialize]

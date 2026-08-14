@@ -2,6 +2,7 @@ using Dreambit.Editor.Compilation;
 using Dreambit.Editor.Projects;
 using Dreambit.Editor.Assets;
 using Dreambit.LDtk;
+using Dreambit.Tiled;
 
 namespace Dreambit.Editor.Scenes;
 
@@ -48,7 +49,8 @@ internal sealed class SceneDocumentService : IDisposable
             Selection,
             _reportError,
             ResolveBlueprintInstance,
-            ResolveLDtkProject);
+            ResolveLDtkProject,
+            tiledMapResolver: ResolveTiledMap);
         ReplaceCurrent(replacement);
         return replacement;
     }
@@ -80,6 +82,34 @@ internal sealed class SceneDocumentService : IDisposable
                 AssetName = asset.LogicalAssetName,
                 WorldIid = worldIid,
                 ImportOptions = (importOptions ?? new LDtkImportOptions()).Clone()
+            },
+            tiledMapResolver: ResolveTiledMap);
+        ReplaceCurrent(replacement);
+        return replacement;
+    }
+
+    public SceneDocument NewFromTiled(
+        AssetRecord asset,
+        TiledImportOptions? importOptions = null)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(asset);
+        if (asset.Kind != AssetKind.TiledMap ||
+            !asset.RelativePath.EndsWith(".tmx", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("The selected asset is not a Tiled TMX map.", nameof(asset));
+
+        var replacement = SceneDocument.CreateNew(
+            System.IO.Path.GetFileNameWithoutExtension(asset.Name),
+            Selection,
+            _reportError,
+            ResolveBlueprintInstance,
+            ResolveLDtkProject,
+            tiledMapResolver: ResolveTiledMap,
+            tiled: new TiledSceneReference
+            {
+                AssetId = asset.Id.Value,
+                AssetName = asset.LogicalAssetName,
+                ImportOptions = (importOptions ?? new TiledImportOptions()).Clone()
             });
         ReplaceCurrent(replacement);
         return replacement;
@@ -105,7 +135,8 @@ internal sealed class SceneDocumentService : IDisposable
             Selection,
             _reportError,
             ResolveBlueprintInstance,
-            ResolveLDtkProject);
+            ResolveLDtkProject,
+            tiledMapResolver: ResolveTiledMap);
         ReplaceCurrent(replacement);
         return replacement;
     }
@@ -145,16 +176,20 @@ internal sealed class SceneDocumentService : IDisposable
         if (assetVersion != _observedAssetVersion)
         {
             _observedAssetVersion = assetVersion;
-            if (Current?.LDtkReference is not null)
+            if (Current is { } current &&
+                (current.LDtkReference is not null || current.TiledReference is not null))
             {
                 try
                 {
-                    Current.ReimportLDtk();
+                    if (current.LDtkReference is not null)
+                        current.ReimportLDtk();
+                    else
+                        current.ReimportTiled();
                 }
                 catch (Exception exception)
                 {
                     _reportError?.Invoke(
-                        "Could not live-reimport the linked LDtk project. The editor will retry after the next asset change or bake.",
+                        "Could not live-reimport the linked map source. The editor will retry after the next asset change or bake.",
                         exception);
                 }
             }
@@ -237,6 +272,34 @@ internal sealed class SceneDocumentService : IDisposable
             _project.ContentRootPath,
             asset.RelativePath.Replace('/', System.IO.Path.DirectorySeparatorChar));
         return LDtkFile.FromContentFile(path, asset.LogicalAssetName, _project.ContentRootPath);
+    }
+
+    private TmxMap ResolveTiledMap(TiledSceneReference instance)
+    {
+        var assets = _assets.GetSnapshot().Assets;
+        var asset = instance.AssetId != Guid.Empty
+            ? assets.FirstOrDefault(candidate => candidate.Id.Value == instance.AssetId)
+            : assets.FirstOrDefault(candidate =>
+                !string.IsNullOrWhiteSpace(instance.AssetName) &&
+                string.Equals(
+                    candidate.LogicalAssetName,
+                    instance.AssetName,
+                    StringComparison.OrdinalIgnoreCase));
+        if (asset is null || asset.Kind != AssetKind.TiledMap ||
+            !asset.RelativePath.EndsWith(".tmx", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new FileNotFoundException(
+                $"Tiled map asset '{instance.AssetName}' is not present in this project.");
+        }
+        return LoadTiledSource(asset);
+    }
+
+    private TmxMap LoadTiledSource(AssetRecord asset)
+    {
+        var path = System.IO.Path.Combine(
+            _project.ContentRootPath,
+            asset.RelativePath.Replace('/', System.IO.Path.DirectorySeparatorChar));
+        return TmxMap.FromContentFile(path, asset.LogicalAssetName, _project.ContentRootPath);
     }
 
     public void Dispose()

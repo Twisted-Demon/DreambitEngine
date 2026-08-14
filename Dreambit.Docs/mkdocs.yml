@@ -142,6 +142,8 @@ nav:
       - Loading worlds and levels: ldtk/loading-levels.md
       - MonoGame conversions: ldtk/monogame-conversions.md
       - Mapping LDtk entities: ldtk/entities.md
+  - Tiled:
+      - Overview and quick start: tiled/index.md
   - Scripting and cutscenes: scripting/index.md
   - Utilities:
       - Math and ranges: utilities/math.md

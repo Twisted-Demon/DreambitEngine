@@ -5,7 +5,7 @@ using Newtonsoft.Json;
 namespace Dreambit;
 
 /// <summary>Dreambit asset-system handle for a baked TrueType font.</summary>
-[DreambitAssetType("dreambit.font")]
+[DreambitAssetType("dreambit.font", FileExtension = ".ttf")]
 public sealed class FontAsset : DreambitAsset
 {
     private FontSystem _fontSystem;

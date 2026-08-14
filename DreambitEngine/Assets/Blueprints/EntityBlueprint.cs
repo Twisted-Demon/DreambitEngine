@@ -6,7 +6,9 @@ using Newtonsoft.Json;
 
 namespace Dreambit;
 
-[DreambitAssetType("dreambit.blueprint.entity")]
+[DreambitAssetType(
+    "dreambit.blueprint.entity",
+    FileExtension = DreambitAssetFileExtensions.EntityBlueprint)]
 public class EntityBlueprint : DreambitAsset
 {
     [DreambitSerialize]

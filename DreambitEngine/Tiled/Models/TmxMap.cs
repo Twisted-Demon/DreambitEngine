@@ -12,6 +12,14 @@ namespace Dreambit.Tiled;
 [DreambitAssetType("dreambit.tiled.map")]
 public sealed class TmxMap : DreambitAsset
 {
+    public static TmxMap FromFile(string path) => TmxSourceLoader.LoadMap(path);
+
+    public static TmxMap FromContentFile(
+        string path,
+        string logicalAssetName,
+        string contentRoot)
+        => TmxSourceLoader.LoadMap(path, logicalAssetName, contentRoot);
+
     [XmlAttribute("version")]
     public string? Version { get; set; }
 
@@ -110,6 +118,14 @@ public sealed class TmxMap : DreambitAsset
 [DreambitAssetType("dreambit.tiled.tileset")]
 public sealed class TmxTileset : DreambitAsset
 {
+    public static TmxTileset FromFile(string path) => TmxSourceLoader.LoadTileset(path);
+
+    public static TmxTileset FromContentFile(
+        string path,
+        string logicalAssetName,
+        string contentRoot)
+        => TmxSourceLoader.LoadTileset(path, logicalAssetName, contentRoot);
+
     // Present on a tileset reference inside a TMX map, absent on the external TSX root.
     [XmlAttribute("firstgid")]
     public uint FirstGid { get; set; }
@@ -190,6 +206,12 @@ public sealed class TmxTileset : DreambitAsset
 
     [XmlElement("tile")]
     public List<TmxTilesetTile> Tiles { get; set; } = [];
+
+    [XmlIgnore]
+    public TmxTileset? ResolvedTileset { get; internal set; }
+
+    [XmlIgnore]
+    public TmxTileset EffectiveTileset => ResolvedTileset ?? this;
 }
 
 public sealed class TmxTileOffset
@@ -242,6 +264,9 @@ public sealed class TmxImage
 
     [XmlElement("data")]
     public TmxData? Data { get; set; }
+
+    [XmlIgnore]
+    public string? ResolvedAssetName { get; internal set; }
 }
 
 public sealed class TmxTerrainTypes
@@ -466,6 +491,10 @@ public abstract class TmxLayer
     [DefaultValue(1d)]
     public double ParallaxY { get; set; } = 1d;
 
+    [XmlAttribute("blendmode")]
+    [DefaultValue("normal")]
+    public string BlendMode { get; set; } = "normal";
+
     [XmlElement("properties")]
     public TmxProperties? Properties { get; set; }
 }
@@ -486,9 +515,12 @@ public sealed class TmxTileLayer : TmxLayer
     [XmlAttribute("height")]
     public int Height { get; set; }
 
-    [XmlAttribute("mode")]
-    [DefaultValue("normal")]
-    public string Mode { get; set; } = "normal";
+    [XmlIgnore]
+    public string Mode
+    {
+        get => BlendMode;
+        set => BlendMode = value;
+    }
 
     [XmlElement("data")]
     public TmxData? Data { get; set; }

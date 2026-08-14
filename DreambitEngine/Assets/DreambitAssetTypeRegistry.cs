@@ -50,6 +50,32 @@ public static class DreambitAssetTypeRegistry
         return assetType.Assembly != typeof(DreambitAsset).Assembly;
     }
 
+    /// <summary>Gets the canonical source-file extension for an asset type.</summary>
+    public static string GetFileExtension(Type assetType)
+    {
+        ValidateAssetType(assetType);
+        var extension = assetType
+            .GetCustomAttribute<DreambitAssetTypeAttribute>(false)?
+            .FileExtension;
+        if (string.IsNullOrWhiteSpace(extension))
+            extension = DreambitAssetFileExtensions.Generic;
+
+        extension = extension.Trim();
+        if (extension[0] != '.')
+            extension = "." + extension;
+        if (extension.Length < 2 ||
+            extension.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
+            extension.Contains('/') ||
+            extension.Contains('\\'))
+        {
+            throw new InvalidOperationException(
+                $"Dreambit asset type '{assetType.FullName}' declares invalid file extension " +
+                $"'{extension}'.");
+        }
+
+        return extension.ToLowerInvariant();
+    }
+
     /// <summary>
     /// Returns whether an asset can use the engine's generic JSONB loader. Engine-owned assets
     /// retain their semantic loaders and formats; game-owned concrete assets use JSONB unless a

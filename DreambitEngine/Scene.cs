@@ -5,6 +5,7 @@ using Dreambit.ECS;
 using Dreambit.Events;
 using Dreambit.LDtk;
 using Dreambit.Scripting;
+using Dreambit.Tiled;
 using Dreambit.UI;
 using Microsoft.Xna.Framework;
 
@@ -138,6 +139,8 @@ public class Scene : IDisposable
         ArgumentNullException.ThrowIfNull(options);
         if (blueprint.LDtk is { } ldtk)
             MaterializeLDtkScene(ldtk, options);
+        if (blueprint.Tiled is { } tiled)
+            MaterializeTiledScene(tiled, options);
         if (blueprint.Entities.Count == 0)
             return;
 
@@ -504,7 +507,7 @@ public class Scene : IDisposable
 
         foreach (var entity in GetAllEntities())
         {
-            if ((entity.IsEditorOnly && !entity.IsLDtkGenerated) || !entity.Enabled)
+            if ((entity.IsEditorOnly && !entity.IsImportedMapGenerated) || !entity.Enabled)
                 continue;
             var selected = selectedEntityIds.Contains(entity.Id);
             foreach (var component in entity.GetAllAttachedComponents())
@@ -569,6 +572,42 @@ public class Scene : IDisposable
         return string.IsNullOrWhiteSpace(assetName)
             ? null
             : Resources.LoadAsset<LDtkFile>(assetName);
+    }
+
+    private void MaterializeTiledScene(
+        TiledSceneReference reference,
+        SceneBlueprintLoadOptions options)
+    {
+        var map = (options.TiledMapResolver ?? ResolveTiledMap)(reference)
+                  ?? throw new InvalidOperationException(
+                      $"Tiled map asset '{reference.AssetName}' could not be loaded.");
+        var importer = new TiledMapImporter();
+        var importOptions = (reference.ImportOptions ?? new TiledImportOptions()).Clone();
+        importOptions.Validate();
+        var instance = importer.Import(this, map, importOptions);
+        TiledGeneratedEntityOverrides.Apply(
+            instance.OwnedEntities,
+            reference.EntityOverrides ?? new Dictionary<string, TiledGeneratedEntityOverride>());
+        if (!options.MarkImportedTiledEntitiesEditorOnly)
+            return;
+        foreach (var entity in instance.OwnedEntities)
+            entity.IsEditorOnly = true;
+    }
+
+    private static TmxMap ResolveTiledMap(TiledSceneReference reference)
+    {
+        var assetName = reference.AssetName;
+        if (reference.AssetId != Guid.Empty &&
+            Resources.AssetRegistry?.TryResolveAssetName(
+                new AssetId(reference.AssetId),
+                out var resolvedName) == true)
+        {
+            assetName = resolvedName;
+        }
+
+        return string.IsNullOrWhiteSpace(assetName)
+            ? null
+            : Resources.LoadAsset<TmxMap>(assetName);
     }
 
     /// <summary>

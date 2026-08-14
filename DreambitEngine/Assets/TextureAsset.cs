@@ -8,7 +8,7 @@ namespace Dreambit;
 /// Use this type in serialized assets and components, then access <see cref="Texture"/>
 /// when passing the underlying resource to MonoGame drawing APIs.
 /// </summary>
-[DreambitAssetType("dreambit.texture")]
+[DreambitAssetType("dreambit.texture", FileExtension = ".png")]
 public sealed class TextureAsset : DreambitAsset
 {
     private readonly bool _ownsTexture;
