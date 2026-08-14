@@ -103,6 +103,132 @@ public sealed class GameCompilationTests : IDisposable
             message.Message.Contains("still referenced after unload", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void ReloadSubscriberFailuresDoNotSkipLaterSubscribersOrRejectTheCandidate()
+    {
+        var messages = new List<GameCodeMessage>();
+        using var loader = new GameAssemblyLoadService(_root, messages.Add);
+        var assemblyPath = typeof(GameCompilationTests).Assembly.Location;
+        Assert.True(loader.TryLoad(assemblyPath, out var firstError), firstError);
+
+        var callbacks = new List<string>();
+        Action<LoadedGameAssembly?> preparationFailure = _ =>
+        {
+            callbacks.Add("preparation failure");
+            throw new InvalidOperationException("Preparation failed for testing.");
+        };
+        Action<LoadedGameAssembly?> preparationCompleted = _ => callbacks.Add("preparation completed");
+        Action<LoadedGameAssembly> releaseFailure = _ =>
+        {
+            callbacks.Add("release failure");
+            throw new InvalidOperationException("Release failed for testing.");
+        };
+        Action<LoadedGameAssembly> releaseCompleted = _ => callbacks.Add("release completed");
+        Action<LoadedGameAssembly> activationFailure = _ =>
+        {
+            callbacks.Add("activation failure");
+            throw new InvalidOperationException("Activation failed for testing.");
+        };
+        Action<LoadedGameAssembly> activationCompleted = _ => callbacks.Add("activation completed");
+        loader.Reloading += preparationFailure;
+        loader.Reloading += preparationCompleted;
+        loader.Unloading += releaseFailure;
+        loader.Unloading += releaseCompleted;
+        loader.Reloaded += activationFailure;
+        loader.Reloaded += activationCompleted;
+
+        Assert.True(loader.TryLoad(assemblyPath, out var secondError), secondError);
+        loader.Reloading -= preparationFailure;
+        loader.Reloading -= preparationCompleted;
+        loader.Unloading -= releaseFailure;
+        loader.Unloading -= releaseCompleted;
+        loader.Reloaded -= activationFailure;
+        loader.Reloaded -= activationCompleted;
+
+        Assert.Equal(
+            [
+                "preparation failure",
+                "preparation completed",
+                "release failure",
+                "release completed",
+                "activation failure",
+                "activation completed"
+            ],
+            callbacks);
+        Assert.Equal(2, loader.Current!.Generation);
+        Assert.Contains(messages, message =>
+            message.Severity == GameCodeMessageSeverity.Error &&
+            message.Message.Contains("preparation", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(messages, message =>
+            message.Severity == GameCodeMessageSeverity.Error &&
+            message.Message.Contains("cache release", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(messages, message =>
+            message.Severity == GameCodeMessageSeverity.Error &&
+            message.Message.Contains("activation", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void ReloadPreparationCanPopulateMetadataBeforeOutgoingTypesAreReleased()
+    {
+        var messages = new List<GameCodeMessage>();
+        using var loader = new GameAssemblyLoadService(_root, messages.Add);
+        var metadata = new InspectorMetadataCache();
+        using var registry = new EditorTypeRegistry(loader, metadata);
+        var assemblyPath = typeof(GameCompilationTests).Assembly.Location;
+        Assert.True(loader.TryLoad(assemblyPath, out var firstError), firstError);
+
+        var expectedTypeName = typeof(TestCustomAsset).FullName!;
+        var metadataCaptured = false;
+        var typesReleased = false;
+        Action<LoadedGameAssembly?> captureMetadata = outgoing =>
+        {
+            if (outgoing is null)
+                return;
+            var outgoingType = registry.AssetTypes.Single(type =>
+                type.Assembly == outgoing.Assembly && type.FullName == expectedTypeName);
+            metadata.Get(outgoingType, InspectorTargetKind.Asset);
+            metadataCaptured = true;
+        };
+        Action<LoadedGameAssembly> observeReleasedTypes = outgoing =>
+        {
+            typesReleased = registry.AssetTypes.All(type => type.Assembly != outgoing.Assembly);
+        };
+        loader.Reloading += captureMetadata;
+        loader.Unloading += observeReleasedTypes;
+
+        Assert.True(loader.TryLoad(assemblyPath, out var secondError), secondError);
+        loader.Reloading -= captureMetadata;
+        loader.Unloading -= observeReleasedTypes;
+
+        Assert.True(metadataCaptured);
+        Assert.True(typesReleased);
+        Assert.DoesNotContain(messages, message =>
+            message.Severity == GameCodeMessageSeverity.Warning &&
+            message.Message.Contains("still referenced after unload", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ThrowingCustomEditorDisposeDoesNotBlockRegistryReloadOrAssemblyUnload()
+    {
+        var messages = new List<GameCodeMessage>();
+        var editorErrors = new List<string>();
+        using var loader = new GameAssemblyLoadService(_root, messages.Add);
+        using var registry = new CustomEditorRegistry(
+            loader,
+            (message, exception) => editorErrors.Add($"{message} {exception?.Message}"));
+        var assemblyPath = typeof(GameCompilationTests).Assembly.Location;
+
+        Assert.True(loader.TryLoad(assemblyPath, out var firstError), firstError);
+        Assert.True(loader.TryLoad(assemblyPath, out var secondError), secondError);
+
+        Assert.Equal(2, loader.Current!.Generation);
+        Assert.Contains(editorErrors, error =>
+            error.Contains(nameof(ThrowingDisposeReloadTestCustomEditor), StringComparison.Ordinal));
+        Assert.DoesNotContain(messages, message =>
+            message.Severity == GameCodeMessageSeverity.Warning &&
+            message.Message.Contains("still referenced after unload", StringComparison.Ordinal));
+    }
+
     public void Dispose()
     {
         try
@@ -126,4 +252,14 @@ public sealed class ReloadTestComponent : Component;
 public sealed class ReloadTestCustomEditor : IDreambitCustomEditor
 {
     public void Draw(IEditorInspectorContext context) => context.DrawDefaultInspector();
+}
+
+public sealed class ThrowingDisposeReloadTestComponent : Component;
+
+[DreambitCustomEditor(typeof(ThrowingDisposeReloadTestComponent))]
+public sealed class ThrowingDisposeReloadTestCustomEditor : IDreambitCustomEditor, IDisposable
+{
+    public void Draw(IEditorInspectorContext context) => context.DrawDefaultInspector();
+
+    public void Dispose() => throw new InvalidOperationException("Custom Editor dispose failed for testing.");
 }

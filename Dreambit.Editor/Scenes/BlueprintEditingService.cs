@@ -11,24 +11,25 @@ namespace Dreambit.Editor.Scenes;
 /// </summary>
 internal sealed class BlueprintEditingService : IDisposable
 {
-    private readonly AssetDatabase _assets;
     private readonly AssetEditingService _assetEditing;
     private readonly GameAssemblyLoadService _assemblies;
+    private readonly BlueprintSourceService _blueprintSources;
     private readonly Action<string, Exception?>? _reportError;
     private AssetId _openAssetId;
     private Guid _rootEntityId;
     private bool _synchronizing;
+    private bool _rebuildRequested;
     private bool _disposed;
 
     public BlueprintEditingService(
-        AssetDatabase assets,
         AssetEditingService assetEditing,
         GameAssemblyLoadService assemblies,
+        BlueprintSourceService blueprintSources,
         Action<string, Exception?>? reportError = null)
     {
-        _assets = assets;
         _assetEditing = assetEditing;
         _assemblies = assemblies;
+        _blueprintSources = blueprintSources;
         _reportError = reportError;
         Selection = new SelectionService();
         _assetEditing.Changed += OnAssetEditingChanged;
@@ -41,15 +42,19 @@ internal sealed class BlueprintEditingService : IDisposable
     public SelectionService Selection { get; }
     public string? Error { get; private set; }
 
-    public void Open(AssetRecord asset)
+    public bool Open(AssetRecord asset)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (asset.Kind != AssetKind.Blueprint)
             throw new ArgumentException("The asset is not an Entity Blueprint.", nameof(asset));
+        if (!_assetEditing.Select(asset))
+            return false;
+        if (_openAssetId != asset.Id)
+            Selection.Clear();
         _openAssetId = asset.Id;
-        _assetEditing.Select(asset);
         if (Current is null || _assetEditing.Current?.Asset.Id != asset.Id)
             RebuildFromAssetDocument();
+        return true;
     }
 
     /// <summary>
@@ -58,6 +63,15 @@ internal sealed class BlueprintEditingService : IDisposable
     /// must not be inferred by counting every parentless runtime entity.
     /// </summary>
     public Entity? Root => FindAuthoredRoot(Current, _rootEntityId);
+
+    /// <summary>Repairs a preview whose source synchronization failed on the previous frame.</summary>
+    public void Update()
+    {
+        if (!_rebuildRequested)
+            return;
+        _rebuildRequested = false;
+        RebuildFromAssetDocument();
+    }
 
     internal static Entity? FindAuthoredRoot(
         SceneDocument? document,
@@ -91,12 +105,13 @@ internal sealed class BlueprintEditingService : IDisposable
                 null,
                 Selection,
                 _reportError,
-                ResolveBlueprintInstance);
+                ResolveBlueprintInstance,
+                historyOwnership: SceneDocumentHistoryOwnership.External);
             replacement.Changed += OnSceneDocumentChanged;
             var previous = Current;
             Current = replacement;
             _rootEntityId = rootEntityId;
-            previous?.Dispose();
+            DisposeDocument(previous);
             Selection.Restore(selectedIds);
             Selection.RemoveMissing(Current.Scene);
             Error = null;
@@ -118,12 +133,16 @@ internal sealed class BlueprintEditingService : IDisposable
         try
         {
             _synchronizing = true;
-            assetDocument.ReplaceBlueprint("Edit Blueprint Hierarchy", sceneDocument.CaptureSingleRoot());
+            assetDocument.ReplaceBlueprint(
+                "Edit Blueprint Hierarchy",
+                sceneDocument.CaptureSingleRoot(),
+                sceneDocument.ActiveChangeMergeKey);
             Error = null;
         }
         catch (Exception exception)
         {
             Error = exception.Message;
+            _rebuildRequested = true;
             _reportError?.Invoke("Could not update the Blueprint asset from its hierarchy.", exception);
         }
         finally
@@ -132,23 +151,8 @@ internal sealed class BlueprintEditingService : IDisposable
         }
     }
 
-    private EntityBlueprint ResolveBlueprintInstance(BlueprintInstanceReference instance)
-    {
-        var asset = _assets.GetSnapshot().Assets.FirstOrDefault(candidate =>
-            candidate.Kind == AssetKind.Blueprint &&
-            ((instance.AssetId != Guid.Empty && candidate.Id.Value == instance.AssetId) ||
-             (!string.IsNullOrWhiteSpace(instance.AssetName) &&
-              string.Equals(candidate.LogicalAssetName, instance.AssetName, StringComparison.OrdinalIgnoreCase))))
-                    ?? throw new FileNotFoundException($"Blueprint asset '{instance.AssetName}' is not present in this project.");
-        var path = Path.Combine(
-            _assets.ContentRoot,
-            asset.RelativePath.Replace('/', Path.DirectorySeparatorChar));
-        var blueprint = DreambitJson.Deserialize<EntityBlueprint>(File.ReadAllText(path))
-                        ?? throw new InvalidDataException($"Blueprint '{asset.RelativePath}' is empty.");
-        blueprint.AssetId = asset.Id;
-        blueprint.AssetName = asset.LogicalAssetName;
-        return blueprint;
-    }
+    private EntityBlueprint ResolveBlueprintInstance(BlueprintInstanceReference instance) =>
+        _blueprintSources.Resolve(instance);
 
     private void OnAssetEditingChanged()
     {
@@ -169,12 +173,10 @@ internal sealed class BlueprintEditingService : IDisposable
 
     private void SuspendDocumentPreservingSelection()
     {
-        if (Current is not null)
-            Current.Changed -= OnSceneDocumentChanged;
-
-        Current?.Dispose();
+        var current = Current;
         Current = null;
         _rootEntityId = Guid.Empty;
+        DisposeDocument(current);
     }
 
     private void OnAssetPreviewChanged(DreambitAssetDocument document)
@@ -185,34 +187,45 @@ internal sealed class BlueprintEditingService : IDisposable
 
     private void OnAssemblyReloading(LoadedGameAssembly? _)
     {
-        if (Current is null)
-            return;
-        Current.Changed -= OnSceneDocumentChanged;
-        Current.Dispose();
+        var current = Current;
         Current = null;
+        DisposeDocument(current);
     }
 
     private void OnAssemblyReloaded(LoadedGameAssembly _) => RebuildFromAssetDocument();
 
     private void CloseDocument()
     {
-        if (Current is not null)
-            Current.Changed -= OnSceneDocumentChanged;
-        Current?.Dispose();
+        var current = Current;
         Current = null;
         _rootEntityId = Guid.Empty;
         Selection.Clear();
+        DisposeDocument(current);
+    }
+
+    private void DisposeDocument(SceneDocument? document)
+    {
+        if (document is null)
+            return;
+        document.Changed -= OnSceneDocumentChanged;
+        var cleanupFailure = EditorDisposal.TryDispose(document);
+        if (cleanupFailure is not null)
+        {
+            _reportError?.Invoke(
+                "Could not fully dispose the previous Blueprint preview scene.\n" + cleanupFailure,
+                null);
+        }
     }
 
     public void Dispose()
     {
         if (_disposed)
             return;
+        _disposed = true;
         _assetEditing.Changed -= OnAssetEditingChanged;
         _assetEditing.PreviewChanged -= OnAssetPreviewChanged;
         _assemblies.Reloading -= OnAssemblyReloading;
         _assemblies.Reloaded -= OnAssemblyReloaded;
         CloseDocument();
-        _disposed = true;
     }
 }

@@ -1,8 +1,10 @@
 using Dreambit.ECS;
 using Dreambit.Editor.Graphics;
 using Dreambit.Editor.Scenes;
-using Dreambit.Editor.UI.Panels;
+using Dreambit.Editor.UI;
+using Dreambit.Editor.UI.Viewport;
 using Dreambit.LDtk;
+using Microsoft.Xna.Framework;
 using Newtonsoft.Json.Linq;
 
 namespace Dreambit.Editor.Tests;
@@ -44,6 +46,46 @@ public sealed class SceneDocumentTests : IDisposable
 
         Assert.Equal(1, changed);
         Assert.Equal(new[] { "Leaves", "Shadow" }, captured.Children.Select(child => child.Name));
+    }
+
+    [Fact]
+    public void DuplicateOnlyRemapsTypedEntityReferences()
+    {
+        var referencedId = Guid.NewGuid();
+        var root = new EntityBlueprint
+        {
+            Name = "Root",
+            Guid = referencedId,
+            Children =
+            [
+                new EntityBlueprint
+                {
+                    Name = "Child",
+                    Guid = Guid.NewGuid(),
+                    Components =
+                    [
+                        new ComponentBlueprint
+                        {
+                            Type = $"{typeof(EditorReloadSafetyComponent).Assembly.GetName().Name}." +
+                                   nameof(EditorReloadSafetyComponent),
+                            Properties = new Dictionary<string, JToken>
+                            {
+                                [nameof(EditorReloadSafetyComponent.Target)] = referencedId.ToString(),
+                                [nameof(EditorReloadSafetyComponent.StableGuid)] = referencedId.ToString(),
+                                [nameof(EditorReloadSafetyComponent.Label)] = referencedId.ToString()
+                            }
+                        }
+                    ]
+                }
+            ]
+        };
+
+        var duplicate = SceneDocumentSerializer.CloneAndRemap(root);
+        var component = Assert.Single(Assert.Single(duplicate.Children).Components);
+
+        Assert.Equal(duplicate.Guid.ToString(), component.Properties[nameof(EditorReloadSafetyComponent.Target)]!.Value<string>());
+        Assert.Equal(referencedId.ToString(), component.Properties[nameof(EditorReloadSafetyComponent.StableGuid)]!.Value<string>());
+        Assert.Equal(referencedId.ToString(), component.Properties[nameof(EditorReloadSafetyComponent.Label)]!.Value<string>());
     }
 
     [Fact]
@@ -234,8 +276,214 @@ public sealed class SceneDocumentTests : IDisposable
         var center = new Microsoft.Xna.Framework.Vector2(2f, 3f);
         var handle = new Microsoft.Xna.Framework.Vector2(5f, 7f);
 
-        Assert.Equal(5f, ScenePanel.CalculatePointLightRadius(center, handle, false, 1f));
-        Assert.Equal(6f, ScenePanel.CalculatePointLightRadius(center, handle, true, 3f));
+        Assert.Equal(5f, PointLight2DEditorGizmo.CalculateRadius(center, handle, false, 1f));
+        Assert.Equal(6f, PointLight2DEditorGizmo.CalculateRadius(center, handle, true, 3f));
+    }
+
+    [Fact]
+    public void BoxColliderResizeUsesEntityLocalSpaceThroughTransformedParent()
+    {
+        using var scene = new TestEditorScene();
+        var parent = scene.CreateEntity(
+            "parent",
+            createAt: new Microsoft.Xna.Framework.Vector3(8f, -3f, 0f),
+            eulerRotation: new Microsoft.Xna.Framework.Vector3(0f, 0f, MathF.PI / 2f),
+            scale: new Microsoft.Xna.Framework.Vector3(2f, 3f, 1f));
+        var entity = scene.CreateEntity("collider");
+        entity.SetParent(parent, preserveWorldTransform: false);
+        scene.FlushStructuralChanges();
+
+        var oppositeLocal = new Microsoft.Xna.Framework.Vector2(1f, 1f);
+        var cursorWorld = entity.Transform.TransformPoint2D(
+            new Microsoft.Xna.Framework.Vector2(-3f, -1f));
+        var resized = BoxColliderEditorGizmo.CalculateResizedShape(
+            entity.Transform,
+            oppositeLocal,
+            cursorWorld,
+            false,
+            1f);
+
+        Assert.InRange(resized.TopLeft.X, -3.001f, -2.999f);
+        Assert.InRange(resized.TopLeft.Y, -1.001f, -0.999f);
+        Assert.InRange(resized.BottomRight.X, 0.999f, 1.001f);
+        Assert.InRange(resized.BottomRight.Y, 0.999f, 1.001f);
+    }
+
+    [Fact]
+    public void TransformSelectionExcludesDescendantsWhoseAncestorIsSelected()
+    {
+        var parentId = Guid.NewGuid();
+        var childId = Guid.NewGuid();
+        using var document = new SceneDocument(
+            new SceneBlueprint
+            {
+                Name = "Hierarchy",
+                Entities =
+                [
+                    new EntityBlueprint
+                    {
+                        Name = "Parent",
+                        Guid = parentId,
+                        Children = [new EntityBlueprint { Name = "Child", Guid = childId }]
+                    }
+                ]
+            },
+            null,
+            new SelectionService());
+        var parent = document.Scene!.FindEntity(parentId)!;
+        var child = document.Scene.FindEntity(childId)!;
+        document.Selection.Set(child);
+        document.Selection.Set(parent, additive: true);
+
+        var states = EditorTransformGizmo.CaptureEditableSelection(document);
+
+        var state = Assert.Single(states);
+        Assert.Equal(parentId, state.Id);
+    }
+
+    [Fact]
+    public void TransformManipulationAnchorMatchesSelectedAncestorFiltering()
+    {
+        using var scene = new TestEditorScene();
+        var root = scene.CreateEntity("Root");
+        var parent = scene.CreateEntity("Parent");
+        parent.SetParent(root, preserveWorldTransform: false);
+        var child = scene.CreateEntity("Child");
+        child.SetParent(parent, preserveWorldTransform: false);
+        scene.FlushStructuralChanges();
+
+        var anchor = EditorTransformGizmo.ResolveManipulationAnchor(
+            child,
+            new HashSet<Guid> { root.Id, parent.Id, child.Id });
+
+        Assert.Same(root, anchor);
+    }
+
+    [Fact]
+    public void TransformSelectionAllowsBoxedRootButNotItsMaterializedChild()
+    {
+        var sourceRootId = Guid.NewGuid();
+        var sourceChildId = Guid.NewGuid();
+        var instanceId = Guid.NewGuid();
+        var source = new EntityBlueprint
+        {
+            Name = "Source",
+            Guid = sourceRootId,
+            Children = [new EntityBlueprint { Name = "Source Child", Guid = sourceChildId }]
+        };
+        using var document = new SceneDocument(
+            new SceneBlueprint
+            {
+                Name = "Scene",
+                Entities =
+                [
+                    new EntityBlueprint
+                    {
+                        Name = "Instance",
+                        Guid = instanceId,
+                        BlueprintInstance = new BlueprintInstanceReference
+                        {
+                            AssetId = Guid.NewGuid(),
+                            AssetName = "source"
+                        }
+                    }
+                ]
+            },
+            null,
+            new SelectionService(),
+            blueprintInstanceResolver: _ => source);
+        var instance = document.Scene!.FindEntity(instanceId)!;
+        var child = Assert.Single(instance.Children);
+        document.Selection.Set(child);
+
+        Assert.Empty(EditorTransformGizmo.CaptureEditableSelection(document));
+        Assert.False(EditorComponentGizmoSystem.CanEditComponents(document, child));
+
+        document.Selection.Set(instance);
+        Assert.Equal(instanceId, Assert.Single(EditorTransformGizmo.CaptureEditableSelection(document)).Id);
+        Assert.False(EditorComponentGizmoSystem.CanEditComponents(document, instance));
+    }
+
+    [Fact]
+    public void ParentAndChildSelectionAppliesMoveOnlyOnceToChild()
+    {
+        var parentId = Guid.NewGuid();
+        var childId = Guid.NewGuid();
+        using var document = new SceneDocument(
+            new SceneBlueprint
+            {
+                Name = "Hierarchy",
+                Entities =
+                [
+                    new EntityBlueprint
+                    {
+                        Name = "Parent",
+                        Guid = parentId,
+                        Children =
+                        [
+                            new EntityBlueprint
+                            {
+                                Name = "Child",
+                                Guid = childId,
+                                Position = new Microsoft.Xna.Framework.Vector3(2f, 0f, 0f)
+                            }
+                        ]
+                    }
+                ]
+            },
+            null,
+            new SelectionService());
+        var parent = document.Scene!.FindEntity(parentId)!;
+        var child = document.Scene.FindEntity(childId)!;
+        document.Selection.Set(child);
+        document.Selection.Set(parent, additive: true);
+        var states = EditorTransformGizmo.CaptureEditableSelection(document);
+
+        EditorTransformGizmo.ApplyMove(
+            document,
+            document.Scene,
+            states,
+            new Microsoft.Xna.Framework.Vector2(3f, 0f));
+
+        Assert.Equal(3f, parent.Transform.WorldPosition.X);
+        Assert.Equal(5f, child.Transform.WorldPosition.X);
+    }
+
+    [Fact]
+    public void PointLightGizmoMutationUsesDocumentUndoPath()
+    {
+        var entityId = Guid.NewGuid();
+        using var document = new SceneDocument(
+            new SceneBlueprint
+            {
+                Name = "Light",
+                Entities =
+                [
+                    new EntityBlueprint
+                    {
+                        Name = "Light",
+                        Guid = entityId,
+                        Components = [new ComponentBlueprint { Type = nameof(PointLight2D) }]
+                    }
+                ]
+            },
+            null,
+            new SelectionService());
+        var transaction = document.BeginTransaction("Resize Point Light");
+        transaction.Update(scene => PointLight2DEditorGizmo.ApplyResize(
+            document,
+            scene,
+            entityId,
+            new Microsoft.Xna.Framework.Vector2(7f, 0f),
+            false,
+            1f));
+        transaction.Commit();
+
+        Assert.Equal(7f, document.Scene!.FindEntity(entityId)!.GetComponent<PointLight2D>()!.Radius);
+        Assert.True(document.Undo.CanUndo);
+
+        document.Undo.Undo();
+        Assert.Equal(0f, document.Scene.FindEntity(entityId)!.GetComponent<PointLight2D>()!.Radius);
     }
 
     [Fact]
@@ -356,6 +604,148 @@ public sealed class SceneDocumentTests : IDisposable
     }
 
     [Fact]
+    public void EditorPreservesKnownComponentPayloadWhenConstructionFails()
+    {
+        var entityId = Guid.NewGuid();
+        var componentType = SceneDocumentSerializer.GetComponentTypeId(
+            typeof(EditorConstructionFailureComponent));
+        EditorConstructionFailureComponent.FailConstruction = true;
+        try
+        {
+            using var document = new SceneDocument(
+                new SceneBlueprint
+                {
+                    Name = "Construction Failure",
+                    Entities =
+                    [
+                        new EntityBlueprint
+                        {
+                            Name = "Before",
+                            Guid = entityId,
+                            Components =
+                            [
+                                new ComponentBlueprint
+                                {
+                                    Type = componentType,
+                                    Properties = new Dictionary<string, JToken>
+                                    {
+                                        [nameof(EditorConstructionFailureComponent.Value)] = new JValue(42)
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                null,
+                new SelectionService());
+            var entity = document.Scene!.FindEntity(entityId)!;
+            Assert.Null(entity.GetComponent<EditorConstructionFailureComponent>());
+
+            document.Rename(entity, "After");
+
+            var captured = document.CaptureSingleRoot();
+            var preserved = Assert.Single(captured.Components);
+            Assert.Equal(componentType, preserved.Type);
+            Assert.Equal(42, preserved.Properties[nameof(EditorConstructionFailureComponent.Value)]!.Value<int>());
+        }
+        finally
+        {
+            EditorConstructionFailureComponent.FailConstruction = false;
+        }
+    }
+
+    [Fact]
+    public void DeliberatelyDetachedKnownComponentIsNotResurrected()
+    {
+        var entityId = Guid.NewGuid();
+        var componentType = SceneDocumentSerializer.GetComponentTypeId(
+            typeof(EditorConstructionFailureComponent));
+        using var document = new SceneDocument(
+            new SceneBlueprint
+            {
+                Name = "Deliberate Removal",
+                Entities =
+                [
+                    new EntityBlueprint
+                    {
+                        Name = "Entity",
+                        Guid = entityId,
+                        Components =
+                        [
+                            new ComponentBlueprint
+                            {
+                                Type = componentType,
+                                Properties = new Dictionary<string, JToken>
+                                {
+                                    [nameof(EditorConstructionFailureComponent.Value)] = new JValue(7)
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            null,
+            new SelectionService());
+        var entity = document.Scene!.FindEntity(entityId)!;
+        var component = entity.GetComponent<EditorConstructionFailureComponent>()!;
+
+        document.Apply("Remove Component", _ => entity.DetachComponent(component));
+
+        Assert.Empty(document.CaptureSingleRoot().Components);
+        Assert.True(document.Undo.Undo());
+        Assert.NotNull(document.Scene!.FindEntity(entityId)!
+            .GetComponent<EditorConstructionFailureComponent>());
+        Assert.Single(document.CaptureSingleRoot().Components);
+        Assert.True(document.Undo.Redo());
+        Assert.Empty(document.CaptureSingleRoot().Components);
+    }
+
+    [Fact]
+    public void CaptureDropsDuplicateKnownComponentsWhenOneLiveComponentMatches()
+    {
+        var componentType = SceneDocumentSerializer.GetComponentTypeId(
+            typeof(EditorConstructionFailureComponent));
+        using var document = new SceneDocument(
+            new SceneBlueprint
+            {
+                Name = "Duplicate Cleanup",
+                Entities =
+                [
+                    new EntityBlueprint
+                    {
+                        Name = "Entity",
+                        Guid = Guid.NewGuid(),
+                        Components =
+                        [
+                            new ComponentBlueprint
+                            {
+                                Type = componentType,
+                                Properties = new Dictionary<string, JToken>
+                                {
+                                    [nameof(EditorConstructionFailureComponent.Value)] = new JValue(1)
+                                }
+                            },
+                            new ComponentBlueprint
+                            {
+                                Type = componentType,
+                                Properties = new Dictionary<string, JToken>
+                                {
+                                    [nameof(EditorConstructionFailureComponent.Value)] = new JValue(2)
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            null,
+            new SelectionService());
+
+        var captured = document.CaptureSingleRoot();
+        var component = Assert.Single(captured.Components);
+        Assert.Equal(2, component.Properties[nameof(EditorConstructionFailureComponent.Value)]!.Value<int>());
+    }
+
+    [Fact]
     public void AssemblyReloadRehydratesTheSceneAndRestoresSelectionByStableId()
     {
         var selection = new SelectionService();
@@ -439,6 +829,355 @@ public sealed class SceneDocumentTests : IDisposable
         var unboxed = document.Scene!.FindEntity(instanceId)!;
         Assert.Equal("Hero Updated", unboxed.Name);
         Assert.Equal(childId, Assert.Single(unboxed.Children).Id);
+    }
+
+    [Fact]
+    public void BlueprintMaterializationOnlyRemapsTypedEntityReferences()
+    {
+        var sourceRootId = Guid.NewGuid();
+        var source = new EntityBlueprint
+        {
+            AssetId = AssetId.New(),
+            AssetName = "actors/reference-test.blueprint",
+            Name = "Reference Test",
+            Guid = sourceRootId,
+            Children =
+            [
+                new EntityBlueprint
+                {
+                    Name = "Child",
+                    Guid = Guid.NewGuid(),
+                    Components =
+                    [
+                        new ComponentBlueprint
+                        {
+                            Type = $"{typeof(EditorReloadSafetyComponent).Assembly.GetName().Name}." +
+                                   nameof(EditorReloadSafetyComponent),
+                            Properties = new Dictionary<string, JToken>
+                            {
+                                [nameof(EditorReloadSafetyComponent.Target)] = sourceRootId.ToString(),
+                                [nameof(EditorReloadSafetyComponent.StableGuid)] = sourceRootId.ToString(),
+                                [nameof(EditorReloadSafetyComponent.Label)] = sourceRootId.ToString()
+                            }
+                        }
+                    ]
+                }
+            ]
+        };
+        using var document = SceneDocument.CreateNew(
+            "References",
+            new SelectionService(),
+            blueprintInstanceResolver: _ => source);
+
+        var instance = document.InstantiateBlueprint(source);
+        var component = Assert.Single(instance.Children)
+            .GetComponent<EditorReloadSafetyComponent>()!;
+
+        Assert.Same(instance, component.Target);
+        Assert.Equal(sourceRootId, component.StableGuid);
+        Assert.Equal(sourceRootId.ToString(), component.Label);
+    }
+
+    [Fact]
+    public void DirtyStateTracksTheLastSuccessfulSceneSaveAcrossUndoAndRedo()
+    {
+        var scenePath = Path.Combine(_root, "dirty-baseline.scene.json");
+        var entityId = Guid.NewGuid();
+        File.WriteAllText(scenePath, DreambitJson.Serialize(new SceneBlueprint
+        {
+            Name = "Dirty Baseline",
+            Entities = [new EntityBlueprint { Name = "Before", Guid = entityId }]
+        }));
+        using var document = SceneDocument.Open(scenePath, new SelectionService());
+
+        document.Rename(document.Scene!.FindEntity(entityId)!, "After");
+        Assert.True(document.IsDirty);
+        document.Save();
+        Assert.False(document.IsDirty);
+
+        Assert.True(document.Undo.Undo());
+        Assert.True(document.IsDirty);
+        Assert.Equal("Before", document.Scene!.FindEntity(entityId)!.Name);
+
+        Assert.True(document.Undo.Redo());
+        Assert.False(document.IsDirty);
+        Assert.Equal("After", document.Scene!.FindEntity(entityId)!.Name);
+    }
+
+    [Fact]
+    public void FailedSceneMutationRestoresThePreviousSnapshotWithoutHistory()
+    {
+        var entityId = Guid.NewGuid();
+        using var document = new SceneDocument(
+            new SceneBlueprint
+            {
+                Name = "Atomic Mutation",
+                Entities = [new EntityBlueprint { Name = "Before", Guid = entityId }]
+            },
+            null,
+            new SelectionService());
+        var changed = 0;
+        document.Changed += _ => changed++;
+
+        Assert.Throws<InvalidOperationException>(() => document.Apply("Fail", scene =>
+        {
+            scene.FindEntity(entityId)!.Name = "Partial";
+            throw new InvalidOperationException("Mutation failed.");
+        }));
+
+        Assert.Equal("Before", document.Scene!.FindEntity(entityId)!.Name);
+        Assert.False(document.IsDirty);
+        Assert.False(document.Undo.CanUndo);
+        Assert.Equal(0, changed);
+    }
+
+    [Fact]
+    public void NoOpSceneTransactionDoesNotDirtyOrRecordHistory()
+    {
+        var entityId = Guid.NewGuid();
+        using var document = new SceneDocument(
+            new SceneBlueprint
+            {
+                Name = "No-op Transaction",
+                Entities = [new EntityBlueprint { Name = "Original", Guid = entityId }]
+            },
+            null,
+            new SelectionService());
+        var entity = document.Scene!.FindEntity(entityId)!;
+        var changed = 0;
+        document.Changed += _ => changed++;
+
+        using (var transaction = document.BeginTransaction("Temporary Rename"))
+        {
+            transaction.Update(_ => entity.Name = "Temporary");
+            transaction.Update(_ => entity.Name = "Original");
+        }
+
+        Assert.False(document.IsDirty);
+        Assert.False(document.Undo.CanUndo);
+        Assert.Equal(0, changed);
+    }
+
+    [Fact]
+    public void AssemblyReloadRollsBackActiveTransactionBeforeCapturingSource()
+    {
+        var entityId = Guid.NewGuid();
+        using var document = new SceneDocument(
+            new SceneBlueprint
+            {
+                Name = "Reload During Gesture",
+                Entities = [new EntityBlueprint { Name = "Before", Guid = entityId }]
+            },
+            null,
+            new SelectionService());
+        document.Selection.Set(document.Scene!.FindEntity(entityId));
+        var changed = 0;
+        document.Changed += _ => changed++;
+        using var transaction = document.BeginTransaction("Rename Gesture");
+        transaction.Update(scene => scene.FindEntity(entityId)!.Name = "Uncommitted");
+        Assert.Equal("Uncommitted", document.Scene.FindEntity(entityId)!.Name);
+
+        document.BeforeAssemblyReload();
+        Assert.Null(document.Scene);
+        Assert.False(document.IsDirty);
+        Assert.False(document.Undo.CanUndo);
+        Assert.Equal(0, changed);
+
+        document.AfterAssemblyReload();
+        Assert.Equal("Before", document.Scene!.FindEntity(entityId)!.Name);
+        Assert.Equal(entityId, Assert.Single(document.Selection.EntityIds));
+        Assert.False(document.IsDirty);
+        Assert.False(document.Undo.CanUndo);
+        Assert.Equal(0, changed);
+
+        // The stale interaction was finished and unregistered by the document, so a
+        // fresh viewport interaction can begin after reload.
+        using var next = document.BeginTransaction("Next Gesture");
+        next.Abandon();
+    }
+
+    [Fact]
+    public void SceneDocumentOwnsAtMostOneActiveTransactionAndFinishPathsReleaseIt()
+    {
+        using var document = SceneDocument.CreateNew("Transactions", new SelectionService());
+        var first = document.BeginTransaction("First");
+        Assert.Throws<InvalidOperationException>(() => document.BeginTransaction("Overlapping"));
+        first.Abandon();
+
+        var second = document.BeginTransaction("Second");
+        second.Cancel();
+        var third = document.BeginTransaction("Third");
+        third.Commit();
+        var fourth = document.BeginTransaction("Fourth");
+
+        document.Dispose();
+        fourth.Abandon();
+        fourth.Dispose();
+    }
+
+    [Fact]
+    public void ContinuousSceneAppliesWithSameKeyUndoToTheFirstSnapshot()
+    {
+        var entityId = Guid.NewGuid();
+        using var document = new SceneDocument(
+            new SceneBlueprint
+            {
+                Name = "Continuous Scene Edit",
+                Entities = [new EntityBlueprint { Name = "Entity", Guid = entityId }]
+            },
+            null,
+            new SelectionService());
+
+        foreach (var x in new[] { 1f, 2f, 3f })
+        {
+            document.Apply(
+                "Change Position",
+                scene => scene.FindEntity(entityId)!.Transform.Position =
+                    new Microsoft.Xna.Framework.Vector3(x, 0f, 0f),
+                "Transform.Position");
+        }
+
+        Assert.True(document.Undo.Undo());
+        Assert.Equal(
+            Microsoft.Xna.Framework.Vector3.Zero,
+            document.Scene!.FindEntity(entityId)!.Transform.Position);
+        Assert.False(document.Undo.CanUndo);
+        Assert.True(document.Undo.Redo());
+        Assert.Equal(
+            new Microsoft.Xna.Framework.Vector3(3f, 0f, 0f),
+            document.Scene!.FindEntity(entityId)!.Transform.Position);
+    }
+
+    [Fact]
+    public void ExternallyOwnedSceneDocumentPublishesChangesWithoutOwningDirtyOrUndoState()
+    {
+        var entityId = Guid.NewGuid();
+        using var document = new SceneDocument(
+            new SceneBlueprint
+            {
+                Name = "Blueprint Host",
+                Entities = [new EntityBlueprint { Name = "Before", Guid = entityId }]
+            },
+            null,
+            new SelectionService(),
+            historyOwnership: SceneDocumentHistoryOwnership.External);
+        var changed = 0;
+        document.Changed += _ => changed++;
+
+        document.Rename(document.Scene!.FindEntity(entityId)!, "After");
+
+        Assert.Equal("After", document.CaptureSingleRoot().Name);
+        Assert.False(document.IsDirty);
+        Assert.False(document.Undo.CanUndo);
+        Assert.Equal(1, changed);
+    }
+
+    [Fact]
+    public void FailedUndoKeepsTheExistingLiveSceneAndUndoEntry()
+    {
+        var instanceId = Guid.NewGuid();
+        var linked = new EntityBlueprint
+        {
+            AssetId = AssetId.New(),
+            AssetName = "linked",
+            Name = "Linked",
+            Guid = Guid.NewGuid()
+        };
+        var failResolution = false;
+        using var document = new SceneDocument(
+            new SceneBlueprint
+            {
+                Name = "Atomic Restore",
+                Entities =
+                [
+                    new EntityBlueprint
+                    {
+                        Name = "Instance",
+                        Guid = instanceId,
+                        BlueprintInstance = new BlueprintInstanceReference
+                        {
+                            AssetId = linked.AssetId.Value,
+                            AssetName = linked.AssetName
+                        }
+                    }
+                ]
+            },
+            null,
+            new SelectionService(),
+            blueprintInstanceResolver: _ => failResolution
+                ? throw new InvalidOperationException("Resolver unavailable.")
+                : linked);
+        document.Apply("Move Instance", scene =>
+            scene.FindEntity(instanceId)!.Transform.Position =
+                new Microsoft.Xna.Framework.Vector3(4, 5, 0));
+        var workingScene = document.Scene;
+        failResolution = true;
+
+        Assert.Throws<InvalidOperationException>(() => document.Undo.Undo());
+
+        Assert.Same(workingScene, document.Scene);
+        Assert.Equal(
+            new Microsoft.Xna.Framework.Vector3(4, 5, 0),
+            document.Scene!.FindEntity(instanceId)!.Transform.Position);
+        Assert.True(document.Undo.CanUndo);
+        Assert.False(document.Undo.CanRedo);
+    }
+
+    [Fact]
+    public void UnboxingOuterBlueprintKeepsNestedInstanceAuthoredAndBoxed()
+    {
+        var innerId = AssetId.New();
+        var outerId = AssetId.New();
+        var inner = new EntityBlueprint
+        {
+            AssetId = innerId,
+            AssetName = "blueprints/inner",
+            Name = "Inner",
+            Guid = Guid.NewGuid(),
+            Children = [new EntityBlueprint { Name = "Materialized Inner Child", Guid = Guid.NewGuid() }]
+        };
+        var nestedSourceId = Guid.NewGuid();
+        var outer = new EntityBlueprint
+        {
+            AssetId = outerId,
+            AssetName = "blueprints/outer",
+            Name = "Outer",
+            Guid = Guid.NewGuid(),
+            Children =
+            [
+                new EntityBlueprint
+                {
+                    Name = "Nested Inner",
+                    Guid = nestedSourceId,
+                    BlueprintInstance = new BlueprintInstanceReference
+                    {
+                        AssetId = innerId.Value,
+                        AssetName = inner.AssetName
+                    }
+                }
+            ]
+        };
+        using var document = SceneDocument.CreateNew(
+            "Nested Unbox",
+            new SelectionService(),
+            blueprintInstanceResolver: reference => reference.AssetId == outerId.Value ? outer : inner);
+        var instance = document.InstantiateBlueprint(outer);
+        var nestedLive = Assert.Single(instance.Children);
+        Assert.Single(nestedLive.Children);
+
+        document.UnboxBlueprint(instance);
+        var authored = document.CaptureSingleRoot();
+        var nested = Assert.Single(authored.Children);
+
+        Assert.Null(authored.BlueprintInstance);
+        Assert.NotNull(nested.BlueprintInstance);
+        Assert.Equal(innerId.Value, nested.BlueprintInstance.AssetId);
+        Assert.Equal(inner.AssetName, nested.BlueprintInstance.AssetName);
+        Assert.Empty(nested.Children);
+        Assert.Equal(nestedLive.Id, nested.Guid);
+        Assert.Equal(
+            authored.FlattenedHierarchy().Count(),
+            authored.FlattenedHierarchy().Select(entity => entity.Guid).Distinct().Count());
     }
 
     [Fact]
@@ -610,8 +1349,11 @@ public sealed class SceneDocumentTests : IDisposable
         document.Apply("Override LDtk Background", _ =>
         {
             background.Entity.Transform.Position = new Microsoft.Xna.Framework.Vector3(5, 7, 0);
+            background.Entity.Tags.Clear();
+            background.Entity.Tags.Add("editor-override");
             background.Width = 99f;
             document.RecordLDtkPosition(background.Entity);
+            document.RecordLDtkEntityTags(background.Entity);
             document.RecordLDtkComponentMember(background, nameof(FilledRectDrawer.Width), background.Width);
         });
 
@@ -633,6 +1375,7 @@ public sealed class SceneDocumentTests : IDisposable
                 .SelectMany(entity => entity.GetAllComponents())
                 .OfType<FilledRectDrawer>());
         Assert.Equal(new Microsoft.Xna.Framework.Vector3(5, 7, 0), reimportedBackground.Entity.Transform.Position);
+        Assert.Contains("editor-override", reimportedBackground.Entity.Tags);
         Assert.Equal(99f, reimportedBackground.Width);
 
         document.UpdateLDtkImportOptions("Disable LDtk Background", options =>
@@ -671,6 +1414,9 @@ public sealed class SceneDocumentTests : IDisposable
         Assert.Contains(
             roundTripped.LDtk.EntityOverrides.Values,
             item => item.Position == new Microsoft.Xna.Framework.Vector3(5, 7, 0));
+        Assert.Contains(
+            roundTripped.LDtk.EntityOverrides.Values,
+            item => item.Tags?.Contains("editor-override") == true);
     }
 
     public void Dispose()
@@ -705,6 +1451,20 @@ public sealed class SceneDocumentTests : IDisposable
         }
         public void Rectangle(RectangleF rectangle, Microsoft.Xna.Framework.Color color, float thickness = 1) { }
         public void Label(Microsoft.Xna.Framework.Vector2 position, string text, Microsoft.Xna.Framework.Color color) { }
+        public void ShowIcon(string icon, Vector2 position, Color color, float size = 24)
+        {
+            
+        }
+
+        public void RadiusHandle(Component component, string memberName, Vector2 center, Color color, float thickness = 1)
+        {
+            
+        }
+
+        public void BoxHandle(Component component, string memberName, Color color, float thickness = 1)
+        {
+            
+        }
     }
 }
 
@@ -743,4 +1503,24 @@ public sealed class EditorReloadSafetyComponent : Component
 
     [DreambitSerialize]
     public Entity? Target { get; set; }
+
+    [DreambitSerialize]
+    public Guid StableGuid { get; set; }
+
+    [DreambitSerialize]
+    public string Label { get; set; } = string.Empty;
+}
+
+public sealed class EditorConstructionFailureComponent : Component
+{
+    public static bool FailConstruction { get; set; }
+
+    public EditorConstructionFailureComponent()
+    {
+        if (FailConstruction)
+            throw new InvalidOperationException("Intentional editor construction failure.");
+    }
+
+    [DreambitSerialize]
+    public int Value { get; set; }
 }

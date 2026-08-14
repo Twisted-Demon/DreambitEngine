@@ -94,7 +94,13 @@ internal static class BlueprintInstanceMaterializer
             entity.Guid = remap[entity.Guid];
             foreach (var component in entity.Components)
                 foreach (var key in component.Properties.Keys.ToArray())
-                    component.Properties[key] = RemapReferences(component.Properties[key], remap);
+                {
+                    component.Properties[key] = RemapComponentProperty(
+                        component,
+                        key,
+                        component.Properties[key],
+                        remap);
+                }
         }
     }
 
@@ -131,5 +137,60 @@ internal static class BlueprintInstanceMaterializer
                     child.Value = newId.ToString();
                 }
         return clone;
+    }
+
+    private static JToken RemapComponentProperty(
+        ComponentBlueprint component,
+        string propertyName,
+        JToken token,
+        IReadOnlyDictionary<Guid, Guid> remap)
+    {
+        var componentType = BlueprintResolver.ResolveComponentType(component.Type);
+        if (componentType == null ||
+            !BlueprintResolver.TryGetBlueprintMemberType(
+                componentType,
+                propertyName,
+                out var memberType))
+        {
+            // Without current type metadata, retain the compatibility behavior so references in
+            // a temporarily unavailable component still follow materialized entity IDs.
+            return componentType == null
+                ? RemapReferences(token, remap)
+                : token.DeepClone();
+        }
+
+        return ContainsEntityReference(memberType)
+            ? RemapReferences(token, remap)
+            : token.DeepClone();
+    }
+
+    private static bool ContainsEntityReference(Type type)
+    {
+        if (type == typeof(ECS.Entity) || typeof(ECS.Component).IsAssignableFrom(type))
+            return true;
+        if (type.IsArray)
+            return ContainsEntityReference(type.GetElementType());
+        if (!type.IsGenericType)
+            return false;
+
+        var definition = type.GetGenericTypeDefinition();
+        var arguments = type.GetGenericArguments();
+        if (definition == typeof(Dictionary<,>) ||
+            definition == typeof(IDictionary<,>) ||
+            definition == typeof(IReadOnlyDictionary<,>))
+        {
+            return ContainsEntityReference(arguments[1]);
+        }
+
+        return definition == typeof(List<>) ||
+               definition == typeof(IList<>) ||
+               definition == typeof(ICollection<>) ||
+               definition == typeof(IReadOnlyCollection<>) ||
+               definition == typeof(IReadOnlyList<>) ||
+               definition == typeof(IEnumerable<>) ||
+               definition == typeof(ISet<>) ||
+               definition == typeof(HashSet<>)
+            ? ContainsEntityReference(arguments[0])
+            : false;
     }
 }

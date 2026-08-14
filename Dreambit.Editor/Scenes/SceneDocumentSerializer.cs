@@ -25,7 +25,8 @@ internal static class SceneDocumentSerializer
         Scene scene,
         SceneBlueprint source,
         string sceneName,
-        IReadOnlySet<string>? explicitlyClearedReferences = null)
+        IReadOnlySet<string>? explicitlyClearedReferences = null,
+        IReadOnlySet<string>? explicitlyRemovedComponents = null)
     {
         scene.FlushStructuralChanges();
         var sourceEntities = source.Entities
@@ -33,7 +34,11 @@ internal static class SceneDocumentSerializer
             .ToDictionary(entity => entity.Guid);
         var roots = scene.GetAllEntities()
             .Where(entity => entity.Parent is null && !entity.IsEditorOnly)
-            .Select(entity => CaptureEntity(entity, sourceEntities, explicitlyClearedReferences))
+            .Select(entity => CaptureEntity(
+                entity,
+                sourceEntities,
+                explicitlyClearedReferences,
+                explicitlyRemovedComponents))
             .ToList();
 
         return new SceneBlueprint
@@ -50,7 +55,7 @@ internal static class SceneDocumentSerializer
         var sourceEntities = source.Entities
             .SelectMany(root => root.FlattenedHierarchy())
             .ToDictionary(item => item.Guid);
-        return CaptureEntity(entity, sourceEntities, null);
+        return CaptureEntity(entity, sourceEntities, null, null);
     }
 
     public static EntityBlueprint CloneAndRemap(EntityBlueprint source)
@@ -65,17 +70,90 @@ internal static class SceneDocumentSerializer
             entity.Guid = remap[entity.Guid];
             foreach (var component in entity.Components)
             foreach (var key in component.Properties.Keys.ToArray())
-                component.Properties[key] = RemapReferences(component.Properties[key], remap);
+            {
+                component.Properties[key] = RemapComponentProperty(
+                    component,
+                    key,
+                    component.Properties[key],
+                    remap);
+            }
         }
 
         clone.Name = MakeCopyName(clone.Name);
         return clone;
     }
 
+    /// <summary>
+    /// Converts a resolved Blueprint source into authored scene data for unboxing.
+    /// Nested Blueprint instance markers remain boxed; only the outer source hierarchy
+    /// is remapped into the instance's stable entity-ID namespace.
+    /// </summary>
+    public static EntityBlueprint CloneAuthoredForUnboxing(EntityBlueprint source, Entity materializedRoot)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(materializedRoot);
+
+        var clone = DreambitJson.Deserialize<EntityBlueprint>(DreambitJson.Serialize(source))
+                    ?? throw new InvalidOperationException("Could not clone the Blueprint source for unboxing.");
+        var sourceEntities = clone.FlattenedHierarchy().ToArray();
+        var remap = new Dictionary<Guid, Guid>(sourceEntities.Length);
+        MapAuthoredHierarchy(clone, materializedRoot, remap, isRoot: true);
+
+        foreach (var entity in sourceEntities)
+        {
+            foreach (var component in entity.Components)
+            foreach (var key in component.Properties.Keys.ToArray())
+            {
+                component.Properties[key] = RemapComponentProperty(
+                    component,
+                    key,
+                    component.Properties[key],
+                    remap);
+            }
+        }
+
+        clone.AssetId = default;
+        clone.AssetName = string.Empty;
+        clone.BlueprintInstance = null;
+        return clone;
+    }
+
+    private static void MapAuthoredHierarchy(
+        EntityBlueprint authored,
+        Entity materialized,
+        IDictionary<Guid, Guid> remap,
+        bool isRoot)
+    {
+        remap.Add(authored.Guid, materialized.Id);
+        authored.Guid = materialized.Id;
+
+        // A nested boxed node's live children belong to the linked asset, not the outer
+        // authored source. Retaining the marker and stopping here prevents those children
+        // from becoming scene-authored data during unboxing.
+        if (!isRoot && authored.BlueprintInstance is not null)
+            return;
+
+        if (authored.Children.Count != materialized.Children.Count)
+        {
+            throw new InvalidOperationException(
+                "The materialized Blueprint hierarchy no longer matches its authored source.");
+        }
+
+        for (var index = 0; index < authored.Children.Count; index++)
+        {
+            MapAuthoredHierarchy(
+                authored.Children[index],
+                materialized.Children[index],
+                remap,
+                isRoot: false);
+        }
+    }
+
     private static EntityBlueprint CaptureEntity(
         Entity entity,
         IReadOnlyDictionary<Guid, EntityBlueprint> sourceEntities,
-        IReadOnlySet<string>? explicitlyClearedReferences)
+        IReadOnlySet<string>? explicitlyClearedReferences,
+        IReadOnlySet<string>? explicitlyRemovedComponents)
     {
         sourceEntities.TryGetValue(entity.Id, out var source);
 
@@ -100,6 +178,9 @@ internal static class SceneDocumentSerializer
 
         var sourceComponents = source?.Components ?? [];
         var liveComponents = entity.GetAllComponents().ToArray();
+        var liveComponentTypeIds = liveComponents
+            .Select(component => GetComponentTypeId(component.GetType()))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var capturedComponents =
             new List<ComponentBlueprint>(
@@ -191,13 +272,9 @@ internal static class SceneDocumentSerializer
             });
         }
 
-        // Preserve ONLY genuinely unknown components.
-        //
-        // If the type resolves but isn't on the live entity, that means the
-        // user removed it. Do NOT resurrect it from the previous source JSON.
-        //
-        // Also, any additional serialized copies of a known component are
-        // discarded here. This lets old corrupted blueprints self-heal.
+        // Preserve unmatched source payload when the editor could not construct a
+        // known component. Absence alone is not removal: component constructors and
+        // requirement resolution are deliberately fault-isolated while editing.
         foreach (var missing in sourceComponents)
         {
             if (matchedSourceComponents.Contains(missing))
@@ -206,17 +283,27 @@ internal static class SceneDocumentSerializer
             var resolvedType =
                 BlueprintResolver.ResolveComponentType(missing.Type);
 
-            if (resolvedType is not null)
-                // Known type + not represented by a live component:
-                //
-                // 1. It was deliberately removed, or
-                // 2. It is a duplicate left by an old broken capture.
-                //
-                // Either way, don't preserve it.
+            if (resolvedType is null)
+            {
+                // Its assembly is unavailable, so keep the JSON untouched until it returns.
+                capturedComponents.Add(CloneComponent(missing));
                 continue;
+            }
 
-            // Truly unknown component. Its assembly isn't currently available,
-            // so keep the JSON untouched until that assembly returns.
+            var stableTypeId = GetComponentTypeId(resolvedType);
+            if (liveComponentTypeIds.Contains(stableTypeId))
+            {
+                // One live component already supplied this type's state. Any further
+                // serialized copies are stale duplicates and are deliberately discarded.
+                continue;
+            }
+
+            if (explicitlyRemovedComponents?.Contains(
+                    GetComponentKey(entity.Id, stableTypeId)) == true)
+            {
+                continue;
+            }
+
             capturedComponents.Add(CloneComponent(missing));
         }
 
@@ -240,7 +327,8 @@ internal static class SceneDocumentSerializer
                 .Select(child => CaptureEntity(
                     child,
                     sourceEntities,
-                    explicitlyClearedReferences))
+                    explicitlyClearedReferences,
+                    explicitlyRemovedComponents))
                 .ToList()
         };
     }
@@ -333,7 +421,7 @@ internal static class SceneDocumentSerializer
         return DreambitJson.ToToken(value);
     }
 
-    private static string GetComponentTypeId(Type type)
+    internal static string GetComponentTypeId(Type type)
     {
         var explicitId = type.GetCustomAttribute<BlueprintTypeAttribute>()?.Id;
         return string.IsNullOrWhiteSpace(explicitId)
@@ -359,6 +447,12 @@ internal static class SceneDocumentSerializer
         return $"{entityId:N}|{componentType.AssemblyQualifiedName}|{memberName}";
     }
 
+    internal static string GetComponentKey(Guid entityId, Type componentType) =>
+        GetComponentKey(entityId, GetComponentTypeId(componentType));
+
+    private static string GetComponentKey(Guid entityId, string componentTypeId) =>
+        $"{entityId:N}|{componentTypeId}";
+
     private static JToken RemapReferences(JToken token, IReadOnlyDictionary<Guid, Guid> remap)
     {
         if (token.Type == JTokenType.String &&
@@ -374,6 +468,68 @@ internal static class SceneDocumentSerializer
                     remap.TryGetValue(oldId, out newId))
                     child.Value = newId.ToString();
         return clone;
+    }
+
+    private static JToken RemapComponentProperty(
+        ComponentBlueprint component,
+        string propertyName,
+        JToken token,
+        IReadOnlyDictionary<Guid, Guid> remap)
+    {
+        var componentType = BlueprintResolver.ResolveComponentType(component.Type);
+        if (componentType is null)
+        {
+            // With no loaded type metadata, retain the legacy best effort so references in
+            // temporarily unavailable game components still follow duplicated entities.
+            return RemapReferences(token, remap);
+        }
+
+        var member = GetBlueprintMembers(componentType).FirstOrDefault(candidate =>
+            string.Equals(candidate.Name, propertyName, StringComparison.OrdinalIgnoreCase) ||
+            candidate.GetCustomAttribute<DreambitSerializeAttribute>()?.FormerNames.Any(
+                formerName => string.Equals(
+                    formerName,
+                    propertyName,
+                    StringComparison.OrdinalIgnoreCase)) == true);
+        if (member is null)
+            return token.DeepClone();
+
+        var declaredType = member is PropertyInfo property
+            ? property.PropertyType
+            : ((FieldInfo)member).FieldType;
+        return ContainsEntityReference(declaredType)
+            ? RemapReferences(token, remap)
+            : token.DeepClone();
+    }
+
+    private static bool ContainsEntityReference(Type type)
+    {
+        if (type == typeof(Entity) || typeof(Component).IsAssignableFrom(type))
+            return true;
+        if (type.IsArray)
+            return ContainsEntityReference(type.GetElementType()!);
+        if (!type.IsGenericType)
+            return false;
+
+        var definition = type.GetGenericTypeDefinition();
+        var arguments = type.GetGenericArguments();
+        if (definition == typeof(Dictionary<,>) ||
+            definition == typeof(IDictionary<,>) ||
+            definition == typeof(IReadOnlyDictionary<,>))
+        {
+            return ContainsEntityReference(arguments[1]);
+        }
+
+        return definition == typeof(List<>) ||
+               definition == typeof(IList<>) ||
+               definition == typeof(ICollection<>) ||
+               definition == typeof(IReadOnlyCollection<>) ||
+               definition == typeof(IReadOnlyList<>) ||
+               definition == typeof(IEnumerable<>) ||
+               definition == typeof(ISet<>) ||
+               definition == typeof(HashSet<>)
+            ? ContainsEntityReference(arguments[0])
+            : false;
     }
 
     private static string MakeCopyName(string name)

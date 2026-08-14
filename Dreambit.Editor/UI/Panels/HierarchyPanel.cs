@@ -3,31 +3,32 @@ using Dreambit.ECS;
 using Dreambit.Editor.Assets;
 using Dreambit.Editor.Persistence;
 using Dreambit.Editor.Scenes;
-using Dreambit.Editor.UI;
 using ImGuiNET;
 
 namespace Dreambit.Editor.UI.Panels;
 
 internal sealed class HierarchyPanel : EditorPanel
 {
+    private readonly AssetDatabase _assets;
+    private readonly BlueprintSourceService _blueprintSources;
     private readonly EditorDocumentContext _documentContext;
     private readonly EditorDragDropService _dragDrop;
-    private readonly AssetDatabase _assets;
-    private readonly EditorWorkspaceState _workspace;
     private readonly EditorIconService _icons;
-    private string _search = string.Empty;
+    private readonly EditorWorkspaceState _workspace;
     private string _blueprintSearch = string.Empty;
+    private string? _error;
+    private Guid[] _pendingDeleteIds = [];
     private string _rename = string.Empty;
     private Guid? _renameEntityId;
-    private Guid[] _pendingDeleteIds = [];
-    private bool _requestDeletePopup;
     private bool _requestBlueprintPicker;
-    private string? _error;
+    private bool _requestDeletePopup;
+    private string _search = string.Empty;
 
     public HierarchyPanel(
         EditorDocumentContext documentContext,
         EditorDragDropService dragDrop,
         AssetDatabase assets,
+        BlueprintSourceService blueprintSources,
         EditorWorkspaceState workspace,
         EditorIconService icons)
         : base(EditorPanelIds.Hierarchy, "Hierarchy")
@@ -35,6 +36,7 @@ internal sealed class HierarchyPanel : EditorPanel
         _documentContext = documentContext;
         _dragDrop = dragDrop;
         _assets = assets;
+        _blueprintSources = blueprintSources;
         _workspace = workspace;
         _icons = icons;
     }
@@ -42,6 +44,9 @@ internal sealed class HierarchyPanel : EditorPanel
     protected override void DrawContents()
     {
         var document = _documentContext.Current;
+        if (document is not null &&
+            ImGui.IsWindowFocused(ImGuiFocusedFlags.RootAndChildWindows))
+            _documentContext.Activate(document);
         if (_icons.Button("HierarchyCreate", "add", "Create entity"))
             ImGui.OpenPopup("Create Entity##Hierarchy");
 
@@ -81,59 +86,143 @@ internal sealed class HierarchyPanel : EditorPanel
         }
     }
 
-    private static bool MatchesSearch(Entity entity, string search) =>
-        string.IsNullOrWhiteSpace(search) ||
-        entity.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ||
-        entity.Children.Any(child => MatchesSearch(child, search));
+    private static bool MatchesSearch(Entity entity, string search)
+    {
+        return string.IsNullOrWhiteSpace(search) ||
+               entity.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+               entity.Children.Any(child => MatchesSearch(child, search));
+    }
 
     private void DrawEntity(SceneDocument document, Entity entity)
+{
+    if (!MatchesSearch(entity, _search))
+        return;
+
+    var hasVisibleChildren =
+        entity.Children.Any(child => MatchesSearch(child, _search));
+
+    var flags =
+        ImGuiTreeNodeFlags.SpanAvailWidth |
+        ImGuiTreeNodeFlags.OpenOnArrow |
+        ImGuiTreeNodeFlags.OpenOnDoubleClick;
+
+    if (!hasVisibleChildren)
     {
-        if (!MatchesSearch(entity, _search))
-            return;
+        flags |=
+            ImGuiTreeNodeFlags.Leaf |
+            ImGuiTreeNodeFlags.NoTreePushOnOpen;
+    }
 
-        var hasVisibleChildren = entity.Children.Any(child => MatchesSearch(child, _search));
-        var flags = ImGuiTreeNodeFlags.SpanAvailWidth |
-                    ImGuiTreeNodeFlags.OpenOnArrow |
-                    ImGuiTreeNodeFlags.OpenOnDoubleClick;
-        if (!hasVisibleChildren)
-            flags |= ImGuiTreeNodeFlags.Leaf | ImGuiTreeNodeFlags.NoTreePushOnOpen;
-        if (document.Selection.Contains(entity))
-            flags |= ImGuiTreeNodeFlags.Selected;
-        if (!entity.LocallyEnabled)
-            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.52f, 0.55f, 0.60f, 1f));
+    if (document.Selection.Contains(entity))
+        flags |= ImGuiTreeNodeFlags.Selected;
 
-        ImGui.SetNextItemOpen(
-            _workspace.HierarchyExpandedEntityIds.Contains(entity.Id),
-            ImGuiCond.Once);
-        var boxedRoot = document.IsBlueprintInstanceRoot(entity);
-        var displayName = boxedRoot
-            ? $"[B] {entity.Name}"
-            : entity.IsLDtkGenerated
-                ? $"[LDtk] {entity.Name}"
-                : entity.Name;
-        var open = ImGui.TreeNodeEx($"{displayName}##Hierarchy.{entity.Id}", flags);
-        if (ImGui.IsItemToggledOpen())
-        {
-            if (open)
-                _workspace.HierarchyExpandedEntityIds.Add(entity.Id);
-            else
-                _workspace.HierarchyExpandedEntityIds.Remove(entity.Id);
-        }
-        if (!entity.LocallyEnabled)
-            ImGui.PopStyleColor();
-        if (ImGui.IsItemClicked() && !ImGui.IsItemToggledOpen())
-            document.Selection.Set(entity, ImGui.GetIO().KeyCtrl);
+    if (!entity.LocallyEnabled)
+    {
+        ImGui.PushStyleColor(
+            ImGuiCol.Text,
+            new Vector4(0.52f, 0.55f, 0.60f, 1f));
+    }
 
-        DrawDragSource(document, entity);
-        DrawDropTarget(document, entity);
-        DrawContextMenu(document, entity);
+    ImGui.SetNextItemOpen(
+        _workspace.HierarchyExpandedEntityIds.Contains(entity.Id),
+        ImGuiCond.Once);
 
-        if (open && hasVisibleChildren)
-        {
-            foreach (var child in entity.Children.ToArray())
-                DrawEntity(document, child);
-            ImGui.TreePop();
-        }
+    var boxedRoot =
+        document.IsBlueprintInstanceRoot(entity);
+
+    var displayName =
+        entity.IsLDtkGenerated
+            ? $"[LDtk] {entity.Name}"
+            : entity.Name;
+
+    // The label is hidden because we draw the visible icon/name ourselves.
+    // TreeNodeEx remains the actual interactive hierarchy item.
+    var open = ImGui.TreeNodeEx(
+        $"##Hierarchy.{entity.Id}",
+        flags);
+
+    DrawEntityLabel(
+        boxedRoot
+            ? "view_in_ar"
+            : "account_tree",
+        displayName);
+
+    if (ImGui.IsItemToggledOpen())
+    {
+        if (open)
+            _workspace.HierarchyExpandedEntityIds.Add(entity.Id);
+        else
+            _workspace.HierarchyExpandedEntityIds.Remove(entity.Id);
+    }
+
+    if (!entity.LocallyEnabled)
+        ImGui.PopStyleColor();
+
+    if (ImGui.IsItemClicked() &&
+        !ImGui.IsItemToggledOpen())
+    {
+        document.Selection.Set(
+            entity,
+            ImGui.GetIO().KeyCtrl);
+    }
+
+    DrawDragSource(document, entity);
+    DrawDropTarget(document, entity);
+    DrawContextMenu(document, entity);
+
+    if (open && hasVisibleChildren)
+    {
+        foreach (var child in entity.Children.ToArray())
+            DrawEntity(document, child);
+
+        ImGui.TreePop();
+    }
+}
+
+    private void DrawEntityLabel(
+        string icon,
+        string text)
+    {
+        const float iconSize = 16f;
+        const float iconSpacing = 4f;
+
+        var itemMin = ImGui.GetItemRectMin();
+        var itemMax = ImGui.GetItemRectMax();
+
+        var labelX =
+            itemMin.X +
+            ImGui.GetTreeNodeToLabelSpacing();
+
+        var rowHeight =
+            itemMax.Y - itemMin.Y;
+
+        var iconY =
+            itemMin.Y +
+            (rowHeight - iconSize) * 0.5f;
+
+        var iconPosition =
+            new Vector2(
+                labelX,
+                iconY);
+
+        _icons.DrawAt(
+            ImGui.GetWindowDrawList(),
+            icon,
+            iconPosition,
+            new Vector2(iconSize, iconSize));
+
+        var textSize =
+            ImGui.CalcTextSize(text);
+
+        var textPosition =
+            new Vector2(
+                labelX + iconSize + iconSpacing,
+                itemMin.Y + (rowHeight - textSize.Y) * 0.5f);
+
+        ImGui.GetWindowDrawList().AddText(
+            textPosition,
+            ImGui.GetColorU32(ImGuiCol.Text),
+            text);
     }
 
     private void DrawCreateMenu(SceneDocument? document)
@@ -142,14 +231,15 @@ internal sealed class HierarchyPanel : EditorPanel
             return;
         ImGui.BeginDisabled(document is null);
         if (ImGui.MenuItem("Create Empty"))
-            document!.CreateEmpty(
+            TryEdit(() => document!.CreateEmpty(
                 "Entity",
-                _documentContext.IsBlueprint ? _documentContext.Blueprints.Root : null);
+                _documentContext.IsBlueprint ? _documentContext.Blueprints.Root : null));
         if (ImGui.MenuItem("Create From Blueprint"))
         {
             _blueprintSearch = string.Empty;
             _requestBlueprintPicker = true;
         }
+
         ImGui.EndDisabled();
         ImGui.EndPopup();
     }
@@ -168,9 +258,10 @@ internal sealed class HierarchyPanel : EditorPanel
             ImGui.TextDisabled("Generated from the linked LDtk project");
             ImGui.Separator();
         }
+
         ImGui.BeginDisabled(linked || entity.IsLDtkGenerated);
         if (ImGui.MenuItem("Create Child"))
-            document.CreateEmpty("Entity", entity);
+            TryEdit(() => document.CreateEmpty("Entity", entity));
         ImGui.EndDisabled();
         ImGui.BeginDisabled(linked);
         if (ImGui.MenuItem("Rename", "F2"))
@@ -178,15 +269,16 @@ internal sealed class HierarchyPanel : EditorPanel
         ImGui.EndDisabled();
         ImGui.BeginDisabled(isBlueprintRoot || entity.IsLDtkGenerated || (linked && !isInstanceRoot));
         if (ImGui.MenuItem("Duplicate", "Ctrl+D"))
-            document.Duplicate(entity);
+            TryEdit(() => document.Duplicate(entity));
         ImGui.EndDisabled();
         if (linked)
         {
             ImGui.Separator();
             ImGui.TextDisabled(instance.AssetName);
             if (ImGui.MenuItem("Unbox Blueprint Instance"))
-                document.UnboxBlueprint(instanceRoot);
+                TryEdit(() => document.UnboxBlueprint(instanceRoot));
         }
+
         ImGui.Separator();
         ImGui.BeginDisabled(isBlueprintRoot || entity.IsLDtkGenerated || (linked && !isInstanceRoot));
         if (ImGui.MenuItem("Delete", "Delete"))
@@ -227,6 +319,7 @@ internal sealed class HierarchyPanel : EditorPanel
             TryReparent(document, entity, parent);
             _dragDrop.ClearHierarchyEntity();
         }
+
         ImGui.EndDragDropTarget();
     }
 
@@ -245,20 +338,13 @@ internal sealed class HierarchyPanel : EditorPanel
                 _documentContext.IsBlueprint ? _documentContext.Blueprints.Root : null);
             _dragDrop.ClearHierarchyEntity();
         }
+
         ImGui.EndDragDropTarget();
     }
 
     private void TryReparent(SceneDocument document, Entity entity, Entity? parent)
     {
-        try
-        {
-            document.Reparent(entity, parent);
-            _error = null;
-        }
-        catch (Exception exception)
-        {
-            _error = exception.Message;
-        }
+        TryEdit(() => document.Reparent(entity, parent));
     }
 
     private void RequestRename(Entity entity)
@@ -276,10 +362,8 @@ internal sealed class HierarchyPanel : EditorPanel
         var submit = ImGui.InputText("Name", ref _rename, 256, ImGuiInputTextFlags.EnterReturnsTrue);
         var entity = _renameEntityId is { } id ? document.Scene?.FindEntity(id) : null;
         if ((submit || ImGui.Button("Rename")) && entity is not null && !string.IsNullOrWhiteSpace(_rename))
-        {
-            document.Rename(entity, _rename);
-            ImGui.CloseCurrentPopup();
-        }
+            if (TryEdit(() => document.Rename(entity, _rename)))
+                ImGui.CloseCurrentPopup();
         ImGui.SameLine();
         if (ImGui.Button("Cancel"))
             ImGui.CloseCurrentPopup();
@@ -293,6 +377,7 @@ internal sealed class HierarchyPanel : EditorPanel
             ImGui.OpenPopup("Create From Blueprint##Hierarchy");
             _requestBlueprintPicker = false;
         }
+
         if (!ImGui.BeginPopupModal(
                 "Create From Blueprint##Hierarchy",
                 ImGuiWindowFlags.AlwaysAutoResize))
@@ -314,13 +399,7 @@ internal sealed class HierarchyPanel : EditorPanel
                 continue;
             try
             {
-                var path = Path.Combine(
-                    _assets.ContentRoot,
-                    blueprint.RelativePath.Replace('/', Path.DirectorySeparatorChar));
-                var source = DreambitJson.Deserialize<EntityBlueprint>(File.ReadAllText(path))
-                             ?? throw new InvalidDataException("Blueprint file is empty.");
-                source.AssetId = blueprint.Id;
-                source.AssetName = blueprint.LogicalAssetName;
+                using var source = _blueprintSources.Load(blueprint);
                 document.InstantiateBlueprint(
                     source,
                     parent: _documentContext.IsBlueprint ? _documentContext.Blueprints.Root : null);
@@ -332,6 +411,7 @@ internal sealed class HierarchyPanel : EditorPanel
                 _error = $"Could not instantiate Blueprint. {exception.Message}";
             }
         }
+
         ImGui.EndChild();
         if (ImGui.Button("Cancel", new Vector2(90f, 0f)))
             ImGui.CloseCurrentPopup();
@@ -351,6 +431,7 @@ internal sealed class HierarchyPanel : EditorPanel
             ImGui.OpenPopup("Delete Entities##Hierarchy");
             _requestDeletePopup = false;
         }
+
         if (!ImGui.BeginPopupModal("Delete Entities##Hierarchy", ImGuiWindowFlags.AlwaysAutoResize))
             return;
 
@@ -364,17 +445,19 @@ internal sealed class HierarchyPanel : EditorPanel
         ImGui.TextDisabled("This action can be undone with Ctrl+Z.");
         ImGui.Spacing();
         if (ImGui.Button("Delete", new Vector2(90f, 0f)))
-        {
-            document.Delete(entities);
-            _pendingDeleteIds = [];
-            ImGui.CloseCurrentPopup();
-        }
+            if (TryEdit(() => document.Delete(entities)))
+            {
+                _pendingDeleteIds = [];
+                ImGui.CloseCurrentPopup();
+            }
+
         ImGui.SameLine();
         if (ImGui.Button("Cancel", new Vector2(90f, 0f)))
         {
             _pendingDeleteIds = [];
             ImGui.CloseCurrentPopup();
         }
+
         ImGui.EndPopup();
     }
 
@@ -391,7 +474,8 @@ internal sealed class HierarchyPanel : EditorPanel
         var hasLDtkGeneratedEntity = selected.Any(entity => entity.IsLDtkGenerated);
         var includesBlueprintRoot = _documentContext.IsBlueprint &&
                                     selected.Any(entity => ReferenceEquals(entity, _documentContext.Blueprints.Root));
-        if (ImGui.IsKeyPressed(ImGuiKey.Delete) && !includesBlueprintRoot && !hasLockedBlueprintChild && !hasLDtkGeneratedEntity)
+        if (ImGui.IsKeyPressed(ImGuiKey.Delete) && !includesBlueprintRoot && !hasLockedBlueprintChild &&
+            !hasLDtkGeneratedEntity)
             RequestDelete(selected);
         if (ImGui.IsKeyPressed(ImGuiKey.F2) && selected.Count == 1 &&
             !document.TryGetBlueprintInstanceRoot(selected[0], out _, out _))
@@ -399,6 +483,21 @@ internal sealed class HierarchyPanel : EditorPanel
         if (ImGui.GetIO().KeyCtrl && ImGui.IsKeyPressed(ImGuiKey.D) && selected.Count == 1 &&
             !includesBlueprintRoot &&
             !hasLockedBlueprintChild && !hasLDtkGeneratedEntity)
-            document.Duplicate(selected[0]);
+            TryEdit(() => document.Duplicate(selected[0]));
+    }
+
+    private bool TryEdit(Action edit)
+    {
+        try
+        {
+            edit();
+            _error = null;
+            return true;
+        }
+        catch (Exception exception)
+        {
+            _error = exception.Message;
+            return false;
+        }
     }
 }

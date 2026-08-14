@@ -50,8 +50,14 @@ internal abstract class EditorPanel : IEditorPanel
         if (_disposed)
             return;
 
-        DisposeCore();
-        _disposed = true;
+        try
+        {
+            DisposeCore();
+        }
+        finally
+        {
+            _disposed = true;
+        }
     }
 
     protected abstract void DrawContents();

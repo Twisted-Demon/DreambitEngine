@@ -9,4 +9,18 @@ public interface IEditorGizmoContext
     void Circle(Vector2 center, float radius, Color color, float thickness = 1f);
     void Rectangle(RectangleF rectangle, Color color, float thickness = 1f);
     void Label(Vector2 position, string text, Color color);
+    void ShowIcon(string icon, Vector2 position, Color color, float size = 24f);
+
+    void RadiusHandle(
+        Component component,
+        string memberName,
+        Vector2 center,
+        Color color,
+        float thickness = 1f);
+    
+    void BoxHandle(
+        Component component,
+        string memberName,
+        Color color,
+        float thickness = 1f);
 }

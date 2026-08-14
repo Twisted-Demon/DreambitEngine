@@ -6,14 +6,26 @@ using Newtonsoft.Json.Linq;
 
 namespace Dreambit.Editor.Scenes;
 
+internal enum SceneDocumentHistoryOwnership
+{
+    Document,
+    External
+}
+
 internal sealed class SceneDocument : IDisposable
 {
     private readonly Action<string, Exception?>? _reportError;
     private readonly Func<BlueprintInstanceReference, EntityBlueprint>? _blueprintInstanceResolver;
     private readonly Func<LDtkSceneReference, LDtkFile>? _ldtkProjectResolver;
+    private readonly SceneDocumentHistoryOwnership _historyOwnership;
     private SceneBlueprint _source;
+    private string? _savedSnapshot;
     private readonly HashSet<string> _explicitlyClearedReferences = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _explicitlyRemovedComponents = new(StringComparer.OrdinalIgnoreCase);
     private long _lastChangeTimestamp;
+    private int _sceneGeneration;
+    private string? _activeChangeMergeKey;
+    private SceneEditTransaction? _activeTransaction;
     private bool _disposed;
 
     public SceneDocument(
@@ -22,7 +34,8 @@ internal sealed class SceneDocument : IDisposable
         SelectionService selection,
         Action<string, Exception?>? reportError = null,
         Func<BlueprintInstanceReference, EntityBlueprint>? blueprintInstanceResolver = null,
-        Func<LDtkSceneReference, LDtkFile>? ldtkProjectResolver = null)
+        Func<LDtkSceneReference, LDtkFile>? ldtkProjectResolver = null,
+        SceneDocumentHistoryOwnership historyOwnership = SceneDocumentHistoryOwnership.Document)
     {
         _source = source;
         Path = path;
@@ -31,7 +44,11 @@ internal sealed class SceneDocument : IDisposable
         _reportError = reportError;
         _blueprintInstanceResolver = blueprintInstanceResolver;
         _ldtkProjectResolver = ldtkProjectResolver;
+        _historyOwnership = historyOwnership;
         RebuildLiveScene();
+        // Dirty comparisons operate on captured snapshots, so establish the saved
+        // baseline in that same canonical representation.
+        _savedSnapshot = CaptureJson();
     }
 
     public EditorScene? Scene { get; private set; }
@@ -42,6 +59,9 @@ internal sealed class SceneDocument : IDisposable
     public string DisplayName => System.IO.Path.GetFileNameWithoutExtension(
         System.IO.Path.GetFileNameWithoutExtension(Path ?? Name));
     public bool IsDirty { get; private set; }
+    public bool OwnsEditHistory => _historyOwnership == SceneDocumentHistoryOwnership.Document;
+    internal int SceneGeneration => _sceneGeneration;
+    internal string? ActiveChangeMergeKey => _activeChangeMergeKey;
     public bool HasLiveScene => Scene is not null;
     public LDtkSceneReference? LDtkReference => _source.LDtk;
     public event Action<SceneDocument>? Changed;
@@ -52,24 +72,33 @@ internal sealed class SceneDocument : IDisposable
         Action<string, Exception?>? reportError = null,
         Func<BlueprintInstanceReference, EntityBlueprint>? blueprintInstanceResolver = null,
         Func<LDtkSceneReference, LDtkFile>? ldtkProjectResolver = null,
-        LDtkSceneReference? ldtk = null) =>
-        new(
+        LDtkSceneReference? ldtk = null,
+        SceneDocumentHistoryOwnership historyOwnership = SceneDocumentHistoryOwnership.Document)
+    {
+        var document = new SceneDocument(
             new SceneBlueprint { Name = name, Entities = [], LDtk = ldtk },
             null,
             selection,
             reportError,
             blueprintInstanceResolver,
-            ldtkProjectResolver)
+            ldtkProjectResolver,
+            historyOwnership);
+        if (document.OwnsEditHistory)
         {
-            IsDirty = true
-        };
+            // A new scene has no successful on-disk save to compare against.
+            document._savedSnapshot = null;
+            document.IsDirty = true;
+        }
+        return document;
+    }
 
     public static SceneDocument Open(
         string path,
         SelectionService selection,
         Action<string, Exception?>? reportError = null,
         Func<BlueprintInstanceReference, EntityBlueprint>? blueprintInstanceResolver = null,
-        Func<LDtkSceneReference, LDtkFile>? ldtkProjectResolver = null)
+        Func<LDtkSceneReference, LDtkFile>? ldtkProjectResolver = null,
+        SceneDocumentHistoryOwnership historyOwnership = SceneDocumentHistoryOwnership.Document)
     {
         var fullPath = System.IO.Path.GetFullPath(path);
         var source = SceneDocumentSerializer.Deserialize(File.ReadAllText(fullPath));
@@ -79,7 +108,8 @@ internal sealed class SceneDocument : IDisposable
             selection,
             reportError,
             blueprintInstanceResolver,
-            ldtkProjectResolver);
+            ldtkProjectResolver,
+            historyOwnership);
     }
 
     public void Update(bool autoSave, TimeSpan autoSaveDelay)
@@ -105,20 +135,21 @@ internal sealed class SceneDocument : IDisposable
     public void Save(string? path = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (!string.IsNullOrWhiteSpace(path))
-            Path = System.IO.Path.GetFullPath(path);
-        if (Path is null)
+        var targetPath = !string.IsNullOrWhiteSpace(path)
+            ? System.IO.Path.GetFullPath(path)
+            : Path;
+        if (targetPath is null)
             throw new InvalidOperationException("Choose a path before saving this scene.");
-        if (Scene is not null)
-            CaptureSource();
+        RollBackActiveTransactionBeforeSourceCapture();
+        var snapshot = CaptureJson();
 
-        var directory = System.IO.Path.GetDirectoryName(Path)!;
+        var directory = System.IO.Path.GetDirectoryName(targetPath)!;
         Directory.CreateDirectory(directory);
-        var temporaryPath = Path + $".{Guid.NewGuid():N}.tmp";
+        var temporaryPath = targetPath + $".{Guid.NewGuid():N}.tmp";
         try
         {
-            File.WriteAllText(temporaryPath, SceneDocumentSerializer.Serialize(_source));
-            File.Move(temporaryPath, Path, true);
+            File.WriteAllText(temporaryPath, snapshot);
+            File.Move(temporaryPath, targetPath, true);
         }
         finally
         {
@@ -126,39 +157,57 @@ internal sealed class SceneDocument : IDisposable
                 File.Delete(temporaryPath);
         }
 
+        Path = targetPath;
+        _savedSnapshot = snapshot;
         IsDirty = false;
     }
 
-    public void Apply(string name, Action<EditorScene> mutation)
+    public void Apply(
+        string name,
+        Action<EditorScene> mutation,
+        string? mergeKey = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(mutation);
+        if (_activeTransaction is not null)
+        {
+            throw new InvalidOperationException(
+                "Finish the active scene edit transaction before applying another mutation.");
+        }
         var scene = Scene ?? throw new InvalidOperationException("The live scene is unavailable during reload.");
         var before = CaptureJson();
         var beforeSelection = Selection.EntityIds.ToArray();
-        var wasDirty = IsDirty;
+        var beforeComponents = CaptureLiveComponentKeys(scene);
+        string after;
+        try
+        {
+            mutation(scene);
+            scene.FlushStructuralChanges();
+            Selection.RemoveMissing(scene);
+            MarkRemovedComponents(beforeComponents, scene);
+            after = CaptureJson();
+        }
+        catch (Exception exception)
+        {
+            RollBackFailedMutation(before, beforeSelection, exception);
+            throw;
+        }
 
-        mutation(scene);
-        scene.FlushStructuralChanges();
-        Selection.RemoveMissing(scene);
-        var after = CaptureJson();
         var afterSelection = Selection.EntityIds.ToArray();
         if (string.Equals(before, after, StringComparison.Ordinal))
+        {
+            UpdateDirtyState(after);
             return;
+        }
 
-        IsDirty = true;
-        _lastChangeTimestamp = Stopwatch.GetTimestamp();
-        Undo.Record(new SceneSnapshotCommand(
+        CommitSnapshotChange(
             name,
-            this,
             before,
             after,
             beforeSelection,
             afterSelection,
-            wasDirty,
-            true));
-        Changed?.Invoke(this);
+            mergeKey);
     }
 
     public SceneEditTransaction BeginTransaction(string name)
@@ -167,12 +216,17 @@ internal sealed class SceneDocument : IDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         if (Scene is null)
             throw new InvalidOperationException("The live scene is unavailable during reload.");
-        return new SceneEditTransaction(
+        if (_activeTransaction is not null)
+            throw new InvalidOperationException("Only one scene edit transaction can be active at a time.");
+        var transaction = new SceneEditTransaction(
             this,
             name,
             CaptureJson(),
             Selection.EntityIds.ToArray(),
-            IsDirty);
+            CaptureLiveComponentKeys(Scene),
+            _sceneGeneration);
+        _activeTransaction = transaction;
+        return transaction;
     }
 
     public Entity CreateEmpty(string name = "Entity", Entity? parent = null)
@@ -322,13 +376,26 @@ internal sealed class SceneDocument : IDisposable
 
     public void UnboxBlueprint(Entity entity)
     {
-        if (!TryGetBlueprintInstanceRoot(entity, out var root, out _))
+        if (!TryGetBlueprintInstanceRoot(entity, out var root, out var instance))
             return;
         Apply("Unbox Blueprint Instance", _ =>
         {
-            var source = FindSourceEntity(root.Id)
-                         ?? throw new InvalidOperationException("The Blueprint instance source was not found.");
-            source.BlueprintInstance = null;
+            var resolver = _blueprintInstanceResolver
+                           ?? throw new InvalidOperationException(
+                               "The Blueprint instance cannot be unboxed without its source resolver.");
+            var resolved = resolver(instance)
+                           ?? throw new InvalidOperationException(
+                               $"Could not resolve Blueprint instance '{instance.AssetName}'.");
+            var authored = SceneDocumentSerializer.CloneAuthoredForUnboxing(resolved, root);
+
+            // The scene instance owns the root placement. Everything beneath it comes from
+            // the authored Blueprint, including nested boxed Blueprint references.
+            authored.Position = root.Transform.Position;
+            authored.Rotation = new Microsoft.Xna.Framework.Vector3(0f, 0f, root.Transform.Rotation2D);
+            authored.Scale = root.Transform.Scale;
+
+            if (!ReplaceSourceEntity(_source.Entities, root.Id, authored))
+                throw new InvalidOperationException("The Blueprint instance source was not found.");
         });
     }
 
@@ -389,6 +456,16 @@ internal sealed class SceneDocument : IDisposable
             entityOverride.Enabled = entity.LocallyEnabled;
     }
 
+    public void RecordLDtkEntityTags(Entity entity)
+    {
+        if (TryGetLDtkOverride(entity, out var entityOverride))
+        {
+            entityOverride.Tags = new HashSet<string>(
+                entity.Tags,
+                StringComparer.OrdinalIgnoreCase);
+        }
+    }
+
     public void RecordLDtkPosition(Entity entity)
     {
         if (TryGetLDtkOverride(entity, out var entityOverride))
@@ -421,44 +498,47 @@ internal sealed class SceneDocument : IDisposable
         properties[memberName] = DreambitJson.ToToken(value);
     }
 
-    public void UpdateLDtkImportOptions(string name, Action<LDtkImportOptions> mutation)
+    public void UpdateLDtkImportOptions(
+        string name,
+        Action<LDtkImportOptions> mutation,
+        string? mergeKey = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(mutation);
+        RollBackActiveTransactionBeforeSourceCapture();
         var reference = _source.LDtk
                         ?? throw new InvalidOperationException("This scene is not linked to an LDtk project.");
         var before = CaptureJson();
         var beforeSelection = Selection.EntityIds.ToArray();
-        var wasDirty = IsDirty;
-        var updated = (reference.ImportOptions ?? new LDtkImportOptions()).Clone();
-        mutation(updated);
-        updated.Validate();
-        reference.ImportOptions = updated;
+        string after;
         try
         {
+            var updated = (reference.ImportOptions ?? new LDtkImportOptions()).Clone();
+            mutation(updated);
+            updated.Validate();
+            reference.ImportOptions = updated;
             RebuildPreservingSelection();
+            after = CaptureJson();
         }
-        catch
+        catch (Exception exception)
         {
-            _source = SceneDocumentSerializer.Deserialize(before);
+            RollBackFailedMutation(before, beforeSelection, exception);
             throw;
         }
-        var after = CaptureJson();
         if (string.Equals(before, after, StringComparison.Ordinal))
+        {
+            UpdateDirtyState(after);
             return;
+        }
 
-        IsDirty = true;
-        _lastChangeTimestamp = Stopwatch.GetTimestamp();
-        Undo.Record(new SceneSnapshotCommand(
+        CommitSnapshotChange(
             name,
-            this,
             before,
             after,
             beforeSelection,
             Selection.EntityIds.ToArray(),
-            wasDirty,
-            true));
+            mergeKey);
     }
 
     /// <summary>Reloads the linked LDtk source while preserving Dreambit-authored scene entities.</summary>
@@ -473,10 +553,45 @@ internal sealed class SceneDocument : IDisposable
     public void BeforeAssemblyReload()
     {
         if (Scene is null)
+        {
+            _activeTransaction?.Abandon();
             return;
-        CaptureSource();
-        Scene.Dispose();
-        Scene = null;
+        }
+        Exception? captureFailure = null;
+        try
+        {
+            // Viewport input runs after assembly polling. The document must therefore
+            // settle its own gesture before capture; waiting for the viewport would
+            // serialize an uncommitted drag without dirty state or undo history.
+            RollBackActiveTransactionBeforeSourceCapture();
+            CaptureSource();
+        }
+        catch (Exception exception)
+        {
+            captureFailure = exception;
+        }
+        finally
+        {
+            var scene = Scene;
+            Scene = null;
+            _sceneGeneration++;
+            var cleanupFailure = EditorDisposal.TryDispose(scene);
+            if (cleanupFailure is not null)
+            {
+                _reportError?.Invoke(
+                    "Could not fully dispose the previous live scene before game assembly reload. " +
+                    "Its editor reference was released and reload will continue.\n" + cleanupFailure,
+                    null);
+            }
+        }
+
+        if (captureFailure is not null)
+        {
+            _reportError?.Invoke(
+                "Could not capture the latest live scene before game assembly reload. " +
+                "The last valid authored snapshot will be rebuilt.",
+                captureFailure);
+        }
     }
 
     public void AfterAssemblyReload()
@@ -499,25 +614,27 @@ internal sealed class SceneDocument : IDisposable
     {
         if (_disposed || Scene is null)
             return;
+        RollBackActiveTransactionBeforeSourceCapture();
         var selection = Selection.EntityIds.ToArray();
         CaptureSource();
-        Scene.Dispose();
-        Scene = null;
-        RebuildLiveScene();
+        var replacement = BuildLiveScene(_source);
+        ReplaceLiveScene(replacement);
         Selection.Restore(selection);
         Selection.RemoveMissing(Scene);
     }
 
     private void RebuildPreservingSelection()
     {
+        RollBackActiveTransactionBeforeSourceCapture();
         var selected = Selection.Resolve(Scene)
             .Select(entity => new SelectionMarker(entity.Id, entity.LDtkSourceKey))
             .ToArray();
         CaptureSource();
         var previous = Scene!;
-        var replacement = BuildLiveScene();
+        var replacement = BuildLiveScene(_source);
         Scene = replacement;
-        previous.Dispose();
+        _sceneGeneration++;
+        ReportSceneCleanupFailure(previous, "Could not fully dispose the replaced LDtk editor scene.");
         var restored = selected.Select(marker =>
         {
             if (string.IsNullOrWhiteSpace(marker.LDtkSourceKey))
@@ -559,35 +676,174 @@ internal sealed class SceneDocument : IDisposable
             Scene!,
             _source,
             Name,
-            _explicitlyClearedReferences);
+            _explicitlyClearedReferences,
+            _explicitlyRemovedComponents);
         _explicitlyClearedReferences.Clear();
+        _explicitlyRemovedComponents.Clear();
     }
 
-    private void Restore(string json, IReadOnlyList<Guid> selection, bool dirty)
+    private void CommitSnapshotChange(
+        string name,
+        string before,
+        string after,
+        IReadOnlyList<Guid> beforeSelection,
+        IReadOnlyList<Guid> afterSelection,
+        string? mergeKey = null)
     {
-        _source = SceneDocumentSerializer.Deserialize(json);
-        Scene?.Dispose();
-        Scene = null;
-        RebuildLiveScene();
+        UpdateDirtyState(after);
+        _lastChangeTimestamp = Stopwatch.GetTimestamp();
+        if (OwnsEditHistory)
+        {
+            Undo.Record(new SceneSnapshotCommand(
+                name,
+                this,
+                before,
+                after,
+                beforeSelection,
+                afterSelection,
+                mergeKey));
+        }
+        NotifyChanged(mergeKey);
+    }
+
+    private void NotifyChanged(string? mergeKey)
+    {
+        _activeChangeMergeKey = mergeKey;
+        try
+        {
+            Changed?.Invoke(this);
+        }
+        finally
+        {
+            _activeChangeMergeKey = null;
+        }
+    }
+
+    private void UpdateDirtyState(string snapshot)
+    {
+        IsDirty = OwnsEditHistory &&
+                  (_savedSnapshot is null ||
+                   !string.Equals(_savedSnapshot, snapshot, StringComparison.Ordinal));
+    }
+
+    private void RollBackFailedMutation(
+        string before,
+        IReadOnlyList<Guid> beforeSelection,
+        Exception mutationException)
+    {
+        try
+        {
+            Restore(before, beforeSelection, notifyChanged: false);
+        }
+        catch (Exception rollbackException)
+        {
+            throw new AggregateException(
+                "The scene mutation failed and its previous snapshot could not be restored.",
+                mutationException,
+                rollbackException);
+        }
+    }
+
+    private void Restore(
+        string json,
+        IReadOnlyList<Guid> selection,
+        bool notifyChanged = true)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        // Undo/redo and failed-mutation restoration replace the live scene. Any
+        // gesture still pointing at the outgoing generation can only be abandoned.
+        _activeTransaction?.Abandon();
+        var restoredSource = SceneDocumentSerializer.Deserialize(json);
+        var replacement = BuildLiveScene(restoredSource);
+        var previous = Scene;
+        _source = restoredSource;
+        Scene = replacement;
+        _sceneGeneration++;
+        _explicitlyClearedReferences.Clear();
+        _explicitlyRemovedComponents.Clear();
+        ReportSceneCleanupFailure(previous, "Could not fully dispose the replaced editor scene.");
         Selection.Restore(selection);
         Selection.RemoveMissing(Scene);
-        IsDirty = dirty;
+        UpdateDirtyState(json);
         _lastChangeTimestamp = Stopwatch.GetTimestamp();
-        Changed?.Invoke(this);
+        if (notifyChanged)
+            NotifyChanged(null);
+    }
+
+    private void ReplaceLiveScene(EditorScene replacement)
+    {
+        _activeTransaction?.Abandon();
+        var previous = Scene;
+        Scene = replacement;
+        _sceneGeneration++;
+        ReportSceneCleanupFailure(previous, "Could not fully dispose the replaced editor scene.");
+    }
+
+    private void ReportSceneCleanupFailure(EditorScene? scene, string message)
+    {
+        var cleanupFailure = EditorDisposal.TryDispose(scene);
+        if (cleanupFailure is not null)
+            _reportError?.Invoke(message + "\n" + cleanupFailure, null);
+    }
+
+    private void RollBackActiveTransactionBeforeSourceCapture() =>
+        _activeTransaction?.RollBackForDocumentLifecycle();
+
+    private void UnregisterTransaction(SceneEditTransaction transaction)
+    {
+        if (ReferenceEquals(_activeTransaction, transaction))
+            _activeTransaction = null;
+    }
+
+    private static bool ReplaceSourceEntity(
+        IList<EntityBlueprint> entities,
+        Guid entityId,
+        EntityBlueprint replacement)
+    {
+        for (var index = 0; index < entities.Count; index++)
+        {
+            if (entities[index].Guid == entityId)
+            {
+                entities[index] = replacement;
+                return true;
+            }
+            if (ReplaceSourceEntity(entities[index].Children, entityId, replacement))
+                return true;
+        }
+        return false;
+    }
+
+    private static HashSet<string> CaptureLiveComponentKeys(EditorScene scene)
+    {
+        scene.FlushStructuralChanges();
+        var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var entity in scene.GetAllEntities())
+        foreach (var component in entity.GetAllComponents())
+            keys.Add(SceneDocumentSerializer.GetComponentKey(entity.Id, component.GetType()));
+        return keys;
+    }
+
+    private void MarkRemovedComponents(IReadOnlySet<string> before, EditorScene scene)
+    {
+        var after = CaptureLiveComponentKeys(scene);
+        foreach (var componentKey in before)
+            if (!after.Contains(componentKey))
+                _explicitlyRemovedComponents.Add(componentKey);
     }
 
     private void RebuildLiveScene()
     {
-        Scene = BuildLiveScene();
+        Scene = BuildLiveScene(_source);
+        _sceneGeneration++;
         Selection.RemoveMissing(Scene);
     }
 
-    private EditorScene BuildLiveScene()
+    private EditorScene BuildLiveScene(SceneBlueprint source)
     {
         var scene = new EditorScene();
         try
         {
-            scene.LoadIntoSelf(_source, CreateEditorLoadOptions());
+            scene.LoadIntoSelf(source, CreateEditorLoadOptions());
             scene.FlushStructuralChanges();
             return scene;
         }
@@ -664,24 +920,50 @@ internal sealed class SceneDocument : IDisposable
     {
         if (_disposed)
             return;
-        Scene?.Dispose();
+        _activeTransaction?.Abandon();
+        _disposed = true;
+        _sceneGeneration++;
+        var scene = Scene;
         Scene = null;
         Undo.Clear();
-        _disposed = true;
+        Changed = null;
+        scene?.Dispose();
     }
 
-    private sealed record SceneSnapshotCommand(
-        string Name,
-        SceneDocument Document,
-        string Before,
-        string After,
-        IReadOnlyList<Guid> BeforeSelection,
-        IReadOnlyList<Guid> AfterSelection,
-        bool BeforeDirty,
-        bool AfterDirty) : IUndoableEditorCommand
+    private sealed class SceneSnapshotCommand(
+        string name,
+        SceneDocument document,
+        string before,
+        string after,
+        IReadOnlyList<Guid> beforeSelection,
+        IReadOnlyList<Guid> afterSelection,
+        string? mergeKey) : IUndoableEditorCommand
     {
-        public void Undo() => Document.Restore(Before, BeforeSelection, BeforeDirty);
-        public void Redo() => Document.Restore(After, AfterSelection, AfterDirty);
+        public string Name { get; } = name;
+        public string? MergeKey { get; } = mergeKey;
+        private SceneDocument Document { get; } = document;
+        private string Before { get; } = before;
+        private string After { get; set; } = after;
+        private IReadOnlyList<Guid> BeforeSelection { get; } = beforeSelection;
+        private IReadOnlyList<Guid> AfterSelection { get; set; } = afterSelection;
+        public bool IsNoOp => string.Equals(Before, After, StringComparison.Ordinal);
+
+        public bool TryMerge(IUndoableEditorCommand subsequent)
+        {
+            if (subsequent is not SceneSnapshotCommand next ||
+                !ReferenceEquals(Document, next.Document) ||
+                !string.Equals(MergeKey, next.MergeKey, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            After = next.After;
+            AfterSelection = next.AfterSelection;
+            return true;
+        }
+
+        public void Undo() => Document.Restore(Before, BeforeSelection);
+        public void Redo() => Document.Restore(After, AfterSelection);
     }
 
     private readonly record struct SelectionMarker(Guid EntityId, string? LDtkSourceKey);
@@ -692,7 +974,8 @@ internal sealed class SceneDocument : IDisposable
         private readonly string _name;
         private readonly string _before;
         private readonly IReadOnlyList<Guid> _beforeSelection;
-        private readonly bool _beforeDirty;
+        private readonly IReadOnlySet<string> _beforeComponents;
+        private readonly int _sceneGeneration;
         private bool _finished;
 
         internal SceneEditTransaction(
@@ -700,54 +983,140 @@ internal sealed class SceneDocument : IDisposable
             string name,
             string before,
             IReadOnlyList<Guid> beforeSelection,
-            bool beforeDirty)
+            IReadOnlySet<string> beforeComponents,
+            int sceneGeneration)
         {
             _document = document;
             _name = name;
             _before = before;
             _beforeSelection = beforeSelection;
-            _beforeDirty = beforeDirty;
+            _beforeComponents = beforeComponents;
+            _sceneGeneration = sceneGeneration;
         }
 
         public void Update(Action<EditorScene> mutation)
         {
-            if (_finished)
-                throw new InvalidOperationException("The scene edit transaction has finished.");
-            mutation(_document.Scene ?? throw new InvalidOperationException("The live scene is unavailable."));
-            _document.Scene.FlushStructuralChanges();
-            _document.IsDirty = true;
-            _document._lastChangeTimestamp = Stopwatch.GetTimestamp();
+            var scene = GetActiveScene();
+            try
+            {
+                mutation(scene);
+                scene.FlushStructuralChanges();
+            }
+            catch (Exception exception)
+            {
+                Finish();
+                _document.RollBackFailedMutation(_before, _beforeSelection, exception);
+                throw;
+            }
         }
 
         public void Commit()
         {
             if (_finished)
                 return;
-            var after = _document.CaptureJson();
-            if (!string.Equals(_before, after, StringComparison.Ordinal))
+            try
             {
-                _document.Undo.Record(new SceneSnapshotCommand(
-                    _name,
-                    _document,
-                    _before,
-                    after,
-                    _beforeSelection,
-                    _document.Selection.EntityIds.ToArray(),
-                    _beforeDirty,
-                    true));
-                _document.Changed?.Invoke(_document);
+                GetActiveScene();
             }
-            _finished = true;
+            catch
+            {
+                Finish();
+                throw;
+            }
+            string after;
+            try
+            {
+                _document.MarkRemovedComponents(_beforeComponents, GetActiveScene());
+                after = _document.CaptureJson();
+            }
+            catch (Exception exception)
+            {
+                Finish();
+                _document.RollBackFailedMutation(_before, _beforeSelection, exception);
+                throw;
+            }
+
+            Finish();
+            if (string.Equals(_before, after, StringComparison.Ordinal))
+            {
+                _document.UpdateDirtyState(after);
+                return;
+            }
+
+            _document.CommitSnapshotChange(
+                _name,
+                _before,
+                after,
+                _beforeSelection,
+                _document.Selection.EntityIds.ToArray());
         }
 
         public void Cancel()
         {
             if (_finished)
                 return;
-            _document.Restore(_before, _beforeSelection, _beforeDirty);
-            _finished = true;
+            try
+            {
+                GetActiveScene();
+            }
+            catch
+            {
+                Finish();
+                throw;
+            }
+            Finish();
+            _document.Restore(_before, _beforeSelection);
+        }
+
+        /// <summary>
+        /// Ends an interaction whose document or live scene has already been replaced.
+        /// Unlike <see cref="Cancel"/>, this deliberately does not touch document state.
+        /// </summary>
+        public void Abandon() => Finish();
+
+        internal void RollBackForDocumentLifecycle()
+        {
+            if (_finished)
+            {
+                _document.UnregisterTransaction(this);
+                return;
+            }
+
+            try
+            {
+                GetActiveScene();
+            }
+            catch
+            {
+                Finish();
+                throw;
+            }
+
+            Finish();
+            _document.Restore(_before, _beforeSelection, notifyChanged: false);
         }
 
         public void Dispose() => Commit();
+
+        private void Finish()
+        {
+            if (_finished)
+                return;
+            _finished = true;
+            _document.UnregisterTransaction(this);
+        }
+
+        private EditorScene GetActiveScene()
+        {
+            if (_finished)
+                throw new InvalidOperationException("The scene edit transaction has finished.");
+            ObjectDisposedException.ThrowIf(_document._disposed, _document);
+            if (_document._sceneGeneration != _sceneGeneration || _document.Scene is null)
+            {
+                throw new InvalidOperationException(
+                    "The live scene changed while this edit transaction was active. Abandon the stale transaction.");
+            }
+            return _document.Scene;
+        }
     }
 }

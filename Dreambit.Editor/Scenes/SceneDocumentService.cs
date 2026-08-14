@@ -12,8 +12,8 @@ internal sealed class SceneDocumentService : IDisposable
     private readonly DreambitProjectDefinition _project;
     private readonly GameAssemblyLoadService _assemblies;
     private readonly AssetDatabase _assets;
+    private readonly BlueprintSourceService _blueprintSources;
     private readonly Action<string, Exception?>? _reportError;
-    private readonly Dictionary<AssetId, EntityBlueprint> _blueprintPreviews = [];
     private long _observedAssetVersion;
     private bool _disposed;
 
@@ -21,14 +21,17 @@ internal sealed class SceneDocumentService : IDisposable
         DreambitProjectDefinition project,
         GameAssemblyLoadService assemblies,
         AssetDatabase assets,
+        BlueprintSourceService blueprintSources,
         Action<string, Exception?>? reportError = null)
     {
         _project = project;
         _assemblies = assemblies;
         _assets = assets;
+        _blueprintSources = blueprintSources;
         _reportError = reportError;
         _observedAssetVersion = _assets.GetSnapshot().Version;
         Selection = new SelectionService();
+        _blueprintSources.Changed += OnBlueprintSourcesChanged;
         _assemblies.Reloading += OnAssemblyReloading;
         _assemblies.Reloaded += OnAssemblyReloaded;
     }
@@ -40,15 +43,14 @@ internal sealed class SceneDocumentService : IDisposable
     public SceneDocument New(string name = "Untitled")
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        Close();
-        Current = SceneDocument.CreateNew(
+        var replacement = SceneDocument.CreateNew(
             name,
             Selection,
             _reportError,
             ResolveBlueprintInstance,
             ResolveLDtkProject);
-        CurrentChanged?.Invoke(Current);
-        return Current;
+        ReplaceCurrent(replacement);
+        return replacement;
     }
 
     public SceneDocument NewFromLDtk(
@@ -63,11 +65,10 @@ internal sealed class SceneDocumentService : IDisposable
             !asset.RelativePath.EndsWith(".ldtk", StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException("The selected asset is not an LDtk project.", nameof(asset));
 
-        Close();
         var sceneName = string.IsNullOrWhiteSpace(worldName)
             ? System.IO.Path.GetFileNameWithoutExtension(asset.Name)
             : worldName;
-        Current = SceneDocument.CreateNew(
+        var replacement = SceneDocument.CreateNew(
             sceneName,
             Selection,
             _reportError,
@@ -80,8 +81,8 @@ internal sealed class SceneDocumentService : IDisposable
                 WorldIid = worldIid,
                 ImportOptions = (importOptions ?? new LDtkImportOptions()).Clone()
             });
-        CurrentChanged?.Invoke(Current);
-        return Current;
+        ReplaceCurrent(replacement);
+        return replacement;
     }
 
     public IReadOnlyList<LDtkWorldChoice> GetLDtkWorldChoices(AssetRecord asset)
@@ -99,15 +100,14 @@ internal sealed class SceneDocumentService : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         var fullPath = ResolveScenePath(path);
-        Close();
-        Current = SceneDocument.Open(
+        var replacement = SceneDocument.Open(
             fullPath,
             Selection,
             _reportError,
             ResolveBlueprintInstance,
             ResolveLDtkProject);
-        CurrentChanged?.Invoke(Current);
-        return Current;
+        ReplaceCurrent(replacement);
+        return replacement;
     }
 
     public void Save(string? path = null)
@@ -118,9 +118,25 @@ internal sealed class SceneDocumentService : IDisposable
 
     public string ResolveScenePath(string path)
     {
-        if (System.IO.Path.IsPathFullyQualified(path))
-            return System.IO.Path.GetFullPath(path);
-        return System.IO.Path.GetFullPath(System.IO.Path.Combine(_project.ContentRootPath, path));
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        var contentRoot = System.IO.Path.TrimEndingDirectorySeparator(
+            System.IO.Path.GetFullPath(_project.ContentRootPath));
+        var resolved = System.IO.Path.GetFullPath(
+            System.IO.Path.IsPathFullyQualified(path)
+                ? path
+                : System.IO.Path.Combine(contentRoot, path));
+        var comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        var contentPrefix = contentRoot + System.IO.Path.DirectorySeparatorChar;
+        if (!string.Equals(resolved, contentRoot, comparison) &&
+            !resolved.StartsWith(contentPrefix, comparison))
+        {
+            throw new InvalidOperationException(
+                "Scene paths must remain inside the project's raw Assets folder.");
+        }
+
+        return resolved;
     }
 
     public void Update(bool autoSave, TimeSpan autoSaveDelay)
@@ -156,65 +172,59 @@ internal sealed class SceneDocumentService : IDisposable
     }
 
     public void PreviewBlueprint(AssetRecord asset, EntityBlueprint blueprint)
-    {
-        var preview = DreambitJson.Deserialize<EntityBlueprint>(DreambitJson.Serialize(blueprint))
-                      ?? throw new InvalidOperationException("Could not clone the Blueprint preview.");
-        preview.AssetId = asset.Id;
-        preview.AssetName = asset.LogicalAssetName;
-        _blueprintPreviews[asset.Id] = preview;
-        Current?.RefreshBlueprintInstances();
-    }
+        => _blueprintSources.SetPreview(asset, blueprint);
 
-    public void ClearBlueprintPreviews() => _blueprintPreviews.Clear();
+    public void ClearBlueprintPreviews() => _blueprintSources.ClearPreviews();
 
     public void Close()
     {
-        Current?.Dispose();
+        var current = Current;
         Current = null;
+        DisposeDocument(current);
         Selection.Clear();
         CurrentChanged?.Invoke(null);
     }
 
+    private void ReplaceCurrent(SceneDocument replacement)
+    {
+        ArgumentNullException.ThrowIfNull(replacement);
+        var previous = Current;
+        Current = replacement;
+        DisposeDocument(previous);
+        CurrentChanged?.Invoke(replacement);
+    }
+
+    private void DisposeDocument(SceneDocument? document)
+    {
+        if (document is null)
+            return;
+        var cleanupFailure = EditorDisposal.TryDispose(document);
+        if (cleanupFailure is not null)
+        {
+            _reportError?.Invoke(
+                "Could not fully dispose the previous editor scene.\n" + cleanupFailure,
+                null);
+        }
+    }
+
     private void OnAssemblyReloading(LoadedGameAssembly? _) => Current?.BeforeAssemblyReload();
     private void OnAssemblyReloaded(LoadedGameAssembly _) => Current?.AfterAssemblyReload();
+    private void OnBlueprintSourcesChanged() => Current?.RefreshBlueprintInstances();
 
-    private EntityBlueprint ResolveBlueprintInstance(BlueprintInstanceReference instance)
-    {
-        if (instance.AssetId != Guid.Empty &&
-            _blueprintPreviews.TryGetValue(new AssetId(instance.AssetId), out var preview))
-        {
-            return preview;
-        }
-        var asset = FindProjectAsset(instance)
-                    ?? throw new FileNotFoundException(
-                        $"Blueprint asset '{instance.AssetName}' is not present in this project.");
-        var path = System.IO.Path.Combine(
-            _project.ContentRootPath,
-            asset.RelativePath.Replace('/', System.IO.Path.DirectorySeparatorChar));
-        var blueprint = DreambitJson.Deserialize<EntityBlueprint>(File.ReadAllText(path))
-                        ?? throw new InvalidDataException($"Blueprint '{asset.RelativePath}' is empty.");
-        blueprint.AssetId = asset.Id;
-        blueprint.AssetName = asset.LogicalAssetName;
-        return blueprint;
-    }
-
-    private AssetRecord? FindProjectAsset(BlueprintInstanceReference instance)
-    {
-        return _assets.GetSnapshot().Assets.FirstOrDefault(asset =>
-            (instance.AssetId != Guid.Empty && asset.Id.Value == instance.AssetId) ||
-            (!string.IsNullOrWhiteSpace(instance.AssetName) &&
-             string.Equals(asset.LogicalAssetName, instance.AssetName, StringComparison.OrdinalIgnoreCase)));
-    }
+    private EntityBlueprint ResolveBlueprintInstance(BlueprintInstanceReference instance) =>
+        _blueprintSources.Resolve(instance);
 
     private LDtkFile ResolveLDtkProject(LDtkSceneReference instance)
     {
-        var asset = _assets.GetSnapshot().Assets.FirstOrDefault(candidate =>
-            (instance.AssetId != Guid.Empty && candidate.Id.Value == instance.AssetId) ||
-            (!string.IsNullOrWhiteSpace(instance.AssetName) &&
-             string.Equals(
-                 candidate.LogicalAssetName,
-                 instance.AssetName,
-                 StringComparison.OrdinalIgnoreCase)));
+        var assets = _assets.GetSnapshot().Assets;
+        var asset = instance.AssetId != Guid.Empty
+            ? assets.FirstOrDefault(candidate => candidate.Id.Value == instance.AssetId)
+            : assets.FirstOrDefault(candidate =>
+                !string.IsNullOrWhiteSpace(instance.AssetName) &&
+                string.Equals(
+                    candidate.LogicalAssetName,
+                    instance.AssetName,
+                    StringComparison.OrdinalIgnoreCase));
         if (asset is null || asset.Kind != AssetKind.Ldtk)
             throw new FileNotFoundException(
                 $"LDtk project asset '{instance.AssetName}' is not present in this project.");
@@ -233,9 +243,10 @@ internal sealed class SceneDocumentService : IDisposable
     {
         if (_disposed)
             return;
+        _disposed = true;
+        _blueprintSources.Changed -= OnBlueprintSourcesChanged;
         _assemblies.Reloading -= OnAssemblyReloading;
         _assemblies.Reloaded -= OnAssemblyReloaded;
         Close();
-        _disposed = true;
     }
 }

@@ -78,11 +78,10 @@ internal sealed class DreambitProjectManager : IDisposable
                 _reportGameCode,
                 _reportSceneError);
         }
-        catch (Exception exception) when (
-            exception is AssetDatabaseException or IOException or UnauthorizedAccessException)
+        catch (Exception exception)
         {
             lease!.Dispose();
-            error = $"Could not initialize the asset database. {exception.Message}";
+            error = $"Could not initialize the project session. {exception.Message}";
             return false;
         }
 
@@ -95,8 +94,15 @@ internal sealed class DreambitProjectManager : IDisposable
         if (_disposed)
             return;
 
-        _session?.Dispose();
+        var session = _session;
         _session = null;
-        _disposed = true;
+        try
+        {
+            session?.Dispose();
+        }
+        finally
+        {
+            _disposed = true;
+        }
     }
 }

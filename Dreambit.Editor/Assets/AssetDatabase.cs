@@ -49,21 +49,31 @@ internal sealed class AssetDatabase : IAssetRegistry, IDisposable
 
         if (enableWatcher)
         {
-            _watcher = new FileSystemWatcher(_contentRoot)
+            FileSystemWatcher? watcher = null;
+            try
             {
-                IncludeSubdirectories = true,
-                NotifyFilter = NotifyFilters.FileName |
-                               NotifyFilters.DirectoryName |
-                               NotifyFilters.LastWrite |
-                               NotifyFilters.Size,
-                EnableRaisingEvents = false
-            };
-            _watcher.Created += OnFileSystemChanged;
-            _watcher.Changed += OnFileSystemChanged;
-            _watcher.Deleted += OnFileSystemChanged;
-            _watcher.Renamed += OnFileSystemRenamed;
-            _watcher.Error += OnWatcherError;
-            _watcher.EnableRaisingEvents = true;
+                watcher = new FileSystemWatcher(_contentRoot)
+                {
+                    IncludeSubdirectories = true,
+                    NotifyFilter = NotifyFilters.FileName |
+                                   NotifyFilters.DirectoryName |
+                                   NotifyFilters.LastWrite |
+                                   NotifyFilters.Size,
+                    EnableRaisingEvents = false
+                };
+                watcher.Created += OnFileSystemChanged;
+                watcher.Changed += OnFileSystemChanged;
+                watcher.Deleted += OnFileSystemChanged;
+                watcher.Renamed += OnFileSystemRenamed;
+                watcher.Error += OnWatcherError;
+                watcher.EnableRaisingEvents = true;
+                _watcher = watcher;
+            }
+            catch
+            {
+                watcher?.Dispose();
+                throw;
+            }
         }
     }
 

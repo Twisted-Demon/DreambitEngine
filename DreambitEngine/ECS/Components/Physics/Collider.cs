@@ -16,13 +16,13 @@ public class Collider : Component
     /// <summary>Draws the collider outline in editor-hosted scene and blueprint views.</summary>
     public override void OnEditorDrawGizmos(IEditorGizmoContext context)
     {
-        DrawEditorOutline(context, new Color(82, 235, 140, 150), 1.5f);
+        //DrawEditorOutline(context, new Color(82, 235, 140, 150), 1.5f);
     }
 
     /// <summary>Emphasizes the collider when its entity is selected in the editor.</summary>
     public override void OnEditorDrawGizmosSelected(IEditorGizmoContext context)
     {
-        DrawEditorOutline(context, new Color(82, 235, 140, 235), 2.5f);
+        DrawEditorOutline(context, new Color(82, 235, 140, 150), 1.5f);
     }
 
     /// <summary>Renders polygon outline for debugging purposes.</summary>
