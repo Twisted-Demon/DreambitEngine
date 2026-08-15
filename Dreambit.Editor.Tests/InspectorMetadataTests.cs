@@ -1,7 +1,6 @@
 using Dreambit.ECS;
 using Dreambit.Editor.Inspection;
 using Dreambit.Editor.Assets;
-using Dreambit.Editor.UI.Panels;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -359,13 +358,47 @@ public sealed class InspectorMetadataTests
             ]
         };
 
-        var componentCandidates = InspectorPanel.GetBlueprintReferenceCandidates(
+        var componentCandidates = BlueprintInspector.GetReferenceCandidates(
             root,
             typeof(FilledRectDrawer));
         Assert.Equal(root.Guid, Assert.Single(componentCandidates).Guid);
 
-        var entityCandidates = InspectorPanel.GetBlueprintReferenceCandidates(root, typeof(Entity));
+        var entityCandidates = BlueprintInspector.GetReferenceCandidates(root, typeof(Entity));
         Assert.Equal(2, entityCandidates.Count);
+    }
+
+    [Fact]
+    public void MultiSelectionDetectsComponentsMissingFromTheFirstEntity()
+    {
+        using var scene = new InspectorTestScene();
+        var first = scene.CreateEntity("First");
+        var second = scene.CreateEntity("Second");
+        first.AttachComponent<InspectorTestComponent>();
+        second.AttachComponent<InspectorTestComponent>();
+        second.AttachComponent<InspectorAssetReferenceComponent>();
+
+        Assert.True(SceneEntityInspector.HasPartialComponents(
+            [first, second],
+            [typeof(InspectorTestComponent)]));
+    }
+
+    [Theory]
+    [InlineData(false, true, true, false, "LDtk")]
+    [InlineData(false, true, false, true, "Tiled")]
+    [InlineData(false, true, false, false, "Imported")]
+    [InlineData(true, true, false, true, "Boxed")]
+    public void ComponentStatusDescribesTheActualSource(
+        bool readOnly,
+        bool hasGeneratedEntity,
+        bool allLDtkGenerated,
+        bool allTiledGenerated,
+        string expected)
+    {
+        Assert.Equal(expected, SceneEntityInspector.GetComponentStatus(
+            readOnly,
+            hasGeneratedEntity,
+            allLDtkGenerated,
+            allTiledGenerated));
     }
 
     [Fact]
@@ -434,6 +467,8 @@ public sealed class InspectorMetadataTests
             type.FullName,
             0,
             DateTimeOffset.UtcNow);
+
+    private sealed class InspectorTestScene() : Scene(SceneExecutionMode.Editor);
 }
 
 public sealed class InspectorTestComponent : Component

@@ -523,16 +523,16 @@ public sealed class TiledImportTests : IDisposable
         var placedId = placed.Id;
         document.Apply("Move Dreambit Entity", _ =>
             placed.Transform.Position = new Vector3(12, 34, 0));
-        document.Apply("Override Tiled Background", _ =>
-        {
-            background.Entity.Transform.Position = new Vector3(5, 7, 0);
-            background.Entity.Tags.Clear();
-            background.Entity.Tags.Add("editor-override");
-            background.Width = 99f;
-            document.RecordGeneratedPosition(background.Entity);
-            document.RecordGeneratedEntityTags(background.Entity);
-            document.RecordGeneratedComponentMember(background, nameof(FilledRectDrawer.Width), background.Width);
-        });
+        document.SetEntityPosition([background.Entity], new Vector3(5, 7, 0));
+        document.SetEntityEnabled([background.Entity], false);
+        document.SetEntityTags([background.Entity], ["editor-override"]);
+        document.SetComponentMember(
+            "Override Tiled Background Width",
+            [background],
+            nameof(FilledRectDrawer.Width),
+            typeof(float),
+            99f,
+            (component, value) => ((FilledRectDrawer)component).Width = (float)value!);
 
         WriteEmptyMap(mapPath, 4, "Ground Updated", "#654321");
         document.ReimportTiled();
@@ -548,6 +548,7 @@ public sealed class TiledImportTests : IDisposable
                 .SelectMany(entity => entity.GetAllComponents())
                 .OfType<FilledRectDrawer>());
         Assert.Equal(new Vector3(5, 7, 0), reimportedBackground.Entity.Transform.Position);
+        Assert.False(reimportedBackground.Entity.LocallyEnabled);
         Assert.Contains("editor-override", reimportedBackground.Entity.Tags);
         Assert.Equal(99f, reimportedBackground.Width);
 

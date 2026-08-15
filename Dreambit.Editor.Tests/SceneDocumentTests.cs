@@ -126,6 +126,7 @@ public sealed class SceneDocumentTests : IDisposable
         {
             settings.AmbientLightIntensity = 0.4f;
             settings.AmbientLightColor = Color.CornflowerBlue;
+            settings.Exposure = 1.5f;
             settings.PostProcessing.HueShift = 0.2f;
             settings.PostProcessing.Saturation = 0.6f;
             settings.PostProcessing.TintColor = Color.OrangeRed;
@@ -133,12 +134,15 @@ public sealed class SceneDocumentTests : IDisposable
 
         Assert.Equal(0.4f, document.Settings.AmbientLightIntensity);
         Assert.Equal(Color.CornflowerBlue, document.Settings.AmbientLightColor);
+        Assert.Equal(1.5f, document.Settings.Exposure);
         Assert.Equal(0.2f, document.Settings.PostProcessing.HueShift);
         Assert.Equal(0.6f, document.Settings.PostProcessing.Saturation);
         Assert.Equal(Color.OrangeRed, document.Settings.PostProcessing.TintColor);
         Assert.True(document.Undo.Undo());
         Assert.Equal(1f, document.Settings.AmbientLightIntensity);
+        Assert.Equal(1f, document.Settings.Exposure);
         Assert.True(document.Undo.Redo());
+        Assert.Equal(1.5f, document.Settings.Exposure);
         Assert.Equal(Color.OrangeRed, document.Settings.PostProcessing.TintColor);
     }
 
@@ -528,17 +532,35 @@ public sealed class SceneDocumentTests : IDisposable
         Assert.Contains(nameof(EditorReloadSafetyComponent.Target), component.EditorSerializationFailures);
         Assert.Contains("RetiredMember", component.EditorSerializationFailures);
 
-        document.Apply("Replace invalid count", _ =>
-        {
-            component.Count = 7;
-            component.AcknowledgeEditorSerializationFailure(nameof(EditorReloadSafetyComponent.Count));
-        });
+        document.SetComponentMember(
+            "Replace invalid count",
+            [component],
+            nameof(EditorReloadSafetyComponent.Count),
+            typeof(int),
+            7,
+            (target, value) => ((EditorReloadSafetyComponent)target).Count = (int)value!);
         document.Save();
 
         var saved = SceneDocumentSerializer.Deserialize(File.ReadAllText(scenePath));
         var properties = Assert.Single(Assert.Single(saved.Entities).Components).Properties;
         Assert.Equal(7, properties[nameof(EditorReloadSafetyComponent.Count)]!.Value<int>());
         Assert.Equal(missingTarget.ToString(), properties[nameof(EditorReloadSafetyComponent.Target)]!.Value<string>());
+        Assert.True(properties["RetiredMember"]!["stillHere"]!.Value<bool>());
+
+        document.SetComponentMember(
+            "Clear invalid target",
+            [component],
+            nameof(EditorReloadSafetyComponent.Target),
+            typeof(Entity),
+            null,
+            (target, value) => ((EditorReloadSafetyComponent)target).Target = (Entity?)value);
+        document.Save();
+
+        saved = SceneDocumentSerializer.Deserialize(File.ReadAllText(scenePath));
+        properties = Assert.Single(Assert.Single(saved.Entities).Components).Properties;
+        Assert.Equal(
+            JTokenType.Null,
+            properties[nameof(EditorReloadSafetyComponent.Target)]!.Type);
         Assert.True(properties["RetiredMember"]!["stillHere"]!.Value<bool>());
     }
 

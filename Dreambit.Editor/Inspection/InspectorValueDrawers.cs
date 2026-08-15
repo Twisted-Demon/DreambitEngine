@@ -102,34 +102,11 @@ internal sealed class InspectorValueDrawerRegistry
 
             // Keep generated properties in a predictable label/value layout.
             // Drawers get an ID-only label so controls do not add a second label.
-            var availableWidth = MathF.Max(1f, ImGui.GetContentRegionAvail().X);
-            var labelWidth = Math.Clamp(availableWidth * 0.35f, 120f, 190f);
-            var flags = ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.NoSavedSettings;
-            if (!ImGui.BeginTable($"##PropertyRow.{context.Id}", 2, flags))
-                return drawer.Draw(this, $"##{context.Id}", type, value, context);
-
-            try
-            {
-                ImGui.TableSetupColumn("##Label", ImGuiTableColumnFlags.WidthFixed, labelWidth);
-                ImGui.TableSetupColumn("##Value", ImGuiTableColumnFlags.WidthStretch);
-                ImGui.TableNextRow();
-                ImGui.TableSetColumnIndex(0);
-                ImGui.AlignTextToFramePadding();
-                ImGui.TextUnformatted(label);
-                if (!string.IsNullOrWhiteSpace(context.Metadata.Tooltip) && ImGui.IsItemHovered())
-                    ImGui.SetTooltip(context.Metadata.Tooltip);
-
-                ImGui.TableSetColumnIndex(1);
-                ImGui.SetNextItemWidth(-1f);
-                var result = drawer.Draw(this, $"##{context.Id}", type, value, context);
-                if (!string.IsNullOrWhiteSpace(context.Metadata.Tooltip) && ImGui.IsItemHovered())
-                    ImGui.SetTooltip(context.Metadata.Tooltip);
-                return result;
-            }
-            finally
-            {
-                ImGui.EndTable();
-            }
+            return InspectorUi.PropertyRow(
+                context.Id,
+                label,
+                () => drawer.Draw(this, $"##{context.Id}", type, value, context),
+                context.Metadata.Tooltip);
         }
         finally
         {

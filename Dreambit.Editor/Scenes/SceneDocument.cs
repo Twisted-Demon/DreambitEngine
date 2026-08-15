@@ -272,6 +272,98 @@ internal sealed class SceneDocument : IDisposable
         });
     }
 
+    public void SetEntityEnabled(
+        IReadOnlyList<Entity> entities,
+        bool enabled,
+        string? mergeKey = null)
+    {
+        ArgumentNullException.ThrowIfNull(entities);
+        if (entities.Count == 0)
+            return;
+        Apply("Set Enabled", _ =>
+        {
+            foreach (var entity in entities)
+            {
+                entity.Enabled = enabled;
+                RecordGeneratedEntityEnabled(entity);
+            }
+        }, mergeKey);
+    }
+
+    public void SetEntityTags(
+        IReadOnlyList<Entity> entities,
+        IReadOnlyCollection<string> tags,
+        string? mergeKey = null)
+    {
+        ArgumentNullException.ThrowIfNull(entities);
+        ArgumentNullException.ThrowIfNull(tags);
+        if (entities.Count == 0)
+            return;
+        Apply("Change Entity Tags", _ =>
+        {
+            foreach (var entity in entities)
+            {
+                entity.Tags.Clear();
+                entity.Tags.UnionWith(tags);
+                RecordGeneratedEntityTags(entity);
+            }
+        }, mergeKey);
+    }
+
+    public void SetEntityPosition(
+        IReadOnlyList<Entity> entities,
+        Microsoft.Xna.Framework.Vector3 position,
+        string? mergeKey = null)
+    {
+        ArgumentNullException.ThrowIfNull(entities);
+        if (entities.Count == 0)
+            return;
+        Apply("Change Position", _ =>
+        {
+            foreach (var entity in entities)
+            {
+                entity.Transform.Position = position;
+                RecordGeneratedPosition(entity);
+            }
+        }, mergeKey);
+    }
+
+    public void SetEntityRotation(
+        IReadOnlyList<Entity> entities,
+        float rotation,
+        string? mergeKey = null)
+    {
+        ArgumentNullException.ThrowIfNull(entities);
+        if (entities.Count == 0)
+            return;
+        Apply("Change Rotation", _ =>
+        {
+            foreach (var entity in entities)
+            {
+                entity.Transform.Rotation2D = rotation;
+                RecordGeneratedRotation(entity);
+            }
+        }, mergeKey);
+    }
+
+    public void SetEntityScale(
+        IReadOnlyList<Entity> entities,
+        Microsoft.Xna.Framework.Vector3 scale,
+        string? mergeKey = null)
+    {
+        ArgumentNullException.ThrowIfNull(entities);
+        if (entities.Count == 0)
+            return;
+        Apply("Change Scale", _ =>
+        {
+            foreach (var entity in entities)
+            {
+                entity.Transform.Scale = scale;
+                RecordGeneratedScale(entity);
+            }
+        }, mergeKey);
+    }
+
     public Entity Duplicate(Entity entity)
     {
         if (entity.IsImportedMapGenerated)
@@ -453,6 +545,39 @@ internal sealed class SceneDocument : IDisposable
     {
         _explicitlyClearedReferences.Add(
             SceneDocumentSerializer.GetReferenceKey(entity.Id, componentType, memberName));
+    }
+
+    public void SetComponentMember(
+        string name,
+        IReadOnlyList<Component> components,
+        string memberName,
+        Type valueType,
+        object? value,
+        Action<Component, object?> setValue,
+        string? mergeKey = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(components);
+        ArgumentException.ThrowIfNullOrWhiteSpace(memberName);
+        ArgumentNullException.ThrowIfNull(valueType);
+        ArgumentNullException.ThrowIfNull(setValue);
+        if (components.Count == 0)
+            return;
+
+        var isReference = typeof(DreambitAsset).IsAssignableFrom(valueType) ||
+                          valueType == typeof(Entity) ||
+                          typeof(Component).IsAssignableFrom(valueType);
+        Apply(name, _ =>
+        {
+            foreach (var component in components)
+            {
+                setValue(component, value);
+                component.AcknowledgeEditorSerializationFailure(memberName);
+                RecordGeneratedComponentMember(component, memberName, value);
+                if (value is null && isReference)
+                    MarkReferenceCleared(component.Entity, component.GetType(), memberName);
+            }
+        }, mergeKey);
     }
 
     public void RecordGeneratedEntityName(Entity entity)

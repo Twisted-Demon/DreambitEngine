@@ -28,6 +28,8 @@ internal sealed class SceneSettingsPanel(EditorDocumentContext documentContext)
         var ambientIntensity = edited.AmbientLightIntensity;
         var hueShift = postProcessing.HueShift;
         var saturation = postProcessing.Saturation;
+        var exposure = edited.Exposure;
+        
         var changed = false;
         string? mergeKey = null;
 
@@ -38,6 +40,8 @@ internal sealed class SceneSettingsPanel(EditorDocumentContext documentContext)
             (changed, mergeKey) = (true, "SceneSettings.AmbientLightIntensity");
         if (ImGui.ColorEdit4("Color", ref ambientColor))
             (changed, mergeKey) = (true, "SceneSettings.AmbientLightColor");
+        if (ImGui.DragFloat("Exposure", ref exposure, 0.01f, v_min: 0, v_max: 5f))
+            (changed, mergeKey) = (true, "SceneSettings.Exposure");
 
         ImGui.Spacing();
         ImGui.Separator();
@@ -48,9 +52,11 @@ internal sealed class SceneSettingsPanel(EditorDocumentContext documentContext)
             (changed, mergeKey) = (true, "SceneSettings.PostProcessing.Saturation");
         if (ImGui.ColorEdit4("Tint Color", ref tintColor))
             (changed, mergeKey) = (true, "SceneSettings.PostProcessing.TintColor");
+        
 
         edited.AmbientLightIntensity = ambientIntensity;
         edited.AmbientLightColor = new Color(ambientColor.X, ambientColor.Y, ambientColor.Z, ambientColor.W);
+        edited.Exposure = exposure;
         postProcessing.HueShift = hueShift;
         postProcessing.Saturation = saturation;
         postProcessing.TintColor = new Color(tintColor.X, tintColor.Y, tintColor.Z, tintColor.W);
@@ -67,6 +73,7 @@ internal sealed class SceneSettingsPanel(EditorDocumentContext documentContext)
             {
                 settings.AmbientLightIntensity = edited.AmbientLightIntensity;
                 settings.AmbientLightColor = edited.AmbientLightColor;
+                settings.Exposure = edited.Exposure;
                 settings.PostProcessing = edited.PostProcessing.Clone();
             }, mergeKey);
             _error = null;
