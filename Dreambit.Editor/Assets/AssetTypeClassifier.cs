@@ -7,9 +7,23 @@ internal readonly record struct AssetTypeInfo(AssetKind Kind, string? TypeId);
 
 internal static class AssetTypeClassifier
 {
-    public const int ClassificationVersion = 3;
+    public const int ClassificationVersion = 4;
 
-    private static readonly (string Suffix, AssetKind Kind, Type AssetType)[] JsonTypes =
+    private static readonly (AssetKind Kind, Type AssetType)[] SerializedTypes =
+    [
+        (AssetKind.SpriteSheet, typeof(SpriteSheet)),
+        (AssetKind.Animation, typeof(SpriteSheetAnimation)),
+        (AssetKind.Blueprint, typeof(EntityBlueprint)),
+        (AssetKind.ParticleEffect, typeof(ParticleFxConfig)),
+        (AssetKind.SoundCue, typeof(SoundCue)),
+        (AssetKind.Cutscene, typeof(Dreambit.Scripting.Cutscene)),
+        (AssetKind.Sprite, typeof(Sprite)),
+        (AssetKind.Scene, typeof(SceneBlueprint)),
+        (AssetKind.DreambitAsset, typeof(Tileset))
+    ];
+
+    // Keep recognizing source files created before semantic extensions became standalone.
+    private static readonly (string Suffix, AssetKind Kind, Type AssetType)[] LegacyJsonTypes =
     [
         (".spritesheet.json", AssetKind.SpriteSheet, typeof(SpriteSheet)),
         (".animation.json", AssetKind.Animation, typeof(SpriteSheetAnimation)),
@@ -32,48 +46,35 @@ internal static class AssetTypeClassifier
         out string? diagnostic)
     {
         diagnostic = null;
-        foreach (var (suffix, kind, assetType) in JsonTypes)
+        var extension = Path.GetExtension(relativePath);
+        foreach (var (kind, assetType) in SerializedTypes)
+            if (extension.Equals(
+                    DreambitAssetTypeRegistry.GetFileExtension(assetType),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return new AssetTypeInfo(kind, DreambitAssetTypeRegistry.GetTypeId(assetType));
+            }
+
+        if (extension.Equals(
+                DreambitAssetFileExtensions.Generic,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return InspectGenericAsset(json, AssetKind.DreambitAsset, out diagnostic);
+        }
+
+        foreach (var (suffix, kind, assetType) in LegacyJsonTypes)
             if (relativePath.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
                 return new AssetTypeInfo(kind, DreambitAssetTypeRegistry.GetTypeId(assetType));
 
-        if (Path.GetExtension(relativePath).Equals(".json", StringComparison.OrdinalIgnoreCase))
+        if (extension.Equals(".json", StringComparison.OrdinalIgnoreCase))
         {
             if (json is null)
                 return new AssetTypeInfo(AssetKind.Json, null);
 
-            try
-            {
-                var token = JToken.Parse(json);
-                if (token is not JObject document)
-                    return new AssetTypeInfo(AssetKind.Json, null);
-                if (!document.TryGetValue(
-                        DreambitAssetTypeRegistry.MetadataPropertyName,
-                        StringComparison.Ordinal,
-                        out var typeToken))
-                {
-                    return new AssetTypeInfo(AssetKind.Json, null);
-                }
-
-                if (typeToken.Type != JTokenType.String ||
-                    string.IsNullOrWhiteSpace(typeToken.Value<string>()))
-                {
-                    diagnostic =
-                        $"'{DreambitAssetTypeRegistry.MetadataPropertyName}' must be a non-empty string.";
-                    return new AssetTypeInfo(AssetKind.Json, null);
-                }
-
-                return new AssetTypeInfo(
-                    AssetKind.DreambitAsset,
-                    typeToken.Value<string>()!.Trim());
-            }
-            catch (JsonException exception)
-            {
-                diagnostic = $"Could not inspect JSON metadata. {exception.Message}";
-                return new AssetTypeInfo(AssetKind.Json, null);
-            }
+            return InspectGenericAsset(json, AssetKind.Json, out diagnostic);
         }
 
-        return Path.GetExtension(relativePath).ToLowerInvariant() switch
+        return extension.ToLowerInvariant() switch
         {
             ".png" or ".jpg" or ".jpeg" or ".bmp" or ".gif" or ".tga" or ".webp" =>
                 new AssetTypeInfo(AssetKind.Texture, DreambitAssetTypeRegistry.GetTypeId(typeof(TextureAsset))),
@@ -94,10 +95,66 @@ internal static class AssetTypeClassifier
         };
     }
 
+    private static AssetTypeInfo InspectGenericAsset(
+        string? json,
+        AssetKind fallbackKind,
+        out string? diagnostic)
+    {
+        diagnostic = null;
+        if (json is null)
+            return new AssetTypeInfo(fallbackKind, null);
+
+        try
+        {
+            var token = JToken.Parse(json);
+            if (token is not JObject document)
+                return new AssetTypeInfo(fallbackKind, null);
+            if (!document.TryGetValue(
+                    DreambitAssetTypeRegistry.MetadataPropertyName,
+                    StringComparison.Ordinal,
+                    out var typeToken))
+            {
+                if (fallbackKind == AssetKind.DreambitAsset)
+                {
+                    diagnostic =
+                        $"'{DreambitAssetTypeRegistry.MetadataPropertyName}' is required in a " +
+                        $"'{DreambitAssetFileExtensions.Generic}' asset.";
+                }
+                return new AssetTypeInfo(fallbackKind, null);
+            }
+
+            if (typeToken.Type != JTokenType.String ||
+                string.IsNullOrWhiteSpace(typeToken.Value<string>()))
+            {
+                diagnostic =
+                    $"'{DreambitAssetTypeRegistry.MetadataPropertyName}' must be a non-empty string.";
+                return new AssetTypeInfo(fallbackKind, null);
+            }
+
+            return new AssetTypeInfo(
+                AssetKind.DreambitAsset,
+                typeToken.Value<string>()!.Trim());
+        }
+        catch (JsonException exception)
+        {
+            diagnostic = $"Could not inspect JSON metadata. {exception.Message}";
+            return new AssetTypeInfo(fallbackKind, null);
+        }
+    }
+
+    public static bool RequiresContentInspection(string relativePath)
+    {
+        var extension = Path.GetExtension(relativePath);
+        return extension.Equals(".json", StringComparison.OrdinalIgnoreCase) ||
+               extension.Equals(
+                   DreambitAssetFileExtensions.Generic,
+                   StringComparison.OrdinalIgnoreCase);
+    }
+
     public static string GetDuplicateFileName(string fileName, int copyNumber)
     {
         var copyLabel = copyNumber == 1 ? " Copy" : $" Copy {copyNumber}";
-        foreach (var (suffix, _, _) in JsonTypes)
+        foreach (var (suffix, _, _) in LegacyJsonTypes)
         {
             if (!fileName.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
                 continue;
@@ -109,18 +166,14 @@ internal static class AssetTypeClassifier
         return fileName[..^extension.Length] + copyLabel + extension;
     }
 
-    public static string GetFileSuffix(Type type)
-    {
-        if (type == typeof(EntityBlueprint)) return ".blueprint.json";
-        if (type == typeof(SceneBlueprint)) return ".scene.json";
-        if (type == typeof(Sprite)) return ".sprite.json";
-        if (type == typeof(SpriteSheet)) return ".spritesheet.json";
-        if (type == typeof(SpriteSheetAnimation)) return ".animation.json";
-        if (type == typeof(SoundCue)) return ".soundcue.json";
-        if (type == typeof(ParticleFxConfig)) return ".particlefx.json";
-        if (type == typeof(Dreambit.Scripting.Cutscene)) return ".cutscene.json";
-        return ".json";
-    }
+    public static string GetFileSuffix(Type type) =>
+        DreambitAssetTypeRegistry.GetFileExtension(type);
+
+    public static bool CanCreateAsset(Type type) =>
+        typeof(DreambitAsset).IsAssignableFrom(type) &&
+        !type.IsAbstract &&
+        DreambitAssetFileExtensions.IsSerialized(
+            DreambitAssetTypeRegistry.GetFileExtension(type));
 
     public static bool IsCompatibleWith(AssetRecord asset, Type requestedType)
     {

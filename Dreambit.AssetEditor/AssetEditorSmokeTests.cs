@@ -38,8 +38,8 @@ internal static class AssetEditorSmokeTests
             passed.Add($"catalog discovery ({catalog.AssetTypes.Count} assets, {catalog.ComponentTypes.Count} components)");
 
             var projectRoot = Path.Combine(testDirectory, "project-assets");
-            var blueprintPath = Path.Combine(projectRoot, "characters", "heroes", "hero.blueprint.json");
-            var spritePath = Path.Combine(projectRoot, "sprites", "hero.sprite.json");
+            var blueprintPath = Path.Combine(projectRoot, "characters", "heroes", "hero.blueprint");
+            var spritePath = Path.Combine(projectRoot, "sprites", "hero.sprite");
             Directory.CreateDirectory(Path.GetDirectoryName(blueprintPath)!);
             Directory.CreateDirectory(Path.GetDirectoryName(spritePath)!);
             File.WriteAllText(blueprintPath, "{}");
@@ -60,17 +60,17 @@ internal static class AssetEditorSmokeTests
                 .ToArray();
             Require(renderedRootNames.Contains("characters") && renderedRootNames.Contains("sprites"),
                 "Project explorer data existed but its folder rows were not rendered.");
-            Require(renderedRootNames.Contains("hero.sprite.json") && renderedRootNames.Contains("hero.blueprint.json"),
+            Require(renderedRootNames.Contains("hero.sprite") && renderedRootNames.Contains("hero.blueprint"),
                 "Project explorer did not render files inside its expanded folder hierarchy.");
             var spritesFolder = projectRootItems.Single(item => GetProperty<string>(item, "Name") == "sprites");
             var spriteItems = GetProperty<System.Collections.IEnumerable>(spritesFolder, "Children").Cast<object>().ToArray();
-            Require(spriteItems.Any(item => GetProperty<string>(item, "Name") == "hero.sprite.json"),
+            Require(spriteItems.Any(item => GetProperty<string>(item, "Name") == "hero.sprite"),
                 "Project explorer did not include the nested sprite asset.");
             var charactersFolder = projectRootItems.Single(item => GetProperty<string>(item, "Name") == "characters");
             var characterItems = GetProperty<System.Collections.IEnumerable>(charactersFolder, "Children").Cast<object>().ToArray();
             var heroesFolder = characterItems.Single(item => GetProperty<string>(item, "Name") == "heroes");
             var heroItems = GetProperty<System.Collections.IEnumerable>(heroesFolder, "Children").Cast<object>().ToArray();
-            Require(heroItems.Any(item => GetProperty<string>(item, "Name") == "hero.blueprint.json"),
+            Require(heroItems.Any(item => GetProperty<string>(item, "Name") == "hero.blueprint"),
                 "Project explorer did not include the deeply nested blueprint asset.");
 
             var transfer = new DataTransfer();
@@ -90,7 +90,7 @@ internal static class AssetEditorSmokeTests
                 "Dragging an explorer asset did not populate a DreambitAsset field.");
             Require(populatedReference == "sprites/hero.sprite",
                 "The DreambitAsset field did not commit the extensionless project-relative path.");
-            Require(!project.TryCreateAssetReference(Path.Combine(testDirectory, "outside.sprite.json"), out _),
+            Require(!project.TryCreateAssetReference(Path.Combine(testDirectory, "outside.sprite"), out _),
                 "A file outside the project root was accepted as an asset reference.");
             passed.Add("project root, explorer hierarchy, and extensionless drag reference");
 

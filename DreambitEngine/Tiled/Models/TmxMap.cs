@@ -9,7 +9,7 @@ namespace Dreambit.Tiled;
 /// Raw XML model for a Tiled TMX map.
 /// </summary>
 [XmlRoot("map")]
-[DreambitAssetType("dreambit.tiled.map")]
+[DreambitAssetType("dreambit.tiled.map", FileExtension = ".tmx")]
 public sealed class TmxMap : DreambitAsset
 {
     public static TmxMap FromFile(string path) => TmxSourceLoader.LoadMap(path);
@@ -115,7 +115,7 @@ public sealed class TmxMap : DreambitAsset
 /// or a tileset reference when Source is set.
 /// </summary>
 [XmlRoot("tileset")]
-[DreambitAssetType("dreambit.tiled.tileset")]
+[DreambitAssetType("dreambit.tiled.tileset", FileExtension = ".tsx")]
 public sealed class TmxTileset : DreambitAsset
 {
     public static TmxTileset FromFile(string path) => TmxSourceLoader.LoadTileset(path);

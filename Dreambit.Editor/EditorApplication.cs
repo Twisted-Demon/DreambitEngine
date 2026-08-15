@@ -355,7 +355,9 @@ internal sealed class EditorApplication : IDisposable
                 if (ImGui.BeginMenu("Dreambit Asset"))
                 {
                     foreach (var type in _projectManager.CurrentSession!.EditorTypes.AssetTypes
-                                 .Where(type => type != typeof(EntityBlueprint)))
+                                 .Where(type =>
+                                     type != typeof(EntityBlueprint) &&
+                                     AssetTypeClassifier.CanCreateAsset(type)))
                         if (ImGui.MenuItem(type.Name))
                             projectPanel!.RequestCreateAsset(type);
                     ImGui.EndMenu();
@@ -950,7 +952,8 @@ internal sealed class EditorApplication : IDisposable
         var document = session.Scenes.Current;
         if (document is null)
             return;
-        _scenePath = document.Path ?? $"Scenes/{document.DisplayName}.scene.json";
+        _scenePath = document.Path ??
+                     $"Scenes/{document.DisplayName}{DreambitAssetFileExtensions.SceneBlueprint}";
         _saveSceneAsPopupRequested = true;
     }
 

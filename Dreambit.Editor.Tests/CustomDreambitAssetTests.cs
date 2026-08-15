@@ -552,10 +552,10 @@ public sealed class CustomDreambitAssetTests
             type.FullName == typeof(TestCustomAsset).FullName);
 
         Assert.True(
-            editing.TryCreate(loadedAssetType, "items/test-custom.json", out var createError),
+            editing.TryCreate(loadedAssetType, "items/test-custom.asset", out var createError),
             createError);
         var source = JObject.Parse(File.ReadAllText(
-            Path.Combine(contentRoot, "items", "test-custom.json")));
+            Path.Combine(contentRoot, "items", "test-custom.asset")));
         Assert.Equal("test.custom-asset", source.Value<string>("$dreambitType"));
         Assert.Equal(100, source.Value<int>(nameof(TestCustomAsset.Health)));
         Assert.Null(source[nameof(TestCustomAsset.ShouldNeverAppear)]);

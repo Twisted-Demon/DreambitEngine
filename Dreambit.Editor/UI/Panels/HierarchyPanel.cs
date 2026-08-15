@@ -61,7 +61,7 @@ internal sealed class HierarchyPanel : EditorPanel
         {
             ImGui.Spacing();
             ImGui.TextDisabled("No scene is open.");
-            ImGui.TextWrapped("Create or open a .scene.json file from the File menu.");
+            ImGui.TextWrapped("Create or open a .scene file from the File menu.");
             return;
         }
 

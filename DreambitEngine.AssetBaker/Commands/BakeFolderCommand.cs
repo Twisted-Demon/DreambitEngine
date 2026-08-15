@@ -69,7 +69,7 @@ public class BakeFolderCommand : Command<BakeFolderSettings>
             var outputDirectory = Path.Combine(outputRoot, Path.GetDirectoryName(relativePath) ?? "");
             var outputPath = Path.Combine(
                 outputDirectory,
-                Path.GetFileNameWithoutExtension(relativePath) + baker.OutputExtension);
+                Path.GetFileName(baker.GetOutputPath(relativePath)));
             Directory.CreateDirectory(outputDirectory);
 
             AnsiConsole.MarkupLine(

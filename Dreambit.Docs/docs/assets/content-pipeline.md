@@ -13,7 +13,13 @@ It recursively mirrors logical paths inside the pak and supports:
 | `.png`, `.jpg`, `.jpeg`, `.bmp`, `.tga` | `.texb` |
 | `.wav`, `.ogg`, `.mp3` | `.audb` |
 | `.json`, `.ldtk`, `.ldtkl` | `.jsonb` |
-| `.yaml` | `.yamlb` |
+| `.asset`, `.blueprint`, `.particlefx`, `.scene`, `.soundcue`, `.sprite`, `.spriteanimation`, `.spritesheet`, `.tileset` | source extension + `.jsonb` |
+| `.yaml`, `.cutscene` | `.yamlb` (`.cutscene` keeps its source extension) |
+
+Serialized Dreambit assets use their semantic source extension as part of their logical runtime
+name. For example, `Sprites/hero.sprite` bakes to `sprites/hero.sprite.jsonb` and is loaded as
+`Resources.LoadAsset<Sprite>("Sprites/hero.sprite")`. Game-defined `DreambitAsset` classes use
+`.asset` by default.
 
 Texture options include `--mips`, `--premul`, `--max-size N`, and `--srgb`.
 The runtime defaults to `Resources.UsePak = true` and

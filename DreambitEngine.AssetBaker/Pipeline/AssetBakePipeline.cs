@@ -112,7 +112,7 @@ public sealed class AssetBakePipeline
                 }
 
                 var relativePath = NormalizeRelativePath(Path.GetRelativePath(bakeRoot.Path, file));
-                var expectedLogicalPath = Path.ChangeExtension(relativePath, baker.OutputExtension)
+                var expectedLogicalPath = baker.GetOutputPath(relativePath)
                     .Replace('\\', '/')
                     .ToLowerInvariant();
                 if (!bakeRoot.IsBuiltIn && builtInEffectPaths.Contains(expectedLogicalPath))
@@ -213,7 +213,10 @@ public sealed class AssetBakePipeline
         {
             if (entry.Id == Guid.Empty || string.IsNullOrWhiteSpace(entry.Path))
                 throw new InvalidDataException("The Dreambit asset registry contains an invalid entry.");
-            var logicalName = Path.ChangeExtension(entry.Path, null)!.Replace('\\', '/');
+            var extension = Path.GetExtension(entry.Path);
+            var logicalName = IsSerializedDreambitExtension(extension)
+                ? entry.Path.Replace('\\', '/')
+                : Path.ChangeExtension(entry.Path, null)!.Replace('\\', '/');
             if (!seenIds.Add(entry.Id))
                 throw new InvalidDataException($"Duplicate asset ID '{entry.Id:D}'.");
             if (!seenNames.Add(logicalName))
@@ -253,6 +256,18 @@ public sealed class AssetBakePipeline
 
     private static string NormalizeRelativePath(string path) =>
         path.Replace('\\', '/').TrimStart('/');
+
+    private static bool IsSerializedDreambitExtension(string extension) =>
+        extension.Equals(".asset", StringComparison.OrdinalIgnoreCase) ||
+        extension.Equals(".blueprint", StringComparison.OrdinalIgnoreCase) ||
+        extension.Equals(".cutscene", StringComparison.OrdinalIgnoreCase) ||
+        extension.Equals(".particlefx", StringComparison.OrdinalIgnoreCase) ||
+        extension.Equals(".scene", StringComparison.OrdinalIgnoreCase) ||
+        extension.Equals(".soundcue", StringComparison.OrdinalIgnoreCase) ||
+        extension.Equals(".sprite", StringComparison.OrdinalIgnoreCase) ||
+        extension.Equals(".spriteanimation", StringComparison.OrdinalIgnoreCase) ||
+        extension.Equals(".spritesheet", StringComparison.OrdinalIgnoreCase) ||
+        extension.Equals(".tileset", StringComparison.OrdinalIgnoreCase);
 
     private sealed record BakeRoot(
         string Path,

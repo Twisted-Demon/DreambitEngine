@@ -138,7 +138,9 @@ internal sealed class ProjectPanel : EditorPanel
                 RequestCreateAsset(typeof(EntityBlueprint));
             if (ImGui.BeginMenu("Dreambit Asset"))
             {
-                foreach (var type in _types.AssetTypes.Where(type => type != typeof(EntityBlueprint)))
+                foreach (var type in _types.AssetTypes.Where(type =>
+                             type != typeof(EntityBlueprint) &&
+                             AssetTypeClassifier.CanCreateAsset(type)))
                     if (ImGui.MenuItem(type.Name))
                         RequestCreateAsset(type);
                 ImGui.EndMenu();

@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+
 namespace Dreambit;
 
 /// <summary>
@@ -34,11 +37,11 @@ public static class DreambitAssetFileExtensions
     };
 
     /// <summary>Returns whether an extension identifies a serialized Dreambit asset document.</summary>
-    public static bool IsSerialized(string? extension) =>
+    public static bool IsSerialized(string extension) =>
         !string.IsNullOrWhiteSpace(extension) && SerializedExtensions.Contains(extension);
 
     /// <summary>Returns whether an extension identifies a JSON-backed Dreambit asset document.</summary>
-    public static bool IsJsonSerialized(string? extension) =>
+    public static bool IsJsonSerialized(string extension) =>
         IsSerialized(extension) &&
         !string.Equals(extension, Cutscene, StringComparison.OrdinalIgnoreCase);
 }
