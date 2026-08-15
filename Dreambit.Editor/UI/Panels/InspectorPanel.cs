@@ -6,6 +6,7 @@ using Dreambit.Editor.Logging;
 using Dreambit.EditorApi;
 using Dreambit.Editor.Scenes;
 using Dreambit.LDtk;
+using Dreambit.Tiled;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
 using Vector3 = System.Numerics.Vector3;
@@ -142,6 +143,8 @@ internal sealed class InspectorPanel : EditorPanel
 
         if (document.LDtkReference is not null)
             DrawLDtkImportOptions(document);
+        if (document.TiledReference is not null)
+            DrawTiledImportOptions(document);
 
         if (entities.Count == 0)
         {
@@ -185,17 +188,22 @@ internal sealed class InspectorPanel : EditorPanel
 
         DrawEntityHeader(document, entities);
         DrawEntityTags(document, entities);
-        if (entities.Any(entity => entity.IsLDtkGenerated))
+        if (entities.Any(entity => entity.IsImportedMapGenerated))
         {
-            ImGui.TextColored(new Vector4(0.42f, 0.78f, 1f, 1f), "LDtk-generated visualization");
+            var sourceLabel = entities.All(entity => entity.IsTiledGenerated)
+                ? "Tiled-generated visualization"
+                : entities.All(entity => entity.IsLDtkGenerated)
+                    ? "LDtk-generated visualization"
+                    : "Imported map visualization";
+            ImGui.TextColored(new Vector4(0.42f, 0.78f, 1f, 1f), sourceLabel);
             ImGui.TextDisabled("Value changes are stored as Dreambit overrides and survive reimport.");
-            ImGui.TextDisabled("Hierarchy structure and components remain owned by LDtk.");
+            ImGui.TextDisabled("Hierarchy structure and components remain owned by the source map.");
         }
         ImGui.Separator();
 
         DrawTransform(document, entities);
         DrawComponents(document, entities);
-        if (entities.All(entity => !entity.IsLDtkGenerated))
+        if (entities.All(entity => !entity.IsImportedMapGenerated))
             DrawAddComponent(document, entities);
 
         if (!string.IsNullOrWhiteSpace(_error))
@@ -300,6 +308,105 @@ internal sealed class InspectorPanel : EditorPanel
             }
         }
         ImGui.TextDisabled("Live sync watches the .ldtk project and its external level files.");
+        ImGui.Separator();
+    }
+
+    private void DrawTiledImportOptions(SceneDocument document)
+    {
+        if (!ImGui.CollapsingHeader("Tiled Import Options", ImGuiTreeNodeFlags.DefaultOpen))
+            return;
+
+        var current = document.TiledReference!.ImportOptions ?? new TiledImportOptions();
+        var edited = current.Clone();
+        var pixelsPerUnit = edited.PixelsPerUnit;
+        var baseDrawLayer = edited.BaseDrawLayer;
+        var drawLayerStep = edited.DrawLayerStep;
+        var worldDepth = edited.WorldDepth;
+        var worldDepthStride = edited.WorldDepthDrawLayerStride;
+        var renderBackgroundColor = edited.RenderMapBackgroundColor;
+        var includeInvisibleLayers = edited.IncludeInvisibleLayers;
+        var changed = false;
+        string? mergeKey = null;
+        DrawPropertyRow("Tiled.PixelsPerUnit", "Pixels Per Unit", () =>
+        {
+            if (ImGui.DragFloat("##Value", ref pixelsPerUnit, 0.1f, 0.001f, 100000f))
+                (changed, mergeKey) = (true, "Tiled.PixelsPerUnit");
+        });
+        DrawPropertyRow("Tiled.BaseDrawLayer", "Base Draw Layer", () =>
+        {
+            if (ImGui.DragInt("##Value", ref baseDrawLayer, 1f))
+                (changed, mergeKey) = (true, "Tiled.BaseDrawLayer");
+        });
+        DrawPropertyRow("Tiled.DrawLayerStep", "Draw Layer Step", () =>
+        {
+            if (ImGui.DragInt("##Value", ref drawLayerStep, 1f, 1, 100000))
+                (changed, mergeKey) = (true, "Tiled.DrawLayerStep");
+        });
+        DrawPropertyRow("Tiled.WorldDepth", "World Depth", () =>
+        {
+            if (ImGui.DragInt("##Value", ref worldDepth, 1f))
+                (changed, mergeKey) = (true, "Tiled.WorldDepth");
+        });
+        DrawPropertyRow("Tiled.WorldDepthStride", "World Depth Stride", () =>
+        {
+            if (ImGui.DragInt("##Value", ref worldDepthStride, 1f, 1, int.MaxValue))
+                (changed, mergeKey) = (true, "Tiled.WorldDepthStride");
+        });
+        DrawPropertyRow("Tiled.RenderBackgroundColor", "Render Background Color", () =>
+        {
+            if (ImGui.Checkbox("##Value", ref renderBackgroundColor))
+                (changed, mergeKey) = (true, "Tiled.RenderBackgroundColor");
+        });
+        DrawPropertyRow("Tiled.IncludeInvisibleLayers", "Include Invisible Layers", () =>
+        {
+            if (ImGui.Checkbox("##Value", ref includeInvisibleLayers))
+                (changed, mergeKey) = (true, "Tiled.IncludeInvisibleLayers");
+        });
+
+        edited.PixelsPerUnit = pixelsPerUnit;
+        edited.BaseDrawLayer = baseDrawLayer;
+        edited.DrawLayerStep = drawLayerStep;
+        edited.WorldDepth = worldDepth;
+        edited.WorldDepthDrawLayerStride = worldDepthStride;
+        edited.RenderMapBackgroundColor = renderBackgroundColor;
+        edited.IncludeInvisibleLayers = includeInvisibleLayers;
+
+        if (changed)
+        {
+            try
+            {
+                document.UpdateTiledImportOptions("Change Tiled Import Options", options =>
+                {
+                    options.PixelsPerUnit = edited.PixelsPerUnit;
+                    options.BaseDrawLayer = edited.BaseDrawLayer;
+                    options.DrawLayerStep = edited.DrawLayerStep;
+                    options.WorldDepth = edited.WorldDepth;
+                    options.WorldDepthDrawLayerStride = edited.WorldDepthDrawLayerStride;
+                    options.RenderMapBackgroundColor = edited.RenderMapBackgroundColor;
+                    options.IncludeInvisibleLayers = edited.IncludeInvisibleLayers;
+                }, mergeKey);
+                _error = null;
+            }
+            catch (Exception exception)
+            {
+                _error = exception.Message;
+            }
+        }
+
+        if (ImGui.Button("Reimport Tiled Now", new System.Numerics.Vector2(-1f, 0f)))
+        {
+            try
+            {
+                document.ReimportTiled();
+                _error = null;
+            }
+            catch (Exception exception)
+            {
+                _error = exception.Message;
+            }
+        }
+        ImGui.TextDisabled("Live sync watches the .tmx map and referenced .tsx tilesets.");
+        ImGui.TextDisabled("Object and image layers are intentionally ignored.");
         ImGui.Separator();
     }
 
@@ -871,7 +978,7 @@ internal sealed class InspectorPanel : EditorPanel
                 foreach (var entity in entities)
                 {
                     entity.Enabled = enabled;
-                    document.RecordLDtkEntityEnabled(entity);
+                    document.RecordGeneratedEntityEnabled(entity);
                 }
             });
     }
@@ -901,7 +1008,7 @@ internal sealed class InspectorPanel : EditorPanel
                     {
                         entity.Tags.Clear();
                         entity.Tags.UnionWith(updatedTags);
-                        document.RecordLDtkEntityTags(entity);
+                        document.RecordGeneratedEntityTags(entity);
                     }
                 });
             }
@@ -935,7 +1042,7 @@ internal sealed class InspectorPanel : EditorPanel
                         foreach (var entity in entities)
                         {
                             entity.Transform.Position = value;
-                            document.RecordLDtkPosition(entity);
+                            document.RecordGeneratedPosition(entity);
                         }
                     });
                 DrawMixedLabel("Position", mixedPosition);
@@ -953,7 +1060,7 @@ internal sealed class InspectorPanel : EditorPanel
                         foreach (var entity in entities)
                         {
                             entity.Transform.Rotation2D = value;
-                            document.RecordLDtkRotation(entity);
+                            document.RecordGeneratedRotation(entity);
                         }
                     });
                 DrawMixedLabel("Rotation", mixedRotation);
@@ -970,7 +1077,7 @@ internal sealed class InspectorPanel : EditorPanel
                         foreach (var entity in entities)
                         {
                             entity.Transform.Scale = value;
-                            document.RecordLDtkScale(entity);
+                            document.RecordGeneratedScale(entity);
                         }
                     });
                 DrawMixedLabel("Scale", mixedScale);
@@ -1006,7 +1113,7 @@ internal sealed class InspectorPanel : EditorPanel
         ImGui.PushID(componentType.FullName);
         try
         {
-            var generated = entities.Any(entity => entity.IsLDtkGenerated);
+            var generated = entities.Any(entity => entity.IsImportedMapGenerated);
 
             var allowRemove = !readOnly && !generated;
             var statusText = readOnly
@@ -1061,7 +1168,7 @@ internal sealed class InspectorPanel : EditorPanel
                     (name, mutation) => document.Apply(name, _ =>
                     {
                         mutation();
-                        RecordLDtkComponentValues(document, components);
+                        RecordGeneratedComponentValues(document, components);
                     }),
                     LogExtension);
 
@@ -1233,7 +1340,7 @@ internal sealed class InspectorPanel : EditorPanel
                         component.AcknowledgeEditorSerializationFailure(
                             member.SerializedName);
 
-                        document.RecordLDtkComponentMember(
+                        document.RecordGeneratedComponentMember(
                             component,
                             member.SerializedName,
                             result.Value);
@@ -1263,14 +1370,14 @@ internal sealed class InspectorPanel : EditorPanel
     }
 }
 
-    private void RecordLDtkComponentValues(
+    private void RecordGeneratedComponentValues(
         SceneDocument document,
         IReadOnlyList<Component> components)
     {
         foreach (var component in components)
             foreach (var member in _metadata.Get(component.GetType(), InspectorTargetKind.Component))
                 if (!member.IsReadOnly)
-                    document.RecordLDtkComponentMember(
+                    document.RecordGeneratedComponentMember(
                         component,
                         member.SerializedName,
                         member.GetValue(component));

@@ -11,8 +11,12 @@ public class YamlBaker : AssetBakerBase
     private const uint FlagUtf8NoBom = 1u << 2;
     
     public override string AssetTypeName => "Yaml";
-    public override string[] SupportedInputs => [".yaml", ".yml"];
+    public override string[] SupportedInputs => [".yaml", ".yml", ".cutscene"];
     public override string OutputExtension => ".yamlb";
+    public override string GetOutputPath(string inputPath) =>
+        Path.GetExtension(inputPath).Equals(".cutscene", StringComparison.OrdinalIgnoreCase)
+            ? inputPath + OutputExtension
+            : base.GetOutputPath(inputPath);
     public override void Bake(BakeContext ctx)
     {
         var blob = BakeToBytes(ctx);
@@ -45,7 +49,13 @@ public class YamlBaker : AssetBakerBase
         YmlbWriter.Write(ms, payload, flags);
         var data = ms.ToArray();
 
-        var logical = GetLogicalPath(ctx, OutputExtension);
+        var root = string.IsNullOrWhiteSpace(ctx.LogicalRoot)
+            ? Path.GetDirectoryName(ctx.InputPath)!
+            : ctx.LogicalRoot!;
+        var logical = GetOutputPath(Path.GetRelativePath(root, ctx.InputPath))
+            .Replace('\\', '/')
+            .ToLowerInvariant()
+            .TrimStart('.', '/');
 
         return new AssetBlob(logical, AssetType.Yaml, OutputExtension, data);
     }

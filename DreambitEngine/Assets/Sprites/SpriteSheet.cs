@@ -6,7 +6,7 @@ using Newtonsoft.Json;
 
 namespace Dreambit;
 
-[DreambitAssetType("dreambit.sprite-sheet")]
+[DreambitAssetType("dreambit.sprite-sheet", FileExtension = DreambitAssetFileExtensions.SpriteSheet)]
 public class SpriteSheet : DreambitAsset
 {
     [JsonIgnore] private static readonly Logger<SpriteSheet> Logger = new();

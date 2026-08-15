@@ -381,7 +381,8 @@ internal sealed class MainWindow : AvaloniaWindow
     private static bool IsProjectAssetFile(string path)
         => Path.GetExtension(path) is { } extension &&
            (extension.Equals(".json", StringComparison.OrdinalIgnoreCase) ||
-            extension.Equals(".jsonb", StringComparison.OrdinalIgnoreCase));
+            extension.Equals(".jsonb", StringComparison.OrdinalIgnoreCase) ||
+            DreambitAssetFileExtensions.IsJsonSerialized(extension));
 
     private static int CountProjectFiles(IEnumerable<ProjectTreeNode> items)
         => items.Sum(item => item.IsDirectory ? CountProjectFiles(item.Children) : 1);
@@ -451,7 +452,7 @@ internal sealed class MainWindow : AvaloniaWindow
 
         if (_catalog.AssetTypes.Count == 0)
         {
-            await MessageDialog.ShowAsync(this, "No Asset Types", "No .jsonb-backed DreambitAsset loaders were discovered.", tone: MessageTone.Warning);
+            await MessageDialog.ShowAsync(this, "No Asset Types", "No editable DreambitAsset loaders were discovered.", tone: MessageTone.Warning);
             return;
         }
 
@@ -482,7 +483,15 @@ internal sealed class MainWindow : AvaloniaWindow
             SuggestedStartLocation = await GetProjectRootFolderAsync(),
             FileTypeFilter =
             [
-                new FilePickerFileType("Dreambit JSON Assets") { Patterns = ["*.json", "*.jsonb"] },
+                new FilePickerFileType("Dreambit Assets")
+                {
+                    Patterns =
+                    [
+                        "*.asset", "*.blueprint", "*.particlefx", "*.scene", "*.soundcue",
+                        "*.sprite", "*.spriteanimation", "*.spritesheet", "*.tileset",
+                        "*.json", "*.jsonb"
+                    ]
+                },
                 new FilePickerFileType("Dreambit JSON Binary") { Patterns = ["*.jsonb"] },
                 new FilePickerFileType("JSON Source") { Patterns = ["*.json"] }
             ]
@@ -498,7 +507,7 @@ internal sealed class MainWindow : AvaloniaWindow
         try
         {
             var json = JsonbFile.Load(path);
-            var type = InferAssetType(json);
+            var type = InferAssetType(json, path);
             if (type is null)
             {
                 type = await new TypePickerDialog("Open Asset As…", _catalog.AssetTypes, "asset")
@@ -524,15 +533,21 @@ internal sealed class MainWindow : AvaloniaWindow
         var path = _document.FilePath;
         if (saveAs || string.IsNullOrWhiteSpace(path))
         {
+            var sourceExtension = DreambitAssetTypeRegistry.GetFileExtension(_document.AssetType);
             var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
             {
                 Title = "Save Dreambit Asset",
                 SuggestedStartLocation = await GetProjectRootFolderAsync(),
                 SuggestedFileName = path is null ? _document.AssetType.Name : Path.GetFileNameWithoutExtension(path),
-                DefaultExtension = path is null ? "json" : Path.GetExtension(path).TrimStart('.'),
+                DefaultExtension = path is null
+                    ? sourceExtension.TrimStart('.')
+                    : Path.GetExtension(path).TrimStart('.'),
                 FileTypeChoices =
                 [
-                    new FilePickerFileType("JSON Source") { Patterns = ["*.json"] },
+                    new FilePickerFileType($"{_document.AssetType.Name} Source")
+                    {
+                        Patterns = [$"*{sourceExtension}"]
+                    },
                     new FilePickerFileType("Dreambit JSON Binary") { Patterns = ["*.jsonb"] }
                 ]
             });
@@ -760,7 +775,7 @@ internal sealed class MainWindow : AvaloniaWindow
 
         _editorHost.Child = editor;
         UpdateDocumentChrome();
-        SetStatus($"{document.AssetType.FullName}  ·  .jsonb-backed DreambitAsset");
+        SetStatus($"{document.AssetType.FullName}  ·  {DreambitAssetTypeRegistry.GetFileExtension(document.AssetType)} asset");
     }
 
     private void EditorChanged(object? sender, EventArgs e)
@@ -782,11 +797,11 @@ internal sealed class MainWindow : AvaloniaWindow
             MaxWidth = 700
         };
 
-        var create = WelcomeAction("Create Asset", "Create any .jsonb-backed DreambitAsset discovered from registered loaders.");
+        var create = WelcomeAction("Create Asset", "Create any editable DreambitAsset discovered from registered loaders.");
         create.PointerPressed += async (_, _) => await NewAssetAsync();
         shortcuts.Children.Add(create);
 
-        var open = WelcomeAction("Open Asset", "Open a .json or .jsonb file and infer the Dreambit asset type.");
+        var open = WelcomeAction("Open Asset", "Open a semantic Dreambit source file or .jsonb asset.");
         open.PointerPressed += async (_, _) => await OpenAssetAsync();
         Grid.SetColumn(open, 1);
         shortcuts.Children.Add(open);
@@ -908,8 +923,26 @@ internal sealed class MainWindow : AvaloniaWindow
         return json;
     }
 
-    private Type? InferAssetType(JObject json)
+    private Type? InferAssetType(JObject json, string? path = null)
     {
+        if (json.Value<string>(DreambitAssetTypeRegistry.MetadataPropertyName) is { } typeId &&
+            DreambitAssetTypeRegistry.TryResolve(typeId, out var metadataType) &&
+            _catalog.AssetTypes.Contains(metadataType))
+        {
+            return metadataType;
+        }
+
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            var extension = Path.GetExtension(path);
+            var extensionType = _catalog.AssetTypes.FirstOrDefault(type =>
+                extension.Equals(
+                    DreambitAssetTypeRegistry.GetFileExtension(type),
+                    StringComparison.OrdinalIgnoreCase));
+            if (extensionType is not null)
+                return extensionType;
+        }
+
         var scored = _catalog.AssetTypes
             .Select(type => new { Type = type, Score = ScoreType(type, json) })
             .OrderByDescending(x => x.Score)
@@ -1001,7 +1034,9 @@ internal sealed class MainWindow : AvaloniaWindow
             return;
         }
 
-        if (extension.Equals(".json", StringComparison.OrdinalIgnoreCase) || extension.Equals(".jsonb", StringComparison.OrdinalIgnoreCase))
+        if (extension.Equals(".json", StringComparison.OrdinalIgnoreCase) ||
+            extension.Equals(".jsonb", StringComparison.OrdinalIgnoreCase) ||
+            DreambitAssetFileExtensions.IsJsonSerialized(extension))
         {
             if (await CanDiscardCurrentAsync())
                 await OpenAssetPathAsync(path);

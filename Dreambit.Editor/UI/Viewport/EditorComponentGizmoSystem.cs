@@ -591,7 +591,7 @@ internal sealed class EditorComponentGizmoSystem : IDisposable
                 binding.MemberName,
                 radius);
 
-        document.RecordLDtkComponentMember(
+        document.RecordGeneratedComponentMember(
             component,
             binding.MemberName,
             storedValue);
@@ -625,7 +625,7 @@ internal sealed class EditorComponentGizmoSystem : IDisposable
                 binding.MemberName,
                 box);
 
-        document.RecordLDtkComponentMember(
+        document.RecordGeneratedComponentMember(
             component,
             binding.MemberName,
             storedValue);

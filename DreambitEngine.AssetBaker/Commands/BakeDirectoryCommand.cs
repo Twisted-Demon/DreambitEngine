@@ -84,9 +84,7 @@ public sealed class BakeDirectoryCommand : Command<BakeDirectorySettings>
 
             var rel = Path.GetRelativePath(inputRoot, file);
             var outDir = Path.Combine(outputRoot, Path.GetDirectoryName(rel) ?? "");
-            var outFile = Path.Combine(
-                outDir,
-                Path.GetFileNameWithoutExtension(rel) + baker.OutputExtension);
+            var outFile = Path.Combine(outDir, Path.GetFileName(baker.GetOutputPath(rel)));
             Directory.CreateDirectory(outDir);
 
             var ctxBake = new BakeContext

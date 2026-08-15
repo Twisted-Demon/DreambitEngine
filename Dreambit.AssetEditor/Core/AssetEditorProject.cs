@@ -35,11 +35,14 @@ internal sealed class AssetEditorProject
             return false;
         }
 
-        var withoutExtension = Path.ChangeExtension(relativePath, null);
-        if (string.IsNullOrWhiteSpace(withoutExtension))
+        var extension = Path.GetExtension(relativePath);
+        var logicalPath = DreambitAssetFileExtensions.IsSerialized(extension)
+            ? relativePath
+            : Path.ChangeExtension(relativePath, null);
+        if (string.IsNullOrWhiteSpace(logicalPath))
             return false;
 
-        reference = withoutExtension.Replace(Path.DirectorySeparatorChar, '/');
+        reference = logicalPath.Replace(Path.DirectorySeparatorChar, '/');
         return true;
     }
 }

@@ -845,6 +845,9 @@ internal sealed class AssetDatabase : IAssetRegistry, IDisposable
 
     private static string ToLogicalAssetName(string relativePath)
     {
+        if (DreambitAssetFileExtensions.IsSerialized(Path.GetExtension(relativePath)))
+            return relativePath.Replace('\\', '/');
+
         var withoutExtension = Path.ChangeExtension(relativePath, null) ?? relativePath;
         return withoutExtension.Replace('\\', '/');
     }
@@ -864,7 +867,7 @@ internal sealed class AssetDatabase : IAssetRegistry, IDisposable
     private AssetTypeInfo ClassifyChangedFile(string relativePath, string absolutePath)
     {
         var suffixClassification = AssetTypeClassifier.Classify(relativePath);
-        if (suffixClassification.Kind != AssetKind.Json)
+        if (!AssetTypeClassifier.RequiresContentInspection(relativePath))
             return suffixClassification;
 
         var json = File.ReadAllText(absolutePath);

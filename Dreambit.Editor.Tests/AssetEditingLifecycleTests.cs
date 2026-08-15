@@ -170,14 +170,14 @@ public sealed class AssetEditingLifecycleTests : IDisposable
 
         var created = fixture.Editing.TryCreate(
             typeof(ThrowingDisposeAsset),
-            "broken/create.json",
+            "broken/create.asset",
             out var error);
 
         Assert.False(created);
         Assert.Contains("Intentional asset cleanup failure", error);
         var folder = Path.Combine(ContentRoot, "broken");
-        Assert.False(File.Exists(Path.Combine(folder, "create.json")));
-        Assert.Empty(Directory.EnumerateFiles(folder, "create.json.*.tmp"));
+        Assert.False(File.Exists(Path.Combine(folder, "create.asset")));
+        Assert.Empty(Directory.EnumerateFiles(folder, "create.asset.*.tmp"));
     }
 
     [Fact]

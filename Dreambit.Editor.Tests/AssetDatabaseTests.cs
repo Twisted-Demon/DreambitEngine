@@ -21,7 +21,7 @@ public sealed class AssetDatabaseTests : IDisposable
     [Fact]
     public void InitialScanCreatesStableRegistryAndClassifiesSemanticTypes()
     {
-        WriteAsset("characters/hero.sprite.json", "{\"source\":{}}");
+        WriteAsset("characters/hero.sprite", "{\"source\":{}}");
         WriteAsset("characters/hero.texture.png", "not-a-real-png");
 
         AssetId spriteId;
@@ -31,7 +31,7 @@ public sealed class AssetDatabaseTests : IDisposable
             Assert.Equal(2, snapshot.Assets.Count);
             var sprite = Assert.Single(
                 snapshot.Assets,
-                asset => asset.RelativePath == "characters/hero.sprite.json");
+                asset => asset.RelativePath == "characters/hero.sprite");
             Assert.Equal(AssetKind.Sprite, sprite.Kind);
             Assert.Equal("dreambit.sprite", sprite.TypeId);
             Assert.Equal("characters/hero.sprite", sprite.LogicalAssetName);
@@ -46,7 +46,7 @@ public sealed class AssetDatabaseTests : IDisposable
         }
 
         using var reopened = CreateDatabase();
-        Assert.True(reopened.TryGetAsset("characters/hero.sprite.json", out var reopenedSprite));
+        Assert.True(reopened.TryGetAsset("characters/hero.sprite", out var reopenedSprite));
         Assert.Equal(spriteId, reopenedSprite!.Id);
     }
 
@@ -187,10 +187,10 @@ public sealed class AssetDatabaseTests : IDisposable
     public void GenericJsonClassificationPreservesRawDreambitTypeIdsAndOrdinaryJson()
     {
         WriteAsset(
-            "items/weapon.json",
+            "items/weapon.asset",
             "{\"$dreambitType\":\"game.weapon\",\"Damage\":25}");
         WriteAsset(
-            "items/missing.json",
+            "items/missing.asset",
             "{\"$dreambitType\":\"game.deleted-type\"}");
         WriteAsset("data/settings.json", "{\"volume\":0.5}");
         WriteAsset("data/list.json", "[1,2,3]");
@@ -201,10 +201,11 @@ public sealed class AssetDatabaseTests : IDisposable
         using var database = CreateDatabase(reportDiagnostic: diagnostics.Add);
         var assets = database.GetSnapshot().Assets.ToDictionary(asset => asset.RelativePath);
 
-        Assert.Equal(AssetKind.DreambitAsset, assets["items/weapon.json"].Kind);
-        Assert.Equal("game.weapon", assets["items/weapon.json"].TypeId);
-        Assert.Equal(AssetKind.DreambitAsset, assets["items/missing.json"].Kind);
-        Assert.Equal("game.deleted-type", assets["items/missing.json"].TypeId);
+        Assert.Equal(AssetKind.DreambitAsset, assets["items/weapon.asset"].Kind);
+        Assert.Equal("game.weapon", assets["items/weapon.asset"].TypeId);
+        Assert.Equal("items/weapon.asset", assets["items/weapon.asset"].LogicalAssetName);
+        Assert.Equal(AssetKind.DreambitAsset, assets["items/missing.asset"].Kind);
+        Assert.Equal("game.deleted-type", assets["items/missing.asset"].TypeId);
         Assert.Equal(AssetKind.Json, assets["data/settings.json"].Kind);
         Assert.Null(assets["data/settings.json"].TypeId);
         Assert.Equal(AssetKind.Json, assets["data/list.json"].Kind);

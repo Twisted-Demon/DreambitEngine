@@ -12,8 +12,33 @@ public sealed class JsonbBaker : AssetBakerBase
 
 
     public override string AssetTypeName => "Json";
-    public override string[] SupportedInputs => [".json", ".ldtk", ".ldtkl"];
+    private static readonly HashSet<string> DreambitAssetExtensions = new(
+        StringComparer.OrdinalIgnoreCase)
+    {
+        ".asset",
+        ".blueprint",
+        ".particlefx",
+        ".scene",
+        ".soundcue",
+        ".sprite",
+        ".spriteanimation",
+        ".spritesheet",
+        ".tileset"
+    };
+
+    public override string[] SupportedInputs =>
+    [
+        ".json",
+        ".ldtk",
+        ".ldtkl",
+        .. DreambitAssetExtensions.OrderBy(extension => extension, StringComparer.Ordinal)
+    ];
     public override string OutputExtension => ".jsonb";
+
+    public override string GetOutputPath(string inputPath) =>
+        DreambitAssetExtensions.Contains(Path.GetExtension(inputPath))
+            ? inputPath + OutputExtension
+            : base.GetOutputPath(inputPath);
 
     public override void Bake(BakeContext ctx)
     {
@@ -43,9 +68,21 @@ public sealed class JsonbBaker : AssetBakerBase
         JsnbWriter.Write(ms, payload, flags);
         var blobData = ms.ToArray();
 
-        var logical = GetLogicalPath(ctx, ".jsonb");
+        var logical = GetLogicalPath(ctx, GetOutputPath);
 
         return new AssetBlob(logical, AssetType.Json, ".jsonb", blobData);
+    }
+
+    private static string GetLogicalPath(BakeContext context, Func<string, string> mapOutputPath)
+    {
+        var root = string.IsNullOrWhiteSpace(context.LogicalRoot)
+            ? Path.GetDirectoryName(context.InputPath)!
+            : context.LogicalRoot!;
+        var relativePath = Path.GetRelativePath(root, context.InputPath);
+        return mapOutputPath(relativePath)
+            .Replace('\\', '/')
+            .ToLowerInvariant()
+            .TrimStart('.', '/');
     }
     
 }

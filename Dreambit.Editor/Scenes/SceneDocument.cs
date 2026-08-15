@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Dreambit.ECS;
 using Dreambit.Editor.Undo;
 using Dreambit.LDtk;
+using Dreambit.Tiled;
 using Newtonsoft.Json.Linq;
 
 namespace Dreambit.Editor.Scenes;
@@ -17,6 +18,7 @@ internal sealed class SceneDocument : IDisposable
     private readonly Action<string, Exception?>? _reportError;
     private readonly Func<BlueprintInstanceReference, EntityBlueprint>? _blueprintInstanceResolver;
     private readonly Func<LDtkSceneReference, LDtkFile>? _ldtkProjectResolver;
+    private readonly Func<TiledSceneReference, TmxMap>? _tiledMapResolver;
     private readonly SceneDocumentHistoryOwnership _historyOwnership;
     private SceneBlueprint _source;
     private string? _savedSnapshot;
@@ -35,7 +37,8 @@ internal sealed class SceneDocument : IDisposable
         Action<string, Exception?>? reportError = null,
         Func<BlueprintInstanceReference, EntityBlueprint>? blueprintInstanceResolver = null,
         Func<LDtkSceneReference, LDtkFile>? ldtkProjectResolver = null,
-        SceneDocumentHistoryOwnership historyOwnership = SceneDocumentHistoryOwnership.Document)
+        SceneDocumentHistoryOwnership historyOwnership = SceneDocumentHistoryOwnership.Document,
+        Func<TiledSceneReference, TmxMap>? tiledMapResolver = null)
     {
         _source = source;
         Path = path;
@@ -44,6 +47,7 @@ internal sealed class SceneDocument : IDisposable
         _reportError = reportError;
         _blueprintInstanceResolver = blueprintInstanceResolver;
         _ldtkProjectResolver = ldtkProjectResolver;
+        _tiledMapResolver = tiledMapResolver;
         _historyOwnership = historyOwnership;
         RebuildLiveScene();
         // Dirty comparisons operate on captured snapshots, so establish the saved
@@ -64,6 +68,7 @@ internal sealed class SceneDocument : IDisposable
     internal string? ActiveChangeMergeKey => _activeChangeMergeKey;
     public bool HasLiveScene => Scene is not null;
     public LDtkSceneReference? LDtkReference => _source.LDtk;
+    public TiledSceneReference? TiledReference => _source.Tiled;
     public event Action<SceneDocument>? Changed;
 
     public static SceneDocument CreateNew(
@@ -73,16 +78,19 @@ internal sealed class SceneDocument : IDisposable
         Func<BlueprintInstanceReference, EntityBlueprint>? blueprintInstanceResolver = null,
         Func<LDtkSceneReference, LDtkFile>? ldtkProjectResolver = null,
         LDtkSceneReference? ldtk = null,
-        SceneDocumentHistoryOwnership historyOwnership = SceneDocumentHistoryOwnership.Document)
+        SceneDocumentHistoryOwnership historyOwnership = SceneDocumentHistoryOwnership.Document,
+        Func<TiledSceneReference, TmxMap>? tiledMapResolver = null,
+        TiledSceneReference? tiled = null)
     {
         var document = new SceneDocument(
-            new SceneBlueprint { Name = name, Entities = [], LDtk = ldtk },
+            new SceneBlueprint { Name = name, Entities = [], LDtk = ldtk, Tiled = tiled },
             null,
             selection,
             reportError,
             blueprintInstanceResolver,
             ldtkProjectResolver,
-            historyOwnership);
+            historyOwnership,
+            tiledMapResolver);
         if (document.OwnsEditHistory)
         {
             // A new scene has no successful on-disk save to compare against.
@@ -98,7 +106,8 @@ internal sealed class SceneDocument : IDisposable
         Action<string, Exception?>? reportError = null,
         Func<BlueprintInstanceReference, EntityBlueprint>? blueprintInstanceResolver = null,
         Func<LDtkSceneReference, LDtkFile>? ldtkProjectResolver = null,
-        SceneDocumentHistoryOwnership historyOwnership = SceneDocumentHistoryOwnership.Document)
+        SceneDocumentHistoryOwnership historyOwnership = SceneDocumentHistoryOwnership.Document,
+        Func<TiledSceneReference, TmxMap>? tiledMapResolver = null)
     {
         var fullPath = System.IO.Path.GetFullPath(path);
         var source = SceneDocumentSerializer.Deserialize(File.ReadAllText(fullPath));
@@ -109,7 +118,8 @@ internal sealed class SceneDocument : IDisposable
             reportError,
             blueprintInstanceResolver,
             ldtkProjectResolver,
-            historyOwnership);
+            historyOwnership,
+            tiledMapResolver);
     }
 
     public void Update(bool autoSave, TimeSpan autoSaveDelay)
@@ -231,8 +241,8 @@ internal sealed class SceneDocument : IDisposable
 
     public Entity CreateEmpty(string name = "Entity", Entity? parent = null)
     {
-        if (parent?.IsLDtkGenerated == true)
-            throw new InvalidOperationException("LDtk-generated entities cannot own Dreambit-authored children.");
+        if (parent?.IsImportedMapGenerated == true)
+            throw new InvalidOperationException("Imported map entities cannot own Dreambit-authored children.");
         if (parent is not null && TryGetBlueprintInstanceRoot(parent, out _, out _))
             throw new InvalidOperationException("Unbox the Blueprint instance before adding children to it.");
         Entity? created = null;
@@ -257,14 +267,14 @@ internal sealed class SceneDocument : IDisposable
         Apply("Rename Entity", _ =>
         {
             entity.Name = trimmed;
-            RecordLDtkEntityName(entity);
+            RecordGeneratedEntityName(entity);
         });
     }
 
     public Entity Duplicate(Entity entity)
     {
-        if (entity.IsLDtkGenerated)
-            throw new InvalidOperationException("LDtk-generated entities are recreated from their source and cannot be duplicated.");
+        if (entity.IsImportedMapGenerated)
+            throw new InvalidOperationException("Imported map entities are recreated from their source and cannot be duplicated.");
         if (TryGetBlueprintInstanceRoot(entity, out var instanceRoot, out _) &&
             !ReferenceEquals(entity, instanceRoot))
         {
@@ -302,8 +312,8 @@ internal sealed class SceneDocument : IDisposable
         Entity? parent = null)
     {
         ArgumentNullException.ThrowIfNull(blueprint);
-        if (parent?.IsLDtkGenerated == true)
-            throw new InvalidOperationException("LDtk-generated entities cannot own Dreambit-authored children.");
+        if (parent?.IsImportedMapGenerated == true)
+            throw new InvalidOperationException("Imported map entities cannot own Dreambit-authored children.");
         Entity? created = null;
         Apply("Instantiate Blueprint", scene =>
         {
@@ -404,9 +414,9 @@ internal sealed class SceneDocument : IDisposable
         var roots = RemoveDescendantDuplicates(entities).ToArray();
         if (roots.Length == 0)
             return;
-        if (roots.Any(entity => entity.IsLDtkGenerated))
+        if (roots.Any(entity => entity.IsImportedMapGenerated))
             throw new InvalidOperationException(
-                "LDtk-generated entities are recreated from their source. Disable their import option instead of deleting them.");
+                "Imported map entities are recreated from their source and cannot be deleted directly.");
         if (roots.Any(entity =>
                 TryGetBlueprintInstanceRoot(entity, out var instanceRoot, out _) &&
                 !ReferenceEquals(entity, instanceRoot)))
@@ -426,8 +436,8 @@ internal sealed class SceneDocument : IDisposable
     {
         if (ReferenceEquals(entity.Parent, parent))
             return;
-        if (entity.IsLDtkGenerated || parent?.IsLDtkGenerated == true)
-            throw new InvalidOperationException("LDtk-generated hierarchy structure is owned by the LDtk source.");
+        if (entity.IsImportedMapGenerated || parent?.IsImportedMapGenerated == true)
+            throw new InvalidOperationException("Imported map hierarchy structure is owned by its source map.");
         if (TryGetBlueprintInstanceRoot(entity, out var instanceRoot, out _) &&
             !ReferenceEquals(entity, instanceRoot))
         {
@@ -444,19 +454,23 @@ internal sealed class SceneDocument : IDisposable
             SceneDocumentSerializer.GetReferenceKey(entity.Id, componentType, memberName));
     }
 
-    public void RecordLDtkEntityName(Entity entity)
+    public void RecordGeneratedEntityName(Entity entity)
     {
         if (TryGetLDtkOverride(entity, out var entityOverride))
             entityOverride.Name = entity.Name;
+        else if (TryGetTiledOverride(entity, out var tiledOverride))
+            tiledOverride.Name = entity.Name;
     }
 
-    public void RecordLDtkEntityEnabled(Entity entity)
+    public void RecordGeneratedEntityEnabled(Entity entity)
     {
         if (TryGetLDtkOverride(entity, out var entityOverride))
             entityOverride.Enabled = entity.LocallyEnabled;
+        else if (TryGetTiledOverride(entity, out var tiledOverride))
+            tiledOverride.Enabled = entity.LocallyEnabled;
     }
 
-    public void RecordLDtkEntityTags(Entity entity)
+    public void RecordGeneratedEntityTags(Entity entity)
     {
         if (TryGetLDtkOverride(entity, out var entityOverride))
         {
@@ -464,39 +478,65 @@ internal sealed class SceneDocument : IDisposable
                 entity.Tags,
                 StringComparer.OrdinalIgnoreCase);
         }
+        else if (TryGetTiledOverride(entity, out var tiledOverride))
+        {
+            tiledOverride.Tags = new HashSet<string>(
+                entity.Tags,
+                StringComparer.OrdinalIgnoreCase);
+        }
     }
 
-    public void RecordLDtkPosition(Entity entity)
+    public void RecordGeneratedPosition(Entity entity)
     {
         if (TryGetLDtkOverride(entity, out var entityOverride))
             entityOverride.Position = entity.Transform.Position;
+        else if (TryGetTiledOverride(entity, out var tiledOverride))
+            tiledOverride.Position = entity.Transform.Position;
     }
 
-    public void RecordLDtkRotation(Entity entity)
+    public void RecordGeneratedRotation(Entity entity)
     {
         if (TryGetLDtkOverride(entity, out var entityOverride))
             entityOverride.Rotation2D = entity.Transform.Rotation2D;
+        else if (TryGetTiledOverride(entity, out var tiledOverride))
+            tiledOverride.Rotation2D = entity.Transform.Rotation2D;
     }
 
-    public void RecordLDtkScale(Entity entity)
+    public void RecordGeneratedScale(Entity entity)
     {
         if (TryGetLDtkOverride(entity, out var entityOverride))
             entityOverride.Scale = entity.Transform.Scale;
+        else if (TryGetTiledOverride(entity, out var tiledOverride))
+            tiledOverride.Scale = entity.Transform.Scale;
     }
 
-    public void RecordLDtkComponentMember(Component component, string memberName, object? value)
+    public void RecordGeneratedComponentMember(Component component, string memberName, object? value)
     {
-        if (!TryGetLDtkOverride(component.Entity, out var entityOverride))
-            return;
         var componentType = component.GetType();
         var componentKey = componentType.FullName ?? componentType.AssemblyQualifiedName ?? componentType.Name;
-        if (!entityOverride.Components.TryGetValue(componentKey, out var properties))
+        Dictionary<string, Dictionary<string, JToken>>? components = null;
+        if (TryGetLDtkOverride(component.Entity, out var entityOverride))
+            components = entityOverride.Components;
+        else if (TryGetTiledOverride(component.Entity, out var tiledOverride))
+            components = tiledOverride.Components;
+        if (components is null)
+            return;
+        if (!components.TryGetValue(componentKey, out var properties))
         {
             properties = new Dictionary<string, JToken>(StringComparer.OrdinalIgnoreCase);
-            entityOverride.Components[componentKey] = properties;
+            components[componentKey] = properties;
         }
         properties[memberName] = DreambitJson.ToToken(value);
     }
+
+    public void RecordLDtkEntityName(Entity entity) => RecordGeneratedEntityName(entity);
+    public void RecordLDtkEntityEnabled(Entity entity) => RecordGeneratedEntityEnabled(entity);
+    public void RecordLDtkEntityTags(Entity entity) => RecordGeneratedEntityTags(entity);
+    public void RecordLDtkPosition(Entity entity) => RecordGeneratedPosition(entity);
+    public void RecordLDtkRotation(Entity entity) => RecordGeneratedRotation(entity);
+    public void RecordLDtkScale(Entity entity) => RecordGeneratedScale(entity);
+    public void RecordLDtkComponentMember(Component component, string memberName, object? value)
+        => RecordGeneratedComponentMember(component, memberName, value);
 
     public void UpdateLDtkImportOptions(
         string name,
@@ -541,11 +581,63 @@ internal sealed class SceneDocument : IDisposable
             mergeKey);
     }
 
+    public void UpdateTiledImportOptions(
+        string name,
+        Action<TiledImportOptions> mutation,
+        string? mergeKey = null)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(mutation);
+        RollBackActiveTransactionBeforeSourceCapture();
+        var reference = _source.Tiled
+                        ?? throw new InvalidOperationException("This scene is not linked to a Tiled map.");
+        var before = CaptureJson();
+        var beforeSelection = Selection.EntityIds.ToArray();
+        string after;
+        try
+        {
+            var updated = (reference.ImportOptions ?? new TiledImportOptions()).Clone();
+            mutation(updated);
+            updated.Validate();
+            reference.ImportOptions = updated;
+            RebuildPreservingSelection();
+            after = CaptureJson();
+        }
+        catch (Exception exception)
+        {
+            RollBackFailedMutation(before, beforeSelection, exception);
+            throw;
+        }
+        if (string.Equals(before, after, StringComparison.Ordinal))
+        {
+            UpdateDirtyState(after);
+            return;
+        }
+
+        CommitSnapshotChange(
+            name,
+            before,
+            after,
+            beforeSelection,
+            Selection.EntityIds.ToArray(),
+            mergeKey);
+    }
+
     /// <summary>Reloads the linked LDtk source while preserving Dreambit-authored scene entities.</summary>
     public void ReimportLDtk()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_source.LDtk is null || Scene is null)
+            return;
+        RebuildPreservingSelection();
+    }
+
+    /// <summary>Reloads the linked TMX source while preserving Dreambit-authored scene entities.</summary>
+    public void ReimportTiled()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_source.Tiled is null || Scene is null)
             return;
         RebuildPreservingSelection();
     }
@@ -627,20 +719,27 @@ internal sealed class SceneDocument : IDisposable
     {
         RollBackActiveTransactionBeforeSourceCapture();
         var selected = Selection.Resolve(Scene)
-            .Select(entity => new SelectionMarker(entity.Id, entity.LDtkSourceKey))
+            .Select(entity => new SelectionMarker(
+                entity.Id,
+                entity.LDtkSourceKey,
+                entity.TiledSourceKey))
             .ToArray();
         CaptureSource();
         var previous = Scene!;
         var replacement = BuildLiveScene(_source);
         Scene = replacement;
         _sceneGeneration++;
-        ReportSceneCleanupFailure(previous, "Could not fully dispose the replaced LDtk editor scene.");
+        ReportSceneCleanupFailure(previous, "Could not fully dispose the replaced imported-map editor scene.");
         var restored = selected.Select(marker =>
         {
-            if (string.IsNullOrWhiteSpace(marker.LDtkSourceKey))
+            if (string.IsNullOrWhiteSpace(marker.LDtkSourceKey) &&
+                string.IsNullOrWhiteSpace(marker.TiledSourceKey))
                 return marker.EntityId;
-            return Scene!.GetAllEntities()
-                .FirstOrDefault(entity => entity.LDtkSourceKey == marker.LDtkSourceKey)?.Id ?? Guid.Empty;
+            return Scene!.GetAllEntities().FirstOrDefault(entity =>
+                (!string.IsNullOrWhiteSpace(marker.LDtkSourceKey) &&
+                 entity.LDtkSourceKey == marker.LDtkSourceKey) ||
+                (!string.IsNullOrWhiteSpace(marker.TiledSourceKey) &&
+                 entity.TiledSourceKey == marker.TiledSourceKey))?.Id ?? Guid.Empty;
         }).Where(id => id != Guid.Empty);
         Selection.Restore(restored);
         Selection.RemoveMissing(Scene);
@@ -876,6 +975,23 @@ internal sealed class SceneDocument : IDisposable
         return true;
     }
 
+    private bool TryGetTiledOverride(Entity entity, out TiledGeneratedEntityOverride entityOverride)
+    {
+        if (_source.Tiled is not { } reference || string.IsNullOrWhiteSpace(entity.TiledSourceKey))
+        {
+            entityOverride = null!;
+            return false;
+        }
+
+        reference.EntityOverrides ??= new Dictionary<string, TiledGeneratedEntityOverride>(StringComparer.Ordinal);
+        if (!reference.EntityOverrides.TryGetValue(entity.TiledSourceKey, out entityOverride!))
+        {
+            entityOverride = new TiledGeneratedEntityOverride();
+            reference.EntityOverrides[entity.TiledSourceKey] = entityOverride;
+        }
+        return true;
+    }
+
     private SceneBlueprintLoadOptions CreateEditorLoadOptions() => new()
     {
         AllowMissingComponentTypes = true,
@@ -883,7 +999,9 @@ internal sealed class SceneDocument : IDisposable
         TolerateComponentLoadErrors = true,
         BlueprintInstanceResolver = _blueprintInstanceResolver,
         LDtkProjectResolver = _ldtkProjectResolver,
+        TiledMapResolver = _tiledMapResolver,
         MarkImportedLDtkEntitiesEditorOnly = true,
+        MarkImportedTiledEntitiesEditorOnly = true,
         MaterializeLDtkEntities = false
     };
 
@@ -966,7 +1084,10 @@ internal sealed class SceneDocument : IDisposable
         public void Redo() => Document.Restore(After, AfterSelection);
     }
 
-    private readonly record struct SelectionMarker(Guid EntityId, string? LDtkSourceKey);
+    private readonly record struct SelectionMarker(
+        Guid EntityId,
+        string? LDtkSourceKey,
+        string? TiledSourceKey);
 
     internal sealed class SceneEditTransaction : IDisposable
     {

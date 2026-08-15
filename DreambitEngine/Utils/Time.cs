@@ -4,14 +4,14 @@ namespace Dreambit;
 
 public static class Time
 {
-    public static float MaxDeltaTime = float.MaxValue;
+    private const float MaxDeltaTime = float.MaxValue;
     public static float TotalTime { get; private set; }
 
     public static float DeltaTime { get; private set; }
 
-    public static float UnscaledDeltaTime { get; private set; }
-
     public static float AltDeltaTime { get; private set; }
+
+    public static float UnscaledDeltaTime { get; private set; }
 
     public static float TimeSinceSceneLoaded { get; private set; }
 

@@ -7,7 +7,9 @@ using Newtonsoft.Json.Linq;
 
 namespace Dreambit;
 
-[DreambitAssetType("dreambit.animation.sprite-sheet")]
+[DreambitAssetType(
+    "dreambit.animation.sprite-sheet",
+    FileExtension = DreambitAssetFileExtensions.SpriteSheetAnimation)]
 public class SpriteSheetAnimation : DreambitAsset
 {
     // Allow a null draft while the asset is being authored. Runtime loading remains strict through

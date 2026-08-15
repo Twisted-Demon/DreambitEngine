@@ -8,6 +8,9 @@ public interface IAssetBaker
     string[] SupportedInputs { get;}
     string OutputExtension { get; }
 
+    /// <summary>Maps a source path to its baked path.</summary>
+    string GetOutputPath(string inputPath);
+
     void Bake(BakeContext ctx);
     AssetBlob BakeToBytes(BakeContext ctx);
 }

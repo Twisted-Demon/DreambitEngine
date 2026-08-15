@@ -7,7 +7,7 @@
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <IsPackable>true</IsPackable>
         <PackageId>DreambitEngine</PackageId>
-        <PackageVersion Condition="'$(PackageVersion)' == ''">0.2.1</PackageVersion>
+        <PackageVersion Condition="'$(PackageVersion)' == ''">0.3.2</PackageVersion>
         <Authors>Dreambit Engine</Authors>
         <Description>DreambitEngine runtime library for MonoGame games.</Description>
         <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -32,6 +32,7 @@
         <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
         <PackageReference Include="Spectre.Console" Version="0.57.2" />
         <PackageReference Include="YamlDotNet" Version="18.1.0" />
+        <PackageReference Include="ZstdSharp.Port" Version="0.8.8" />
     </ItemGroup>
     <ItemGroup>
       <Compile Remove="bin\**" />

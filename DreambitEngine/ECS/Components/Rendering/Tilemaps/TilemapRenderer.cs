@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -7,13 +9,13 @@ namespace Dreambit.ECS;
 /// <summary>
 /// Draws generic Dreambit tilemap data and rejects off-camera tiles using the
 /// layer's spatial grid. Importers are responsible only for producing
-/// <see cref="TilemapLayerData"/> and loading the corresponding texture.
+/// <see cref="TilemapLayerData"/> and loading the corresponding textures.
 /// </summary>
 [BlueprintType(nameof(TilemapRenderer))]
 public sealed class TilemapRenderer : DrawableComponent<TilemapRenderer>
 {
-    public Texture2D Texture { get; private set; }
-    public TilemapLayerData Layer { get; private set; }
+    public Texture2D? Texture { get; private set; }
+    public TilemapLayerData? Layer { get; private set; }
 
     [DreambitSerialize]
     public Color Tint { get; set; } = Color.White;
@@ -39,9 +41,15 @@ public sealed class TilemapRenderer : DrawableComponent<TilemapRenderer>
         return this;
     }
 
+    public TilemapRenderer Configure(TilemapLayerData layer)
+    {
+        Texture = null;
+        Layer = layer ?? throw new ArgumentNullException(nameof(layer));
+        return this;
+    }
+
     protected override void OnDraw()
     {
-        ArgumentNullException.ThrowIfNull(Texture);
         ArgumentNullException.ThrowIfNull(Layer);
 
         LastVisibleTileCount = 0;
@@ -57,27 +65,31 @@ public sealed class TilemapRenderer : DrawableComponent<TilemapRenderer>
                 out var maximumRow))
             return;
 
-        for (var row = minimumRow; row <= maximumRow; row++)
-        for (var column = minimumColumn; column <= maximumColumn; column++)
-        foreach (var tile in Layer.GetTiles(column, row))
+        var elapsedMilliseconds = Time.TimeSinceSceneLoaded * 1000f;
+        switch (Layer.RenderOrder)
         {
-            var worldBounds = TransformBounds(tile.Bounds, worldMatrix);
-            if (!cameraBounds.Intersects(worldBounds))
-                continue;
-
-            var scale = new Vector2(
-                tile.Size.X / tile.SourceRectangle.Width,
-                tile.Size.Y / tile.SourceRectangle.Height) * Transform.WorldScale2D;
-            Core.SpriteBatch.DrawWorldSprite(
-                Texture,
-                Vector2.Transform(tile.Position, worldMatrix),
-                tile.SourceRectangle,
-                tile.Tint * Tint,
-                Transform.WorldRotation2D,
-                Vector2.Zero,
-                scale,
-                tile.Effects);
-            LastVisibleTileCount++;
+            case TilemapRenderOrder.RightDown:
+                for (var row = minimumRow; row <= maximumRow; row++)
+                for (var column = minimumColumn; column <= maximumColumn; column++)
+                    DrawCell(column, row, cameraBounds, worldMatrix, elapsedMilliseconds);
+                break;
+            case TilemapRenderOrder.RightUp:
+                for (var row = maximumRow; row >= minimumRow; row--)
+                for (var column = minimumColumn; column <= maximumColumn; column++)
+                    DrawCell(column, row, cameraBounds, worldMatrix, elapsedMilliseconds);
+                break;
+            case TilemapRenderOrder.LeftDown:
+                for (var row = minimumRow; row <= maximumRow; row++)
+                for (var column = maximumColumn; column >= minimumColumn; column--)
+                    DrawCell(column, row, cameraBounds, worldMatrix, elapsedMilliseconds);
+                break;
+            case TilemapRenderOrder.LeftUp:
+                for (var row = maximumRow; row >= minimumRow; row--)
+                for (var column = maximumColumn; column >= minimumColumn; column--)
+                    DrawCell(column, row, cameraBounds, worldMatrix, elapsedMilliseconds);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(Layer.RenderOrder));
         }
     }
 
@@ -86,6 +98,47 @@ public sealed class TilemapRenderer : DrawableComponent<TilemapRenderer>
         Texture = null;
         Layer = null;
         LastVisibleTileCount = 0;
+    }
+
+    private void DrawCell(
+        int column,
+        int row,
+        RectangleF cameraBounds,
+        Matrix worldMatrix,
+        float elapsedMilliseconds)
+    {
+        foreach (var tile in Layer!.GetTiles(column, row))
+        {
+            var worldBounds = TransformBounds(tile.Bounds, worldMatrix);
+            if (!cameraBounds.Intersects(worldBounds))
+                continue;
+
+            var frame = tile.Animation?.GetFrame(elapsedMilliseconds);
+            var sourceRectangle = frame?.SourceRectangle ?? tile.SourceRectangle;
+            var texture = frame?.Texture ?? tile.Texture ?? Texture
+                          ?? throw new InvalidOperationException(
+                              "A tilemap tile has no texture and the renderer has no fallback texture.");
+            var quarterTurn = MathF.Abs(MathF.Sin(tile.Rotation)) > 0.5f;
+            var scale = quarterTurn
+                ? new Vector2(
+                    tile.Size.Y / sourceRectangle.Width,
+                    tile.Size.X / sourceRectangle.Height)
+                : new Vector2(
+                    tile.Size.X / sourceRectangle.Width,
+                    tile.Size.Y / sourceRectangle.Height);
+            scale *= Transform.WorldScale2D;
+
+            Core.SpriteBatch.DrawWorldSprite(
+                texture,
+                Vector2.Transform(tile.Position + tile.Size * 0.5f, worldMatrix),
+                sourceRectangle,
+                tile.Tint * Tint,
+                Transform.WorldRotation2D + tile.Rotation,
+                new Vector2(sourceRectangle.Width * 0.5f, sourceRectangle.Height * 0.5f),
+                scale,
+                tile.Effects);
+            LastVisibleTileCount++;
+        }
     }
 
     private static RectangleF TransformBounds(RectangleF bounds, Matrix matrix)
@@ -100,5 +153,4 @@ public sealed class TilemapRenderer : DrawableComponent<TilemapRenderer>
         var maximumY = MathF.Max(MathF.Max(topLeft.Y, topRight.Y), MathF.Max(bottomLeft.Y, bottomRight.Y));
         return new RectangleF(minimumX, minimumY, maximumX - minimumX, maximumY - minimumY);
     }
-
 }

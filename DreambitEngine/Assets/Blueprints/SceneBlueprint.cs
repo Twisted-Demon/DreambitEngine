@@ -1,12 +1,15 @@
 ﻿using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using Dreambit.LDtk;
+using Dreambit.Tiled;
 using Dreambit.ECS;
 using Newtonsoft.Json;
 
 namespace Dreambit;
 
-[DreambitAssetType("dreambit.blueprint.scene")]
+[DreambitAssetType(
+    "dreambit.blueprint.scene",
+    FileExtension = DreambitAssetFileExtensions.SceneBlueprint)]
 public class SceneBlueprint : DreambitAsset
 {
     [DreambitSerialize]
@@ -19,4 +22,8 @@ public class SceneBlueprint : DreambitAsset
     [DreambitSerialize]
     [JsonProperty("ldtk")]
     public LDtkSceneReference LDtk { get; set; }
+
+    [DreambitSerialize]
+    [JsonProperty("tiled")]
+    public TiledSceneReference Tiled { get; set; }
 }

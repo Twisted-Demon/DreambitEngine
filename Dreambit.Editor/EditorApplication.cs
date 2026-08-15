@@ -10,6 +10,7 @@ using Dreambit.Editor.Scenes;
 using Dreambit.Editor.UI;
 using Dreambit.Editor.UI.Panels;
 using Dreambit.LDtk;
+using Dreambit.Tiled;
 using ImGuiNET;
 
 namespace Dreambit.Editor;
@@ -40,6 +41,7 @@ internal sealed class EditorApplication : IDisposable
     private bool _showAbout;
     private bool _newScenePopupRequested;
     private bool _newLdtkScenePopupRequested;
+    private bool _newTiledScenePopupRequested;
     private bool _openScenePopupRequested;
     private bool _saveSceneAsPopupRequested;
     private bool _createFromBlueprintPopupRequested;
@@ -47,7 +49,9 @@ internal sealed class EditorApplication : IDisposable
     private string _scenePath = string.Empty;
     private string _blueprintSearch = string.Empty;
     private string _ldtkSearch = string.Empty;
+    private string _tiledSearch = string.Empty;
     private LDtkImportOptions _newLdtkImportOptions = new();
+    private TiledImportOptions _newTiledImportOptions = new();
     private string? _sceneOperationError;
     private bool _rebuildDockLayout;
     private bool _exitAfterProjectLaunch;
@@ -293,6 +297,12 @@ internal sealed class EditorApplication : IDisposable
                 _newLdtkImportOptions = new LDtkImportOptions();
                 _newLdtkScenePopupRequested = true;
             }
+            if (ImGui.MenuItem("New Tiled Scene..."))
+            {
+                _tiledSearch = string.Empty;
+                _newTiledImportOptions = new TiledImportOptions();
+                _newTiledScenePopupRequested = true;
+            }
             if (ImGui.MenuItem("Open Scene...", "Ctrl+Shift+O"))
                 _openScenePopupRequested = true;
             if (ImGui.MenuItem("Save", "Ctrl+S"))
@@ -345,7 +355,9 @@ internal sealed class EditorApplication : IDisposable
                 if (ImGui.BeginMenu("Dreambit Asset"))
                 {
                     foreach (var type in _projectManager.CurrentSession!.EditorTypes.AssetTypes
-                                 .Where(type => type != typeof(EntityBlueprint)))
+                                 .Where(type =>
+                                     type != typeof(EntityBlueprint) &&
+                                     AssetTypeClassifier.CanCreateAsset(type)))
                         if (ImGui.MenuItem(type.Name))
                             projectPanel!.RequestCreateAsset(type);
                     ImGui.EndMenu();
@@ -529,6 +541,11 @@ internal sealed class EditorApplication : IDisposable
             ImGui.OpenPopup("New LDtk Scene##Dreambit.Editor");
             _newLdtkScenePopupRequested = false;
         }
+        if (_newTiledScenePopupRequested)
+        {
+            ImGui.OpenPopup("New Tiled Scene##Dreambit.Editor");
+            _newTiledScenePopupRequested = false;
+        }
         if (_openScenePopupRequested)
         {
             ImGui.OpenPopup("Open Scene##Dreambit.Editor");
@@ -542,6 +559,7 @@ internal sealed class EditorApplication : IDisposable
 
         DrawNewScenePopup();
         DrawNewLDtkScenePopup();
+        DrawNewTiledScenePopup();
         DrawCreateFromBlueprintPopup();
         DrawScenePathPopup("Open Scene##Dreambit.Editor", "Open", TryOpenScene);
         DrawScenePathPopup("Save Scene As##Dreambit.Editor", "Save", TrySaveSceneAs);
@@ -648,6 +666,87 @@ internal sealed class EditorApplication : IDisposable
                     _sceneOperationError = null;
                     ImGui.CloseCurrentPopup();
                 }
+            }
+            catch (Exception exception)
+            {
+                ImGui.TextColored(
+                    new Vector4(0.96f, 0.34f, 0.36f, 1f),
+                    $"{asset.RelativePath}: {exception.Message}");
+            }
+        }
+        ImGui.EndChild();
+        if (!string.IsNullOrWhiteSpace(_sceneOperationError))
+            ImGui.TextColored(new Vector4(0.96f, 0.34f, 0.36f, 1f), _sceneOperationError);
+        if (ImGui.Button("Cancel", new Vector2(90f, 0f)))
+            ImGui.CloseCurrentPopup();
+        ImGui.EndPopup();
+    }
+
+    private void DrawNewTiledScenePopup()
+    {
+        if (!ImGui.BeginPopupModal(
+                "New Tiled Scene##Dreambit.Editor",
+                ImGuiWindowFlags.AlwaysAutoResize))
+            return;
+
+        var session = _projectManager.CurrentSession!;
+        ImGui.TextWrapped(
+            "Choose a Tiled TMX map. Its tile layers stay linked while entities placed in " +
+            "Dreambit are preserved on reimport. Object and image layers are ignored.");
+        var pixelsPerUnit = _newTiledImportOptions.PixelsPerUnit;
+        var baseDrawLayer = _newTiledImportOptions.BaseDrawLayer;
+        var drawLayerStep = _newTiledImportOptions.DrawLayerStep;
+        var worldDepth = _newTiledImportOptions.WorldDepth;
+        var worldDepthStride = _newTiledImportOptions.WorldDepthDrawLayerStride;
+        var renderBackgroundColor = _newTiledImportOptions.RenderMapBackgroundColor;
+        var includeInvisibleLayers = _newTiledImportOptions.IncludeInvisibleLayers;
+        ImGui.SetNextItemWidth(240f);
+        ImGui.DragFloat("Pixels Per Unit##NewTiled", ref pixelsPerUnit, 0.1f, 0.001f, 100000f);
+        ImGui.SetNextItemWidth(240f);
+        ImGui.DragInt("Base Draw Layer##NewTiled", ref baseDrawLayer, 1f);
+        ImGui.SetNextItemWidth(240f);
+        ImGui.DragInt("Draw Layer Step##NewTiled", ref drawLayerStep, 1f, 1, 100000);
+        ImGui.SetNextItemWidth(240f);
+        ImGui.DragInt("World Depth##NewTiled", ref worldDepth, 1f);
+        ImGui.SetNextItemWidth(240f);
+        ImGui.DragInt("World Depth Stride##NewTiled", ref worldDepthStride, 1f, 1, int.MaxValue);
+        ImGui.Checkbox("Render Background Color##NewTiled", ref renderBackgroundColor);
+        ImGui.Checkbox("Include Invisible Layers##NewTiled", ref includeInvisibleLayers);
+        _newTiledImportOptions.PixelsPerUnit = pixelsPerUnit;
+        _newTiledImportOptions.BaseDrawLayer = baseDrawLayer;
+        _newTiledImportOptions.DrawLayerStep = drawLayerStep;
+        _newTiledImportOptions.WorldDepth = worldDepth;
+        _newTiledImportOptions.WorldDepthDrawLayerStride = worldDepthStride;
+        _newTiledImportOptions.RenderMapBackgroundColor = renderBackgroundColor;
+        _newTiledImportOptions.IncludeInvisibleLayers = includeInvisibleLayers;
+        ImGui.Separator();
+        ImGui.SetNextItemWidth(520f);
+        ImGui.InputTextWithHint("##TiledSearch", "Search TMX maps", ref _tiledSearch, 256);
+        ImGui.BeginChild("##TiledResults", new Vector2(520f, 300f), ImGuiChildFlags.Borders);
+        var maps = session.Assets.GetSnapshot().Assets
+            .Where(asset => asset.Kind == AssetKind.TiledMap &&
+                            asset.RelativePath.EndsWith(".tmx", StringComparison.OrdinalIgnoreCase) &&
+                            (string.IsNullOrWhiteSpace(_tiledSearch) ||
+                             asset.RelativePath.Contains(_tiledSearch, StringComparison.OrdinalIgnoreCase)))
+            .ToArray();
+        if (maps.Length == 0)
+            ImGui.TextDisabled("No matching .tmx maps were found under Assets.");
+        foreach (var asset in maps)
+        {
+            if (!ImGui.Selectable($"{asset.RelativePath}##{asset.Id.Value:N}"))
+                continue;
+            try
+            {
+                if (!session.AssetEditing.Clear())
+                {
+                    _sceneOperationError =
+                        "Could not create the Tiled scene because the current asset could not be saved.";
+                    continue;
+                }
+                session.Scenes.NewFromTiled(asset, _newTiledImportOptions);
+                session.Documents.ActivateScene();
+                _sceneOperationError = null;
+                ImGui.CloseCurrentPopup();
             }
             catch (Exception exception)
             {
@@ -853,7 +952,8 @@ internal sealed class EditorApplication : IDisposable
         var document = session.Scenes.Current;
         if (document is null)
             return;
-        _scenePath = document.Path ?? $"Scenes/{document.DisplayName}.scene.json";
+        _scenePath = document.Path ??
+                     $"Scenes/{document.DisplayName}{DreambitAssetFileExtensions.SceneBlueprint}";
         _saveSceneAsPopupRequested = true;
     }
 

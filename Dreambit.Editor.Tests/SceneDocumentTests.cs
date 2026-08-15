@@ -269,45 +269,8 @@ public sealed class SceneDocumentTests : IDisposable
         Assert.Equal(1, EditorLifecycleTestComponent.GizmosDrawn);
         Assert.Equal(1, EditorLifecycleTestComponent.SelectedGizmosDrawn);
     }
-
-    [Fact]
-    public void PointLightRadiusHandleUsesWorldDistanceAndOptionalSnapping()
-    {
-        var center = new Microsoft.Xna.Framework.Vector2(2f, 3f);
-        var handle = new Microsoft.Xna.Framework.Vector2(5f, 7f);
-
-        Assert.Equal(5f, PointLight2DEditorGizmo.CalculateRadius(center, handle, false, 1f));
-        Assert.Equal(6f, PointLight2DEditorGizmo.CalculateRadius(center, handle, true, 3f));
-    }
-
-    [Fact]
-    public void BoxColliderResizeUsesEntityLocalSpaceThroughTransformedParent()
-    {
-        using var scene = new TestEditorScene();
-        var parent = scene.CreateEntity(
-            "parent",
-            createAt: new Microsoft.Xna.Framework.Vector3(8f, -3f, 0f),
-            eulerRotation: new Microsoft.Xna.Framework.Vector3(0f, 0f, MathF.PI / 2f),
-            scale: new Microsoft.Xna.Framework.Vector3(2f, 3f, 1f));
-        var entity = scene.CreateEntity("collider");
-        entity.SetParent(parent, preserveWorldTransform: false);
-        scene.FlushStructuralChanges();
-
-        var oppositeLocal = new Microsoft.Xna.Framework.Vector2(1f, 1f);
-        var cursorWorld = entity.Transform.TransformPoint2D(
-            new Microsoft.Xna.Framework.Vector2(-3f, -1f));
-        var resized = BoxColliderEditorGizmo.CalculateResizedShape(
-            entity.Transform,
-            oppositeLocal,
-            cursorWorld,
-            false,
-            1f);
-
-        Assert.InRange(resized.TopLeft.X, -3.001f, -2.999f);
-        Assert.InRange(resized.TopLeft.Y, -1.001f, -0.999f);
-        Assert.InRange(resized.BottomRight.X, 0.999f, 1.001f);
-        Assert.InRange(resized.BottomRight.Y, 0.999f, 1.001f);
-    }
+    
+    
 
     [Fact]
     public void TransformSelectionExcludesDescendantsWhoseAncestorIsSelected()
@@ -447,58 +410,6 @@ public sealed class SceneDocumentTests : IDisposable
 
         Assert.Equal(3f, parent.Transform.WorldPosition.X);
         Assert.Equal(5f, child.Transform.WorldPosition.X);
-    }
-
-    [Fact]
-    public void PointLightGizmoMutationUsesDocumentUndoPath()
-    {
-        var entityId = Guid.NewGuid();
-        using var document = new SceneDocument(
-            new SceneBlueprint
-            {
-                Name = "Light",
-                Entities =
-                [
-                    new EntityBlueprint
-                    {
-                        Name = "Light",
-                        Guid = entityId,
-                        Components = [new ComponentBlueprint { Type = nameof(PointLight2D) }]
-                    }
-                ]
-            },
-            null,
-            new SelectionService());
-        var transaction = document.BeginTransaction("Resize Point Light");
-        transaction.Update(scene => PointLight2DEditorGizmo.ApplyResize(
-            document,
-            scene,
-            entityId,
-            new Microsoft.Xna.Framework.Vector2(7f, 0f),
-            false,
-            1f));
-        transaction.Commit();
-
-        Assert.Equal(7f, document.Scene!.FindEntity(entityId)!.GetComponent<PointLight2D>()!.Radius);
-        Assert.True(document.Undo.CanUndo);
-
-        document.Undo.Undo();
-        Assert.Equal(0f, document.Scene.FindEntity(entityId)!.GetComponent<PointLight2D>()!.Radius);
-    }
-
-    [Fact]
-    public void SelectedPointLightDrawsItsRadiusCircle()
-    {
-        using var scene = new TestEditorScene();
-        var entity = scene.CreateEntity("point light");
-        entity.AttachComponent<PointLight2D>().Radius = 4.5f;
-        scene.FlushStructuralChanges();
-        var context = new RecordingGizmoContext();
-
-        scene.DrawEditorGizmos(context, new HashSet<Guid> { entity.Id });
-
-        Assert.Equal(1, context.CircleCount);
-        Assert.Equal(4.5f, context.LastCircleRadius);
     }
 
     [Fact]

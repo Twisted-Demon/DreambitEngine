@@ -262,8 +262,8 @@ public sealed class InspectorMetadataTests
     [Fact]
     public void AnimationAndSpriteSheetAssetsUseRecognizableSemanticSuffixes()
     {
-        Assert.Equal(".animation.json", AssetTypeClassifier.GetFileSuffix(typeof(SpriteSheetAnimation)));
-        Assert.Equal(".spritesheet.json", AssetTypeClassifier.GetFileSuffix(typeof(SpriteSheet)));
+        Assert.Equal(".spriteanimation", AssetTypeClassifier.GetFileSuffix(typeof(SpriteSheetAnimation)));
+        Assert.Equal(".spritesheet", AssetTypeClassifier.GetFileSuffix(typeof(SpriteSheet)));
 
         var draft = new SpriteSheetAnimation();
         var restored = DreambitJson.Deserialize<SpriteSheetAnimation>(DreambitJson.Serialize(draft));
@@ -278,9 +278,32 @@ public sealed class InspectorMetadataTests
     }
 
     [Fact]
+    public void DreambitAssetTypesExposeCanonicalSourceExtensions()
+    {
+        Assert.Equal(".cutscene", DreambitAssetTypeRegistry.GetFileExtension(typeof(Dreambit.Scripting.Cutscene)));
+        Assert.Equal(".fx", DreambitAssetTypeRegistry.GetFileExtension(typeof(EffectAsset)));
+        Assert.Equal(".blueprint", DreambitAssetTypeRegistry.GetFileExtension(typeof(EntityBlueprint)));
+        Assert.Equal(".scene", DreambitAssetTypeRegistry.GetFileExtension(typeof(SceneBlueprint)));
+        Assert.Equal(".ttf", DreambitAssetTypeRegistry.GetFileExtension(typeof(FontAsset)));
+        Assert.Equal(".particlefx", DreambitAssetTypeRegistry.GetFileExtension(typeof(ParticleFxConfig)));
+        Assert.Equal(".soundcue", DreambitAssetTypeRegistry.GetFileExtension(typeof(SoundCue)));
+        Assert.Equal(".sprite", DreambitAssetTypeRegistry.GetFileExtension(typeof(Sprite)));
+        Assert.Equal(".spriteanimation", DreambitAssetTypeRegistry.GetFileExtension(typeof(SpriteSheetAnimation)));
+        Assert.Equal(".spritesheet", DreambitAssetTypeRegistry.GetFileExtension(typeof(SpriteSheet)));
+        Assert.Equal(".png", DreambitAssetTypeRegistry.GetFileExtension(typeof(TextureAsset)));
+        Assert.Equal(".asset", DreambitAssetTypeRegistry.GetFileExtension(typeof(TestCustomAsset)));
+
+        Assert.True(AssetTypeClassifier.CanCreateAsset(typeof(Sprite)));
+        Assert.True(AssetTypeClassifier.CanCreateAsset(typeof(TestCustomAsset)));
+        Assert.False(AssetTypeClassifier.CanCreateAsset(typeof(TextureAsset)));
+        Assert.False(AssetTypeClassifier.CanCreateAsset(typeof(FontAsset)));
+        Assert.False(AssetTypeClassifier.CanCreateAsset(typeof(EffectAsset)));
+    }
+
+    [Fact]
     public void NewlyCreatedSpriteCanBeOpenedAsAnEditableDraft()
     {
-        var path = Path.Combine(Path.GetTempPath(), $"new-sprite-{Guid.NewGuid():N}.sprite.json");
+        var path = Path.Combine(Path.GetTempPath(), $"new-sprite-{Guid.NewGuid():N}.sprite");
         try
         {
             var json = DreambitJson.Serialize(new Sprite());
@@ -291,7 +314,7 @@ public sealed class InspectorMetadataTests
                 file.Name,
                 file.Name,
                 string.Empty,
-                Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(file.Name)),
+                file.Name,
                 AssetKind.Sprite,
                 typeof(Sprite).FullName,
                 file.Length,

@@ -45,7 +45,8 @@ internal static class SceneDocumentSerializer
         {
             Name = sceneName,
             Entities = roots,
-            LDtk = source.LDtk
+            LDtk = source.LDtk,
+            Tiled = source.Tiled
         };
     }
 

@@ -42,4 +42,10 @@ public sealed class DreambitAssetTypeAttribute : Attribute
 
     /// <summary>Previous IDs accepted while loading older asset documents.</summary>
     public IReadOnlyList<string> FormerIds { get; }
+
+    /// <summary>
+    /// Canonical source-file extension used when creating this asset. Game-defined assets use
+    /// <c>.asset</c> unless they explicitly declare another extension.
+    /// </summary>
+    public string FileExtension { get; set; } = DreambitAssetFileExtensions.Generic;
 }

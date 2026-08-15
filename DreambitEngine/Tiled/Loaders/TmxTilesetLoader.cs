@@ -16,6 +16,7 @@ public class TmxTilesetLoader : AssetLoaderBase
         if (tileSet is null) return null;
 
         tileSet.AssetName = assetName;
+        TmxResolver.ResolveTmxTileset(tileSet);
         return tileSet;
     }
 }

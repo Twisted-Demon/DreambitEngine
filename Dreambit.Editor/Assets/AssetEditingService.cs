@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using Dreambit.Editor.Compilation;
 using Dreambit.Editor.Inspection;
 using Dreambit.Editor.Projects;
+using Dreambit.Scripting;
 
 namespace Dreambit.Editor.Assets;
 
@@ -138,6 +139,12 @@ internal sealed class AssetEditingService : IDisposable
             var normalized = relativePath.Replace('\\', '/').Trim().TrimStart('/');
             if (normalized.Length == 0 || normalized.Contains("../", StringComparison.Ordinal))
                 throw new InvalidOperationException("Choose a path inside the Assets folder.");
+            var expectedExtension = DreambitAssetTypeRegistry.GetFileExtension(assetType);
+            if (!normalized.EndsWith(expectedExtension, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    $"{assetType.Name} assets must use the '{expectedExtension}' extension.");
+            }
             var path = Path.GetFullPath(Path.Combine(_project.ContentRootPath, normalized));
             var contentPrefix = Path.TrimEndingDirectorySeparator(_project.ContentRootPath) + Path.DirectorySeparatorChar;
             if (!path.StartsWith(contentPrefix, StringComparison.OrdinalIgnoreCase))
@@ -345,7 +352,7 @@ internal sealed class AssetEditingService : IDisposable
 
     private Type? ResolveAssetType(AssetRecord asset)
     {
-        if (asset.Kind is AssetKind.Texture or AssetKind.Font or AssetKind.Effect)
+        if (asset.Kind is AssetKind.Texture or AssetKind.Font or AssetKind.Effect or AssetKind.Cutscene)
             return null;
         if (asset.Kind == AssetKind.Blueprint)
             return typeof(EntityBlueprint);
@@ -594,6 +601,14 @@ internal sealed class AssetEditingService : IDisposable
 
     private static string CreateAssetSource(Type assetType, string path)
     {
+        if (assetType == typeof(Cutscene))
+        {
+            return """
+                   - scriptGroup:
+                       - script: TODO
+                   """ + Environment.NewLine;
+        }
+
         var instance = (DreambitAsset?)Activator.CreateInstance(assetType)
                        ?? throw new InvalidOperationException($"Could not create '{assetType.FullName}'.");
         Exception? failure = null;

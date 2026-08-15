@@ -9,8 +9,9 @@ public class Core : Game
 {
     private const float FixedPhysicsStep = 1f / 60f;
     private const int MaxPhysicsStepsPerFrame = 8;
-    public static readonly Logger<Core> Logger = new();
     private float _accumulatedPhysicsTime;
+    
+    public static readonly Logger<Core> Logger = new();
 
     public Core(int width = 800, int height = 600, string title = "Dreambit Engine")
     {
@@ -138,6 +139,7 @@ public class Core : Game
         Resources.Instance.CleanUp();
         SpriteBatch?.Dispose();
         base.OnExiting(sender, args);
+        Dreambit.Window.Shutdown();
     }
 
     private void ChangeScenes()

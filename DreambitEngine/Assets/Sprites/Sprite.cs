@@ -6,7 +6,7 @@ using Newtonsoft.Json;
 
 namespace Dreambit;
 
-[DreambitAssetType("dreambit.sprite")]
+[DreambitAssetType("dreambit.sprite", FileExtension = DreambitAssetFileExtensions.Sprite)]
 public class Sprite : DreambitAsset
 {
     private const float MinimumPixelsPerUnit = 0.0001f;

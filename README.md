@@ -6,7 +6,7 @@
 
 Build games with a scene-driven core, entity-component composition, lit 2D
 rendering, polygon physics, XML user interfaces, baked content, particles,
-audio, AI, coroutines, and LDtk worlds.
+audio, AI, coroutines, and LDtk or Tiled worlds.
 
 [Read the documentation](Dreambit.Docs/docs/index.md) ·
 [Build your first game](Dreambit.Docs/docs/getting-started/first-game.md) ·
@@ -24,8 +24,8 @@ into scenes, entities, and small reusable components. Engine content stays
 source-controlled alongside the game, and data-driven assets can be baked into a
 single runtime package.
 
-The repository includes the engine, content pipeline, Asset Baker, LDtk
-integration, runnable examples, and a complete MkDocs learning guide.
+The repository includes the engine, content pipeline, Asset Baker, LDtk and
+Tiled integration, runnable examples, and a complete MkDocs learning guide.
 
 ## Engine systems
 
@@ -36,7 +36,7 @@ integration, runnable examples, and a complete MkDocs learning guide.
 | **Physics** | Polygon colliders, triggers, spatial hashing, and point, ray, circle, polygon, and collider queries |
 | **User interface** | XML layouts, responsive panels, controls, focus/navigation, popups, reusable components, and composable brushes |
 | **Input** | Keyboard, mouse, controller, UI capture, named actions, maps, chords, and composite bindings |
-| **Assets** | Textures, sprites, sprite sheets, animations, audio, JSON blueprints, fonts, LDtk data, and pak files |
+| **Assets** | Textures, sprites, sprite sheets, animations, audio, typed blueprints, fonts, LDtk/TMX data, and pak files |
 | **Gameplay tools** | Coroutines, finite state machines, blackboards, A* pathfinding, cutscene scripting, logging, and debug drawing |
 
 ## A first scene
@@ -101,21 +101,20 @@ The `[Require]` attribute ensures that the drawable exists, while
 ### Loading a scene created by Dreambit Editor
 
 Save the scene anywhere under the project's `Assets` directory. The build and the Editor's asset
-baker include `*.scene.json` files in `content.pak`. A runtime scene can load one directly:
+baker include `*.scene` files in `content.pak`. A runtime scene can load one directly:
 
 ```csharp
 public sealed class GameScene : Scene<GameScene>
 {
     protected override void OnInitialize()
     {
-        LoadIntoSelf("scenes/first-level");
+        LoadIntoSelf("scenes/first-level.scene");
     }
 }
 ```
 
-`scenes/first-level`, `scenes/first-level.scene`, and
-`scenes/first-level.scene.json` are accepted. The equivalent explicit form is
-`LoadIntoSelf(Resources.LoadAsset<SceneBlueprint>("scenes/first-level"));`.
+The equivalent explicit form is
+`LoadIntoSelf(Resources.LoadAsset<SceneBlueprint>("scenes/first-level.scene"));`.
 
 ## UI without hard-coded screens
 
@@ -192,6 +191,7 @@ Useful starting points:
 - [Physics](Dreambit.Docs/docs/physics/index.md)
 - [Assets and content](Dreambit.Docs/docs/assets/index.md)
 - [LDtk integration](Dreambit.Docs/docs/ldtk/index.md)
+- [Tiled integration](Dreambit.Docs/docs/tiled/index.md)
 
 ## Repository map
 
@@ -203,6 +203,7 @@ Dreambit.Examples/           Runnable UI, Pong, space game, and particle example
 Dreambit.Examples.Content/   Example source assets and loose UI layouts
 Dreambit.Docs/               MkDocs documentation project
 DreambitEngine/LDtk/         Native LDtk schema, loading, and reference resolution
+DreambitEngine/Tiled/        Native TMX/TSX loading, import, and scene integration
 ```
 
 ## Project status
