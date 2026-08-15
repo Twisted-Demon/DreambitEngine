@@ -10,7 +10,7 @@ struct PS_INPUT
     float2 TexCoord : TEXCOORD0;
 };
 
-// Light positions and radii are expressed in render-target pixels.
+// All light positions/radii are in render-target pixels.
 float3 AmbientColor;
 int LightCount;
 
@@ -19,26 +19,44 @@ float LightsRadius[MAX_LIGHTS];
 float3 LightsColor[MAX_LIGHTS];
 float LightsIntensity[MAX_LIGHTS];
 
-float Smooth01(float value)
-{
-    return value * value * (3.0f - 2.0f * value);
-}
-
-float AttenuateSoft(
+// Finite-range attenuation with an inverse-square-like response.
+//
+// A real inverse-square function has infinite range and becomes singular
+// at distance zero, neither of which is particularly useful for authored
+// 2D point lights.
+//
+// Distance is normalized by the authored radius so Intensity remains
+// predictable regardless of resolution or camera scale.
+float AttenuatePointLight(
     float distanceToLight,
-    float innerRadius,
-    float outerRadius)
+    float radius)
 {
-    float width = max(
-        outerRadius - innerRadius,
-        0.00001f
-    );
+    float normalizedDistance =
+        distanceToLight / max(radius, 0.00001f);
 
-    float t = saturate(
-        (distanceToLight - innerRadius) / width
-    );
+    if (normalizedDistance >= 1.0f)
+        return 0.0f;
 
-    return 1.0f - Smooth01(t);
+    float distanceSq =
+        normalizedDistance * normalizedDistance;
+
+    // Smooth finite-radius cutoff.
+    //
+    // Squaring this window prevents an obvious hard ring at the edge.
+    float distanceFourth =
+        distanceSq * distanceSq;
+
+    float window =
+        saturate(1.0f - distanceFourth);
+
+    window *= window;
+
+    // Inverse-square-inspired decrease without a singularity at the
+    // center of the light.
+    float inverseFalloff =
+        1.0f / (1.0f + 4.0f * distanceSq);
+
+    return window * inverseFalloff;
 }
 
 float4 MainPS(PS_INPUT input) : SV_Target0
@@ -50,7 +68,7 @@ float4 MainPS(PS_INPUT input) : SV_Target0
 
     baseColor *= input.Color;
 
-    float3 litColor = baseColor.rgb * AmbientColor;
+    float3 lighting = AmbientColor;
 
     int activeLightCount = clamp(
         LightCount,
@@ -58,7 +76,8 @@ float4 MainPS(PS_INPUT input) : SV_Target0
         MAX_LIGHTS
     );
 
-    // SV_Position is in render-target pixel coordinates here.
+    // SpriteBatch's SV_Position is already expressed in render-target
+    // pixel coordinates, matching LightingUniforms.
     float2 screenPosition = input.Position.xy;
 
     [loop]
@@ -69,25 +88,34 @@ float4 MainPS(PS_INPUT input) : SV_Target0
             0.00001f
         );
 
-        float distanceToLight = length(
-            LightsPos[i] - screenPosition
-        );
+        float2 toLight =
+            LightsPos[i] - screenPosition;
 
-        float attenuation = AttenuateSoft(
-            distanceToLight,
-            0.0f,
-            radius
-        );
+        float distanceToLight =
+            length(toLight);
 
-        float3 lightPower =
+        float attenuation =
+            AttenuatePointLight(
+                distanceToLight,
+                radius
+            );
+
+        float3 radiance =
             LightsColor[i] *
-            LightsIntensity[i];
+            max(LightsIntensity[i], 0.0f);
 
-        litColor +=
-            baseColor.rgb *
-            lightPower *
+        lighting +=
+            radiance *
             attenuation;
     }
+
+    // Do not saturate here.
+    //
+    // SceneRenderTarget is HDR, so values > 1 are deliberately preserved
+    // for tone mapping and eventual bloom.
+    float3 litColor =
+        baseColor.rgb *
+        lighting;
 
     return float4(
         litColor,

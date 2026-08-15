@@ -482,6 +482,7 @@ public class Scene : IDisposable
         Settings.AmbientLightIntensity = settings.AmbientLightIntensity;
         Settings.AmbientLightColor = settings.AmbientLightColor;
         Settings.PostProcessing = settings.PostProcessing?.Clone() ?? new PostProcessSettings();
+        Settings.Exposure = settings.Exposure;
 
         PostProcessSettings.HueShift = Settings.PostProcessing.HueShift;
         PostProcessSettings.Saturation = Settings.PostProcessing.Saturation;

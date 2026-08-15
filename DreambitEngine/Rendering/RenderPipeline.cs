@@ -85,6 +85,8 @@ public sealed class RenderPipeline(Scene scene) : IDisposable
         Core.Instance.GraphicsDevice.SetRenderTarget(null);
         Core.Instance.GraphicsDevice.Clear(scene.BackgroundColor);
 
+        _presentEffect.Parameters["Exposure"]?.SetValue(Mathf.Max(0f, scene.Settings.Exposure));
+        
         Core.SpriteBatch.Begin(
             SpriteSortMode.Deferred,
             BlendState.Opaque,
