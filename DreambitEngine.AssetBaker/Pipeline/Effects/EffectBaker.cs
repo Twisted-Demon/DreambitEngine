@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Diagnostics;
 using DreambitEngine.AssetBaker.Abstractions;
 using Microsoft.Xna.Framework.Content.Pipeline;
 using MonoGame.Framework.Content.Pipeline.Builder;
@@ -8,6 +9,10 @@ namespace DreambitEngine.AssetBaker.Pipeline.Effects;
 /// <summary>Compiles MonoGame .fx source and stores raw MGFX bytecode in an FXB envelope.</summary>
 public sealed class EffectBaker : AssetBakerBase
 {
+    // MonoGame's in-process content builder temporarily mutates shared importer metadata.
+    // Serialize parallel bake requests while leaving the rest of the pipeline concurrent.
+    private static readonly object ContentBuilderLock = new();
+
     public override string AssetTypeName => "effect";
     public override string[] SupportedInputs => [".fx"];
     public override string OutputExtension => ".fxb";
@@ -20,6 +25,100 @@ public sealed class EffectBaker : AssetBakerBase
     }
 
     public override AssetBlob BakeToBytes(BakeContext ctx)
+    {
+        if (!string.Equals(
+                Environment.GetEnvironmentVariable("DREAMBIT_EFFECT_WORKER"),
+                "1",
+                StringComparison.Ordinal))
+        {
+            return BakeInWorkerProcess(ctx);
+        }
+
+        return BakeInProcess(ctx);
+    }
+
+    private static AssetBlob BakeInWorkerProcess(BakeContext ctx)
+    {
+        var temporaryRoot = Path.Combine(Path.GetTempPath(), $"dreambit-effect-worker-{Guid.NewGuid():N}");
+        var outputPath = Path.Combine(temporaryRoot, "effect.fxb");
+        var runtimeConfigPath = Path.Combine(temporaryRoot, "effect-worker.runtimeconfig.json");
+        Directory.CreateDirectory(temporaryRoot);
+        try
+        {
+            var assemblyPath = typeof(EffectBaker).Assembly.Location;
+            var dependencyContextPath = Path.ChangeExtension(assemblyPath, ".deps.json");
+            if (!File.Exists(dependencyContextPath))
+                throw new FileNotFoundException(
+                    "The Dreambit effect compiler dependency manifest is missing.",
+                    dependencyContextPath);
+            File.WriteAllText(
+                runtimeConfigPath,
+                $$"""
+                  {
+                    "runtimeOptions": {
+                      "tfm": "net{{Environment.Version.Major}}.{{Environment.Version.Minor}}",
+                      "framework": {
+                        "name": "Microsoft.NETCore.App",
+                        "version": "{{Environment.Version.Major}}.{{Environment.Version.Minor}}.0"
+                      }
+                    }
+                  }
+                  """);
+            var startInfo = new ProcessStartInfo("dotnet")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+            startInfo.Environment["DREAMBIT_EFFECT_WORKER"] = "1";
+            startInfo.ArgumentList.Add("exec");
+            startInfo.ArgumentList.Add("--runtimeconfig");
+            startInfo.ArgumentList.Add(runtimeConfigPath);
+            startInfo.ArgumentList.Add("--depsfile");
+            startInfo.ArgumentList.Add(dependencyContextPath);
+            startInfo.ArgumentList.Add(assemblyPath);
+            startInfo.ArgumentList.Add("__compile-effect");
+            startInfo.ArgumentList.Add(Path.GetFullPath(ctx.InputPath));
+            startInfo.ArgumentList.Add(outputPath);
+            startInfo.ArgumentList.Add(string.IsNullOrWhiteSpace(ctx.LogicalRoot)
+                ? Path.GetDirectoryName(Path.GetFullPath(ctx.InputPath))!
+                : Path.GetFullPath(ctx.LogicalRoot));
+            startInfo.ArgumentList.Add(NormalizePlatform(ctx.TargetPlatform));
+
+            using var process = Process.Start(startInfo)
+                                ?? throw new InvalidOperationException(
+                                    "Could not start the Dreambit effect compiler.");
+            var standardOutput = process.StandardOutput.ReadToEndAsync();
+            var standardError = process.StandardError.ReadToEndAsync();
+            if (!process.WaitForExit((int)TimeSpan.FromMinutes(2).TotalMilliseconds))
+            {
+                process.Kill(true);
+                throw new TimeoutException(
+                    $"Dreambit effect compiler timed out for '{ctx.InputPath}'.");
+            }
+            Task.WaitAll(standardOutput, standardError);
+            if (process.ExitCode != 0 || !File.Exists(outputPath))
+                throw new InvalidOperationException(
+                    $"Dreambit effect compiler failed for '{ctx.InputPath}'. " +
+                    string.Join(
+                        Environment.NewLine,
+                        standardError.Result.Trim(),
+                        standardOutput.Result.Trim()).Trim());
+
+            return new AssetBlob(
+                GetLogicalPath(ctx, ".fxb"),
+                AssetType.Effect,
+                ".fxb",
+                File.ReadAllBytes(outputPath));
+        }
+        finally
+        {
+            TryDeleteDirectory(temporaryRoot);
+        }
+    }
+
+    private static AssetBlob BakeInProcess(BakeContext ctx)
     {
         var sourceRoot = string.IsNullOrWhiteSpace(ctx.LogicalRoot)
             ? Path.GetDirectoryName(Path.GetFullPath(ctx.InputPath))!
@@ -37,15 +136,19 @@ public sealed class EffectBaker : AssetBakerBase
         try
         {
             var builder = new SingleEffectBuilder(relativePath);
-            builder.Run([
-                "build",
-                "-p", NormalizePlatform(ctx.TargetPlatform),
-                "-s", sourceRoot,
-                "-o", outputRoot,
-                "-i", intermediateRoot
-            ]);
-            if (builder.FailedToBuild > 0)
-                throw new InvalidOperationException($"MonoGame failed to compile effect '{relativePath}'.");
+            lock (ContentBuilderLock)
+            {
+                builder.Run([
+                    "build",
+                    "-p", NormalizePlatform(ctx.TargetPlatform),
+                    "-s", sourceRoot,
+                    "-o", outputRoot,
+                    "-i", intermediateRoot
+                ]);
+                if (builder.FailedToBuild > 0)
+                    throw new InvalidOperationException(
+                        $"MonoGame failed to compile effect '{relativePath}'.");
+            }
 
             var xnbPath = Directory.EnumerateFiles(outputRoot, "*.xnb", SearchOption.AllDirectories)
                 .SingleOrDefault()
@@ -62,23 +165,28 @@ public sealed class EffectBaker : AssetBakerBase
             output.Write(buffer[..4]);
             output.Write(effectCode);
             return new AssetBlob(
-                GetLogicalPath(ctx, OutputExtension),
+                GetLogicalPath(ctx, ".fxb"),
                 AssetType.Effect,
-                OutputExtension,
+                ".fxb",
                 output.ToArray());
         }
         finally
         {
-            try
-            {
-                Directory.Delete(temporaryRoot, true);
-            }
-            catch (IOException)
-            {
-            }
-            catch (UnauthorizedAccessException)
-            {
-            }
+            TryDeleteDirectory(temporaryRoot);
+        }
+    }
+
+    private static void TryDeleteDirectory(string path)
+    {
+        try
+        {
+            Directory.Delete(path, true);
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
         }
     }
 

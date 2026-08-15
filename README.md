@@ -21,8 +21,8 @@ audio, AI, coroutines, and LDtk or Tiled worlds.
 Dreambit is a C# game engine built on MonoGame for developers who want a focused
 2D workflow without giving up direct access to their code. Games are organized
 into scenes, entities, and small reusable components. Engine content stays
-source-controlled alongside the game, and data-driven assets can be baked into a
-single runtime package.
+source-controlled alongside the game. Development runs from incremental baked blobs, and
+**Build > Bake Pak** creates a single runtime package when the game is ready to ship.
 
 The repository includes the engine, content pipeline, Asset Baker, LDtk and
 Tiled integration, runnable examples, and a complete MkDocs learning guide.
@@ -100,8 +100,9 @@ The `[Require]` attribute ensures that the drawable exists, while
 
 ### Loading a scene created by Dreambit Editor
 
-Save the scene anywhere under the project's `Assets` directory. The build and the Editor's asset
-baker include `*.scene` files in `content.pak`. A runtime scene can load one directly:
+Save the scene anywhere under the project's `Assets` directory. The Editor makes it available to
+Debug runs through the blob cache, and **Build > Bake Pak** includes it in shipping content. A
+runtime scene can load it directly:
 
 ```csharp
 public sealed class GameScene : Scene<GameScene>

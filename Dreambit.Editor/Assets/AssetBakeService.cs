@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Dreambit;
 using Dreambit.Editor.Projects;
 using DreambitEngine.AssetBaker.Pipeline;
 
@@ -40,11 +41,12 @@ internal sealed class AssetBakeService : IDisposable
     private readonly Action<AssetBakeMessage>? _report;
     private readonly CancellationTokenSource _lifetime;
     private readonly AssetBakePipeline _pipeline = new();
-    private Task<AssetBakeResult>? _activeBake;
+    private Task<AssetWorkResult>? _activeBake;
     private AssetBakeStatus _status = new(AssetBakeState.Idle, "Assets are up to date.");
     private long _lastAssetVersion;
     private long _requestedAt;
     private bool _bakePending;
+    private bool _pakPending;
     private bool _rebuildAll;
     private bool _disposed;
 
@@ -65,7 +67,7 @@ internal sealed class AssetBakeService : IDisposable
             "dreambit",
             "content.pak");
         CacheDirectory = Path.Combine(project.RootDirectory, ".cache", "dreambit", "bake");
-        if (!File.Exists(OutputPakPath) ||
+        if (!File.Exists(Path.Combine(CacheDirectory, BlobContentManifest.FileName)) ||
             !AssetBakePipeline.HasCurrentBuiltInContent(CacheDirectory))
             RequestBake(rebuildAll: false);
     }
@@ -74,7 +76,7 @@ internal sealed class AssetBakeService : IDisposable
     public string CacheDirectory { get; }
     public AssetBakeStatus Status => _status;
     public bool IsRunning => _activeBake is not null;
-    public event Action<AssetBakeResult>? BakeCompleted;
+    public event Action? ContentBaked;
 
     public void Update()
     {
@@ -88,13 +90,19 @@ internal sealed class AssetBakeService : IDisposable
             RequestBake(rebuildAll: false);
         }
 
-        if (_activeBake is not null || !_bakePending ||
-            Stopwatch.GetElapsedTime(_requestedAt) < AutomaticBakeDelay)
+        if (_activeBake is not null)
         {
             return;
         }
 
-        StartBake();
+        if (_pakPending)
+        {
+            StartPakBake();
+            return;
+        }
+
+        if (_bakePending && Stopwatch.GetElapsedTime(_requestedAt) >= AutomaticBakeDelay)
+            StartBlobBake();
     }
 
     public void RequestBake(bool rebuildAll)
@@ -111,17 +119,26 @@ internal sealed class AssetBakeService : IDisposable
                 rebuildAll ? "Full asset rebuild queued." : "Asset bake queued.");
     }
 
-    private void StartBake()
+    public void RequestPakBake()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        _pakPending = true;
+        _bakePending = false;
+        if (_activeBake is null)
+            _status = new AssetBakeStatus(AssetBakeState.Waiting, "Pak bake queued.");
+    }
+
+    private void StartBlobBake()
     {
         var rebuildAll = _rebuildAll;
         _bakePending = false;
         _rebuildAll = false;
         _status = new AssetBakeStatus(
             AssetBakeState.Baking,
-            rebuildAll ? "Rebuilding all assets..." : "Baking changed assets...");
+            rebuildAll ? "Rebuilding all asset blobs..." : "Updating changed asset blobs...");
         _report?.Invoke(new AssetBakeMessage(
             AssetBakeMessageSeverity.Information,
-            rebuildAll ? "Rebuilding all source assets." : "Baking changed source assets."));
+            rebuildAll ? "Rebuilding all asset blobs." : "Updating changed asset blobs."));
 
         var progress = new InlineProgress<AssetBakeProgress>(value =>
         {
@@ -130,7 +147,37 @@ internal sealed class AssetBakeService : IDisposable
                     AssetBakeMessageSeverity.Information,
                     value.Message));
         });
-        _activeBake = _pipeline.BakePakAsync(
+        _activeBake = BakeBlobsAsync(
+            new AssetBlobBakeRequest(
+                _project.ContentRootPath,
+                CacheDirectory,
+                _assets.RegistryPath,
+                rebuildAll,
+                MarkSrgb: true,
+                TargetPlatform: _project.Metadata.TargetRenderer,
+                IncludeBuiltInContent: true),
+            progress,
+            _lifetime.Token);
+    }
+
+    private void StartPakBake()
+    {
+        var rebuildAll = _rebuildAll;
+        _pakPending = false;
+        _rebuildAll = false;
+        _status = new AssetBakeStatus(AssetBakeState.Baking, "Baking content.pak...");
+        _report?.Invoke(new AssetBakeMessage(
+            AssetBakeMessageSeverity.Information,
+            "Baking the shipping pak from current assets."));
+
+        var progress = new InlineProgress<AssetBakeProgress>(value =>
+        {
+            if (value.Stage is "Bake" or "Write" or "Complete")
+                _report?.Invoke(new AssetBakeMessage(
+                    AssetBakeMessageSeverity.Information,
+                    value.Message));
+        });
+        _activeBake = BakePakAsync(
             new AssetBakeRequest(
                 _project.ContentRootPath,
                 OutputPakPath,
@@ -144,6 +191,36 @@ internal sealed class AssetBakeService : IDisposable
             _lifetime.Token);
     }
 
+    private async Task<AssetWorkResult> BakeBlobsAsync(
+        AssetBlobBakeRequest request,
+        IProgress<AssetBakeProgress> progress,
+        CancellationToken cancellationToken)
+    {
+        var result = await _pipeline.BakeBlobsAsync(request, progress, cancellationToken)
+            .ConfigureAwait(false);
+        return new AssetWorkResult(
+            false,
+            result.BakedCount,
+            result.CacheHitCount,
+            result.Duration,
+            null);
+    }
+
+    private async Task<AssetWorkResult> BakePakAsync(
+        AssetBakeRequest request,
+        IProgress<AssetBakeProgress> progress,
+        CancellationToken cancellationToken)
+    {
+        var result = await _pipeline.BakePakAsync(request, progress, cancellationToken)
+            .ConfigureAwait(false);
+        return new AssetWorkResult(
+            true,
+            result.BakedCount,
+            result.CacheHitCount,
+            result.Duration,
+            result.OutputPak);
+    }
+
     private void CompleteFinishedBake()
     {
         if (_activeBake is not { IsCompleted: true } task)
@@ -155,14 +232,18 @@ internal sealed class AssetBakeService : IDisposable
             var result = task.GetAwaiter().GetResult();
             _status = new AssetBakeStatus(
                 AssetBakeState.Succeeded,
-                $"{result.BakedCount} baked, {result.CacheHitCount} cached in " +
-                $"{result.Duration.TotalSeconds:0.00}s.",
+                result.IsPak
+                    ? $"Pak baked in {result.Duration.TotalSeconds:0.00}s."
+                    : $"{result.BakedCount} baked, {result.CacheHitCount} cached in " +
+                      $"{result.Duration.TotalSeconds:0.00}s.",
                 DateTimeOffset.UtcNow,
                 result.OutputPak);
             _report?.Invoke(new AssetBakeMessage(
                 AssetBakeMessageSeverity.Information,
-                $"Asset bake complete: {_status.Message}"));
-            BakeCompleted?.Invoke(result);
+                result.IsPak
+                    ? $"Pak bake complete: {result.OutputPak}"
+                    : $"Asset blob update complete: {_status.Message}"));
+            ContentBaked?.Invoke();
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
         {
@@ -234,4 +315,11 @@ internal sealed class AssetBakeService : IDisposable
     {
         public void Report(T value) => report(value);
     }
+
+    private sealed record AssetWorkResult(
+        bool IsPak,
+        int BakedCount,
+        int CacheHitCount,
+        TimeSpan Duration,
+        string? OutputPak);
 }

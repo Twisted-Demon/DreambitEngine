@@ -13,7 +13,9 @@ Version 0.3.2 provides separate package-based and source-submodule project comma
 
 `dreambit-game` is the package-based template used by Dreambit.Editor. `dreambit-game-source`
 creates a Git repository and pins DreambitEngine as a submodule at `.dreambit/engine`.
-Both templates bake the PAK under `.cache/dreambit` and copy it into build and publish output.
+Both templates maintain development blobs under `.cache/dreambit/bake`. Debug builds run from the
+blobs. Use **Build > Bake Pak** in Dreambit Editor before a Release build or publish; Release copies
+that verified PAK into the output.
 
 ## Pack and install locally
 

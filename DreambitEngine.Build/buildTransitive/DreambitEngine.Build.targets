@@ -5,6 +5,9 @@
     <DreambitContentCacheRoot Condition="'$(DreambitContentCacheRoot)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/.cache/dreambit'))</DreambitContentCacheRoot>
     <DreambitContentPak Condition="'$(DreambitContentPak)' == ''">$(DreambitContentCacheRoot)/content.pak</DreambitContentPak>
     <DreambitAssetCache Condition="'$(DreambitAssetCache)' == ''">$(DreambitContentCacheRoot)/bake</DreambitAssetCache>
+    <DreambitBlobManifest>$(DreambitAssetCache)/content.blobs.json</DreambitBlobManifest>
+    <DreambitBlobFingerprint>$(DreambitAssetCache)/content.blobs.fingerprint</DreambitBlobFingerprint>
+    <DreambitPakFingerprint>$(DreambitContentPak).fingerprint</DreambitPakFingerprint>
     <DreambitRuntimeContentDirectory Condition="'$(DreambitRuntimeContentDirectory)' == ''">$(TargetDir)Content</DreambitRuntimeContentDirectory>
   </PropertyGroup>
 
@@ -30,13 +33,11 @@
   <Target Name="BuildDreambitAssets"
           BeforeTargets="BeforeCompile"
           DependsOnTargets="ValidateDreambitAssetBuild"
-          Condition="'$(DreambitContentBuildEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true'"
-          Inputs="@(_DreambitRawAsset);$(DreambitAssetRegistry);$(DreambitAssetBakerDll)"
-          Outputs="$(DreambitContentPak)">
+          Condition="'$(DreambitContentBuildEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true'">
     <MakeDir Directories="$(DreambitContentCacheRoot);$(DreambitAssetCache)" />
-    <Exec Command="dotnet &quot;$(DreambitAssetBakerDll)&quot; bake-pak &quot;$(DreambitContentRoot)&quot; &quot;$(DreambitContentPak)&quot; --registry &quot;$(DreambitAssetRegistry)&quot; --cache &quot;$(DreambitAssetCache)&quot; --platform &quot;$(MonoGamePlatform)&quot; --premul --srgb"
+    <Exec Command="dotnet &quot;$(DreambitAssetBakerDll)&quot; bake-blobs &quot;$(DreambitContentRoot)&quot; &quot;$(DreambitAssetCache)&quot; --registry &quot;$(DreambitAssetRegistry)&quot; --platform &quot;$(MonoGamePlatform)&quot; --premul --srgb"
           Condition="Exists('$(DreambitAssetRegistry)')" />
-    <Exec Command="dotnet &quot;$(DreambitAssetBakerDll)&quot; bake-pak &quot;$(DreambitContentRoot)&quot; &quot;$(DreambitContentPak)&quot; --cache &quot;$(DreambitAssetCache)&quot; --platform &quot;$(MonoGamePlatform)&quot; --premul --srgb"
+    <Exec Command="dotnet &quot;$(DreambitAssetBakerDll)&quot; bake-blobs &quot;$(DreambitContentRoot)&quot; &quot;$(DreambitAssetCache)&quot; --platform &quot;$(MonoGamePlatform)&quot; --premul --srgb"
           Condition="!Exists('$(DreambitAssetRegistry)')" />
   </Target>
 
@@ -44,10 +45,36 @@
           DependsOnTargets="ValidateDreambitAssetBuild"
           Condition="'$(DreambitContentBuildEnabled)' == 'true'">
     <MakeDir Directories="$(DreambitContentCacheRoot);$(DreambitAssetCache)" />
-    <Exec Command="dotnet &quot;$(DreambitAssetBakerDll)&quot; bake-pak &quot;$(DreambitContentRoot)&quot; &quot;$(DreambitContentPak)&quot; --registry &quot;$(DreambitAssetRegistry)&quot; --cache &quot;$(DreambitAssetCache)&quot; --platform &quot;$(MonoGamePlatform)&quot; --rebuild --premul --srgb"
+    <Exec Command="dotnet &quot;$(DreambitAssetBakerDll)&quot; bake-blobs &quot;$(DreambitContentRoot)&quot; &quot;$(DreambitAssetCache)&quot; --registry &quot;$(DreambitAssetRegistry)&quot; --platform &quot;$(MonoGamePlatform)&quot; --rebuild --premul --srgb"
           Condition="Exists('$(DreambitAssetRegistry)')" />
-    <Exec Command="dotnet &quot;$(DreambitAssetBakerDll)&quot; bake-pak &quot;$(DreambitContentRoot)&quot; &quot;$(DreambitContentPak)&quot; --cache &quot;$(DreambitAssetCache)&quot; --platform &quot;$(MonoGamePlatform)&quot; --rebuild --premul --srgb"
+    <Exec Command="dotnet &quot;$(DreambitAssetBakerDll)&quot; bake-blobs &quot;$(DreambitContentRoot)&quot; &quot;$(DreambitAssetCache)&quot; --platform &quot;$(MonoGamePlatform)&quot; --rebuild --premul --srgb"
           Condition="!Exists('$(DreambitAssetRegistry)')" />
+  </Target>
+
+  <Target Name="BakeDreambitPak"
+          DependsOnTargets="ValidateDreambitAssetBuild"
+          Condition="'$(DreambitContentBuildEnabled)' == 'true'">
+    <MakeDir Directories="$(DreambitContentCacheRoot);$(DreambitAssetCache)" />
+    <Exec Command="dotnet &quot;$(DreambitAssetBakerDll)&quot; bake-pak &quot;$(DreambitContentRoot)&quot; &quot;$(DreambitContentPak)&quot; --registry &quot;$(DreambitAssetRegistry)&quot; --cache &quot;$(DreambitAssetCache)&quot; --platform &quot;$(MonoGamePlatform)&quot; --premul --srgb"
+          Condition="Exists('$(DreambitAssetRegistry)')" />
+    <Exec Command="dotnet &quot;$(DreambitAssetBakerDll)&quot; bake-pak &quot;$(DreambitContentRoot)&quot; &quot;$(DreambitContentPak)&quot; --cache &quot;$(DreambitAssetCache)&quot; --platform &quot;$(MonoGamePlatform)&quot; --premul --srgb"
+          Condition="!Exists('$(DreambitAssetRegistry)')" />
+  </Target>
+
+  <Target Name="ValidateDreambitPak"
+          BeforeTargets="BeforeCompile"
+          DependsOnTargets="BuildDreambitAssets"
+          Condition="'$(DreambitContentBuildEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true' and '$(Configuration)' != 'Debug'">
+    <Error Condition="!Exists('$(DreambitContentPak)') or !Exists('$(DreambitPakFingerprint)')"
+           Text="The shipping content pak is missing. Open Dreambit Editor and choose Build > Bake Pak before building $(Configuration)." />
+    <ReadLinesFromFile File="$(DreambitBlobFingerprint)">
+      <Output TaskParameter="Lines" ItemName="_DreambitCurrentBlobFingerprint" />
+    </ReadLinesFromFile>
+    <ReadLinesFromFile File="$(DreambitPakFingerprint)">
+      <Output TaskParameter="Lines" ItemName="_DreambitCurrentPakFingerprint" />
+    </ReadLinesFromFile>
+    <Error Condition="'@(_DreambitCurrentBlobFingerprint)' != '@(_DreambitCurrentPakFingerprint)'"
+           Text="The shipping content pak is stale. Open Dreambit Editor and choose Build > Bake Pak before building $(Configuration)." />
   </Target>
 
   <Target Name="CopyDreambitAssetsToOutput"
@@ -55,21 +82,47 @@
           DependsOnTargets="BuildDreambitAssets"
           Condition="'$(DreambitContentBuildEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true'">
     <MakeDir Directories="$(DreambitRuntimeContentDirectory)" />
+    <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+      <_DreambitRuntimeBlob Include="$(DreambitAssetCache)/blobs/**/*" />
+    </ItemGroup>
+    <Copy SourceFiles="$(DreambitBlobManifest);$(DreambitBlobFingerprint)"
+          DestinationFolder="$(DreambitRuntimeContentDirectory)"
+          SkipUnchangedFiles="true"
+          Condition="'$(Configuration)' == 'Debug'" />
+    <Copy SourceFiles="@(_DreambitRuntimeBlob)"
+          DestinationFiles="@(_DreambitRuntimeBlob->'$(DreambitRuntimeContentDirectory)/blobs/%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true"
+          Condition="'$(Configuration)' == 'Debug'" />
+    <Delete Files="$(DreambitRuntimeContentDirectory)/content.pak;$(DreambitRuntimeContentDirectory)/content.pak.fingerprint"
+            Condition="'$(Configuration)' == 'Debug'" />
     <Copy SourceFiles="$(DreambitContentPak)"
           DestinationFiles="$(DreambitRuntimeContentDirectory)/.dreambit-content.pak.tmp"
-          SkipUnchangedFiles="true" />
+          SkipUnchangedFiles="true"
+          Condition="'$(Configuration)' != 'Debug'" />
     <Move SourceFiles="$(DreambitRuntimeContentDirectory)/.dreambit-content.pak.tmp"
           DestinationFiles="$(DreambitRuntimeContentDirectory)/content.pak"
-          Condition="Exists('$(DreambitRuntimeContentDirectory)/.dreambit-content.pak.tmp')" />
+          Condition="'$(Configuration)' != 'Debug' and Exists('$(DreambitRuntimeContentDirectory)/.dreambit-content.pak.tmp')" />
   </Target>
 
   <Target Name="IncludeDreambitAssetsInPublish"
           AfterTargets="ComputeFilesToPublish"
           DependsOnTargets="BuildDreambitAssets"
           Condition="'$(DreambitContentBuildEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true'">
-    <ItemGroup>
+    <ItemGroup Condition="'$(Configuration)' != 'Debug'">
       <ResolvedFileToPublish Include="$(DreambitContentPak)"
                              RelativePath="Content/content.pak"
+                             CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+    <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+      <_DreambitPublishBlob Include="$(DreambitAssetCache)/blobs/**/*" />
+      <ResolvedFileToPublish Include="$(DreambitBlobManifest)"
+                             RelativePath="Content/content.blobs.json"
+                             CopyToPublishDirectory="PreserveNewest" />
+      <ResolvedFileToPublish Include="$(DreambitBlobFingerprint)"
+                             RelativePath="Content/content.blobs.fingerprint"
+                             CopyToPublishDirectory="PreserveNewest" />
+      <ResolvedFileToPublish Include="@(_DreambitPublishBlob)"
+                             RelativePath="Content/blobs/%(RecursiveDir)%(Filename)%(Extension)"
                              CopyToPublishDirectory="PreserveNewest" />
     </ItemGroup>
   </Target>

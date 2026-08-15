@@ -16,6 +16,13 @@ contain a valid `.dreambit/project.json`. The Hub can create a DesktopVK project
 from the version-matched Dreambit template and opens it in a separate Editor
 process.
 
+## Assets
+
+Saving an asset updates the incremental blob store used by the Editor and Debug game builds; it
+does not rewrite `content.pak`. Choose **Build > Bake Pak** only when preparing a Release build or
+publish. Release verifies that the PAK matches the current blobs and explains how to refresh it if
+it is missing or stale.
+
 ## Dreambit SDKs
 
 Projects use coordinated `DreambitEngine`, `DreambitEngine.Build`, and

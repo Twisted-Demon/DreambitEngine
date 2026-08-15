@@ -365,9 +365,9 @@ internal sealed class EditorApplication : IDisposable
                 ImGui.EndMenu();
             }
             ImGui.EndDisabled();
-            if (_project is not null && ImGui.MenuItem("Bake Changed"))
+            if (_project is not null && ImGui.MenuItem("Update Blobs"))
                 _projectManager.CurrentSession!.AssetBaking.RequestBake(false);
-            if (_project is not null && ImGui.MenuItem("Rebuild All"))
+            if (_project is not null && ImGui.MenuItem("Rebuild All Blobs"))
                 _projectManager.CurrentSession!.AssetBaking.RequestBake(true);
             ImGui.EndMenu();
         }
@@ -420,10 +420,8 @@ internal sealed class EditorApplication : IDisposable
             if (_project is not null && ImGui.MenuItem("Rebuild Game"))
                 _projectManager.CurrentSession!.GameCode.RequestBuild(true, true);
             ImGui.Separator();
-            if (_project is not null && ImGui.MenuItem("Bake Assets"))
-                _projectManager.CurrentSession!.AssetBaking.RequestBake(false);
-            if (_project is not null && ImGui.MenuItem("Rebuild All Assets"))
-                _projectManager.CurrentSession!.AssetBaking.RequestBake(true);
+            if (_project is not null && ImGui.MenuItem("Bake Pak"))
+                _projectManager.CurrentSession!.AssetBaking.RequestPakBake();
             ImGui.EndMenu();
         }
 

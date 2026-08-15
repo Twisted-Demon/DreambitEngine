@@ -42,7 +42,10 @@ Place raw assets under:
 src/DreambitGame.Content/Assets
 ```
 
-The `DreambitEngine.Build` package is the stable MSBuild integration boundary for Dreambit content processing. Automatic baking and explicit bake commands are added by Dreambit.Editor Milestone 4; Milestone 2 establishes the package boundary without duplicating that pipeline.
+The `DreambitEngine.Build` package is the stable integration boundary for Dreambit content
+processing. The Editor and Debug builds update incremental blobs automatically. Choose
+**Build > Bake Pak** in Dreambit Editor before building or publishing Release; Release stops with a
+helpful message if the shipping PAK is missing or stale.
 
 ## Useful commands
 

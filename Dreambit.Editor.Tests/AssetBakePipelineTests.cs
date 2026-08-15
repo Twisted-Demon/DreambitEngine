@@ -64,6 +64,82 @@ public sealed class AssetBakePipelineTests : IDisposable
     }
 
     [Fact]
+    public void BlobBakeWritesNoPakAndCanBeLoadedByLogicalPath()
+    {
+        var assets = Path.Combine(_root, "BlobAssets");
+        var cache = Path.Combine(_root, "BlobCache");
+        Directory.CreateDirectory(Path.Combine(assets, "levels"));
+        File.WriteAllText(
+            Path.Combine(assets, "levels", "first.scene"),
+            "{\"name\":\"From blobs\",\"entities\":[]}");
+
+        var result = new AssetBakePipeline().BakeBlobs(new AssetBlobBakeRequest(
+            assets,
+            cache,
+            RebuildAll: true));
+
+        Assert.True(File.Exists(result.ManifestPath));
+        Assert.True(File.Exists(Path.Combine(cache, BlobContentManifest.FingerprintFileName)));
+        Assert.False(File.Exists(Path.Combine(cache, "content.pak")));
+
+        var originalMode = Resources.ContentMode;
+        try
+        {
+            Resources.SetBlobContentSource(cache);
+            var loaded = Assert.IsType<SceneBlueprint>(
+                new SceneBlueprintLoader().Load(
+                    "levels/first.scene",
+                    "content.pak",
+                    Resources.UsePak,
+                    Resources.ActiveContentDirectory));
+            Assert.Equal("From blobs", loaded.Name);
+
+            Resources.RefreshContent();
+            Resources.ContentMode = AssetContentMode.Auto;
+            var autoLoaded = Assert.IsType<SceneBlueprint>(
+                new SceneBlueprintLoader().Load(
+                    "levels/first.scene",
+                    "content.pak",
+                    Resources.UsePak,
+                    Resources.ActiveContentDirectory));
+            Assert.Equal("From blobs", autoLoaded.Name);
+        }
+        finally
+        {
+            Resources.ResetContentSource();
+            Resources.ContentMode = originalMode;
+        }
+    }
+
+    [Fact]
+    public void PakFingerprintBecomesStaleWhenBlobsChange()
+    {
+        var assets = Path.Combine(_root, "FingerprintAssets");
+        var cache = Path.Combine(_root, "FingerprintCache");
+        var output = Path.Combine(_root, "FingerprintContent", "content.pak");
+        Directory.CreateDirectory(assets);
+        var source = Path.Combine(assets, "data.json");
+        File.WriteAllText(source, "{\"version\":1}");
+        var pipeline = new AssetBakePipeline();
+
+        pipeline.BakePak(new AssetBakeRequest(
+            assets,
+            output,
+            CacheDirectory: cache,
+            RebuildAll: true));
+        Assert.Equal(
+            File.ReadAllText(Path.Combine(cache, BlobContentManifest.FingerprintFileName)).Trim(),
+            File.ReadAllText(output + ".fingerprint").Trim());
+
+        File.WriteAllText(source, "{\"version\":2}");
+        pipeline.BakeBlobs(new AssetBlobBakeRequest(assets, cache));
+
+        Assert.NotEqual(
+            File.ReadAllText(Path.Combine(cache, BlobContentManifest.FingerprintFileName)).Trim(),
+            File.ReadAllText(output + ".fingerprint").Trim());
+    }
+
+    [Fact]
     public void FailedBakeDoesNotReplaceLastKnownGoodPak()
     {
         var assets = Path.Combine(_root, "Assets");

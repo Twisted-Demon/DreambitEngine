@@ -9,6 +9,15 @@ using Microsoft.Xna.Framework.Content;
 
 namespace Dreambit;
 
+public enum AssetContentMode
+{
+    /// <summary>Uses a PAK when present, otherwise a baked-blob manifest.</summary>
+    Auto,
+    Pak,
+    Blobs,
+    LooseFiles
+}
+
 public class Resources : Singleton<Resources>
 {
     // Explicit loaders are discovered once per engine/game assembly generation. Generic loaders
@@ -17,14 +26,31 @@ public class Resources : Singleton<Resources>
     private static readonly Dictionary<Type, IAssetLoader> GenericDreambitLoaders = [];
     private readonly Dictionary<string, PakReader> _pakReaders =
         new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, BlobContentReader> _blobReaders =
+        new(StringComparer.OrdinalIgnoreCase);
     private DreambitXnbReader _xnbReader;
     private static string _contentDirectoryOverride;
+    private static AssetContentMode _contentMode = AssetContentMode.Auto;
 
     private static string ContentDirectory =>
         string.IsNullOrWhiteSpace(_contentDirectoryOverride)
             ? Path.Combine(AppContext.BaseDirectory, Core.Instance.Content.RootDirectory)
             : _contentDirectoryOverride;
-    public static bool UsePak { get; set; } = true;
+    /// <summary>
+    /// Compatibility switch for callers that explicitly select PAK or loose-file loading.
+    /// New development hosts should use <see cref="ContentMode"/>.
+    /// </summary>
+    public static bool UsePak
+    {
+        get => _contentMode is AssetContentMode.Auto or AssetContentMode.Pak;
+        set => _contentMode = value ? AssetContentMode.Pak : AssetContentMode.LooseFiles;
+    }
+
+    public static AssetContentMode ContentMode
+    {
+        get => _contentMode;
+        set => _contentMode = value;
+    }
     public static string PakName { get; set; } = "content.pak";
     public static IAssetRegistry AssetRegistry { get; set; }
 
@@ -51,6 +77,22 @@ public class Resources : Singleton<Resources>
         PakName = pakName;
     }
 
+    /// <summary>Points resource loading at an incremental baked-blob directory.</summary>
+    public static void SetBlobContentSource(string contentDirectory)
+    {
+        SetContentSource(contentDirectory);
+        _contentMode = AssetContentMode.Blobs;
+    }
+
+    /// <summary>Restores the game's default Content directory and automatic source selection.</summary>
+    public static void ResetContentSource()
+    {
+        RefreshContent();
+        _contentDirectoryOverride = null;
+        PakName = "content.pak";
+        _contentMode = AssetContentMode.Auto;
+    }
+
     /// <summary>Releases cached assets and PAK readers so newly baked content can be opened.</summary>
     public static void RefreshContent()
     {
@@ -58,6 +100,7 @@ public class Resources : Singleton<Resources>
         foreach (var reader in Instance._pakReaders.Values)
             reader.Dispose();
         Instance._pakReaders.Clear();
+        Instance._blobReaders.Clear();
     }
 
     public void Init()
@@ -311,10 +354,21 @@ public class Resources : Singleton<Resources>
         bool usePak,
         string contentDirectory)
     {
-        if (!usePak)
+        var mode = _contentMode;
+        if (mode == AssetContentMode.Blobs)
+            return OpenBlobStream(assetName, contentDirectory);
+
+        if (mode == AssetContentMode.LooseFiles || !usePak)
             return File.OpenRead(Path.Combine(contentDirectory, assetName));
 
         var pakPath = Path.GetFullPath(Path.Combine(contentDirectory, pakName));
+        if (mode == AssetContentMode.Auto && !File.Exists(pakPath))
+        {
+            var manifestPath = Path.Combine(contentDirectory, BlobContentManifest.FileName);
+            if (File.Exists(manifestPath))
+                return OpenBlobStream(assetName, contentDirectory);
+        }
+
         if (!Instance._pakReaders.TryGetValue(pakPath, out var reader))
         {
             reader = new PakReader(pakPath);
@@ -324,12 +378,23 @@ public class Resources : Singleton<Resources>
         return reader.Open(assetName);
     }
 
+    private static Stream OpenBlobStream(string assetName, string contentDirectory)
+    {
+        var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(contentDirectory));
+        if (!Instance._blobReaders.TryGetValue(root, out var reader))
+        {
+            reader = new BlobContentReader(root);
+            Instance._blobReaders.Add(root, reader);
+        }
+
+        return reader.Open(assetName);
+    }
+
     internal void CleanUp()
     {
-        RefreshContent();
+        ResetContentSource();
         _xnbReader?.Dispose();
         _xnbReader = null;
-        _contentDirectoryOverride = null;
     }
 
     internal static void ReleaseAssembly(Assembly assembly)
