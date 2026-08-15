@@ -112,6 +112,34 @@ public sealed class AssetBakePipelineTests : IDisposable
     }
 
     [Fact]
+    public void IncrementalBlobBakeDoesNotMaterializeCachedPayloads()
+    {
+        const int payloadLength = 8 * 1024 * 1024;
+        var assets = Path.Combine(_root, "LargeBlobAssets");
+        var cache = Path.Combine(_root, "LargeBlobCache");
+        Directory.CreateDirectory(assets);
+        File.WriteAllText(
+            Path.Combine(assets, "large.txt"),
+            new string('x', payloadLength));
+
+        var pipeline = new AssetBakePipeline();
+        var request = new AssetBlobBakeRequest(assets, cache, RebuildAll: false);
+        var first = pipeline.BakeBlobs(request);
+
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var second = pipeline.BakeBlobs(request);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+
+        Assert.Equal(1, first.BakedCount);
+        Assert.Equal(1, second.CacheHitCount);
+        Assert.Equal(first.OutputLength, second.OutputLength);
+        Assert.Equal(first.ContentFingerprint, second.ContentFingerprint);
+        Assert.True(
+            allocated < payloadLength / 2,
+            $"A cached {payloadLength:N0}-byte blob allocated {allocated:N0} bytes while baking.");
+    }
+
+    [Fact]
     public void PakFingerprintBecomesStaleWhenBlobsChange()
     {
         var assets = Path.Combine(_root, "FingerprintAssets");

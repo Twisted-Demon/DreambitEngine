@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
@@ -108,6 +109,7 @@ public sealed class AssetBakePipeline
                 request.MarkSrgb,
                 request.TargetPlatform,
                 request.IncludeBuiltInContent),
+            retainBlobData: false,
             progress,
             cancellationToken);
         stopwatch.Stop();
@@ -125,7 +127,7 @@ public sealed class AssetBakePipeline
             prepared.BakedCount,
             prepared.CacheHitCount,
             prepared.UnsupportedCount,
-            prepared.Blobs.Values.Sum(value => (long)value.Blob.Data.Length),
+            prepared.Blobs.Values.Sum(value => value.Length),
             stopwatch.Elapsed);
     }
 
@@ -149,12 +151,15 @@ public sealed class AssetBakePipeline
                 request.MarkSrgb,
                 request.TargetPlatform,
                 request.IncludeBuiltInContent),
+            retainBlobData: true,
             progress,
             cancellationToken);
 
         var pak = new PakWriter();
         foreach (var preparedBlob in prepared.Blobs.Values)
-            pak.Add(preparedBlob.Blob);
+            pak.Add(preparedBlob.Blob
+                    ?? throw new InvalidOperationException(
+                        $"Asset '{preparedBlob.LogicalPath}' has no in-memory data for PAK output."));
 
         cancellationToken.ThrowIfCancellationRequested();
         progress?.Report(new AssetBakeProgress("Write", $"Writing {outputPak}"));
@@ -177,6 +182,7 @@ public sealed class AssetBakePipeline
 
     private static PreparedBake PrepareAssets(
         BakeParameters request,
+        bool retainBlobData,
         IProgress<AssetBakeProgress>? progress,
         CancellationToken cancellationToken)
     {
@@ -244,9 +250,13 @@ public sealed class AssetBakePipeline
                 var sourceHash = ComputeHash(file);
                 var cacheKey = $"{bakeRoot.CachePrefix}/{relativePath}".ToLowerInvariant();
                 liveCacheKeys.Add(cacheKey);
-                AssetBlob blob;
-                string? blobFile;
-                if (cache.TryRead(cacheKey, sourceHash, optionSignature, out blob, out blobFile))
+                PreparedBlob preparedBlob;
+                if (cache.TryRead(
+                        cacheKey,
+                        sourceHash,
+                        optionSignature,
+                        retainBlobData,
+                        out preparedBlob))
                 {
                     cacheHitCount++;
                     progress?.Report(new AssetBakeProgress(
@@ -261,7 +271,7 @@ public sealed class AssetBakePipeline
                         "Bake",
                         $"Baking {relativePath}",
                         relativePath));
-                    blob = baker.BakeToBytes(new BakeContext
+                    var blob = baker.BakeToBytes(new BakeContext
                     {
                         InputPath = file,
                         OutputPath = string.Empty,
@@ -272,23 +282,27 @@ public sealed class AssetBakePipeline
                         TargetPlatform = request.TargetPlatform,
                         LogicalRoot = bakeRoot.Path
                     });
-                    blobFile = cache.Write(cacheKey, sourceHash, optionSignature, blob);
+                    var blobFile = cache.Write(cacheKey, sourceHash, optionSignature, blob);
+                    preparedBlob = PreparedBlob.FromBlob(
+                        blob,
+                        blobFile,
+                        retainBlobData);
                     bakedCount++;
                 }
 
-                if (!producedPaths.Add(blob.LogicalPath))
+                if (!producedPaths.Add(preparedBlob.LogicalPath))
                     throw new InvalidOperationException(
-                        $"Two {bakeRoot.CachePrefix} source assets produce '{blob.LogicalPath}'.");
-                if (bakeRoot.IsBuiltIn && blob.Type == AssetType.Effect)
-                    builtInEffectPaths.Add(blob.LogicalPath);
+                        $"Two {bakeRoot.CachePrefix} source assets produce '{preparedBlob.LogicalPath}'.");
+                if (bakeRoot.IsBuiltIn && preparedBlob.Type == AssetType.Effect)
+                    builtInEffectPaths.Add(preparedBlob.LogicalPath);
                 if (bakeRoot.AllowProjectOverride)
                 {
-                    if (!finalBlobs.TryAdd(blob.LogicalPath, new PreparedBlob(blob, blobFile)))
+                    if (!finalBlobs.TryAdd(preparedBlob.LogicalPath, preparedBlob))
                         throw new InvalidOperationException(
-                            $"Two source assets produce '{blob.LogicalPath}'.");
+                            $"Two source assets produce '{preparedBlob.LogicalPath}'.");
                 }
                 else
-                    finalBlobs[blob.LogicalPath] = new PreparedBlob(blob, blobFile);
+                    finalBlobs[preparedBlob.LogicalPath] = preparedBlob;
             }
         }
 
@@ -299,30 +313,31 @@ public sealed class AssetBakePipeline
             const string registryCacheKey = "registry/runtime";
             liveCacheKeys.Add(registryCacheKey);
             var registryHash = ComputeHash(request.AssetRegistryPath);
-            AssetBlob registryBlob;
-            string? registryBlobFile;
+            PreparedBlob registryBlob;
             if (!cache.TryRead(
                     registryCacheKey,
                     registryHash,
                     "runtime-registry-v1",
-                    out registryBlob,
-                    out registryBlobFile))
+                    retainBlobData,
+                    out registryBlob))
             {
-                registryBlob = CreateRuntimeRegistryBlob(request.AssetRegistryPath);
-                registryBlobFile = cache.Write(
+                var bakedRegistryBlob = CreateRuntimeRegistryBlob(request.AssetRegistryPath);
+                var registryBlobFile = cache.Write(
                     registryCacheKey,
                     registryHash,
                     "runtime-registry-v1",
-                    registryBlob);
+                    bakedRegistryBlob);
+                registryBlob = PreparedBlob.FromBlob(
+                    bakedRegistryBlob,
+                    registryBlobFile,
+                    retainBlobData);
             }
-            finalBlobs[registryBlob.LogicalPath] = new PreparedBlob(
-                registryBlob,
-                registryBlobFile);
+            finalBlobs[registryBlob.LogicalPath] = registryBlob;
         }
 
         cache.RemoveMissing(liveCacheKeys);
         cancellationToken.ThrowIfCancellationRequested();
-        var fingerprint = ComputeContentFingerprint(finalBlobs);
+        var fingerprint = ComputeContentFingerprint(finalBlobs, request.CacheDirectory);
         cache.Save(finalBlobs, fingerprint);
         if (request.IncludeBuiltInContent && !string.IsNullOrWhiteSpace(request.CacheDirectory))
             BuiltInContentSource.MarkCurrent(request.CacheDirectory);
@@ -376,7 +391,8 @@ public sealed class AssetBakePipeline
         $"platform={request.TargetPlatform}";
 
     private static string ComputeContentFingerprint(
-        IReadOnlyDictionary<string, PreparedBlob> blobs)
+        IReadOnlyDictionary<string, PreparedBlob> blobs,
+        string? cacheDirectory)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         foreach (var (logicalPath, prepared) in blobs.OrderBy(
@@ -385,10 +401,49 @@ public sealed class AssetBakePipeline
         {
             hash.AppendData(Encoding.UTF8.GetBytes(logicalPath.ToLowerInvariant()));
             hash.AppendData([0]);
-            hash.AppendData(prepared.Blob.Data);
+            if (prepared.Blob is { } blob)
+            {
+                hash.AppendData(blob.Data);
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(cacheDirectory) ||
+                    string.IsNullOrWhiteSpace(prepared.BlobFile))
+                {
+                    throw new InvalidOperationException(
+                        $"Asset '{logicalPath}' has neither in-memory data nor a cached blob file.");
+                }
+
+                var blobPath = Path.Combine(
+                    Path.GetFullPath(cacheDirectory),
+                    prepared.BlobFile.Replace('/', Path.DirectorySeparatorChar));
+                AppendFileToHash(hash, blobPath);
+            }
             hash.AppendData([0]);
         }
         return Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
+    }
+
+    private static void AppendFileToHash(IncrementalHash hash, string path)
+    {
+        var buffer = ArrayPool<byte>.Shared.Rent(128 * 1024);
+        try
+        {
+            using var stream = new FileStream(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete,
+                buffer.Length,
+                FileOptions.SequentialScan);
+            int bytesRead;
+            while ((bytesRead = stream.Read(buffer, 0, buffer.Length)) != 0)
+                hash.AppendData(buffer.AsSpan(0, bytesRead));
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
     }
 
     private static void WriteTextAtomically(string path, string content)
@@ -514,7 +569,26 @@ public sealed class AssetBakePipeline
         string TargetPlatform,
         bool IncludeBuiltInContent);
 
-    private sealed record PreparedBlob(AssetBlob Blob, string? BlobFile);
+    private sealed record PreparedBlob(
+        string LogicalPath,
+        AssetType Type,
+        string Extension,
+        long Length,
+        string? BlobFile,
+        AssetBlob? Blob)
+    {
+        public static PreparedBlob FromBlob(
+            AssetBlob blob,
+            string? blobFile,
+            bool retainData) =>
+            new(
+                blob.LogicalPath,
+                blob.Type,
+                blob.Extension,
+                blob.Data.LongLength,
+                blobFile,
+                retainData ? blob : null);
+    }
 
     private sealed record PreparedBake(
         IReadOnlyDictionary<string, PreparedBlob> Blobs,
@@ -584,11 +658,10 @@ public sealed class AssetBakePipeline
             string key,
             string sourceHash,
             string optionSignature,
-            out AssetBlob blob,
-            out string? blobFile)
+            bool includeData,
+            out PreparedBlob blob)
         {
             blob = null!;
-            blobFile = null;
             if (_directory is null ||
                 !_document.Entries.TryGetValue(key, out var entry) ||
                 entry.SourceHash != sourceHash ||
@@ -601,12 +674,24 @@ public sealed class AssetBakePipeline
                 return false;
             try
             {
-                blob = new AssetBlob(
+                var blobFile = "blobs/" + entry.BlobFile;
+                var length = new FileInfo(blobPath).Length;
+                AssetBlob? assetBlob = null;
+                if (includeData)
+                {
+                    assetBlob = new AssetBlob(
+                        entry.LogicalPath,
+                        entry.AssetType,
+                        entry.Extension,
+                        File.ReadAllBytes(blobPath));
+                }
+                blob = new PreparedBlob(
                     entry.LogicalPath,
                     entry.AssetType,
                     entry.Extension,
-                    File.ReadAllBytes(blobPath));
-                blobFile = "blobs/" + entry.BlobFile;
+                    length,
+                    blobFile,
+                    assetBlob);
                 return true;
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
