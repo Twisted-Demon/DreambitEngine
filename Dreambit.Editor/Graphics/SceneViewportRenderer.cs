@@ -45,7 +45,10 @@ internal sealed class SceneViewportRenderer : IDisposable
             Draw(scene, camera.TransformMatrix);
             ApplyLighting(scene, camera, scene.RenderingOptions.SamplerState);
             ApplyColorCorrection(scene, scene.RenderingOptions.SamplerState);
-            Present(scene.RenderingOptions.SamplerState, scene.PostProcessSettings.TintColor);
+            Present(
+                scene.RenderingOptions.SamplerState,
+                scene.PostProcessSettings.TintColor,
+                scene.Settings.Exposure);
             LastError = null;
         }
         catch (Exception exception)
@@ -167,11 +170,12 @@ internal sealed class SceneViewportRenderer : IDisposable
         }
     }
 
-    private void Present(SamplerState samplerState, Color tintColor)
+    private void Present(SamplerState samplerState, Color tintColor, float exposure)
     {
         var presentEffect = Resources.LoadAsset<Effect>("Effects/Present")
                             ?? throw new InvalidOperationException(
                                 "The built-in scene presentation effect could not be loaded.");
+        presentEffect.Parameters["Exposure"]?.SetValue(MathF.Max(0f, exposure));
         _device.SetRenderTarget(_displayTarget);
         _device.Clear(Color.Transparent);
         var batchStarted = false;
