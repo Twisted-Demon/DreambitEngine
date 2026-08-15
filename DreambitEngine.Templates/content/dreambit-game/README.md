@@ -24,6 +24,8 @@ DreambitGame/
 |-- .dreambit/
 |   `-- project.json                 # Portable project metadata
 |-- Directory.Packages.props         # Coordinated SDK/package versions
+|-- scripts/
+|   `-- update-dreambit.ps1          # Updates the project to a selected SDK
 |-- src/
 |   |-- Directory.Build.props
 |   |-- DreambitGame/                # Game code and scenes
@@ -55,3 +57,16 @@ dotnet build DreambitGame.sln
 dotnet run --project src/DreambitGame.VK
 dotnet build src/DreambitGame.VK/DreambitGame.VK.csproj -c Release
 ```
+
+## Updating Dreambit
+
+To update manually, run the project updater with the coordinated SDK version. If
+the SDK packages are local rather than published to a NuGet feed, also provide
+the directory containing the matching `.nupkg` files.
+
+```powershell
+./scripts/update-dreambit.ps1 -SdkVersion 0.3.3 -PackageSource C:\path\to\packages
+```
+
+The script updates `Directory.Packages.props` and `.dreambit/project.json`, then
+restores the solution. If restore fails, it restores both files to their prior state.

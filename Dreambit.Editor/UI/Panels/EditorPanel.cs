@@ -21,13 +21,14 @@ internal abstract class EditorPanel : IEditorPanel
     public string Title { get; }
     public string WindowName { get; }
     public bool IsOpen { get; set; }
+    public virtual bool IsAvailable => true;
 
     protected virtual ImGuiWindowFlags WindowFlags => ImGuiWindowFlags.None;
 
     public void Draw()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (!IsOpen)
+        if (!IsOpen || !IsAvailable)
             return;
 
         var isOpen = IsOpen;

@@ -244,9 +244,21 @@ public sealed class AssetBakePipelineTests : IDisposable
         using (var stream = pak.Open("levels/first.scene.jsonb"))
             Assert.True(stream.Length > 0);
 
-        var loader = new SceneBlueprintLoader();
-        var loaded = Assert.IsType<SceneBlueprint>(
-            loader.Load("levels/first.scene", "content.pak", true, Path.GetDirectoryName(output)!));
+        var originalMode = Resources.ContentMode;
+        SceneBlueprint loaded;
+        try
+        {
+            // An explicit PAK load must remain independent of an editor preview
+            // temporarily using loose files or incremental blobs.
+            Resources.ContentMode = AssetContentMode.LooseFiles;
+            var loader = new SceneBlueprintLoader();
+            loaded = Assert.IsType<SceneBlueprint>(
+                loader.Load("levels/first.scene", "content.pak", true, Path.GetDirectoryName(output)!));
+        }
+        finally
+        {
+            Resources.ContentMode = originalMode;
+        }
         Assert.Equal("First", loaded.Name);
         Assert.Equal("levels/first.scene", loaded.AssetName);
     }

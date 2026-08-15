@@ -141,6 +141,7 @@ public class Scene : IDisposable
             MaterializeLDtkScene(ldtk, options);
         if (blueprint.Tiled is { } tiled)
             MaterializeTiledScene(tiled, options);
+        ApplySettings(blueprint.Settings);
         if (blueprint.Entities.Count == 0)
             return;
 
@@ -235,6 +236,9 @@ public class Scene : IDisposable
     /// <summary>Post-process configuration shared with passes.</summary>
     public readonly PostProcessSettings PostProcessSettings;
 
+    /// <summary>Authorable rendering settings currently applied to this scene.</summary>
+    public readonly SceneSettings Settings = new();
+
     public readonly RenderingOptions RenderingOptions;
 
     /// <summary>Primary world camera.</summary>
@@ -306,6 +310,7 @@ public class Scene : IDisposable
         Entity.Create("event-bus").AttachComponent<EventBus>();
 
         AmbientLight = Entity.Create("ambient-light").AttachComponent<AmbientLight2D>();
+        ApplyAmbientLightSettings();
 
         // Setup default render passes
         _renderPipeline.Initialize();
@@ -470,6 +475,20 @@ public class Scene : IDisposable
         Entities.FlushStructuralChanges();
     }
 
+    /// <summary>Applies serialized scene rendering settings without replacing the scene.</summary>
+    public void ApplySettings(SceneSettings? settings)
+    {
+        settings ??= new SceneSettings();
+        Settings.AmbientLightIntensity = settings.AmbientLightIntensity;
+        Settings.AmbientLightColor = settings.AmbientLightColor;
+        Settings.PostProcessing = settings.PostProcessing?.Clone() ?? new PostProcessSettings();
+
+        PostProcessSettings.HueShift = Settings.PostProcessing.HueShift;
+        PostProcessSettings.Saturation = Settings.PostProcessing.Saturation;
+        PostProcessSettings.TintColor = Settings.PostProcessing.TintColor;
+        ApplyAmbientLightSettings();
+    }
+
     /// <summary>Runs opt-in editor callbacks while keeping gameplay lifecycle suppressed.</summary>
     public void EditorTick()
     {
@@ -493,6 +512,15 @@ public class Scene : IDisposable
         MainCamera = cameraEntity.AttachComponent<Camera2D>();
         FlushStructuralChanges();
         return MainCamera;
+    }
+
+    private void ApplyAmbientLightSettings()
+    {
+        if (AmbientLight is null)
+            return;
+
+        AmbientLight.Intensity = Settings.AmbientLightIntensity;
+        AmbientLight.Color = Settings.AmbientLightColor;
     }
 
     /// <summary>Invokes component editor gizmos without running gameplay drawing callbacks.</summary>

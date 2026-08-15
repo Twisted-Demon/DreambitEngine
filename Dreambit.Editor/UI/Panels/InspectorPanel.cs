@@ -141,11 +141,6 @@ internal sealed class InspectorPanel : EditorPanel
             return;
         }
 
-        if (document.LDtkReference is not null)
-            DrawLDtkImportOptions(document);
-        if (document.TiledReference is not null)
-            DrawTiledImportOptions(document);
-
         if (entities.Count == 0)
         {
             ImGui.TextDisabled("No entity selected");

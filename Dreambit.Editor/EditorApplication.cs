@@ -30,9 +30,11 @@ internal sealed class EditorApplication : IDisposable
     private readonly EditorPanelRegistry _panels;
     private readonly ProjectLauncherView _projectLauncher;
     private readonly ProjectCreationService _projectCreationService;
+    private readonly ProjectUpgradeService _projectUpgradeService;
     private readonly EditorDragDropService _dragDrop = new();
     private readonly EditorIconService _icons;
     private readonly CancellationTokenSource _projectCreationLifetime = new();
+    private readonly CancellationTokenSource _projectUpgradeLifetime = new();
 
     private readonly DreambitProjectDefinition? _project;
     private string _openProjectPath = string.Empty;
@@ -58,6 +60,12 @@ internal sealed class EditorApplication : IDisposable
     private bool _disposed;
     private Task<ProjectCreationResult>? _projectCreationTask;
     private ProjectCreationStatus _projectCreationStatus = new(false);
+    private Task<ProjectUpgradeResult>? _projectUpgradeTask;
+    private ProjectUpgradeCandidate? _projectUpgradeCandidate;
+    private string? _projectUpgradeMessage;
+    private bool _projectUpgradeIsError;
+    private bool _projectUpgradePopupRequested;
+    private bool _closeProjectUpgradePopup;
 
     public EditorApplication(
         EditorLaunchOptions options,
@@ -82,11 +90,16 @@ internal sealed class EditorApplication : IDisposable
             reportSceneError: LogSceneError);
         var sdkManager = new DreambitSdkManager(paths, _logs);
         _projectCreationService = new ProjectCreationService(sdkManager, _logs);
+        _projectUpgradeService = new ProjectUpgradeService(sdkManager, _logs);
 
         string? projectError = null;
         if (!string.IsNullOrWhiteSpace(options.ProjectPath))
         {
-            if (_projectManager.TryOpen(
+            if (QueueProjectUpgradeIfNeeded(options.ProjectPath))
+            {
+                projectError = null;
+            }
+            else if (_projectManager.TryOpen(
                     options.ProjectPath,
                     out var validation,
                     out projectError))
@@ -109,8 +122,11 @@ internal sealed class EditorApplication : IDisposable
             var session = _projectManager.CurrentSession!;
             var blueprintEditing = session.Blueprints;
             var documentContext = session.Documents;
-            var blueprintDockLayoutMissing =
-                !_workspaceState.PanelVisibility.ContainsKey(EditorPanelIds.Blueprint);
+            var dockLayoutMissingNewTabs =
+                !_workspaceState.PanelVisibility.ContainsKey(EditorPanelIds.Blueprint) ||
+                !_workspaceState.PanelVisibility.ContainsKey(EditorPanelIds.LDtkImportOptions) ||
+                !_workspaceState.PanelVisibility.ContainsKey(EditorPanelIds.TiledImportOptions) ||
+                !_workspaceState.PanelVisibility.ContainsKey(EditorPanelIds.SceneSettings);
             _panels.Register(new HierarchyPanel(
                 documentContext,
                 _dragDrop,
@@ -151,6 +167,9 @@ internal sealed class EditorApplication : IDisposable
                     session.Assets.ContentRoot),
                 session.CustomEditors,
                 _logs));
+            _panels.Register(new LDtkImportOptionsPanel(documentContext));
+            _panels.Register(new TiledImportOptionsPanel(documentContext));
+            _panels.Register(new SceneSettingsPanel(documentContext));
             _panels.Register(new ProjectPanel(
                 _project,
                 _projectManager.CurrentSession!.Assets,
@@ -165,7 +184,7 @@ internal sealed class EditorApplication : IDisposable
                 blueprintView.Open));
             _panels.Register(new ConsolePanel(_logs));
             _panels.Register(new BuildPanel(_projectManager.CurrentSession.GameCode, _icons));
-            _rebuildDockLayout = !imGuiRenderer.HasSavedLayout || blueprintDockLayoutMissing;
+            _rebuildDockLayout = !imGuiRenderer.HasSavedLayout || dockLayoutMissingNewTabs;
 
             if (!string.IsNullOrWhiteSpace(_workspaceState.LastScenePath) &&
                 File.Exists(_workspaceState.LastScenePath))
@@ -192,6 +211,7 @@ internal sealed class EditorApplication : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         UpdateProjectCreation();
+        UpdateProjectUpgrade();
         DrawDockHost();
 
         if (_project is null)
@@ -220,6 +240,7 @@ internal sealed class EditorApplication : IDisposable
         }
 
         DrawOpenProjectPopup();
+        DrawProjectUpgradePopup();
         DrawAboutPopup();
         DrawScenePopups();
         HandleShortcuts();
@@ -1052,6 +1073,9 @@ internal sealed class EditorApplication : IDisposable
 
     private bool TryLaunchProject(string projectPath)
     {
+        if (QueueProjectUpgradeIfNeeded(projectPath))
+            return false;
+
         var validation = _projectManager.Validate(projectPath);
         if (!validation.IsValid)
         {
@@ -1089,6 +1113,95 @@ internal sealed class EditorApplication : IDisposable
         _openProjectError = null;
         _logs.Info("Project", $"Launched project '{project.Metadata.Name}'.");
         return true;
+    }
+
+    private bool QueueProjectUpgradeIfNeeded(string projectPath)
+    {
+        if (!_projectUpgradeService.TryGetUpgradeCandidate(projectPath, out var candidate))
+            return false;
+
+        if (_projectUpgradeTask is not null)
+            return true;
+
+        _projectUpgradeCandidate = candidate;
+        _projectUpgradeMessage = null;
+        _projectUpgradeIsError = false;
+        _projectUpgradePopupRequested = true;
+        return true;
+    }
+
+    private void DrawProjectUpgradePopup()
+    {
+        if (_projectUpgradePopupRequested)
+        {
+            ImGui.OpenPopup("Update Dreambit Project##Dreambit.Editor.ProjectUpdate");
+            _projectUpgradePopupRequested = false;
+        }
+
+        if (!ImGui.BeginPopupModal(
+                "Update Dreambit Project##Dreambit.Editor.ProjectUpdate",
+                ImGuiWindowFlags.AlwaysAutoResize))
+        {
+            return;
+        }
+
+        var candidate = _projectUpgradeCandidate;
+        if (candidate is null)
+        {
+            ImGui.CloseCurrentPopup();
+            ImGui.EndPopup();
+            return;
+        }
+
+        ImGui.TextWrapped(
+            $"'{candidate.ProjectName}' uses Dreambit SDK {candidate.CurrentVersion}, but this " +
+            $"Editor provides {DreambitSdkConstants.CurrentVersion}.");
+        ImGui.Spacing();
+        ImGui.TextWrapped(
+            "Would you like Dreambit to update the project and restore its matching packages before opening it?");
+
+        if (!string.IsNullOrWhiteSpace(_projectUpgradeMessage))
+        {
+            ImGui.Spacing();
+            ImGui.PushStyleColor(
+                ImGuiCol.Text,
+                _projectUpgradeIsError
+                    ? new Vector4(0.96f, 0.34f, 0.36f, 1f)
+                    : new Vector4(0.38f, 0.78f, 0.52f, 1f));
+            ImGui.TextWrapped(_projectUpgradeMessage);
+            ImGui.PopStyleColor();
+        }
+
+        var updating = _projectUpgradeTask is not null;
+        if (updating)
+        {
+            ImGui.Spacing();
+            ImGui.TextDisabled("Updating project and restoring packages...");
+        }
+        else if (ImGui.Button("Update and Open", new Vector2(130f, 0f)))
+        {
+            _projectUpgradeMessage = "Updating project and restoring packages...";
+            _projectUpgradeIsError = false;
+            _projectUpgradeTask = _projectUpgradeService.UpgradeAsync(
+                candidate,
+                _projectUpgradeLifetime.Token);
+        }
+
+        ImGui.SameLine();
+        if (!updating && ImGui.Button("Not Now", new Vector2(90f, 0f)))
+        {
+            _projectUpgradeCandidate = null;
+            _projectUpgradeMessage = null;
+            ImGui.CloseCurrentPopup();
+        }
+
+        if (_closeProjectUpgradePopup)
+        {
+            _closeProjectUpgradePopup = false;
+            ImGui.CloseCurrentPopup();
+        }
+
+        ImGui.EndPopup();
     }
 
     private void CaptureCurrentWindowPlacement()
@@ -1170,6 +1283,56 @@ internal sealed class EditorApplication : IDisposable
         _projectCreationStatus = new ProjectCreationStatus(
             false,
             $"{result.Message} The project opened in a new Editor process.");
+    }
+
+    private void UpdateProjectUpgrade()
+    {
+        if (_projectUpgradeTask is not { IsCompleted: true } task)
+            return;
+
+        ProjectUpgradeResult result;
+        try
+        {
+            result = task.GetAwaiter().GetResult();
+        }
+        catch (Exception exception)
+        {
+            _logs.Error("Project", "Project update failed unexpectedly.", exception);
+            result = new ProjectUpgradeResult(false, exception.Message);
+        }
+
+        _projectUpgradeTask = null;
+        if (!result.Succeeded || _projectUpgradeCandidate is null)
+        {
+            _projectUpgradeMessage = result.Message;
+            _projectUpgradeIsError = true;
+            _projectLauncher.SetError(result.Message);
+            return;
+        }
+
+        var projectRoot = _projectUpgradeCandidate.ProjectRoot;
+        _logs.Info("Project", result.Message);
+        _projectUpgradeCandidate = null;
+        _projectUpgradeMessage = null;
+        _projectUpgradeIsError = false;
+        _closeProjectUpgradePopup = true;
+
+        if (!TryLaunchProject(projectRoot))
+        {
+            var error = _openProjectError ?? "The project was updated, but could not be opened.";
+            _projectUpgradeMessage = error;
+            _projectUpgradeIsError = true;
+            _projectLauncher.SetError(error);
+            _closeProjectUpgradePopup = false;
+            _projectUpgradeCandidate = new ProjectUpgradeCandidate(
+                projectRoot,
+                Path.GetFileName(projectRoot),
+                DreambitSdkConstants.CurrentVersion);
+            _projectUpgradePopupRequested = true;
+            return;
+        }
+
+        _exitAfterProjectLaunch = true;
     }
 
     private void RecordRecentProject(DreambitProjectDefinition project)
@@ -1285,6 +1448,8 @@ internal sealed class EditorApplication : IDisposable
         RunShutdownStep(_icons.Dispose, "Could not dispose editor icons.");
         RunShutdownStep(_projectCreationLifetime.Cancel, "Could not cancel project creation.");
         RunShutdownStep(_projectCreationLifetime.Dispose, "Could not dispose project creation state.");
+        RunShutdownStep(_projectUpgradeLifetime.Cancel, "Could not cancel project update.");
+        RunShutdownStep(_projectUpgradeLifetime.Dispose, "Could not dispose project update state.");
         RunShutdownStep(_projectManager.Dispose, "Could not dispose the active project session.");
 
         if (!_stateStore.TrySaveGlobalState(_globalState, out var globalError))

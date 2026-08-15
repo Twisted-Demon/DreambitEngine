@@ -26,4 +26,8 @@ public class SceneBlueprint : DreambitAsset
     [DreambitSerialize]
     [JsonProperty("tiled")]
     public TiledSceneReference Tiled { get; set; }
+
+    [DreambitSerialize]
+    [JsonProperty("settings")]
+    public SceneSettings Settings { get; set; } = new();
 }

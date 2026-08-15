@@ -358,7 +358,11 @@ public class Resources : Singleton<Resources>
         if (mode == AssetContentMode.Blobs)
             return OpenBlobStream(assetName, contentDirectory);
 
-        if (mode == AssetContentMode.LooseFiles || !usePak)
+        // The caller's explicit source selection is authoritative for PAK versus
+        // loose files. ContentMode.LooseFiles is already reflected by UsePak when
+        // normal loaders call this method; honoring it here as a second override
+        // made direct loaders read an unrelated global source during editor work.
+        if (!usePak)
             return File.OpenRead(Path.Combine(contentDirectory, assetName));
 
         var pakPath = Path.GetFullPath(Path.Combine(contentDirectory, pakName));

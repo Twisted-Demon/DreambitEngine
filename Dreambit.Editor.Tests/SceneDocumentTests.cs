@@ -115,6 +115,34 @@ public sealed class SceneDocumentTests : IDisposable
     }
 
     [Fact]
+    public void SceneSettingsPersistAndParticipateInUndo()
+    {
+        using var document = new SceneDocument(
+            new SceneBlueprint { Name = "Lighting", Entities = [] },
+            null,
+            new SelectionService());
+
+        document.UpdateSceneSettings("Change Scene Settings", settings =>
+        {
+            settings.AmbientLightIntensity = 0.4f;
+            settings.AmbientLightColor = Color.CornflowerBlue;
+            settings.PostProcessing.HueShift = 0.2f;
+            settings.PostProcessing.Saturation = 0.6f;
+            settings.PostProcessing.TintColor = Color.OrangeRed;
+        });
+
+        Assert.Equal(0.4f, document.Settings.AmbientLightIntensity);
+        Assert.Equal(Color.CornflowerBlue, document.Settings.AmbientLightColor);
+        Assert.Equal(0.2f, document.Settings.PostProcessing.HueShift);
+        Assert.Equal(0.6f, document.Settings.PostProcessing.Saturation);
+        Assert.Equal(Color.OrangeRed, document.Settings.PostProcessing.TintColor);
+        Assert.True(document.Undo.Undo());
+        Assert.Equal(1f, document.Settings.AmbientLightIntensity);
+        Assert.True(document.Undo.Redo());
+        Assert.Equal(Color.OrangeRed, document.Settings.PostProcessing.TintColor);
+    }
+
+    [Fact]
     public void SpriteDrawerMembersWithNonPublicSettersRoundTripThroughBlueprints()
     {
         var root = new EntityBlueprint
