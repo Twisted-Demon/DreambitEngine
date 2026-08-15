@@ -33,7 +33,7 @@ public class Scene : IDisposable
 
         PostProcessSettings = new PostProcessSettings();
         RenderingOptions = new RenderingOptions();
-
+    
         _renderPipeline = new RenderPipeline(this);
         State = SceneState.Created;
     }
