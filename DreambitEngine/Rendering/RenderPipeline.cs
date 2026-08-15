@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Dreambit.ECS;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -15,20 +16,23 @@ public sealed class RenderPipeline(Scene scene) : IDisposable
 
     private readonly List<RenderPass> _renderers = [];
     private bool _disposed;
+    private bool _initialized;
     private Effect _presentEffect;
 
     public RenderTarget2D SceneRenderTarget { get; set; }
+    internal Camera2D ActiveCamera { get; private set; }
+    internal Point ViewportSize { get; private set; }
 
     public void Dispose()
     {
         if (_disposed) return;
 
-        Window.WindowResized -= OnWindowResized;
-
         foreach (var renderer in _renderers)
             renderer?.Dispose();
 
         _renderers.Clear();
+        SceneRenderTarget?.Dispose();
+        SceneRenderTarget = null;
 
         if (_presentEffect is not null)
         {
@@ -36,6 +40,8 @@ public sealed class RenderPipeline(Scene scene) : IDisposable
             _presentEffect = null;
         }
 
+        ActiveCamera = null;
+        _initialized = false;
         _disposed = true;
 
         GC.SuppressFinalize(this);
@@ -43,9 +49,22 @@ public sealed class RenderPipeline(Scene scene) : IDisposable
 
     public void Initialize()
     {
-        Window.WindowResized += OnWindowResized;
-        SceneRenderTarget = CreateRenderTarget();
+        Initialize(new Point(Window.Width, Window.Height));
+    }
+
+    internal void Initialize(Point viewportSize)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_initialized)
+        {
+            EnsureViewportSize(viewportSize);
+            return;
+        }
+
+        ViewportSize = NormalizeViewportSize(viewportSize);
+        SceneRenderTarget = CreateRenderTarget(ViewportSize);
         _presentEffect = Resources.LoadAsset<Effect>("Effects/Present");
+        _initialized = true;
     }
 
     public void AddRenderPass<T>() where T : RenderPass, new()
@@ -74,6 +93,27 @@ public sealed class RenderPipeline(Scene scene) : IDisposable
 
     public void OnDraw()
     {
+        Render(
+            scene.MainCamera,
+            null,
+            new Point(Window.Width, Window.Height),
+            true);
+    }
+
+    internal void Render(
+        Camera2D camera,
+        RenderTarget2D outputTarget,
+        Point viewportSize,
+        bool renderBackBufferPasses)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(camera);
+        if (!_initialized)
+            throw new InvalidOperationException("The render pipeline has not been initialized.");
+
+        EnsureViewportSize(viewportSize);
+        ActiveCamera = camera;
+
         foreach (var renderer in _renderers)
         {
             if (renderer.RendersToBackBuffer)
@@ -82,7 +122,7 @@ public sealed class RenderPipeline(Scene scene) : IDisposable
             renderer.OnDraw();
         }
 
-        Core.Instance.GraphicsDevice.SetRenderTarget(null);
+        Core.Instance.GraphicsDevice.SetRenderTarget(outputTarget);
         Core.Instance.GraphicsDevice.Clear(scene.BackgroundColor);
 
         _presentEffect.Parameters["Exposure"]?.SetValue(Mathf.Max(0f, scene.Settings.Exposure));
@@ -104,9 +144,12 @@ public sealed class RenderPipeline(Scene scene) : IDisposable
 
         // UI is composed after the scene has been presented so it is neither
         // post-processed nor sampled through the scene render target.
-        foreach (var renderer in _renderers)
-            if (renderer.RendersToBackBuffer)
-                renderer.OnDraw();
+        if (renderBackBufferPasses)
+        {
+            foreach (var renderer in _renderers)
+                if (renderer.RendersToBackBuffer)
+                    renderer.OnDraw();
+        }
     }
 
     public static RenderTarget2D CreateRenderTarget()
@@ -151,9 +194,38 @@ public sealed class RenderPipeline(Scene scene) : IDisposable
         return target;
     }
 
-    private void OnWindowResized(object sender, WindowResizedEventArgs args)
+    internal RenderTarget2D CreateViewportRenderTarget()
     {
-        SceneRenderTarget?.Dispose();
-        SceneRenderTarget = CreateRenderTarget();
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return CreateRenderTarget(ViewportSize);
     }
+
+    private void EnsureViewportSize(Point viewportSize)
+    {
+        viewportSize = NormalizeViewportSize(viewportSize);
+        if (SceneRenderTarget is not null && ViewportSize == viewportSize)
+            return;
+
+        var replacementTarget = CreateRenderTarget(viewportSize);
+        var previousTarget = SceneRenderTarget;
+        ViewportSize = viewportSize;
+        SceneRenderTarget = replacementTarget;
+
+        try
+        {
+            previousTarget?.Dispose();
+            foreach (var renderer in _renderers)
+                renderer.ResizeInternals();
+        }
+        catch
+        {
+            // Force the next render to retry every pass after a partial resize.
+            ViewportSize = Point.Zero;
+            throw;
+        }
+    }
+
+    private static Point NormalizeViewportSize(Point viewportSize) => new(
+        Math.Max(viewportSize.X, 1),
+        Math.Max(viewportSize.Y, 1));
 }

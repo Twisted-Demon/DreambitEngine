@@ -1300,7 +1300,7 @@ public sealed class SceneDocumentTests : IDisposable
         Assert.Contains(generated, entity => entity.Name.Contains("GameplayMarkers"));
         var background = Assert.Single(
             generated.SelectMany(entity => entity.GetAllComponents()).OfType<FilledRectDrawer>());
-        Assert.True(SceneViewportRenderer.ShouldRenderDrawable(background));
+        Assert.True(SceneViewportRenderer.ShouldPickDrawable(background));
         Assert.All(generated, entity => Assert.True(entity.IsLDtkGenerated));
 
         var placed = document.CreateEmpty("Dreambit Placed");

@@ -8,6 +8,7 @@ using Dreambit.Scripting;
 using Dreambit.Tiled;
 using Dreambit.UI;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 
 namespace Dreambit;
 
@@ -195,6 +196,7 @@ public class Scene : IDisposable
 
     /// <summary>Render pipeline composed of render passes.</summary>
     private RenderPipeline _renderPipeline;
+    private bool _renderPipelineInitialized;
 
     /// <summary>Tracks disposal state to avoid double-dispose.</summary>
     private bool _isDisposed;
@@ -312,9 +314,7 @@ public class Scene : IDisposable
         AmbientLight = Entity.Create("ambient-light").AttachComponent<AmbientLight2D>();
         ApplyAmbientLightSettings();
 
-        // Setup default render passes
-        _renderPipeline.Initialize();
-        SetUpRenderPipeLine();
+        EnsureRenderPipelineInitialized(new Point(Window.Width, Window.Height));
     }
 
     /// <summary>
@@ -323,9 +323,22 @@ public class Scene : IDisposable
     protected virtual void SetUpRenderPipeLine()
     {
         _renderPipeline.AddRenderPass<Basic2dLightingRenderPass>();
-        _renderPipeline.AddRenderPass<DebugRenderPass>();
         _renderPipeline.AddRenderPass<PostProcessRenderPass>();
-        _renderPipeline.AddRenderPass<UIRenderPass>();
+        if (ExecutionMode == SceneExecutionMode.Runtime)
+        {
+            _renderPipeline.AddRenderPass<DebugRenderPass>();
+            _renderPipeline.AddRenderPass<UIRenderPass>();
+        }
+    }
+
+    private void EnsureRenderPipelineInitialized(Point viewportSize)
+    {
+        if (_renderPipelineInitialized)
+            return;
+
+        _renderPipeline.Initialize(viewportSize);
+        SetUpRenderPipeLine();
+        _renderPipelineInitialized = true;
     }
 
     /// <summary>
@@ -661,6 +674,25 @@ public class Scene : IDisposable
 
         //Guard.SafeCall(_renderPipeline.OnDraw, "RenderPipeline.OnDraw");
         _renderPipeline.OnDraw();
+    }
+
+    /// <summary>
+    /// Renders this scene through its normal world and post-process passes into a
+    /// caller-owned target without running gameplay lifecycle or backbuffer UI passes.
+    /// </summary>
+    public void RenderTo(RenderTarget2D target, Camera2D camera)
+    {
+        ObjectDisposedException.ThrowIf(_isDisposed, this);
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(camera);
+        if (target.IsDisposed)
+            throw new ObjectDisposedException(nameof(target));
+        if (camera.Scene != this)
+            throw new ArgumentException("The render camera must belong to this scene.", nameof(camera));
+
+        var viewportSize = new Point(target.Width, target.Height);
+        EnsureRenderPipelineInitialized(viewportSize);
+        _renderPipeline.Render(camera, target, viewportSize, false);
     }
 
     #endregion

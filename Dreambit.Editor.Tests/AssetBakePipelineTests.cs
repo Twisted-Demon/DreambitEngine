@@ -279,9 +279,24 @@ public sealed class AssetBakePipelineTests : IDisposable
         using (var stream = pak.Open("intro.cutscene.yamlb"))
             Assert.True(stream.Length > 0);
 
-        var loader = new CutsceneLoader();
-        var loaded = Assert.IsType<Dreambit.Scripting.Cutscene>(
-            loader.Load("intro.cutscene", "content.pak", true, Path.GetDirectoryName(output)!));
+        var originalMode = Resources.ContentMode;
+        Dreambit.Scripting.Cutscene loaded;
+        try
+        {
+            // An explicit PAK request must not inherit an earlier blob-preview
+            // source selected by another editor test.
+            Resources.ContentMode = AssetContentMode.LooseFiles;
+            loaded = Assert.IsType<Dreambit.Scripting.Cutscene>(
+                new CutsceneLoader().Load(
+                    "intro.cutscene",
+                    "content.pak",
+                    true,
+                    Path.GetDirectoryName(output)!));
+        }
+        finally
+        {
+            Resources.ContentMode = originalMode;
+        }
         Assert.Equal("intro.cutscene", loaded.AssetName);
         Assert.Equal("IntroAction", Assert.Single(Assert.Single(loaded.Groups).Actions).Script);
     }

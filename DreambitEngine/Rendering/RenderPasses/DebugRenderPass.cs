@@ -22,7 +22,7 @@ public class DebugRenderPass : RenderPass
             samplerState: SamplerState.PointClamp,
             blendState: BlendState.AlphaBlend,
             sortMode: SpriteSortMode.Deferred,
-            transformMatrix: Scene.MainCamera.TransformMatrix,
+            transformMatrix: RenderCamera.TransformMatrix,
             effect: DefaultEffect);
 
         var entities = Scene.GetAllActiveEntities(); // ideally IReadOnlyList<Entity>

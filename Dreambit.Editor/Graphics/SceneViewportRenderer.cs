@@ -9,10 +9,7 @@ internal sealed class SceneViewportRenderer : IDisposable
 {
     private readonly GraphicsDevice _device;
     private readonly ImGuiRenderer _imGui;
-    private readonly List<DrawableComponent> _drawBuffer = new(512);
-    private RenderTarget2D? _sceneTarget;
-    private RenderTarget2D? _lightingTarget;
-    private RenderTarget2D? _colorCorrectionTarget;
+    private readonly List<DrawableComponent> _pickBuffer = new(512);
     private RenderTarget2D? _displayTarget;
     private nint _textureId;
     private bool _disposed;
@@ -38,17 +35,8 @@ internal sealed class SceneViewportRenderer : IDisposable
             EnsureTarget(width, height);
             camera.Transform.Position = new Vector3(position, camera.Transform.Position.Z);
             camera.Zoom = EditorViewportUi.NormalizeZoom(zoom);
-            camera.ConfigureEditorViewport(_sceneTarget!.Width, _sceneTarget.Height);
-            _device.SetRenderTarget(_sceneTarget);
-            _device.Clear(Color.Transparent);
-            BuildDrawBuffer(scene);
-            Draw(scene, camera.TransformMatrix);
-            ApplyLighting(scene, camera, scene.RenderingOptions.SamplerState);
-            ApplyColorCorrection(scene, scene.RenderingOptions.SamplerState);
-            Present(
-                scene.RenderingOptions.SamplerState,
-                scene.PostProcessSettings.TintColor,
-                scene.Settings.Exposure);
+            camera.ConfigureEditorViewport(_displayTarget!.Width, _displayTarget.Height);
+            scene.RenderTo(_displayTarget, camera);
             LastError = null;
         }
         catch (Exception exception)
@@ -57,7 +45,6 @@ internal sealed class SceneViewportRenderer : IDisposable
         }
         finally
         {
-            _drawBuffer.Clear();
             try
             {
                 _device.SetRenderTarget(null);
@@ -81,10 +68,10 @@ internal sealed class SceneViewportRenderer : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         try
         {
-            BuildDrawBuffer(scene);
-            for (var index = _drawBuffer.Count - 1; index >= 0; index--)
+            BuildPickBuffer(scene);
+            for (var index = _pickBuffer.Count - 1; index >= 0; index--)
             {
-                var drawable = _drawBuffer[index];
+                var drawable = _pickBuffer[index];
                 try
                 {
                     if (drawable.Bounds.Contains(worldPosition))
@@ -116,218 +103,44 @@ internal sealed class SceneViewportRenderer : IDisposable
         }
         finally
         {
-            _drawBuffer.Clear();
+            _pickBuffer.Clear();
         }
     }
 
-    private void BuildDrawBuffer(Scene scene)
+    private void BuildPickBuffer(Scene scene)
     {
-        _drawBuffer.Clear();
+        _pickBuffer.Clear();
         foreach (var drawable in scene.GetAllDrawables())
-            if (ShouldRenderDrawable(drawable))
-                _drawBuffer.Add(drawable);
-        _drawBuffer.Sort(static (left, right) =>
+            if (ShouldPickDrawable(drawable))
+                _pickBuffer.Add(drawable);
+        _pickBuffer.Sort(static (left, right) =>
         {
             var layer = left.DrawLayer.CompareTo(right.DrawLayer);
             return layer != 0 ? layer : left.SortDepth.CompareTo(right.SortDepth);
         });
     }
 
-    // Editor-only means transient/non-serialized, not invisible. This keeps linked
-    // LDtk level geometry visible while selection and hierarchy editing remain disabled.
-    internal static bool ShouldRenderDrawable(DrawableComponent drawable) =>
+    // Editor-only means transient/non-serialized, not unpickable. This keeps linked
+    // map geometry selectable while hierarchy editing remains disabled.
+    internal static bool ShouldPickDrawable(DrawableComponent drawable) =>
         drawable is not Light2D && drawable.Enabled && drawable.Entity.Enabled;
-
-    private void Draw(Scene scene, Matrix transform)
-    {
-        Effect? activeEffect = null;
-        var batchStarted = false;
-        try
-        {
-            foreach (var drawable in _drawBuffer)
-            {
-                var effect = drawable.Effect;
-                if (!batchStarted || !ReferenceEquals(activeEffect, effect))
-                {
-                    EndBatch(ref batchStarted);
-                    Core.SpriteBatch.Begin(
-                        SpriteSortMode.Deferred,
-                        scene.RenderingOptions.BlendState,
-                        scene.RenderingOptions.SamplerState,
-                        DepthStencilState.None,
-                        RasterizerState.CullNone,
-                        effect,
-                        transform);
-                    activeEffect = effect;
-                    batchStarted = true;
-                }
-                drawable.Draw();
-            }
-        }
-        finally
-        {
-            EndBatch(ref batchStarted);
-        }
-    }
-
-    private void Present(SamplerState samplerState, Color tintColor, float exposure)
-    {
-        var presentEffect = Resources.LoadAsset<Effect>("Effects/Present")
-                            ?? throw new InvalidOperationException(
-                                "The built-in scene presentation effect could not be loaded.");
-        presentEffect.Parameters["Exposure"]?.SetValue(MathF.Max(0f, exposure));
-        _device.SetRenderTarget(_displayTarget);
-        _device.Clear(Color.Transparent);
-        var batchStarted = false;
-        try
-        {
-            Core.SpriteBatch.Begin(
-                SpriteSortMode.Deferred,
-                BlendState.Opaque,
-                samplerState,
-                DepthStencilState.None,
-                RasterizerState.CullNone,
-                presentEffect);
-            batchStarted = true;
-            // Applying the tint as the SpriteBatch color before the Present shader is
-            // equivalent to the runtime Tint pass, while avoiding a fourth HDR target.
-            Core.SpriteBatch.Draw(_colorCorrectionTarget!, Vector2.Zero, tintColor);
-        }
-        finally
-        {
-            EndBatch(ref batchStarted);
-        }
-    }
-
-    private void ApplyLighting(Scene scene, Camera2D camera, SamplerState samplerState)
-    {
-        var lightingEffect = Resources.LoadAsset<Effect>("Effects/ForwardLighting2D")
-                             ?? throw new InvalidOperationException(
-                                 "The built-in 2D lighting effect could not be loaded.");
-        var pointLights = scene.GetAllDrawables()
-            .OfType<PointLight2D>()
-            .Where(light => light.Enabled && light.Entity.Enabled && light.IsVisibleFromCamera(camera.BoundsF))
-            .ToArray();
-        var ambient = scene.Settings.AmbientLightColor.ToVector3() *
-                      scene.Settings.AmbientLightIntensity;
-        LightingUniforms.Apply(lightingEffect, pointLights, camera, ambient);
-
-        _device.SetRenderTarget(_lightingTarget);
-        _device.Clear(Color.Transparent);
-        Core.SpriteBatch.Begin(
-            SpriteSortMode.Immediate,
-            BlendState.Opaque,
-            samplerState,
-            DepthStencilState.None,
-            RasterizerState.CullNone,
-            lightingEffect,
-            Matrix.Identity);
-        try
-        {
-            Core.SpriteBatch.Draw(
-                _sceneTarget!,
-                new Rectangle(0, 0, _lightingTarget!.Width, _lightingTarget.Height),
-                Color.White);
-        }
-        finally
-        {
-            Core.SpriteBatch.End();
-        }
-    }
-
-    private void ApplyColorCorrection(Scene scene, SamplerState samplerState)
-    {
-        var colorCorrectionEffect = Resources.LoadAsset<Effect>("Effects/ColorCorrection")
-                                    ?? throw new InvalidOperationException(
-                                        "The built-in color-correction effect could not be loaded.");
-        colorCorrectionEffect.Parameters["hueShift"]?.SetValue(scene.PostProcessSettings.HueShift);
-        colorCorrectionEffect.Parameters["saturation"]?.SetValue(scene.PostProcessSettings.Saturation);
-
-        _device.SetRenderTarget(_colorCorrectionTarget);
-        _device.Clear(Color.Transparent);
-        Core.SpriteBatch.Begin(
-            SpriteSortMode.Immediate,
-            BlendState.AlphaBlend,
-            samplerState,
-            DepthStencilState.None,
-            RasterizerState.CullNone,
-            colorCorrectionEffect);
-        try
-        {
-            Core.SpriteBatch.Draw(_lightingTarget!, Vector2.Zero, Color.White);
-        }
-        finally
-        {
-            Core.SpriteBatch.End();
-        }
-    }
-
-    private static void EndBatch(ref bool batchStarted)
-    {
-        if (!batchStarted)
-            return;
-        batchStarted = false;
-        Core.SpriteBatch.End();
-    }
 
     private void EnsureTarget(int width, int height)
     {
         width = Math.Clamp(width, 1, 8192);
         height = Math.Clamp(height, 1, 8192);
-        if (_sceneTarget is not null &&
-            _lightingTarget is not null &&
-            _colorCorrectionTarget is not null &&
-            _displayTarget is not null &&
+        if (_displayTarget is not null &&
             _textureId != 0 &&
-            _sceneTarget.Width == width &&
-            _sceneTarget.Height == height &&
-            _lightingTarget.Width == width &&
-            _lightingTarget.Height == height &&
-            _colorCorrectionTarget.Width == width &&
-            _colorCorrectionTarget.Height == height &&
             _displayTarget.Width == width &&
             _displayTarget.Height == height)
         {
             return;
         }
 
-        RenderTarget2D? replacementScene = null;
-        RenderTarget2D? replacementLighting = null;
-        RenderTarget2D? replacementColorCorrection = null;
         RenderTarget2D? replacementDisplay = null;
         nint replacementTextureId = 0;
         try
         {
-            replacementScene = new RenderTarget2D(
-                _device,
-                width,
-                height,
-                false,
-                RenderPipeline.SceneColorFormat,
-                DepthFormat.None)
-            {
-                Name = "Dreambit Editor Albedo Scene View"
-            };
-            replacementLighting = new RenderTarget2D(
-                _device,
-                width,
-                height,
-                false,
-                RenderPipeline.SceneColorFormat,
-                DepthFormat.None)
-            {
-                Name = "Dreambit Editor Lit Scene View"
-            };
-            replacementColorCorrection = new RenderTarget2D(
-                _device,
-                width,
-                height,
-                false,
-                RenderPipeline.SceneColorFormat,
-                DepthFormat.None)
-            {
-                Name = "Dreambit Editor Color Corrected Scene View"
-            };
             replacementDisplay = new RenderTarget2D(
                 _device,
                 width,
@@ -350,30 +163,21 @@ internal sealed class SceneViewportRenderer : IDisposable
                         _imGui.UnbindTexture(replacementTextureId);
                 },
                 ref cleanupFailures);
-            TryCleanup(() => replacementScene?.Dispose(), ref cleanupFailures);
-            TryCleanup(() => replacementLighting?.Dispose(), ref cleanupFailures);
-            TryCleanup(() => replacementColorCorrection?.Dispose(), ref cleanupFailures);
             TryCleanup(() => replacementDisplay?.Dispose(), ref cleanupFailures);
             if (cleanupFailures is not null)
             {
                 cleanupFailures.Insert(0, allocationFailure);
                 throw new AggregateException(
-                    "Could not allocate or clean up replacement viewport targets.",
+                    "Could not allocate or clean up the replacement viewport target.",
                     cleanupFailures);
             }
             throw;
         }
 
-        // Publish only a complete target pair and binding. If allocation failed, the
-        // previous renderer state above remains usable on the next frame.
-        var previousScene = _sceneTarget;
-        var previousLighting = _lightingTarget;
-        var previousColorCorrection = _colorCorrectionTarget;
+        // Publish only a complete target and binding. If allocation failed, the
+        // previous renderer state remains usable on the next frame.
         var previousDisplay = _displayTarget;
         var previousTextureId = _textureId;
-        _sceneTarget = replacementScene;
-        _lightingTarget = replacementLighting;
-        _colorCorrectionTarget = replacementColorCorrection;
         _displayTarget = replacementDisplay;
         _textureId = replacementTextureId;
 
@@ -385,14 +189,11 @@ internal sealed class SceneViewportRenderer : IDisposable
                     _imGui.UnbindTexture(previousTextureId);
             },
             ref replacementCleanupFailures);
-        TryCleanup(() => previousScene?.Dispose(), ref replacementCleanupFailures);
-        TryCleanup(() => previousLighting?.Dispose(), ref replacementCleanupFailures);
-        TryCleanup(() => previousColorCorrection?.Dispose(), ref replacementCleanupFailures);
         TryCleanup(() => previousDisplay?.Dispose(), ref replacementCleanupFailures);
         if (replacementCleanupFailures is not null)
         {
             throw new AggregateException(
-                "The new viewport targets were installed, but the previous targets could not be fully released.",
+                "The new viewport target was installed, but the previous target could not be fully released.",
                 replacementCleanupFailures);
         }
     }
@@ -414,15 +215,9 @@ internal sealed class SceneViewportRenderer : IDisposable
         if (_disposed)
             return;
 
-        var sceneTarget = _sceneTarget;
-        var lightingTarget = _lightingTarget;
-        var colorCorrectionTarget = _colorCorrectionTarget;
         var displayTarget = _displayTarget;
         var textureId = _textureId;
-        _drawBuffer.Clear();
-        _sceneTarget = null;
-        _lightingTarget = null;
-        _colorCorrectionTarget = null;
+        _pickBuffer.Clear();
         _displayTarget = null;
         _textureId = 0;
         _disposed = true;
@@ -435,9 +230,6 @@ internal sealed class SceneViewportRenderer : IDisposable
                     _imGui.UnbindTexture(textureId);
             },
             ref failures);
-        TryCleanup(() => sceneTarget?.Dispose(), ref failures);
-        TryCleanup(() => lightingTarget?.Dispose(), ref failures);
-        TryCleanup(() => colorCorrectionTarget?.Dispose(), ref failures);
         TryCleanup(() => displayTarget?.Dispose(), ref failures);
         if (failures is not null)
             throw new AggregateException("Could not fully dispose the scene viewport renderer.", failures);

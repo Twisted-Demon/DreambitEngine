@@ -62,9 +62,9 @@ public sealed class ProjectUpgradeServiceTests
         var result = await service.UpgradeAsync(candidate!, CancellationToken.None);
 
         Assert.True(result.Succeeded, result.Message);
-        Assert.Contains("Version=\"0.3.4\"", File.ReadAllText(
+        Assert.Contains($"Version=\"{DreambitSdkConstants.CurrentVersion}\"", File.ReadAllText(
             Path.Combine(fixture.Root, "Directory.Packages.props")));
-        Assert.Contains("\"version\": \"0.3.4\"", File.ReadAllText(
+        Assert.Contains($"\"version\": \"{DreambitSdkConstants.CurrentVersion}\"", File.ReadAllText(
             Path.Combine(fixture.Root, ".dreambit", "project.json")));
         Assert.Single(runner.Commands);
         Assert.Contains("RestoreAdditionalProjectSources=", runner.Commands[0].Arguments.Last());

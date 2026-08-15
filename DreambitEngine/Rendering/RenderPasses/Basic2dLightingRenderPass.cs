@@ -36,7 +36,7 @@ public class Basic2dLightingRenderPass : RenderPass
     {
         var drawLayers = Drawables.GetDrawLayers();
 
-        var camera = Scene.MainCamera;
+        var camera = RenderCamera;
         var cameraBounds = camera.BoundsF;
         var cameraMatrix = camera.TransformMatrix;
 
@@ -68,15 +68,15 @@ public class Basic2dLightingRenderPass : RenderPass
     private void RenderLighting()
     {
         var lights = Drawables.GetAllDrawablesByType<PointLight2D>()
-            .Where(x => x.IsVisibleFromCamera(Scene.MainCamera.BoundsF)).ToList();
+            .Where(x => x.IsVisibleFromCamera(RenderCamera.BoundsF)).ToList();
 
         var ambientLight = Drawables.GetAllDrawablesByType<AmbientLight2D>().FirstOrDefault();
-
-        var ambientColor = ambientLight != null
+        var ambientColor = ambientLight is not null
             ? ambientLight.Color.ToVector3() * ambientLight.Intensity
-            : Vector3.Zero;
+            : Scene.Settings.AmbientLightColor.ToVector3() *
+              Scene.Settings.AmbientLightIntensity;
 
-        LightingUniforms.Apply(LightingFx, lights, Scene.MainCamera, ambientColor);
+        LightingUniforms.Apply(LightingFx, lights, RenderCamera, ambientColor);
 
         Device.SetRenderTarget(RenderPipeline.SceneRenderTarget);
         Device.Clear(Color.Transparent);
@@ -193,9 +193,9 @@ public class Basic2dLightingRenderPass : RenderPass
             Core.SpriteBatch.End();
     }
 
-    protected override void OnWindowResized(object sender, WindowResizedEventArgs args)
+    protected override void OnViewportResized()
     {
-        base.OnWindowResized(sender, args);
+        base.OnViewportResized();
 
         CreateAlbedoRenderTarget();
     }
@@ -210,7 +210,7 @@ public class Basic2dLightingRenderPass : RenderPass
     private void CreateAlbedoRenderTarget()
     {
         AlbedoRt?.Dispose();
-        AlbedoRt = RenderPipeline.CreateRenderTarget();
+        AlbedoRt = RenderPipeline.CreateViewportRenderTarget();
     }
 
     private void CleanupAlbedoRenderTarget()

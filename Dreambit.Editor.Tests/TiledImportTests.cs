@@ -517,7 +517,7 @@ public sealed class TiledImportTests : IDisposable
         Assert.DoesNotContain(generated, entity => entity.Name.Contains("Objects"));
         var background = Assert.Single(
             generated.SelectMany(entity => entity.GetAllComponents()).OfType<FilledRectDrawer>());
-        Assert.True(SceneViewportRenderer.ShouldRenderDrawable(background));
+        Assert.True(SceneViewportRenderer.ShouldPickDrawable(background));
 
         var placed = document.CreateEmpty("Dreambit Placed");
         var placedId = placed.Id;
