@@ -11,8 +11,9 @@ namespace Dreambit;
 public class Basic2dLightingRenderPass : RenderPass
 {
     private static readonly DrawableSortEntryComparer SortComparer = new();
-    private readonly List<DrawableSortEntry> _drawableSortBuffer = new(512);
 
+    private readonly List<DrawableSortEntry> _sceneRenderList = new(512);
+    private readonly List<DrawableSortEntry> _layerSortBuffer = new(128);
     private readonly List<int> _sortedLayerBuffer = new(16);
     private DreambitEffect LightingFx { get; set; }
     private DreambitEffect DepthFx { get; set; }
@@ -33,108 +34,85 @@ public class Basic2dLightingRenderPass : RenderPass
 
     public override void OnDraw()
     {
+        BuildSceneRenderList();
         RenderDrawables();
         RenderDepth();
         RenderLighting();
     }
 
-    private void RenderDrawables()
+    private void BuildSceneRenderList()
     {
-        var drawLayers = Drawables.GetDrawLayers();
+        _sceneRenderList.Clear();
 
-        var camera = RenderCamera;
-        var cameraBounds = camera.BoundsF;
-        var cameraMatrix = camera.TransformMatrix;
+        var drawLayers = Drawables.GetDrawLayers();
+        var cameraBounds = RenderCamera.BoundsF;
 
         BuildSortedLayerBuffer(drawLayers);
 
+        for (var layerIndex = 0; layerIndex < _sortedLayerBuffer.Count; layerIndex++)
+        {
+            var drawLayer = _sortedLayerBuffer[layerIndex];
+            var layerDrawables = drawLayers[drawLayer];
+            
+            BuildLayerSortBuffer(drawLayer, layerDrawables, cameraBounds);
+
+            if (_layerSortBuffer.Count == 0)
+                continue;
+            
+            _layerSortBuffer.Sort(SortComparer);
+
+            _sceneRenderList.AddRange(
+                _layerSortBuffer);
+        }
+    }
+    
+    private void BuildLayerSortBuffer(
+        int drawLayer,
+        List<DrawableComponent> layerDrawables,
+        RectangleF cameraBounds)
+    {
+        _layerSortBuffer.Clear();
+
+        for (var i = 0; i < layerDrawables.Count; i++)
+        {
+            var drawable = layerDrawables[i];
+
+            if (!drawable.Enabled ||
+                !drawable.Entity.Enabled)
+                continue;
+
+            if (!drawable.IsVisibleFromCamera(cameraBounds))
+                continue;
+
+            var effect =
+                drawable.Effect ?? DefaultEffect;
+
+            _layerSortBuffer.Add(
+                new DrawableSortEntry(
+                    drawable,
+                    effect,
+                    drawLayer,
+                    drawable.SortDepth));
+        }
+    }
+
+    private void RenderDrawables()
+    {
         Device.SetRenderTarget(AlbedoRt);
         Device.Clear(Color.Transparent);
 
-        for (var layerIndex = 0;
-             layerIndex < _sortedLayerBuffer.Count;
-             layerIndex++)
-        {
-            var layer = _sortedLayerBuffer[layerIndex];
-            var layerDrawables = drawLayers[layer];
-
-            BuildDrawableSortBuffer(
-                layerDrawables,
-                cameraBounds);
-
-            if (_drawableSortBuffer.Count == 0)
-                continue;
-
-            _drawableSortBuffer.Sort(SortComparer);
-
-            RenderSortedDrawables(cameraMatrix);
-        }
+        RenderSceneAlbedo(
+            RenderCamera.TransformMatrix);
     }
 
     private void RenderDepth()
     {
-        var drawLayers =
-            Drawables.GetDrawLayers();
-
-        var camera = RenderCamera;
-        var cameraBounds = camera.BoundsF;
-        var cameraMatrix = camera.TransformMatrix;
-
-        BuildSortedLayerBuffer(drawLayers);
-
         Device.SetRenderTarget(DepthRt);
-
         Device.Clear(Color.Transparent);
 
-        for (var layerIndex = 0; layerIndex < _sortedLayerBuffer.Count; layerIndex++)
-        {
-            var layer =
-                _sortedLayerBuffer[layerIndex];
-
-            var layerDrawables =
-                drawLayers[layer];
-
-            BuildDrawableSortBuffer(
-                layerDrawables,
-                cameraBounds);
-
-            if (_drawableSortBuffer.Count == 0)
-                continue;
-
-            _drawableSortBuffer.Sort(
-                SortComparer);
-
-            RenderSortedDepthDrawables(cameraMatrix);
-        }
+        RenderSceneDepth();
     }
-
-    private void RenderSortedDepthDrawables(
-        Matrix cameraMatrix)
-    {
-        for (var i = 0;
-             i < _drawableSortBuffer.Count;
-             i++)
-        {
-            var entry =
-                _drawableSortBuffer[i];
-
-            DepthFx.Effect.Parameters["SortDepth"]
-                ?.SetValue(entry.SortDepth);
-
-            Core.SpriteBatch.Begin(
-                SpriteSortMode.Deferred,
-                BlendState.Opaque,
-                Scene.RenderingOptions.SamplerState,
-                DepthStencilState.None,
-                RasterizerState.CullNone,
-                DepthFx,
-                cameraMatrix);
-
-            entry.Drawable.Draw();
-
-            Core.SpriteBatch.End();
-        }
-    }
+    
 
     private void RenderLighting()
     {
@@ -192,57 +170,34 @@ public class Basic2dLightingRenderPass : RenderPass
 
         _sortedLayerBuffer.Sort();
     }
+    
 
-    private void BuildDrawableSortBuffer(
-        List<DrawableComponent> layerDrawables,
-        RectangleF cameraBounds)
-    {
-        _drawableSortBuffer.Clear();
-
-        for (var i = 0; i < layerDrawables.Count; i++)
-        {
-            var drawable = layerDrawables[i];
-
-            if (!drawable.Enabled ||
-                !drawable.Entity.Enabled)
-                continue;
-
-            if (!drawable.IsVisibleFromCamera(cameraBounds))
-                continue;
-
-            // DreambitEffect is a reloadable asset handle. The handle can remain
-            // on a live drawable after its native MonoGame effect has been
-            // released during a content refresh, so only batch a usable native
-            // effect and otherwise retain the engine fallback.
-            var effect =
-                drawable.Effect?.Effect ?? DefaultEffect;
-
-            var sortDepth =
-                drawable.SortDepth;
-
-            _drawableSortBuffer.Add(
-                new DrawableSortEntry(
-                    drawable,
-                    effect,
-                    sortDepth));
-        }
-    }
-
-    private void RenderSortedDrawables(Matrix cameraMatrix)
+    private void RenderSceneAlbedo(
+        Matrix cameraMatrix)
     {
         Effect currentEffect = null;
+
+        var currentDrawLayer = 0;
         var batchStarted = false;
 
         for (var i = 0;
-             i < _drawableSortBuffer.Count;
+             i < _sceneRenderList.Count;
              i++)
         {
-            var entry = _drawableSortBuffer[i];
+            var entry = _sceneRenderList[i];
 
-            if (!batchStarted ||
+            var effectChanged =
                 !ReferenceEquals(
                     entry.Effect,
-                    currentEffect))
+                    currentEffect);
+
+            var layerChanged =
+                batchStarted &&
+                entry.DrawLayer != currentDrawLayer;
+
+            if (!batchStarted ||
+                effectChanged ||
+                layerChanged)
             {
                 if (batchStarted)
                     Core.SpriteBatch.End();
@@ -254,10 +209,14 @@ public class Basic2dLightingRenderPass : RenderPass
                     DepthStencilState.None,
                     RasterizerState.CullNone,
                     entry.Effect,
-                    cameraMatrix
-                );
+                    cameraMatrix);
 
-                currentEffect = entry.Effect;
+                currentEffect =
+                    entry.Effect;
+
+                currentDrawLayer =
+                    entry.DrawLayer;
+
                 batchStarted = true;
             }
 
@@ -267,6 +226,32 @@ public class Basic2dLightingRenderPass : RenderPass
         if (batchStarted)
             Core.SpriteBatch.End();
     }
+
+    private void RenderSceneDepth()
+    {
+        for (var i = 0; i < _sceneRenderList.Count; i++)
+        {
+            var entry = _sceneRenderList[i];
+
+            DepthFx.Effect.Parameters["SortDepth"]
+                ?.SetValue(entry.SortDepth);
+
+
+            Core.SpriteBatch.Begin(
+                SpriteSortMode.Deferred,
+                BlendState.Opaque,
+                Scene.RenderingOptions.SamplerState,
+                DepthStencilState.None,
+                RasterizerState.CullNone,
+                DepthFx,
+                RenderCamera.TransformMatrix);
+            
+            entry.Drawable.Draw();
+            
+            Core.SpriteBatch.End();
+        }
+    }
+    
 
     protected override void OnViewportResized()
     {
@@ -321,10 +306,12 @@ public class Basic2dLightingRenderPass : RenderPass
         public DrawableSortEntry(
             DrawableComponent drawable,
             Effect effect,
+            int drawLayer,
             float sortDepth)
         {
             Drawable = drawable;
             Effect = effect;
+            DrawLayer = drawLayer;
             SortDepth = sortDepth;
 
             EffectKey =
@@ -334,6 +321,8 @@ public class Basic2dLightingRenderPass : RenderPass
         public DrawableComponent Drawable { get; }
 
         public Effect Effect { get; }
+
+        public int DrawLayer { get; }
 
         public float SortDepth { get; }
 

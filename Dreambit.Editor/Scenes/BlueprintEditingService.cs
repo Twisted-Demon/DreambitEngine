@@ -17,6 +17,7 @@ internal sealed class BlueprintEditingService : IDisposable
     private readonly Action<string, Exception?>? _reportError;
     private AssetId _openAssetId;
     private Guid _rootEntityId;
+    private long _assetRevisionAlreadyApplied = -1;
     private bool _synchronizing;
     private bool _rebuildRequested;
     private bool _disposed;
@@ -50,7 +51,10 @@ internal sealed class BlueprintEditingService : IDisposable
         if (!_assetEditing.Select(asset))
             return false;
         if (_openAssetId != asset.Id)
+        {
             Selection.Clear();
+            _assetRevisionAlreadyApplied = -1;
+        }
         _openAssetId = asset.Id;
         if (Current is null || _assetEditing.Current?.Asset.Id != asset.Id)
             RebuildFromAssetDocument();
@@ -137,6 +141,7 @@ internal sealed class BlueprintEditingService : IDisposable
                 "Edit Blueprint Hierarchy",
                 sceneDocument.CaptureSingleRoot(),
                 sceneDocument.ActiveChangeMergeKey);
+            _assetRevisionAlreadyApplied = assetDocument.Revision;
             Error = null;
         }
         catch (Exception exception)
@@ -181,8 +186,16 @@ internal sealed class BlueprintEditingService : IDisposable
 
     private void OnAssetPreviewChanged(DreambitAssetDocument document)
     {
-        if (!_synchronizing && document.Asset.Id == _openAssetId)
-            RebuildFromAssetDocument();
+        if (_synchronizing || document.Asset.Id != _openAssetId)
+            return;
+        if (document.Revision == _assetRevisionAlreadyApplied)
+        {
+            _assetRevisionAlreadyApplied = -1;
+            return;
+        }
+
+        _assetRevisionAlreadyApplied = -1;
+        RebuildFromAssetDocument();
     }
 
     private void OnAssemblyReloading(LoadedGameAssembly? _)
@@ -199,6 +212,7 @@ internal sealed class BlueprintEditingService : IDisposable
         var current = Current;
         Current = null;
         _rootEntityId = Guid.Empty;
+        _assetRevisionAlreadyApplied = -1;
         Selection.Clear();
         DisposeDocument(current);
     }

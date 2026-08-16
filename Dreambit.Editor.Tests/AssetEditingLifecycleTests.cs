@@ -106,6 +106,85 @@ public sealed class AssetEditingLifecycleTests : IDisposable
     }
 
     [Fact]
+    public void RapidDocumentChangesCoalesceIntoOnePreviewUpdate()
+    {
+        WriteBlueprint("actors/hero.blueprint.json", "Disk Hero");
+        using var fixture = CreateFixture();
+        var asset = Assert.Single(fixture.Assets.GetSnapshot().Assets);
+        fixture.Editing.Select(asset);
+        var previewUpdates = 0;
+        fixture.Editing.PreviewChanged += _ => previewUpdates++;
+
+        fixture.Editing.Current!.Apply(
+            "Rename Blueprint",
+            instance => ((EntityBlueprint)instance).Name = "Unsaved Hero 1",
+            "Blueprint.Name");
+        fixture.Editing.Current.Apply(
+            "Rename Blueprint",
+            instance => ((EntityBlueprint)instance).Name = "Unsaved Hero 2",
+            "Blueprint.Name");
+        fixture.Editing.Current.Apply(
+            "Rename Blueprint",
+            instance => ((EntityBlueprint)instance).Name = "Unsaved Hero 3",
+            "Blueprint.Name");
+
+        Assert.Equal(0, previewUpdates);
+
+        fixture.Editing.FlushPendingPreview();
+
+        Assert.Equal(1, previewUpdates);
+        using var preview = fixture.BlueprintSources.Load(asset);
+        Assert.Equal("Unsaved Hero 3", preview.Name);
+    }
+
+    [Fact]
+    public void SavingBeforeDeferredPreviewStillNotifiesBlueprintConsumersOnce()
+    {
+        WriteBlueprint("actors/hero.blueprint.json", "Disk Hero");
+        using var fixture = CreateFixture();
+        var asset = Assert.Single(fixture.Assets.GetSnapshot().Assets);
+        fixture.Editing.Select(asset);
+        var sourceUpdates = 0;
+        fixture.BlueprintSources.Changed += () => sourceUpdates++;
+
+        fixture.Editing.Current!.Apply(
+            "Rename Blueprint",
+            instance => ((EntityBlueprint)instance).Name = "Saved Hero");
+        fixture.Editing.Save();
+
+        Assert.Equal(1, sourceUpdates);
+        using var loaded = fixture.BlueprintSources.Load(asset);
+        Assert.Equal("Saved Hero", loaded.Name);
+    }
+
+    [Fact]
+    public void ActiveEditorInteractionDefersPreviewPastTheQuietWindow()
+    {
+        WriteBlueprint("actors/hero.blueprint.json", "Disk Hero");
+        using var fixture = CreateFixture();
+        var asset = Assert.Single(fixture.Assets.GetSnapshot().Assets);
+        fixture.Editing.Select(asset);
+        var previewUpdates = 0;
+        fixture.Editing.PreviewChanged += _ => previewUpdates++;
+        fixture.Editing.Current!.Apply(
+            "Rename Blueprint",
+            instance => ((EntityBlueprint)instance).Name = "Typing Hero");
+        var afterQuietWindow = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(1);
+
+        fixture.Editing.UpdatePendingPreview(
+            editorInteractionActive: true,
+            now: afterQuietWindow);
+
+        Assert.Equal(0, previewUpdates);
+
+        fixture.Editing.UpdatePendingPreview(
+            editorInteractionActive: false,
+            now: afterQuietWindow);
+
+        Assert.Equal(1, previewUpdates);
+    }
+
+    [Fact]
     public void CleanExternalRewriteReopensTheAssetDocument()
     {
         WriteBlueprint("actors/hero.blueprint.json", "Disk Hero");

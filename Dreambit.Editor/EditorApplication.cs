@@ -243,7 +243,8 @@ internal sealed class EditorApplication : IDisposable
             _projectManager.CurrentSession.AssetEditing.Update(
                 _workspaceState.AutoSave,
                 TimeSpan.FromSeconds(
-                    Math.Clamp(_workspaceState.AutoSaveDelaySeconds, 0.25, 60)));
+                    Math.Clamp(_workspaceState.AutoSaveDelaySeconds, 0.25, 60)),
+                ImGui.IsAnyItemActive());
             _panels.DrawPanels();
             CaptureWorkspaceSelection(_projectManager.CurrentSession);
         }

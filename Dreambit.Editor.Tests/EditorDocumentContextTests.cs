@@ -67,6 +67,27 @@ public sealed class EditorDocumentContextTests : IDisposable
         Assert.Same(fixture.AssetEditing.Current!.Undo, fixture.Context.Undo);
     }
 
+    [Fact]
+    public void DeferredPreviewDoesNotRebuildTheBlueprintDocumentThatOriginatedTheChange()
+    {
+        File.WriteAllText(
+            Path.Combine(ContentRoot, "hero.blueprint.json"),
+            DreambitJson.Serialize(new EntityBlueprint { Name = "Hero" }));
+        using var fixture = CreateFixture();
+        var blueprint = Assert.Single(fixture.Assets.GetSnapshot().Assets);
+        Assert.True(fixture.Blueprints.Open(blueprint));
+        var previewDocument = Assert.IsType<SceneDocument>(fixture.Blueprints.Current);
+        var root = Assert.IsType<Dreambit.ECS.Entity>(fixture.Blueprints.Root);
+
+        previewDocument.Rename(root, "Renamed Hero");
+        fixture.AssetEditing.FlushPendingPreview();
+
+        Assert.Same(previewDocument, fixture.Blueprints.Current);
+        Assert.Equal(
+            "Renamed Hero",
+            Assert.IsType<EntityBlueprint>(fixture.AssetEditing.Current!.Instance).Name);
+    }
+
     private Fixture CreateFixture()
     {
         var project = new DreambitProjectDefinition(
@@ -102,7 +123,7 @@ public sealed class EditorDocumentContextTests : IDisposable
                 Types,
                 _metadata,
                 Assemblies);
-            BlueprintSources = new BlueprintSourceService(Assets);
+            BlueprintSources = new BlueprintSourceService(Assets, AssetEditing);
             Scenes = new SceneDocumentService(
                 project,
                 Assemblies,
