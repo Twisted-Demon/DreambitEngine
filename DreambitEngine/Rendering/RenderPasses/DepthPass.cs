@@ -24,6 +24,8 @@ public class DepthPass : RenderPass
         DepthFx = Resources.LoadAsset<DreambitEffect>("Effects/Depth2D");
         ArgumentNullException.ThrowIfNull(DepthFx);
         ArgumentNullException.ThrowIfNull(DepthFx.Effect);
+        
+        CreateDepthRenderTarget();
     }
 
     public override void OnDraw()
