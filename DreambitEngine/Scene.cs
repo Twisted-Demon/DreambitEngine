@@ -119,6 +119,30 @@ public class Scene : IDisposable
         Core.Instance.SetNextScene(scene);
     }
 
+    public static void SetNextScene(string sceneAssetName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sceneAssetName);
+        var blueprint = Resources.LoadAsset<SceneBlueprint>(sceneAssetName)
+                        ?? throw new InvalidOperationException(
+                            $"Scene asset '{sceneAssetName}' could not be loaded.");
+
+        var scene = new Scene();
+        scene.LoadIntoSelf(blueprint);
+        SetNextScene(scene);
+    }
+
+    public static void SetNextScene<T>(string sceneAssetName) where T : Scene, new()
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sceneAssetName);
+        var blueprint = Resources.LoadAsset<SceneBlueprint>(sceneAssetName)
+                        ?? throw new InvalidOperationException(
+                            $"Scene asset '{sceneAssetName}' could not be loaded.");
+
+        var scene = new T();
+        scene.LoadIntoSelf(blueprint);
+        SetNextScene(scene);
+    }
+
     public void LoadIntoSelf(SceneBlueprint blueprint)
     {
         LoadIntoSelf(blueprint, SceneBlueprintLoadOptions.Runtime);
@@ -322,7 +346,10 @@ public class Scene : IDisposable
     /// </summary>
     protected virtual void SetUpRenderPipeLine()
     {
-        _renderPipeline.AddRenderPass<Basic2dLightingRenderPass>();
+        _renderPipeline.AddRenderPass<SortDrawablesPass>();
+        _renderPipeline.AddRenderPass<AlbedoPass>();
+        _renderPipeline.AddRenderPass<DepthPass>();
+        _renderPipeline.AddRenderPass<DepthLightingPass>();
         _renderPipeline.AddRenderPass<PostProcessRenderPass>();
         if (ExecutionMode == SceneExecutionMode.Runtime)
         {

@@ -42,7 +42,10 @@ public abstract class RenderPass : IDisposable
         Initialize();
     }
 
-    internal void ResizeInternals() => OnViewportResized();
+    internal void ResizeInternals()
+    {
+        OnViewportResized();
+    }
 
     public virtual void Initialize()
     {
@@ -57,8 +60,8 @@ public abstract class RenderPass : IDisposable
     }
 
     /// <summary>
-    /// Preserves the runtime window notification for custom passes. Built-in passes
-    /// resize through <see cref="OnViewportResized"/> so offscreen hosts work too.
+    ///     Preserves the runtime window notification for custom passes. Built-in passes
+    ///     resize through <see cref="OnViewportResized" /> so offscreen hosts work too.
     /// </summary>
     protected virtual void OnWindowResized(object sender, WindowResizedEventArgs args)
     {
