@@ -416,17 +416,26 @@ public sealed class AssetBakePipelineTests : IDisposable
             IncludeBuiltInContent: true));
 
         using var pak = new PakReader(output);
-        using var effect = pak.Open("effects/forwarddiffuse.fxb");
-        using var present = pak.Open("effects/present.fxb");
-        using var deferred = pak.Open("effects/defferedrendercombine.fxb");
-        using var tint = pak.Open("effects/tint.fxb");
+        var builtInEffects = new[]
+        {
+            "effects/basiclighting2d.fxb",
+            "effects/colorcorrection.fxb",
+            "effects/depth2d.fxb",
+            "effects/depthlighting2d.fxb",
+            "effects/forwarddiffuse.fxb",
+            "effects/present.fxb",
+            "effects/tint.fxb"
+        };
+
+        foreach (var logicalPath in builtInEffects)
+        {
+            using var effect = pak.Open(logicalPath);
+            Assert.NotEqual(-1, effect.ReadByte());
+        }
+
         using var font = pak.Open("fonts/monogram.ttfb");
-        //Assert.True(effect.Length > 16);
-        //Assert.True(present.Length > 16);
-        //Assert.True(deferred.Length > 16);
-        //Assert.True(tint.Length > 16);
-        //Assert.True(font.Length > 16);
-        //Assert.True(AssetBakePipeline.HasCurrentBuiltInContent(cache));
+        Assert.NotEqual(-1, font.ReadByte());
+        Assert.True(AssetBakePipeline.HasCurrentBuiltInContent(cache));
     }
 
     public void Dispose()

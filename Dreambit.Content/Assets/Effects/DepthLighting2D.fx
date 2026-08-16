@@ -1,5 +1,11 @@
 static const int MAX_LIGHTS = 32;
 
+// Temporary global tuning value.
+// This is measured in the same units as SortDepth.
+// Once the behavior feels right, move this to PointLight2D
+// so each light can have its own softness.
+static const float DEPTH_SOFTNESS = 2.0f;
+
 Texture2D<float4> TextureSampler : register(t0);
 Texture2D<float> DepthTexture : register(t1);
 
@@ -55,6 +61,45 @@ float AttenuatePointLight(
         inverseFalloff;
 }
 
+float CalculateDepthInfluence(
+    float lightDepth,
+    float receiverDepth,
+    float depthSoftness)
+{
+    // Larger SortDepth values are rendered in front.
+    //
+    // Negative:
+    // receiver is behind the light.
+    //
+    // Zero:
+    // receiver is at the same depth as the light.
+    //
+    // Positive:
+    // receiver is in front of the light.
+    float depthDelta =
+        receiverDepth -
+        lightDepth;
+
+    // Anything behind the light, or at the same
+    // depth, receives the full light.
+    if (depthDelta <= 0.0f)
+        return 1.0f;
+
+    // Objects slightly in front of the light still
+    // receive some illumination.
+    //
+    // As the receiver gets farther in front,
+    // smoothly fade the light contribution to zero.
+    return
+        1.0f -
+        smoothstep(
+            0.0f,
+            max(
+                depthSoftness,
+                0.00001f),
+            depthDelta);
+}
+
 float4 MainPS(
     PS_INPUT input) : SV_Target0
 {
@@ -63,7 +108,8 @@ float4 MainPS(
             TextureSamplerState,
             input.TexCoord);
 
-    baseColor *= input.Color;
+    baseColor *=
+        input.Color;
 
     float3 lighting =
         AmbientColor;
@@ -77,11 +123,15 @@ float4 MainPS(
     float2 screenPosition =
         input.Position.xy;
 
-    // DepthRt has exactly one float per viewport pixel.
-    // Use Load instead of filtered sampling because interpolating
-    // SortDepth values across sprite edges would be meaningless.
+    // DepthRt contains one raw SortDepth value
+    // for each rendered pixel.
+    //
+    // Use Load instead of Sample so depth values
+    // are never interpolated between neighboring
+    // drawable depths.
     int2 pixelPosition =
-        int2(input.Position.xy);
+        int2(
+            input.Position.xy);
 
     float receiverDepth =
         DepthTexture.Load(
@@ -104,7 +154,8 @@ float4 MainPS(
             screenPosition;
 
         float distanceToLight =
-            length(toLight);
+            length(
+                toLight);
 
         float attenuation =
             AttenuatePointLight(
@@ -117,15 +168,11 @@ float4 MainPS(
                 LightsIntensity[i],
                 0.0f);
 
-        // Larger SortDepth values render in front.
-        //
-        // For this first verification step:
-        // - surfaces behind/equal to the light receive it
-        // - surfaces in front receive none
         float depthInfluence =
-            receiverDepth <= LightsDepth[i]
-                ? 1.0f
-                : 0.0f;
+            CalculateDepthInfluence(
+                LightsDepth[i],
+                receiverDepth,
+                DEPTH_SOFTNESS);
 
         lighting +=
             radiance *
