@@ -56,6 +56,20 @@ float3 LinearToSrgb(float3 linearColor)
     );
 }
 
+float InterleavedGradientNoise(float2 pixelPosition)
+{
+    return frac(52.9829189f * frac(dot(pixelPosition, float2(0.06711056f, 0.00583715f))));
+}
+
+float3 ApplyOutputDither(float3 srgbColor, float2 pixelPosition)
+{
+    float noise = InterleavedGradientNoise(pixelPosition) - 0.5f;
+
+    const float ditherStrength = 1.0f / 255.0f;
+
+    return saturate(srgbColor + noise * ditherStrength);
+}
+
 float4 MainPS(PS_INPUT input) : SV_Target0
 {
     float4 color = TextureSampler.Sample(
@@ -72,8 +86,17 @@ float4 MainPS(PS_INPUT input) : SV_Target0
     float3 mapped =
         ToneMapACES(hdrColor);
 
+    float3 srgb =
+        LinearToSrgb(mapped);
+
+    srgb =
+        ApplyOutputDither(
+            srgb,
+            input.Position.xy
+        );
+
     return float4(
-        LinearToSrgb(mapped),
+        srgb,
         color.a
     );
 }
