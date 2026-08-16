@@ -43,6 +43,20 @@ public abstract class DrawableComponent : Component
     {
     }
 
+    public void PreDraw()
+    {
+        if (IsFaulted() || !Enabled) return;
+
+        try
+        {
+            OnPreDraw();
+        }
+        catch (Exception exception)
+        {
+            HandleCallbackException(nameof(OnPreDraw), exception);
+        }
+    }
+
     public virtual void OnPostDraw()
     {
     }

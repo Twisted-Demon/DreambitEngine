@@ -553,7 +553,10 @@ public sealed class TiledMapImporter
                     visual.Texture,
                     transform.Rotation,
                     animation,
-                    localCell));
+                    localCell,
+                    cell.ChunkX.HasValue && cell.ChunkY.HasValue
+                        ? new Point(cell.ChunkX.Value, cell.ChunkY.Value)
+                        : null));
             }
 
             return new TilemapLayerData(

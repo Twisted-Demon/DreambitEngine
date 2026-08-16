@@ -228,11 +228,13 @@ public sealed class TiledImportTests : IDisposable
             {
                 Assert.Equal((-2, 3), (cell.X, cell.Y));
                 Assert.Equal(7u, cell.GlobalTileId);
+                Assert.Equal((-2, 3), (cell.ChunkX, cell.ChunkY));
             },
             cell =>
             {
                 Assert.Equal((-1, 3), (cell.X, cell.Y));
                 Assert.Equal(0u, cell.GlobalTileId);
+                Assert.Equal((-2, 3), (cell.ChunkX, cell.ChunkY));
             });
     }
 
@@ -338,6 +340,69 @@ public sealed class TiledImportTests : IDisposable
         Assert.Equal(1, layer.TileCount);
         Assert.Equal(tile, Assert.Single(layer.GetTiles(cell.X, cell.Y)));
         Assert.Empty(layer.GetTiles(0, 0));
+    }
+
+    [Fact]
+    public void SparseTilemapVisibilityVisitsOnlyOccupiedIntersectingChunks()
+    {
+        const int columns = 1_000_000;
+        const int rows = 1_000_000;
+        var nearby = new TilemapTile(
+            new Vector2(10, 10),
+            Vector2.One,
+            new Rectangle(0, 0, 1, 1),
+            Color.White,
+            Cell: new Point(10, 10));
+        var distant = new TilemapTile(
+            new Vector2(columns - 1, rows - 1),
+            Vector2.One,
+            new Rectangle(0, 0, 1, 1),
+            Color.White,
+            Cell: new Point(columns - 1, rows - 1));
+        var layer = new TilemapLayerData(
+            columns,
+            rows,
+            Vector2.One,
+            [nearby, distant]);
+        var visible = new List<TilemapChunkData>();
+
+        layer.GetVisibleChunks(new RectangleF(9, 9, 4, 4), visible);
+
+        Assert.Equal(2, layer.ChunkCount);
+        var chunk = Assert.Single(visible);
+        Assert.Equal(nearby, Assert.Single(chunk.Tiles));
+    }
+
+    [Fact]
+    public void TilemapLayerPreservesSourceChunksAndSeparatesAnimatedTiles()
+    {
+        var animation = new TilemapAnimation(
+        [
+            new TilemapAnimationFrame(new Rectangle(0, 0, 1, 1), 100)
+        ]);
+        var sourceChunk = new Point(-16, 32);
+        var staticTile = new TilemapTile(
+            Vector2.Zero,
+            Vector2.One,
+            new Rectangle(0, 0, 1, 1),
+            Color.White,
+            Cell: Point.Zero,
+            Chunk: sourceChunk);
+        var animatedTile = new TilemapTile(
+            Vector2.One,
+            Vector2.One,
+            new Rectangle(0, 0, 1, 1),
+            Color.White,
+            Animation: animation,
+            Cell: new Point(1, 1),
+            Chunk: sourceChunk);
+
+        var layer = new TilemapLayerData(2, 2, Vector2.One, [staticTile, animatedTile]);
+
+        var chunk = Assert.Single(layer.Chunks);
+        Assert.Equal(sourceChunk, chunk.Coordinate);
+        Assert.Equal(staticTile, Assert.Single(chunk.StaticTiles));
+        Assert.Equal(animatedTile, Assert.Single(chunk.AnimatedTiles));
     }
 
     [Fact]

@@ -35,9 +35,18 @@ public class Basic2dLightingRenderPass : RenderPass
     public override void OnDraw()
     {
         BuildSceneRenderList();
+        PrepareSceneDrawables();
         RenderDrawables();
         RenderDepth();
         RenderLighting();
+    }
+
+    private void PrepareSceneDrawables()
+    {
+        // GPU-backed drawables such as tilemaps use this point to prepare lazy
+        // resources before either render pass opens its SpriteBatch.
+        for (var index = 0; index < _sceneRenderList.Count; index++)
+            _sceneRenderList[index].Drawable.PreDraw();
     }
 
     private void BuildSceneRenderList()

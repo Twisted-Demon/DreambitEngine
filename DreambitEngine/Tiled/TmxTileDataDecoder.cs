@@ -20,7 +20,12 @@ public enum TmxTileFlipFlags
     Hexagonal120 = 8
 }
 
-public readonly record struct TmxTileCell(int X, int Y, uint EncodedGlobalTileId)
+public readonly record struct TmxTileCell(
+    int X,
+    int Y,
+    uint EncodedGlobalTileId,
+    int? ChunkX = null,
+    int? ChunkY = null)
 {
     public uint GlobalTileId => TmxTileDataDecoder.ClearTransformFlags(EncodedGlobalTileId);
     public TmxTileFlipFlags FlipFlags => TmxTileDataDecoder.GetFlipFlags(EncodedGlobalTileId);
@@ -66,7 +71,9 @@ public static class TmxTileDataDecoder
                     result.Add(new TmxTileCell(
                         checked(layer.X + chunk.X + localX),
                         checked(layer.Y + chunk.Y + localY),
-                        gids[index]));
+                        gids[index],
+                        chunk.X,
+                        chunk.Y));
                 }
             }
 

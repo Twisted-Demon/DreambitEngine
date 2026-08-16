@@ -103,3 +103,27 @@ resolved Dreambit draw layer to an entity hierarchy.
 Editor-authored scenes store a `TiledSceneReference` in the scene blueprint.
 Runtime `SceneBlueprint` loading resolves that reference, imports fresh tile
 data, and applies the saved Dreambit overrides before the scene starts.
+
+## Rendering and large maps
+
+Infinite-map tile layers retain Tiled's source chunks. Fixed-size layers are
+partitioned into sparse 32-by-32-cell chunks. `TilemapRenderer` culls occupied
+chunks first, so empty space between distant parts of a map is not scanned one
+cell at a time.
+
+Static chunk contents are cached lazily when a tile becomes 12 screen pixels or
+smaller. Animated tiles remain dynamic and are drawn over the cached static
+content. Cache resolution follows a power-of-two screen-space LOD, so a chunk
+first seen at a distant zoom does not consume a full-resolution texture. Cache
+creation is limited to four chunks per frame, 256 retained chunks, and 64 MB per
+renderer by default. These values can be tuned on each generated
+`TilemapRenderer` through `ChunkCacheScreenSizeThreshold`,
+`MaximumChunkCachesBuiltPerFrame`, `MaximumCachedChunks`, and
+`MaximumChunkCacheMegabytes`; set
+`EnableChunkCaching` to false for a layer that must always draw individual
+tiles. Custom-effect tilemaps skip caching automatically.
+
+For profiling, inspect `LastVisibleChunkCount`, `LastCandidateTileCount`,
+`LastVisibleTileCount`, `LastSpriteSubmissionCount`, and
+`FrameSpriteSubmissionCount`. Once the cache is warm, a static visible chunk
+costs one sprite submission in each render pass instead of one per tile.

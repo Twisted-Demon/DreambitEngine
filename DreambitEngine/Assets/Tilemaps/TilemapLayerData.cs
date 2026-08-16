@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -79,9 +80,38 @@ public readonly record struct TilemapTile(
     Texture2D? Texture = null,
     float Rotation = 0f,
     TilemapAnimation? Animation = null,
-    Point? Cell = null)
+    Point? Cell = null,
+    Point? Chunk = null)
 {
     public RectangleF Bounds => new(Position.X, Position.Y, Size.X, Size.Y);
+}
+
+/// <summary>
+/// An occupied spatial chunk in a tile layer. Chunks are the unit used for
+/// camera culling and optional static rendering caches.
+/// </summary>
+public sealed class TilemapChunkData
+{
+    internal TilemapChunkData(
+        Point coordinate,
+        RectangleF bounds,
+        TilemapTile[] tiles,
+        TilemapTile[] staticTiles,
+        TilemapTile[] animatedTiles)
+    {
+        Coordinate = coordinate;
+        Bounds = bounds;
+        Tiles = tiles;
+        StaticTiles = staticTiles;
+        AnimatedTiles = animatedTiles;
+    }
+
+    public Point Coordinate { get; }
+    public RectangleF Bounds { get; }
+    public IReadOnlyList<TilemapTile> Tiles { get; }
+    public IReadOnlyList<TilemapTile> StaticTiles { get; }
+    public IReadOnlyList<TilemapTile> AnimatedTiles { get; }
+    public int TileCount => Tiles.Count;
 }
 
 /// <summary>
@@ -90,8 +120,10 @@ public readonly record struct TilemapTile(
 /// </summary>
 public sealed class TilemapLayerData
 {
+    private const int DefaultChunkSizeInCells = 32;
     private static readonly IReadOnlyList<TilemapTile> EmptyCell = Array.Empty<TilemapTile>();
     private readonly Dictionary<long, List<TilemapTile>> _tilesByCell = [];
+    private readonly TilemapChunkData[] _chunks;
 
     public TilemapLayerData(
         int columns,
@@ -113,15 +145,14 @@ public sealed class TilemapLayerData
         Rows = rows;
         CellSize = cellSize;
         RenderOrder = renderOrder;
-        var gridWidth = columns * cellSize.X;
-        var gridHeight = rows * cellSize.Y;
         var orderedTiles = new List<TilemapTile>();
+        var chunkBuilders = new Dictionary<Point, ChunkBuilder>();
         var maxTileWidth = 0f;
         var maxTileHeight = 0f;
-        var minTileLeft = 0f;
-        var minTileTop = 0f;
-        var maxTileRight = gridWidth;
-        var maxTileBottom = gridHeight;
+        var minTileLeft = float.PositiveInfinity;
+        var minTileTop = float.PositiveInfinity;
+        var maxTileRight = float.NegativeInfinity;
+        var maxTileBottom = float.NegativeInfinity;
         var minimumTileOffsetX = 0f;
         var minimumTileOffsetY = 0f;
         var maximumTileExtentX = cellSize.X;
@@ -146,6 +177,17 @@ public sealed class TilemapLayerData
             }
             cellTiles.Add(tile);
             orderedTiles.Add(tile);
+
+            var chunkCoordinate = tile.Chunk ?? new Point(
+                column / DefaultChunkSizeInCells,
+                row / DefaultChunkSizeInCells);
+            if (!chunkBuilders.TryGetValue(chunkCoordinate, out var chunkBuilder))
+            {
+                chunkBuilder = new ChunkBuilder(chunkCoordinate);
+                chunkBuilders.Add(chunkCoordinate, chunkBuilder);
+            }
+            chunkBuilder.Add(tile);
+
             maxTileWidth = MathF.Max(maxTileWidth, tile.Size.X);
             maxTileHeight = MathF.Max(maxTileHeight, tile.Size.Y);
             minTileLeft = MathF.Min(minTileLeft, tile.Position.X);
@@ -160,12 +202,18 @@ public sealed class TilemapLayerData
             maximumTileExtentY = MathF.Max(maximumTileExtentY, tile.Position.Y + tile.Size.Y - cellOriginY);
         }
 
-        Bounds = new RectangleF(
-            minTileLeft,
-            minTileTop,
-            maxTileRight - minTileLeft,
-            maxTileBottom - minTileTop);
+        Bounds = orderedTiles.Count == 0
+            ? RectangleF.Empty
+            : new RectangleF(
+                minTileLeft,
+                minTileTop,
+                maxTileRight - minTileLeft,
+                maxTileBottom - minTileTop);
         Tiles = orderedTiles.ToArray();
+        _chunks = chunkBuilders.Values
+            .Select(builder => builder.Build(renderOrder))
+            .OrderBy(chunk => chunk, new ChunkRenderOrderComparer(renderOrder))
+            .ToArray();
         MaximumTileSize = new Vector2(maxTileWidth, maxTileHeight);
         MinimumTileOffset = new Vector2(minimumTileOffsetX, minimumTileOffsetY);
         MaximumTileExtent = new Vector2(maximumTileExtentX, maximumTileExtentY);
@@ -181,6 +229,28 @@ public sealed class TilemapLayerData
     public Vector2 MaximumTileExtent { get; }
     public TilemapRenderOrder RenderOrder { get; }
     public int TileCount => Tiles.Count;
+    public IReadOnlyList<TilemapChunkData> Chunks => _chunks;
+    public int ChunkCount => _chunks.Length;
+
+    /// <summary>
+    /// Appends occupied chunks intersecting <paramref name="localView"/> in the
+    /// layer's render order. Empty grid space is never visited.
+    /// </summary>
+    public void GetVisibleChunks(RectangleF localView, List<TilemapChunkData> destination)
+    {
+        ArgumentNullException.ThrowIfNull(destination);
+        destination.Clear();
+
+        if (!Bounds.Intersects(localView) || TileCount == 0)
+            return;
+
+        for (var index = 0; index < _chunks.Length; index++)
+        {
+            var chunk = _chunks[index];
+            if (chunk.Bounds.Intersects(localView))
+                destination.Add(chunk);
+        }
+    }
 
     public IReadOnlyList<TilemapTile> GetTiles(int column, int row)
     {
@@ -228,6 +298,23 @@ public sealed class TilemapLayerData
 
     private long GetCellKey(int column, int row) => (long)row * Columns + column;
 
+    private static int CompareCells(TilemapTile left, TilemapTile right, TilemapRenderOrder renderOrder)
+    {
+        var leftCell = left.Cell ?? Point.Zero;
+        var rightCell = right.Cell ?? Point.Zero;
+        var rowComparison = leftCell.Y.CompareTo(rightCell.Y);
+        var columnComparison = leftCell.X.CompareTo(rightCell.X);
+
+        return renderOrder switch
+        {
+            TilemapRenderOrder.RightDown => rowComparison != 0 ? rowComparison : columnComparison,
+            TilemapRenderOrder.RightUp => rowComparison != 0 ? -rowComparison : columnComparison,
+            TilemapRenderOrder.LeftDown => rowComparison != 0 ? rowComparison : -columnComparison,
+            TilemapRenderOrder.LeftUp => rowComparison != 0 ? -rowComparison : -columnComparison,
+            _ => throw new ArgumentOutOfRangeException(nameof(renderOrder))
+        };
+    }
+
     private static void ValidateTile(TilemapTile tile)
     {
         if (!float.IsFinite(tile.Position.X) || !float.IsFinite(tile.Position.Y))
@@ -239,5 +326,70 @@ public sealed class TilemapLayerData
             throw new ArgumentOutOfRangeException(nameof(tile), "Tile source rectangle must have a positive size.");
         if (!float.IsFinite(tile.Rotation))
             throw new ArgumentOutOfRangeException(nameof(tile), "Tile rotation must be finite.");
+    }
+
+    private sealed class ChunkBuilder(Point coordinate)
+    {
+        private readonly List<TilemapTile> _tiles = [];
+        private float _left = float.PositiveInfinity;
+        private float _top = float.PositiveInfinity;
+        private float _right = float.NegativeInfinity;
+        private float _bottom = float.NegativeInfinity;
+
+        public Point Coordinate { get; } = coordinate;
+
+        public void Add(TilemapTile tile)
+        {
+            _tiles.Add(tile);
+            _left = MathF.Min(_left, tile.Bounds.Left);
+            _top = MathF.Min(_top, tile.Bounds.Top);
+            _right = MathF.Max(_right, tile.Bounds.Right);
+            _bottom = MathF.Max(_bottom, tile.Bounds.Bottom);
+        }
+
+        public TilemapChunkData Build(TilemapRenderOrder renderOrder)
+        {
+            var ordered = _tiles
+                .Select((tile, index) => (tile, index))
+                .OrderBy(item => item.tile, new TileRenderOrderComparer(renderOrder))
+                .ThenBy(item => item.index)
+                .Select(item => item.tile)
+                .ToArray();
+            return new TilemapChunkData(
+                Coordinate,
+                new RectangleF(_left, _top, _right - _left, _bottom - _top),
+                ordered,
+                ordered.Where(tile => tile.Animation is null).ToArray(),
+                ordered.Where(tile => tile.Animation is not null).ToArray());
+        }
+    }
+
+    private sealed class TileRenderOrderComparer(TilemapRenderOrder renderOrder) : IComparer<TilemapTile>
+    {
+        public int Compare(TilemapTile left, TilemapTile right) => CompareCells(left, right, renderOrder);
+    }
+
+    private sealed class ChunkRenderOrderComparer(TilemapRenderOrder renderOrder) : IComparer<TilemapChunkData>
+    {
+        public int Compare(TilemapChunkData? left, TilemapChunkData? right)
+        {
+            if (ReferenceEquals(left, right))
+                return 0;
+            if (left is null)
+                return -1;
+            if (right is null)
+                return 1;
+
+            var rowComparison = left.Bounds.Top.CompareTo(right.Bounds.Top);
+            var columnComparison = left.Bounds.Left.CompareTo(right.Bounds.Left);
+            return renderOrder switch
+            {
+                TilemapRenderOrder.RightDown => rowComparison != 0 ? rowComparison : columnComparison,
+                TilemapRenderOrder.RightUp => rowComparison != 0 ? -rowComparison : columnComparison,
+                TilemapRenderOrder.LeftDown => rowComparison != 0 ? rowComparison : -columnComparison,
+                TilemapRenderOrder.LeftUp => rowComparison != 0 ? -rowComparison : -columnComparison,
+                _ => throw new ArgumentOutOfRangeException(nameof(renderOrder))
+            };
+        }
     }
 }
