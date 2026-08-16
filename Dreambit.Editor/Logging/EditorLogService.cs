@@ -7,15 +7,20 @@ internal sealed class EditorLogService
     private readonly object _sync = new();
     private readonly int _capacity;
     private readonly List<EditorLogEntry> _entries;
+    private readonly string? _errorLogPath;
     private EditorLogEntry[] _snapshot = [];
     private long _version;
+    private bool _reportedPersistenceFailure;
 
-    public EditorLogService(int capacity = DefaultCapacity)
+    public EditorLogService(int capacity = DefaultCapacity, string? errorLogPath = null)
     {
         if (capacity <= 0)
             throw new ArgumentOutOfRangeException(nameof(capacity));
 
         _capacity = capacity;
+        _errorLogPath = string.IsNullOrWhiteSpace(errorLogPath)
+            ? null
+            : Path.GetFullPath(errorLogPath);
         _entries = new List<EditorLogEntry>(Math.Min(capacity, DefaultCapacity));
     }
 
@@ -49,13 +54,17 @@ internal sealed class EditorLogService
             if (_entries.Count == _capacity)
                 _entries.RemoveAt(0);
 
-            _entries.Add(new EditorLogEntry(
+            var entry = new EditorLogEntry(
                 DateTimeOffset.Now,
                 severity,
                 category,
                 message,
-                details));
+                details);
+            _entries.Add(entry);
             PublishSnapshot();
+
+            if (severity == EditorLogSeverity.Error)
+                TryPersistError(entry);
         }
     }
 
@@ -78,5 +87,31 @@ internal sealed class EditorLogService
     {
         _version++;
         _snapshot = _entries.ToArray();
+    }
+
+    private void TryPersistError(EditorLogEntry entry)
+    {
+        if (_errorLogPath is null)
+            return;
+
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(_errorLogPath)!);
+            var report = $"[{entry.Timestamp:O}] ERROR [{entry.Category}] {entry.Message}";
+            if (!string.IsNullOrWhiteSpace(entry.Details))
+                report += Environment.NewLine + entry.Details;
+            File.AppendAllText(_errorLogPath, report + Environment.NewLine + Environment.NewLine);
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException or
+                ArgumentException or NotSupportedException)
+        {
+            if (_reportedPersistenceFailure)
+                return;
+
+            _reportedPersistenceFailure = true;
+            Console.Error.WriteLine(
+                $"Could not write the Dreambit Editor error log '{_errorLogPath}'. {exception.Message}");
+        }
     }
 }

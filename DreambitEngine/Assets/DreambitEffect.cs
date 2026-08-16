@@ -5,11 +5,11 @@ namespace Dreambit;
 
 /// <summary>Dreambit asset-system handle for compiled MonoGame Effect bytecode.</summary>
 [DreambitAssetType("dreambit.effect", FileExtension = ".fx")]
-public sealed class EffectAsset : DreambitAsset
+public sealed class DreambitEffect : DreambitAsset
 {
     private readonly bool _ownsEffect;
 
-    internal EffectAsset(Effect effect, string assetName, bool ownsEffect)
+    internal DreambitEffect(Effect effect, string assetName, bool ownsEffect)
     {
         Effect = effect;
         AssetName = assetName;
@@ -19,12 +19,12 @@ public sealed class EffectAsset : DreambitAsset
     [JsonIgnore]
     public Effect Effect { get; private set; }
 
-    public static implicit operator Effect(EffectAsset asset) => asset?.Effect;
+    public static implicit operator Effect(DreambitEffect asset) => asset?.Effect;
 
-    public static EffectAsset FromEffect(Effect effect, string assetName = null) =>
-        effect is null ? null : new EffectAsset(effect, assetName ?? effect.Name, false);
+    public static DreambitEffect FromEffect(Effect effect, string assetName = null) =>
+        effect is null ? null : new DreambitEffect(effect, assetName ?? effect.Name, false);
 
-    internal static EffectAsset Own(Effect effect, string assetName) => new(effect, assetName, true);
+    internal static DreambitEffect Own(Effect effect, string assetName) => new(effect, assetName, true);
 
     protected override void CleanUp()
     {

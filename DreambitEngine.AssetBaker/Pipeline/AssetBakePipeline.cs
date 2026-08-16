@@ -317,11 +317,13 @@ public sealed class AssetBakePipeline
             if (!cache.TryRead(
                     registryCacheKey,
                     registryHash,
-                    "runtime-registry-v1",
+                    "runtime-registry-v2",
                     retainBlobData,
                     out registryBlob))
             {
-                var bakedRegistryBlob = CreateRuntimeRegistryBlob(request.AssetRegistryPath);
+                var bakedRegistryBlob = CreateRuntimeRegistryBlob(
+                    request.AssetRegistryPath,
+                    bakerRegistry);
                 var registryBlobFile = cache.Write(
                     registryCacheKey,
                     registryHash,
@@ -349,7 +351,9 @@ public sealed class AssetBakePipeline
             unsupportedCount);
     }
 
-    private static AssetBlob CreateRuntimeRegistryBlob(string registryPath)
+    private static AssetBlob CreateRuntimeRegistryBlob(
+        string registryPath,
+        AssetBakerRegistry bakerRegistry)
     {
         using var stream = File.OpenRead(registryPath);
         var source = JsonSerializer.Deserialize<SourceAssetRegistry>(stream, JsonOptions)
@@ -362,6 +366,14 @@ public sealed class AssetBakePipeline
             if (entry.Id == Guid.Empty || string.IsNullOrWhiteSpace(entry.Path))
                 throw new InvalidDataException("The Dreambit asset registry contains an invalid entry.");
             var extension = Path.GetExtension(entry.Path);
+            // The editor tracks source-only files so they remain visible in the
+            // Project panel. They must not enter the runtime registry unless a
+            // baker can actually produce a loadable asset for their extension.
+            // This excludes Tiled's .tiled-project/.tiled-session metadata while
+            // retaining runtime .tmx maps and .tsx tilesets.
+            if (bakerRegistry.GetByExt(extension) is null)
+                continue;
+
             var logicalName = IsSerializedDreambitExtension(extension)
                 ? entry.Path.Replace('\\', '/')
                 : Path.ChangeExtension(entry.Path, null)!.Replace('\\', '/');

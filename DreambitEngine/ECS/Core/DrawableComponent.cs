@@ -9,9 +9,10 @@ public abstract class DrawableComponent : Component
     public virtual RectangleF Bounds => Scene.MainCamera.BoundsF;
     public virtual float SortDepth => Transform.WorldPosition.Y;
 
-    public Effect Effect { get; set; } = null;
+    public DreambitEffect Effect { get; set; } = null;
 
-    public bool UsesEffect => Effect != null;
+    /// <summary>Whether this drawable currently has a usable native shader.</summary>
+    public bool UsesEffect => Effect?.Effect is not null;
 
     [DreambitSerialize]
     public virtual int DrawLayer

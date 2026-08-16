@@ -237,6 +237,28 @@ public sealed class TiledImportTests : IDisposable
     }
 
     [Fact]
+    public void DecoderAcceptsAnEmptyCsvLayerInAnInfiniteMap()
+    {
+        var map = new TmxMap
+        {
+            Infinite = true,
+            Width = 100,
+            Height = 80,
+            TileWidth = 32,
+            TileHeight = 32
+        };
+        var layer = new TmxTileLayer
+        {
+            Name = "Empty",
+            Width = 100,
+            Height = 80,
+            Data = new TmxData { Encoding = "csv", Value = null }
+        };
+
+        Assert.Empty(TmxTileDataDecoder.DecodeLayer(map, layer));
+    }
+
+    [Fact]
     public void DecoderSupportsUncompressedGzipAndZlibBase64()
     {
         var values = new[]
@@ -518,6 +540,10 @@ public sealed class TiledImportTests : IDisposable
         var background = Assert.Single(
             generated.SelectMany(entity => entity.GetAllComponents()).OfType<FilledRectDrawer>());
         Assert.True(SceneViewportRenderer.ShouldPickDrawable(background));
+        Assert.True(SceneViewportRenderer.ShouldDeferImportedMapPick(background));
+        Assert.All(
+            generated.SelectMany(entity => entity.GetAllComponents()).OfType<TilemapRenderer>(),
+            renderer => Assert.True(SceneViewportRenderer.ShouldDeferImportedMapPick(renderer)));
 
         var placed = document.CreateEmpty("Dreambit Placed");
         var placedId = placed.Id;

@@ -73,6 +73,17 @@ public static class TmxTileDataDecoder
             return result;
         }
 
+        // Tiled writes an empty infinite-map layer as a self-closing data element
+        // (for example, <data encoding="csv"/>), while retaining the editor's
+        // nominal layer width and height. It represents no cells, not a truncated
+        // fixed-size tile array.
+        if (map.Infinite &&
+            string.IsNullOrWhiteSpace(layer.Data.Value) &&
+            layer.Data.Tiles.Count == 0)
+        {
+            return result;
+        }
+
         var width = layer.Width > 0 ? layer.Width : map.Width;
         var height = layer.Height > 0 ? layer.Height : map.Height;
         if (width <= 0 || height <= 0)

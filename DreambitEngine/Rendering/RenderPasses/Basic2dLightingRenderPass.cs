@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using Dreambit.ECS;
@@ -13,22 +14,27 @@ public class Basic2dLightingRenderPass : RenderPass
     private readonly List<DrawableSortEntry> _drawableSortBuffer = new(512);
 
     private readonly List<int> _sortedLayerBuffer = new(16);
-    private Effect LightingFx { get; set; }
+    private DreambitEffect LightingFx { get; set; }
+    private DreambitEffect DepthFx { get; set; }
 
     private RenderTarget2D AlbedoRt { get; set; }
+    private RenderTarget2D DepthRt { get; set; }
 
     public override void Initialize()
     {
         base.Initialize();
 
         CreateAlbedoRenderTarget();
+        CreateDepthRenderTarget();
 
-        LightingFx = Resources.LoadAsset<Effect>("Effects/ForwardLighting2D");
+        LightingFx = Resources.LoadAsset<DreambitEffect>("Effects/ForwardLighting2D");
+        DepthFx = Resources.LoadAsset<DreambitEffect>("Effects/Depth2D");
     }
 
     public override void OnDraw()
     {
         RenderDrawables();
+        RenderDepth();
         RenderLighting();
     }
 
@@ -62,6 +68,71 @@ public class Basic2dLightingRenderPass : RenderPass
             _drawableSortBuffer.Sort(SortComparer);
 
             RenderSortedDrawables(cameraMatrix);
+        }
+    }
+
+    private void RenderDepth()
+    {
+        var drawLayers =
+            Drawables.GetDrawLayers();
+
+        var camera = RenderCamera;
+        var cameraBounds = camera.BoundsF;
+        var cameraMatrix = camera.TransformMatrix;
+
+        BuildSortedLayerBuffer(drawLayers);
+
+        Device.SetRenderTarget(DepthRt);
+
+        Device.Clear(Color.Transparent);
+
+        for (var layerIndex = 0; layerIndex < _sortedLayerBuffer.Count; layerIndex++)
+        {
+            var layer =
+                _sortedLayerBuffer[layerIndex];
+
+            var layerDrawables =
+                drawLayers[layer];
+
+            BuildDrawableSortBuffer(
+                layerDrawables,
+                cameraBounds);
+
+            if (_drawableSortBuffer.Count == 0)
+                continue;
+
+            _drawableSortBuffer.Sort(
+                SortComparer);
+
+            RenderSortedDepthDrawables(cameraMatrix);
+        }
+    }
+
+    private void RenderSortedDepthDrawables(
+        Matrix cameraMatrix)
+    {
+        for (var i = 0;
+             i < _drawableSortBuffer.Count;
+             i++)
+        {
+            var entry =
+                _drawableSortBuffer[i];
+
+            DepthFx.Effect.Parameters["SortDepth"]
+                ?.SetValue(entry.SortDepth);
+
+            Core.SpriteBatch.Begin(
+                SpriteSortMode.Deferred,
+                BlendState.Opaque,
+                Scene.RenderingOptions.SamplerState,
+                DepthStencilState.None,
+                RasterizerState.CullNone,
+                DepthFx,
+                cameraMatrix);
+
+            entry.Drawable.Draw();
+
+            Core.SpriteBatch.End();
         }
     }
 
@@ -139,8 +210,12 @@ public class Basic2dLightingRenderPass : RenderPass
             if (!drawable.IsVisibleFromCamera(cameraBounds))
                 continue;
 
+            // DreambitEffect is a reloadable asset handle. The handle can remain
+            // on a live drawable after its native MonoGame effect has been
+            // released during a content refresh, so only batch a usable native
+            // effect and otherwise retain the engine fallback.
             var effect =
-                drawable.Effect ?? DefaultEffect;
+                drawable.Effect?.Effect ?? DefaultEffect;
 
             var sortDepth =
                 drawable.SortDepth;
@@ -198,13 +273,16 @@ public class Basic2dLightingRenderPass : RenderPass
         base.OnViewportResized();
 
         CreateAlbedoRenderTarget();
+        CreateDepthRenderTarget();
     }
 
     protected override void OnDisposing()
     {
         base.OnDisposing();
         CleanupAlbedoRenderTarget();
-        Resources.UnloadAsset(LightingFx.Name);
+        CleanupDepthRenderTarget();
+        Resources.UnloadAsset(LightingFx.AssetName);
+        Resources.UnloadAsset(DepthFx.AssetName);
     }
 
     private void CreateAlbedoRenderTarget()
@@ -213,10 +291,29 @@ public class Basic2dLightingRenderPass : RenderPass
         AlbedoRt = RenderPipeline.CreateViewportRenderTarget();
     }
 
+    private void CreateDepthRenderTarget()
+    {
+        DepthRt?.Dispose();
+        ArgumentNullException.ThrowIfNull(AlbedoRt);
+        DepthRt = new RenderTarget2D(
+            Device,
+            AlbedoRt.Width,
+            AlbedoRt.Height,
+            false,
+            SurfaceFormat.Single,
+            DepthFormat.None);
+    }
+
     private void CleanupAlbedoRenderTarget()
     {
         AlbedoRt?.Dispose();
         AlbedoRt = null;
+    }
+
+    private void CleanupDepthRenderTarget()
+    {
+        DepthRt?.Dispose();
+        DepthRt = null;
     }
 
     private readonly struct DrawableSortEntry

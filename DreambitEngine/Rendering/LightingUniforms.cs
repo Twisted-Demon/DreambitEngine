@@ -17,10 +17,16 @@ public static class LightingUniforms
 
     public static void Apply(Effect fx, IReadOnlyList<PointLight2D> lights, Camera2D camera, Vector3 ambient)
     {
+        
         var count = 0;
         for (var i = 0; i < lights.Count && count < MaxLights; i++)
         {
             var light = lights[i];
+            
+            //do not try to render if not visible from camera
+            if (!light.IsVisibleFromCamera(camera.BoundsF))
+                continue;
+            
             if (!light.Enabled) continue;
 
             var screen = Vector2.Transform(light.Position, camera.TransformMatrix);

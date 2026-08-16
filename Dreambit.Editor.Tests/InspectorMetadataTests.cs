@@ -280,7 +280,7 @@ public sealed class InspectorMetadataTests
     public void DreambitAssetTypesExposeCanonicalSourceExtensions()
     {
         Assert.Equal(".cutscene", DreambitAssetTypeRegistry.GetFileExtension(typeof(Dreambit.Scripting.Cutscene)));
-        Assert.Equal(".fx", DreambitAssetTypeRegistry.GetFileExtension(typeof(EffectAsset)));
+        Assert.Equal(".fx", DreambitAssetTypeRegistry.GetFileExtension(typeof(DreambitEffect)));
         Assert.Equal(".blueprint", DreambitAssetTypeRegistry.GetFileExtension(typeof(EntityBlueprint)));
         Assert.Equal(".scene", DreambitAssetTypeRegistry.GetFileExtension(typeof(SceneBlueprint)));
         Assert.Equal(".ttf", DreambitAssetTypeRegistry.GetFileExtension(typeof(FontAsset)));
@@ -296,7 +296,7 @@ public sealed class InspectorMetadataTests
         Assert.True(AssetTypeClassifier.CanCreateAsset(typeof(TestCustomAsset)));
         Assert.False(AssetTypeClassifier.CanCreateAsset(typeof(TextureAsset)));
         Assert.False(AssetTypeClassifier.CanCreateAsset(typeof(FontAsset)));
-        Assert.False(AssetTypeClassifier.CanCreateAsset(typeof(EffectAsset)));
+        Assert.False(AssetTypeClassifier.CanCreateAsset(typeof(DreambitEffect)));
     }
 
     [Fact]

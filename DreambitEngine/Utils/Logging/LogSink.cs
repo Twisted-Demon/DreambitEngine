@@ -1,4 +1,5 @@
-﻿using System.Threading.Channels;
+﻿using System;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using Spectre.Console;
 
@@ -26,9 +27,31 @@ public static class LogSink
         });
     }
 
+    /// <summary>
+    /// Allows hosts such as the editor to mirror engine log entries into their own
+    /// diagnostic surface without replacing the engine's console sink.
+    /// </summary>
+    public static event Action<LogEntry> EntryLogged;
+
     public static void Enqueue(in LogEntry entry)
     {
         Channel.Writer.TryWrite(entry);
+
+        var listeners = EntryLogged;
+        if (listeners is null)
+            return;
+
+        foreach (Action<LogEntry> listener in listeners.GetInvocationList())
+        {
+            try
+            {
+                listener(entry);
+            }
+            catch
+            {
+                // Logging must never turn a recoverable failure into a crash.
+            }
+        }
     }
 
     private static void SpectreWrite(

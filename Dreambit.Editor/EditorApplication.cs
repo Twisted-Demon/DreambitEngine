@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Numerics;
 using Dreambit.Editor.Assets;
 using Dreambit.Editor.Compilation;
@@ -80,7 +81,7 @@ internal sealed class EditorApplication : IDisposable
         _stateStore = stateStore;
         _globalState = globalState;
         _workspaceState = workspaceState;
-        _logs = new EditorLogService();
+        _logs = new EditorLogService(errorLogPath: paths.ErrorLogPath);
         _icons = new EditorIconService(Core.Instance.GraphicsDevice, imGuiRenderer);
         _projectManager = new DreambitProjectManager(
             paths,
@@ -138,7 +139,10 @@ internal sealed class EditorApplication : IDisposable
                 session.Scenes,
                 documentContext,
                 _workspaceState,
-                new SceneViewportRenderer(Core.Instance.GraphicsDevice, imGuiRenderer),
+                new SceneViewportRenderer(
+                    Core.Instance.GraphicsDevice,
+                    imGuiRenderer,
+                    LogSceneError),
                 _dragDrop,
                 session.Assets,
                 session.BlueprintSources,
@@ -150,7 +154,10 @@ internal sealed class EditorApplication : IDisposable
                 blueprintEditing,
                 documentContext,
                 _workspaceState,
-                new SceneViewportRenderer(Core.Instance.GraphicsDevice, imGuiRenderer),
+                new SceneViewportRenderer(
+                    Core.Instance.GraphicsDevice,
+                    imGuiRenderer,
+                    LogSceneError),
                 _icons,
                 LogSceneError);
             _panels.Register(blueprintView);
@@ -204,6 +211,8 @@ internal sealed class EditorApplication : IDisposable
                 "Project",
                 $"Opened '{_project.Metadata.Name}' with Dreambit SDK {_project.Metadata.Sdk.Version}.");
         }
+
+        LogSink.EntryLogged += OnEngineLogEntry;
     }
 
     public void Draw()
@@ -769,6 +778,12 @@ internal sealed class EditorApplication : IDisposable
             }
             catch (Exception exception)
             {
+                _sceneOperationError =
+                    $"Could not create a Tiled scene from '{asset.RelativePath}'. {exception.Message}";
+                _logs.Error(
+                    "Tiled",
+                    $"Could not create a Tiled scene from '{asset.RelativePath}'.",
+                    exception);
                 ImGui.TextColored(
                     new Vector4(0.96f, 0.34f, 0.36f, 1f),
                     $"{asset.RelativePath}: {exception.Message}");
@@ -1425,6 +1440,29 @@ internal sealed class EditorApplication : IDisposable
     private void LogSceneError(string message, Exception? exception) =>
         _logs.Error("Scene", message, exception);
 
+    private void OnEngineLogEntry(LogEntry entry)
+    {
+        if (entry.Level != LogLevel.Error)
+            return;
+
+        var message = entry.Message;
+        if (entry.Args is { Length: > 0 } args)
+        {
+            try
+            {
+                message = string.Format(CultureInfo.InvariantCulture, entry.Message, args);
+            }
+            catch (FormatException)
+            {
+                message = entry.Message + " | " + string.Join(", ", args);
+            }
+        }
+
+        _logs.Error(
+            string.IsNullOrWhiteSpace(entry.Prefix) ? "Engine" : $"Engine/{entry.Prefix}",
+            message);
+    }
+
     private void TryPersistGlobalState()
     {
         if (!_stateStore.TrySaveGlobalState(_globalState, out var error))
@@ -1437,6 +1475,7 @@ internal sealed class EditorApplication : IDisposable
             return;
 
         _disposed = true;
+        LogSink.EntryLogged -= OnEngineLogEntry;
 
         foreach (var panel in _panels.Panels)
             _workspaceState.PanelVisibility[panel.Id] = panel.IsOpen;

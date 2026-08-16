@@ -7,13 +7,13 @@ public sealed class EffectAssetLoader : AssetLoaderBase
 {
     public override string Extension => ".fxb";
     public override bool AddToDisposableList => true;
-    public override Type TargetType => typeof(EffectAsset);
+    public override Type TargetType => typeof(DreambitEffect);
 
     public override object Load(string assetName, string pakName, bool usePak, string contentDirectory)
     {
         using var stream = GetStream(GetPath(assetName), pakName, usePak, contentDirectory);
         var effect = new Effect(Graphics.Device, FxbLoader.ReadEffectCode(stream)) { Name = assetName };
-        return EffectAsset.Own(effect, assetName);
+        return DreambitEffect.Own(effect, assetName);
     }
 }
 

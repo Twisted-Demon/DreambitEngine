@@ -9,15 +9,21 @@ internal sealed class SceneViewportRenderer : IDisposable
 {
     private readonly GraphicsDevice _device;
     private readonly ImGuiRenderer _imGui;
+    private readonly Action<string, Exception?>? _reportError;
     private readonly List<DrawableComponent> _pickBuffer = new(512);
     private RenderTarget2D? _displayTarget;
     private nint _textureId;
     private bool _disposed;
+    private string? _lastReportedError;
 
-    public SceneViewportRenderer(GraphicsDevice device, ImGuiRenderer imGui)
+    public SceneViewportRenderer(
+        GraphicsDevice device,
+        ImGuiRenderer imGui,
+        Action<string, Exception?>? reportError = null)
     {
         _device = device;
         _imGui = imGui;
+        _reportError = reportError;
     }
 
     public RenderTarget2D? Target => _displayTarget;
@@ -28,6 +34,7 @@ internal sealed class SceneViewportRenderer : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         Camera2D? camera = null;
+        LastError = null;
 
         try
         {
@@ -41,7 +48,7 @@ internal sealed class SceneViewportRenderer : IDisposable
         }
         catch (Exception exception)
         {
-            LastError = exception.Message;
+            CaptureError("Could not render the scene viewport.", exception);
         }
         finally
         {
@@ -51,9 +58,12 @@ internal sealed class SceneViewportRenderer : IDisposable
             }
             catch (Exception exception)
             {
-                LastError ??= exception.Message;
+                CaptureError("Could not restore the graphics backbuffer after rendering the scene viewport.", exception);
             }
         }
+        if (LastError is null)
+            _lastReportedError = null;
+
         // EnsureEditorCamera is the only operation above that can leave this unset. It
         // is an engine invariant for an editor scene, so preserve that failure rather
         // than returning an invalid camera to interaction code.
@@ -69,23 +79,39 @@ internal sealed class SceneViewportRenderer : IDisposable
         try
         {
             BuildPickBuffer(scene);
+            Entity? importedMapHit = null;
             for (var index = _pickBuffer.Count - 1; index >= 0; index--)
             {
                 var drawable = _pickBuffer[index];
                 try
                 {
-                    if (drawable.Bounds.Contains(worldPosition))
-                        return drawable.Entity;
+                    if (!drawable.Bounds.Contains(worldPosition))
+                        continue;
+
+                    // Imported tile and map-background bounds commonly cover the
+                    // complete playable area. Keep that hit as a fallback, but let
+                    // authored scene content win wherever the two overlap.
+                    if (ShouldDeferImportedMapPick(drawable))
+                    {
+                        importedMapHit ??= drawable.Entity;
+                        continue;
+                    }
+
+                    return drawable.Entity;
                 }
                 catch (Exception exception)
                 {
                     // A custom bounds implementation is an extension boundary. Keep
                     // picking other drawables, but surface the fault in the viewport.
-                    LastError ??=
+                    CaptureError(
                         $"{drawable.GetType().FullName ?? drawable.GetType().Name} " +
-                        $"could not provide picking bounds: {exception.Message}";
+                        "could not provide picking bounds.",
+                        exception);
                 }
             }
+
+            if (importedMapHit is not null)
+                return importedMapHit;
 
             Entity? nearest = null;
             var nearestDistanceSquared = 100f;
@@ -124,6 +150,9 @@ internal sealed class SceneViewportRenderer : IDisposable
     // map geometry selectable while hierarchy editing remains disabled.
     internal static bool ShouldPickDrawable(DrawableComponent drawable) =>
         drawable is not Light2D && drawable.Enabled && drawable.Entity.Enabled;
+
+    internal static bool ShouldDeferImportedMapPick(DrawableComponent drawable) =>
+        drawable.Entity.IsImportedMapGenerated;
 
     private void EnsureTarget(int width, int height)
     {
@@ -207,6 +236,26 @@ internal sealed class SceneViewportRenderer : IDisposable
         catch (Exception exception)
         {
             (failures ??= []).Add(exception);
+        }
+    }
+
+    private void CaptureError(string message, Exception exception)
+    {
+        LastError ??= $"{message} {exception.Message}";
+        var signature = message + Environment.NewLine + exception;
+        if (string.Equals(_lastReportedError, signature, StringComparison.Ordinal))
+            return;
+
+        _lastReportedError = signature;
+        try
+        {
+            _reportError?.Invoke(message, exception);
+        }
+        catch (Exception reportingFailure)
+        {
+            Console.Error.WriteLine(
+                $"{message} {exception}{Environment.NewLine}" +
+                $"Reporting the editor error also failed: {reportingFailure}");
         }
     }
 

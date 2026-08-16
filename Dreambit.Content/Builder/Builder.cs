@@ -21,12 +21,9 @@ public sealed class Builder : ContentBuilder
     {
         var content = new ContentCollection();
 
-        content.Include("Effects/ColorCorrection.fx");
-        content.Include("Effects/ForwardDiffuse.fx");
-        content.Include("Effects/ForwardLighting2D.fx");
-        content.Include("Effects/PointLight2D.fx");
-        content.Include("Effects/Tint.fx");
-        content.Include("Effects/WorldRing.fx");
+        // The rendering pipeline loads these by asset name. Bake every built-in
+        // effect so adding a render pass cannot leave its shader absent at runtime.
+        content.Include<WildcardRule>("Effects/*.fx");
         content.IncludeCopy<WildcardRule>("*.ttf");
         content.Exclude<WildcardRule>("*.xnb");
 

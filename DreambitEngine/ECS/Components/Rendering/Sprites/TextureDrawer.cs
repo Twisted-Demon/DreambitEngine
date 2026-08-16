@@ -6,6 +6,7 @@ namespace Dreambit.ECS;
 
 public class TextureDrawer : DrawableComponent
 {
+    
     private int _pixelsPerUnit = 1;
     
     [DreambitSerialize]
