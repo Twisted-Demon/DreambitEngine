@@ -350,6 +350,7 @@ public class Scene : IDisposable
         _renderPipeline.AddRenderPass<AlbedoPass>();
         _renderPipeline.AddRenderPass<DepthPass>();
         _renderPipeline.AddRenderPass<DepthLightingPass>();
+        _renderPipeline.AddRenderPass<BloomPass>();
         _renderPipeline.AddRenderPass<PostProcessRenderPass>();
         if (ExecutionMode == SceneExecutionMode.Runtime)
         {
@@ -527,6 +528,10 @@ public class Scene : IDisposable
         PostProcessSettings.HueShift = Settings.PostProcessing.HueShift;
         PostProcessSettings.Saturation = Settings.PostProcessing.Saturation;
         PostProcessSettings.TintColor = Settings.PostProcessing.TintColor;
+        PostProcessSettings.BloomEnabled = Settings.PostProcessing.BloomEnabled;
+        PostProcessSettings.BloomIntensity = Settings.PostProcessing.BloomIntensity;
+        PostProcessSettings.BloomThreshold = Settings.PostProcessing.BloomThreshold;
+        PostProcessSettings.BloomSoftKnee =  Settings.PostProcessing.BloomSoftKnee;
         ApplyAmbientLightSettings();
     }
 

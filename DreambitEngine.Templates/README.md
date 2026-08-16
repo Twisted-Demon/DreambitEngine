@@ -1,6 +1,6 @@
 # Dreambit Engine Templates
 
-Version 0.3.9 provides separate package-based and source-submodule project commands.
+Version 0.3.11 provides separate package-based and source-submodule project commands.
 
 ## Generated project
 
@@ -36,10 +36,10 @@ These scripts pack the coordinated runtime/build/template package set into the s
 Create a project:
 
 ```powershell
-dotnet new dreambit-game -n MyGame --game-title "My Game" --sdkVersion 0.3.9
+dotnet new dreambit-game -n MyGame --game-title "My Game" --sdkVersion 0.3.11
 
 # Source checkout at .dreambit/engine
-dotnet new dreambit-game-source -n MyGame --game-title "My Game" --sdkVersion 0.3.9 --allow-scripts yes
+dotnet new dreambit-game-source -n MyGame --game-title "My Game" --sdkVersion 0.3.11 --allow-scripts yes
 ```
 
 Dreambit.Editor normally performs template installation, generation, and package restore automatically.

@@ -67,7 +67,8 @@ public sealed class RenderPipeline(Scene scene) : IDisposable
         _initialized = true;
     }
 
-    public void AddRenderPass<T>() where T : RenderPass, new()
+    public void AddRenderPass<T>()
+        where T : RenderPass, new()
     {
         var renderer = new T
         {
@@ -76,10 +77,25 @@ public sealed class RenderPipeline(Scene scene) : IDisposable
         };
 
         renderer.InitializeInternals();
-        _renderers.Add(renderer);
 
-        _renderers.Sort(static (left, right) =>
-            left.Order.CompareTo(right.Order));
+        var insertIndex =
+            _renderers.Count;
+
+        for (var i = 0;
+             i < _renderers.Count;
+             i++)
+        {
+            if (_renderers[i].Order >
+                renderer.Order)
+            {
+                insertIndex = i;
+                break;
+            }
+        }
+
+        _renderers.Insert(
+            insertIndex,
+            renderer);
     }
 
     public T GetRenderPass<T>() where T : RenderPass
