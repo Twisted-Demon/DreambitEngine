@@ -1,5 +1,5 @@
 using Dreambit.Editor.Persistence;
-using ImGuiNET;
+using Dreambit.EditorApi;
 
 namespace Dreambit.Editor.UI.Panels;
 
@@ -28,6 +28,8 @@ internal sealed class EditorPanelRegistry : IDisposable
 
         if (_workspaceState.PanelVisibility.TryGetValue(panel.Id, out var isOpen))
             panel.IsOpen = isOpen;
+        else
+            _workspaceState.PanelVisibility[panel.Id] = panel.IsOpen;
 
         _panels.Add(panel);
     }
@@ -38,6 +40,8 @@ internal sealed class EditorPanelRegistry : IDisposable
 
         foreach (var panel in _panels)
         {
+            if (!panel.IsAvailable)
+                continue;
             var wasOpen = panel.IsOpen;
             panel.Draw();
             if (wasOpen != panel.IsOpen)
@@ -49,8 +53,10 @@ internal sealed class EditorPanelRegistry : IDisposable
     {
         foreach (var panel in _panels)
         {
+            if (!panel.IsAvailable)
+                continue;
             var isOpen = panel.IsOpen;
-            if (!ImGui.MenuItem(panel.Title, string.Empty, isOpen))
+            if (!EditorGui.MenuItem(panel.Title, selected: isOpen))
                 continue;
 
             panel.IsOpen = !isOpen;
@@ -62,6 +68,8 @@ internal sealed class EditorPanelRegistry : IDisposable
     {
         foreach (var panel in _panels)
         {
+            if (!panel.IsAvailable)
+                continue;
             panel.IsOpen = true;
             _workspaceState.PanelVisibility[panel.Id] = true;
         }

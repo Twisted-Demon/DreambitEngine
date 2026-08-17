@@ -10,6 +10,7 @@ internal sealed class AssetEditingService : IDisposable
 {
     private static readonly TimeSpan InitialAutoSaveRetryDelay = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan MaximumAutoSaveRetryDelay = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan PreviewUpdateDelay = TimeSpan.FromMilliseconds(100);
 
     private readonly DreambitProjectDefinition _project;
     private readonly AssetDatabase _assets;
@@ -26,6 +27,10 @@ internal sealed class AssetEditingService : IDisposable
     private string? _reloadSnapshot;
     private bool _reloadDirty;
     private DreambitAssetDocument? _detachedReloadDocument;
+    private DreambitAssetDocument? _pendingPreviewDocument;
+    private DateTimeOffset _pendingPreviewChangedUtc;
+    private bool _previewDeferredByInteraction;
+    private bool _flushingPreview;
     private bool _disposed;
 
     public AssetEditingService(
@@ -82,6 +87,7 @@ internal sealed class AssetEditingService : IDisposable
                 return false;
             }
         }
+        FlushPendingPreview(force: true);
 
         DreambitAssetDocument? replacement = null;
         string? replacementDiskSource = null;
@@ -196,11 +202,12 @@ internal sealed class AssetEditingService : IDisposable
         }
     }
 
-    public void Update(bool autoSave, TimeSpan delay)
+    public void Update(bool autoSave, TimeSpan delay, bool editorInteractionActive = false)
     {
         RefreshFromDatabase();
         var now = DateTimeOffset.UtcNow;
-        if (!autoSave || ExternalChangeConflict is not null ||
+        UpdatePendingPreview(editorInteractionActive, now);
+        if (editorInteractionActive || !autoSave || ExternalChangeConflict is not null ||
             Current is not { IsDirty: true } document ||
             now - document.LastChangedUtc < delay ||
             now < _nextAutoSaveAttemptUtc)
@@ -235,6 +242,7 @@ internal sealed class AssetEditingService : IDisposable
         // The completed bake then rehydrates the open scene from fresh asset instances.
         _assets.RefreshNow();
         _observedAssetVersion = _assets.GetSnapshot().Version;
+        FlushPendingPreview(force: true);
         try
         {
             Saved?.Invoke(document);
@@ -352,7 +360,8 @@ internal sealed class AssetEditingService : IDisposable
 
     private Type? ResolveAssetType(AssetRecord asset)
     {
-        if (asset.Kind is AssetKind.Texture or AssetKind.Font or AssetKind.Effect or AssetKind.Cutscene)
+        if (asset.Kind is AssetKind.Texture or AssetKind.Font or AssetKind.Effect or
+            AssetKind.Cutscene or AssetKind.Ldtk or AssetKind.TiledMap)
             return null;
         if (asset.Kind == AssetKind.Blueprint)
             return typeof(EntityBlueprint);
@@ -405,6 +414,7 @@ internal sealed class AssetEditingService : IDisposable
         _selected = null;
         ClearExternalTracking();
         ClearReloadState();
+        _pendingPreviewDocument = null;
         Changed = null;
         PreviewChanged = null;
         Saved = null;
@@ -412,6 +422,40 @@ internal sealed class AssetEditingService : IDisposable
 
     private void OnDocumentChanged(DreambitAssetDocument document)
     {
+        _pendingPreviewDocument = document;
+        _pendingPreviewChangedUtc = DateTimeOffset.UtcNow;
+    }
+
+    internal void FlushPendingPreview() => FlushPendingPreview(force: true);
+
+    internal void UpdatePendingPreview(bool editorInteractionActive, DateTimeOffset now)
+    {
+        if (editorInteractionActive)
+        {
+            _previewDeferredByInteraction = _pendingPreviewDocument is not null;
+            return;
+        }
+
+        var force = _previewDeferredByInteraction;
+        _previewDeferredByInteraction = false;
+        FlushPendingPreview(now, force);
+    }
+
+    private void FlushPendingPreview(bool force) =>
+        FlushPendingPreview(DateTimeOffset.UtcNow, force);
+
+    private void FlushPendingPreview(DateTimeOffset now, bool force)
+    {
+        if (_flushingPreview || _pendingPreviewDocument is not { } document ||
+            !force && now - _pendingPreviewChangedUtc < PreviewUpdateDelay)
+        {
+            return;
+        }
+
+        // Clear first because PreviewChanged handlers may synchronously resolve Blueprint
+        // sources, which in turn ask us to flush pending editor state.
+        _pendingPreviewDocument = null;
+        _flushingPreview = true;
         try
         {
             var runtimeAsset = Resources.LoadDreambitAsset(
@@ -425,6 +469,10 @@ internal sealed class AssetEditingService : IDisposable
         catch (Exception exception)
         {
             _reportError?.Invoke($"Could not preview '{document.Asset.RelativePath}' in the open scene.", exception);
+        }
+        finally
+        {
+            _flushingPreview = false;
         }
     }
 
@@ -441,6 +489,11 @@ internal sealed class AssetEditingService : IDisposable
     private void DetachAndDispose(DreambitAssetDocument document)
     {
         var relativePath = document.Asset.RelativePath;
+        if (ReferenceEquals(_pendingPreviewDocument, document))
+        {
+            _pendingPreviewDocument = null;
+            _previewDeferredByInteraction = false;
+        }
         document.Changed -= OnDocumentChanged;
         var cleanupFailure = EditorDisposal.TryDispose(document);
         if (cleanupFailure is not null)

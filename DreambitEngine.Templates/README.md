@@ -1,6 +1,6 @@
 # Dreambit Engine Templates
 
-Version 0.3.2 provides separate package-based and source-submodule project commands.
+Version 0.3.14 provides separate package-based and source-submodule project commands.
 
 ## Generated project
 
@@ -13,7 +13,9 @@ Version 0.3.2 provides separate package-based and source-submodule project comma
 
 `dreambit-game` is the package-based template used by Dreambit.Editor. `dreambit-game-source`
 creates a Git repository and pins DreambitEngine as a submodule at `.dreambit/engine`.
-Both templates bake the PAK under `.cache/dreambit` and copy it into build and publish output.
+Both templates maintain development blobs under `.cache/dreambit/bake`. Debug builds run from the
+blobs. Use **Build > Bake Pak** in Dreambit Editor before a Release build or publish; Release copies
+that verified PAK into the output.
 
 ## Pack and install locally
 
@@ -34,10 +36,10 @@ These scripts pack the coordinated runtime/build/template package set into the s
 Create a project:
 
 ```powershell
-dotnet new dreambit-game -n MyGame --game-title "My Game" --sdkVersion 0.3.2
+dotnet new dreambit-game -n MyGame --game-title "My Game" --sdkVersion 0.3.14
 
 # Source checkout at .dreambit/engine
-dotnet new dreambit-game-source -n MyGame --game-title "My Game" --sdkVersion 0.3.2 --allow-scripts yes
+dotnet new dreambit-game-source -n MyGame --game-title "My Game" --sdkVersion 0.3.14 --allow-scripts yes
 ```
 
 Dreambit.Editor normally performs template installation, generation, and package restore automatically.

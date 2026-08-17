@@ -12,6 +12,7 @@ internal sealed class EditorPaths
         SettingsRoot = settingsRoot;
         SdkRootDirectory = Path.Combine(settingsRoot, "sdks");
         CrashLogPath = Path.Combine(settingsRoot, "crash.log");
+        ErrorLogPath = Path.Combine(settingsRoot, "errors.log");
         GlobalStatePath = Path.Combine(settingsRoot, "editor-state.json");
         WorkspaceDirectory = Path.Combine(settingsRoot, "workspaces", workspaceScope);
         WorkspaceStatePath = Path.Combine(WorkspaceDirectory, "workspace-state.json");
@@ -22,6 +23,7 @@ internal sealed class EditorPaths
     public string SettingsRoot { get; }
     public string SdkRootDirectory { get; }
     public string CrashLogPath { get; }
+    public string ErrorLogPath { get; }
     public string GlobalStatePath { get; }
     public string WorkspaceDirectory { get; }
     public string WorkspaceStatePath { get; }

@@ -66,7 +66,7 @@ public class UIRenderPass : RenderPass
         Core.SpriteBatch.Begin(
             transformMatrix: Scene.UiCamera.TopLeftTransformMatrix,
             sortMode: SpriteSortMode.Deferred,
-            samplerState: Scene.RenderingOptions.UISamplerState,
+            samplerState: Scene.RenderingOptions.UiSamplerState,
             blendState: BlendState.AlphaBlend,
             rasterizerState: _scissorRasterizerState);
         _batchActive = true;

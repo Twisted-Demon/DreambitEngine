@@ -11,6 +11,7 @@ internal sealed class DreambitAssetDocument : IDisposable
     private readonly Action<string, Exception?>? _reportError;
     private JObject _source;
     private string _savedSnapshot;
+    private string _currentSnapshot = string.Empty;
     private Type? _assetType;
     private DreambitAsset? _instance;
     private bool _disposed;
@@ -38,6 +39,7 @@ internal sealed class DreambitAssetDocument : IDisposable
     public DreambitAsset Instance => _instance ?? throw new ObjectDisposedException(nameof(DreambitAssetDocument));
     public UndoService Undo { get; }
     public bool IsDirty { get; private set; }
+    public long Revision { get; private set; }
     public DateTimeOffset LastChangedUtc { get; private set; }
     public event Action<DreambitAssetDocument>? Changed;
 
@@ -65,7 +67,7 @@ internal sealed class DreambitAssetDocument : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(mutation);
-        var before = CaptureJson();
+        var before = _currentSnapshot;
         string after;
         try
         {
@@ -85,6 +87,7 @@ internal sealed class DreambitAssetDocument : IDisposable
         UpdateDirtyState(after);
         LastChangedUtc = DateTimeOffset.UtcNow;
         Undo.Record(new AssetSnapshotCommand(name, this, before, after, mergeKey));
+        Revision++;
         Changed?.Invoke(this);
     }
 
@@ -99,7 +102,7 @@ internal sealed class DreambitAssetDocument : IDisposable
         if (AssetType != typeof(EntityBlueprint))
             throw new InvalidOperationException("Only Entity Blueprint documents can accept a hierarchy snapshot.");
 
-        var before = CaptureJson();
+        var before = _currentSnapshot;
         var after = DreambitJson.Serialize(blueprint);
         if (string.Equals(before, after, StringComparison.Ordinal))
         {
@@ -108,9 +111,14 @@ internal sealed class DreambitAssetDocument : IDisposable
         }
 
         ReplaceInstance(after);
+        // ReplaceBlueprint starts from the scene serializer, while ordinary asset edits use
+        // the document's stable merge/order rules. Normalize once so the cached snapshot used
+        // by the next Apply call remains equivalent to its serialized document state.
+        after = CaptureJson();
         UpdateDirtyState(after);
         LastChangedUtc = DateTimeOffset.UtcNow;
         Undo.Record(new AssetSnapshotCommand(name, this, before, after, mergeKey));
+        Revision++;
         Changed?.Invoke(this);
     }
 
@@ -154,7 +162,8 @@ internal sealed class DreambitAssetDocument : IDisposable
                 DreambitAssetTypeRegistry.GetTypeId(AssetType)));
         }
         _source = merged;
-        return merged.ToString(Newtonsoft.Json.Formatting.Indented);
+        _currentSnapshot = merged.ToString(Newtonsoft.Json.Formatting.Indented);
+        return _currentSnapshot;
     }
 
     private static void RemoveProperties(JObject document, IEnumerable<string> names)
@@ -245,7 +254,10 @@ internal sealed class DreambitAssetDocument : IDisposable
         UpdateDirtyState(json);
         LastChangedUtc = DateTimeOffset.UtcNow;
         if (notifyChanged)
+        {
+            Revision++;
             Changed?.Invoke(this);
+        }
     }
 
     private void ReplaceInstance(string json)
@@ -258,6 +270,7 @@ internal sealed class DreambitAssetDocument : IDisposable
         var previous = Instance;
         _source = source;
         _instance = replacement;
+        _currentSnapshot = json;
         var cleanupFailure = EditorDisposal.TryDispose(previous);
         if (cleanupFailure is not null)
         {

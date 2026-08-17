@@ -45,4 +45,32 @@ public sealed class EditorLogServiceTests
         Assert.Contains("InvalidOperationException", entry.Details);
         Assert.Contains("boom", entry.Details);
     }
+
+    [Fact]
+    public void ErrorsArePersistedWithoutPersistingLowerSeverityEntries()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            nameof(EditorLogServiceTests),
+            Guid.NewGuid().ToString("N"));
+        var path = Path.Combine(root, "errors.log");
+        try
+        {
+            var logs = new EditorLogService(errorLogPath: path);
+
+            logs.Warning("Test", "recoverable warning");
+            logs.Error("Viewport", "render failed", new InvalidOperationException("boom"));
+
+            var persisted = File.ReadAllText(path);
+            Assert.Contains("ERROR [Viewport] render failed", persisted);
+            Assert.Contains("InvalidOperationException", persisted);
+            Assert.Contains("boom", persisted);
+            Assert.DoesNotContain("recoverable warning", persisted);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, true);
+        }
+    }
 }

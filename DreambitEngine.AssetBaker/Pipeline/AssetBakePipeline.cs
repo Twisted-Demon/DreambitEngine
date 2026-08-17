@@ -1,8 +1,10 @@
+using System.Buffers;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Dreambit;
 using DreambitEngine.AssetBaker.Abstractions;
 using DreambitEngine.AssetBaker.Core;
 using DreambitEngine.AssetBaker.Pipeline.Docs;
@@ -23,6 +25,18 @@ public sealed record AssetBakeRequest(
     string TargetPlatform = "DesktopVK",
     bool IncludeBuiltInContent = false);
 
+public sealed record AssetBlobBakeRequest(
+    string InputRoot,
+    string BlobDirectory,
+    string? AssetRegistryPath = null,
+    bool RebuildAll = false,
+    bool GenerateMips = false,
+    bool PremultiplyAlpha = true,
+    int? MaxDimension = null,
+    bool MarkSrgb = true,
+    string TargetPlatform = "DesktopVK",
+    bool IncludeBuiltInContent = false);
+
 public sealed record AssetBakeProgress(
     string Stage,
     string Message,
@@ -31,6 +45,17 @@ public sealed record AssetBakeProgress(
 
 public sealed record AssetBakeResult(
     string OutputPak,
+    int BakedCount,
+    int CacheHitCount,
+    int UnsupportedCount,
+    long OutputLength,
+    TimeSpan Duration,
+    string ContentFingerprint = "");
+
+public sealed record AssetBlobBakeResult(
+    string BlobDirectory,
+    string ManifestPath,
+    string ContentFingerprint,
     int BakedCount,
     int CacheHitCount,
     int UnsupportedCount,
@@ -58,6 +83,54 @@ public sealed class AssetBakePipeline
         CancellationToken cancellationToken = default) =>
         Task.Run(() => BakePak(request, progress, cancellationToken), cancellationToken);
 
+    public Task<AssetBlobBakeResult> BakeBlobsAsync(
+        AssetBlobBakeRequest request,
+        IProgress<AssetBakeProgress>? progress = null,
+        CancellationToken cancellationToken = default) =>
+        Task.Run(() => BakeBlobs(request, progress, cancellationToken), cancellationToken);
+
+    public AssetBlobBakeResult BakeBlobs(
+        AssetBlobBakeRequest request,
+        IProgress<AssetBakeProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentException.ThrowIfNullOrWhiteSpace(request.BlobDirectory);
+        var stopwatch = Stopwatch.StartNew();
+        var prepared = PrepareAssets(
+            new BakeParameters(
+                request.InputRoot,
+                request.AssetRegistryPath,
+                request.BlobDirectory,
+                request.RebuildAll,
+                request.GenerateMips,
+                request.PremultiplyAlpha,
+                request.MaxDimension,
+                request.MarkSrgb,
+                request.TargetPlatform,
+                request.IncludeBuiltInContent),
+            retainBlobData: false,
+            progress,
+            cancellationToken);
+        stopwatch.Stop();
+
+        var manifestPath = Path.Combine(
+            Path.GetFullPath(request.BlobDirectory),
+            BlobContentManifest.FileName);
+        progress?.Report(new AssetBakeProgress(
+            "Complete",
+            $"Updated {prepared.Blobs.Count} blobs in {stopwatch.Elapsed.TotalSeconds:0.00}s."));
+        return new AssetBlobBakeResult(
+            Path.GetFullPath(request.BlobDirectory),
+            manifestPath,
+            prepared.Fingerprint,
+            prepared.BakedCount,
+            prepared.CacheHitCount,
+            prepared.UnsupportedCount,
+            prepared.Blobs.Values.Sum(value => value.Length),
+            stopwatch.Elapsed);
+    }
+
     public AssetBakeResult BakePak(
         AssetBakeRequest request,
         IProgress<AssetBakeProgress>? progress = null,
@@ -65,20 +138,67 @@ public sealed class AssetBakePipeline
     {
         ArgumentNullException.ThrowIfNull(request);
         var stopwatch = Stopwatch.StartNew();
+        var outputPak = Path.GetFullPath(request.OutputPak);
+        var prepared = PrepareAssets(
+            new BakeParameters(
+                request.InputRoot,
+                request.AssetRegistryPath,
+                request.CacheDirectory,
+                request.RebuildAll,
+                request.GenerateMips,
+                request.PremultiplyAlpha,
+                request.MaxDimension,
+                request.MarkSrgb,
+                request.TargetPlatform,
+                request.IncludeBuiltInContent),
+            retainBlobData: true,
+            progress,
+            cancellationToken);
+
+        var pak = new PakWriter();
+        foreach (var preparedBlob in prepared.Blobs.Values)
+            pak.Add(preparedBlob.Blob
+                    ?? throw new InvalidOperationException(
+                        $"Asset '{preparedBlob.LogicalPath}' has no in-memory data for PAK output."));
+
+        cancellationToken.ThrowIfCancellationRequested();
+        progress?.Report(new AssetBakeProgress("Write", $"Writing {outputPak}"));
+        pak.Save(outputPak);
+        WriteTextAtomically(outputPak + ".fingerprint", prepared.Fingerprint + Environment.NewLine);
+        stopwatch.Stop();
+        var length = new FileInfo(outputPak).Length;
+        progress?.Report(new AssetBakeProgress(
+            "Complete",
+            $"Wrote {pak.Count} entries ({length:N0} bytes) in {stopwatch.Elapsed.TotalSeconds:0.00}s."));
+        return new AssetBakeResult(
+            outputPak,
+            prepared.BakedCount,
+            prepared.CacheHitCount,
+            prepared.UnsupportedCount,
+            length,
+            stopwatch.Elapsed,
+            prepared.Fingerprint);
+    }
+
+    private static PreparedBake PrepareAssets(
+        BakeParameters request,
+        bool retainBlobData,
+        IProgress<AssetBakeProgress>? progress,
+        CancellationToken cancellationToken)
+    {
         var inputRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(request.InputRoot));
         if (!Directory.Exists(inputRoot))
             throw new DirectoryNotFoundException($"Asset input root '{inputRoot}' does not exist.");
 
-        var outputPak = Path.GetFullPath(request.OutputPak);
         var cache = IncrementalBakeCache.Load(request.CacheDirectory, request.RebuildAll);
         var bakerRegistry = AssetBakerRegistry.CreateDefault();
-        var pak = new PakWriter();
         var bakedCount = 0;
         var cacheHitCount = 0;
         var unsupportedCount = 0;
         var optionSignature = CreateOptionSignature(request);
         var liveCacheKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var builtInEffectPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var finalBlobs = new Dictionary<string, PreparedBlob>(StringComparer.OrdinalIgnoreCase);
 
         var roots = request.IncludeBuiltInContent
             ? new[]
@@ -130,8 +250,13 @@ public sealed class AssetBakePipeline
                 var sourceHash = ComputeHash(file);
                 var cacheKey = $"{bakeRoot.CachePrefix}/{relativePath}".ToLowerInvariant();
                 liveCacheKeys.Add(cacheKey);
-                AssetBlob blob;
-                if (cache.TryRead(cacheKey, sourceHash, optionSignature, out blob))
+                PreparedBlob preparedBlob;
+                if (cache.TryRead(
+                        cacheKey,
+                        sourceHash,
+                        optionSignature,
+                        retainBlobData,
+                        out preparedBlob))
                 {
                     cacheHitCount++;
                     progress?.Report(new AssetBakeProgress(
@@ -146,7 +271,7 @@ public sealed class AssetBakePipeline
                         "Bake",
                         $"Baking {relativePath}",
                         relativePath));
-                    blob = baker.BakeToBytes(new BakeContext
+                    var blob = baker.BakeToBytes(new BakeContext
                     {
                         InputPath = file,
                         OutputPath = string.Empty,
@@ -157,19 +282,27 @@ public sealed class AssetBakePipeline
                         TargetPlatform = request.TargetPlatform,
                         LogicalRoot = bakeRoot.Path
                     });
-                    cache.Write(cacheKey, sourceHash, optionSignature, blob);
+                    var blobFile = cache.Write(cacheKey, sourceHash, optionSignature, blob);
+                    preparedBlob = PreparedBlob.FromBlob(
+                        blob,
+                        blobFile,
+                        retainBlobData);
                     bakedCount++;
                 }
 
-                if (!producedPaths.Add(blob.LogicalPath))
+                if (!producedPaths.Add(preparedBlob.LogicalPath))
                     throw new InvalidOperationException(
-                        $"Two {bakeRoot.CachePrefix} source assets produce '{blob.LogicalPath}'.");
-                if (bakeRoot.IsBuiltIn && blob.Type == AssetType.Effect)
-                    builtInEffectPaths.Add(blob.LogicalPath);
+                        $"Two {bakeRoot.CachePrefix} source assets produce '{preparedBlob.LogicalPath}'.");
+                if (bakeRoot.IsBuiltIn && preparedBlob.Type == AssetType.Effect)
+                    builtInEffectPaths.Add(preparedBlob.LogicalPath);
                 if (bakeRoot.AllowProjectOverride)
-                    pak.Add(blob);
+                {
+                    if (!finalBlobs.TryAdd(preparedBlob.LogicalPath, preparedBlob))
+                        throw new InvalidOperationException(
+                            $"Two source assets produce '{preparedBlob.LogicalPath}'.");
+                }
                 else
-                    pak.AddOrReplace(blob);
+                    finalBlobs[preparedBlob.LogicalPath] = preparedBlob;
             }
         }
 
@@ -177,31 +310,50 @@ public sealed class AssetBakePipeline
             File.Exists(request.AssetRegistryPath))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            pak.Add(CreateRuntimeRegistryBlob(request.AssetRegistryPath));
+            const string registryCacheKey = "registry/runtime";
+            liveCacheKeys.Add(registryCacheKey);
+            var registryHash = ComputeHash(request.AssetRegistryPath);
+            PreparedBlob registryBlob;
+            if (!cache.TryRead(
+                    registryCacheKey,
+                    registryHash,
+                    "runtime-registry-v2",
+                    retainBlobData,
+                    out registryBlob))
+            {
+                var bakedRegistryBlob = CreateRuntimeRegistryBlob(
+                    request.AssetRegistryPath,
+                    bakerRegistry);
+                var registryBlobFile = cache.Write(
+                    registryCacheKey,
+                    registryHash,
+                    "runtime-registry-v1",
+                    bakedRegistryBlob);
+                registryBlob = PreparedBlob.FromBlob(
+                    bakedRegistryBlob,
+                    registryBlobFile,
+                    retainBlobData);
+            }
+            finalBlobs[registryBlob.LogicalPath] = registryBlob;
         }
 
         cache.RemoveMissing(liveCacheKeys);
         cancellationToken.ThrowIfCancellationRequested();
-        progress?.Report(new AssetBakeProgress("Write", $"Writing {outputPak}"));
-        pak.Save(outputPak);
-        cache.Save();
+        var fingerprint = ComputeContentFingerprint(finalBlobs, request.CacheDirectory);
+        cache.Save(finalBlobs, fingerprint);
         if (request.IncludeBuiltInContent && !string.IsNullOrWhiteSpace(request.CacheDirectory))
             BuiltInContentSource.MarkCurrent(request.CacheDirectory);
-        stopwatch.Stop();
-        var length = new FileInfo(outputPak).Length;
-        progress?.Report(new AssetBakeProgress(
-            "Complete",
-            $"Wrote {pak.Count} entries ({length:N0} bytes) in {stopwatch.Elapsed.TotalSeconds:0.00}s."));
-        return new AssetBakeResult(
-            outputPak,
+        return new PreparedBake(
+            finalBlobs,
+            fingerprint,
             bakedCount,
             cacheHitCount,
-            unsupportedCount,
-            length,
-            stopwatch.Elapsed);
+            unsupportedCount);
     }
 
-    private static AssetBlob CreateRuntimeRegistryBlob(string registryPath)
+    private static AssetBlob CreateRuntimeRegistryBlob(
+        string registryPath,
+        AssetBakerRegistry bakerRegistry)
     {
         using var stream = File.OpenRead(registryPath);
         var source = JsonSerializer.Deserialize<SourceAssetRegistry>(stream, JsonOptions)
@@ -214,6 +366,14 @@ public sealed class AssetBakePipeline
             if (entry.Id == Guid.Empty || string.IsNullOrWhiteSpace(entry.Path))
                 throw new InvalidDataException("The Dreambit asset registry contains an invalid entry.");
             var extension = Path.GetExtension(entry.Path);
+            // The editor tracks source-only files so they remain visible in the
+            // Project panel. They must not enter the runtime registry unless a
+            // baker can actually produce a loadable asset for their extension.
+            // This excludes Tiled's .tiled-project/.tiled-session metadata while
+            // retaining runtime .tmx maps and .tsx tilesets.
+            if (bakerRegistry.GetByExt(extension) is null)
+                continue;
+
             var logicalName = IsSerializedDreambitExtension(extension)
                 ? entry.Path.Replace('\\', '/')
                 : Path.ChangeExtension(entry.Path, null)!.Replace('\\', '/');
@@ -237,10 +397,144 @@ public sealed class AssetBakePipeline
             output.ToArray());
     }
 
-    private static string CreateOptionSignature(AssetBakeRequest request) =>
+    private static string CreateOptionSignature(BakeParameters request) =>
         $"v2;mips={request.GenerateMips};premul={request.PremultiplyAlpha};" +
         $"max={request.MaxDimension?.ToString() ?? "none"};srgb={request.MarkSrgb};" +
         $"platform={request.TargetPlatform}";
+
+    private static string ComputeContentFingerprint(
+        IReadOnlyDictionary<string, PreparedBlob> blobs,
+        string? cacheDirectory)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        foreach (var (logicalPath, prepared) in blobs.OrderBy(
+                     pair => pair.Key,
+                     StringComparer.Ordinal))
+        {
+            hash.AppendData(Encoding.UTF8.GetBytes(logicalPath.ToLowerInvariant()));
+            hash.AppendData([0]);
+            if (prepared.Blob is { } blob)
+            {
+                hash.AppendData(blob.Data);
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(cacheDirectory) ||
+                    string.IsNullOrWhiteSpace(prepared.BlobFile))
+                {
+                    throw new InvalidOperationException(
+                        $"Asset '{logicalPath}' has neither in-memory data nor a cached blob file.");
+                }
+
+                var blobPath = Path.Combine(
+                    Path.GetFullPath(cacheDirectory),
+                    prepared.BlobFile.Replace('/', Path.DirectorySeparatorChar));
+                AppendFileToHash(hash, blobPath);
+            }
+            hash.AppendData([0]);
+        }
+        return Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
+    }
+
+    private static void AppendFileToHash(IncrementalHash hash, string path)
+    {
+        var buffer = ArrayPool<byte>.Shared.Rent(128 * 1024);
+        try
+        {
+            using var stream = new FileStream(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete,
+                buffer.Length,
+                FileOptions.SequentialScan);
+            int bytesRead;
+            while ((bytesRead = stream.Read(buffer, 0, buffer.Length)) != 0)
+                hash.AppendData(buffer.AsSpan(0, bytesRead));
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
+    }
+
+    private static void WriteTextAtomically(string path, string content)
+    {
+        var fullPath = Path.GetFullPath(path);
+        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+        var temporaryPath = fullPath + $".{Guid.NewGuid():N}.tmp";
+        try
+        {
+            File.WriteAllText(temporaryPath, content);
+            File.Move(temporaryPath, fullPath, true);
+        }
+        finally
+        {
+            TryDeleteTemporaryFile(temporaryPath);
+        }
+    }
+
+    private static void WriteBytesAtomically(string path, ReadOnlySpan<byte> content)
+    {
+        var fullPath = Path.GetFullPath(path);
+        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+        var temporaryPath = fullPath + $".{Guid.NewGuid():N}.tmp";
+        try
+        {
+            using (var stream = new FileStream(
+                       temporaryPath,
+                       FileMode.CreateNew,
+                       FileAccess.Write,
+                       FileShare.None))
+            {
+                stream.Write(content);
+                stream.Flush(true);
+            }
+            File.Move(temporaryPath, fullPath, true);
+        }
+        finally
+        {
+            TryDeleteTemporaryFile(temporaryPath);
+        }
+    }
+
+    private static void WriteJsonAtomically<T>(string path, T value)
+    {
+        var fullPath = Path.GetFullPath(path);
+        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+        var temporaryPath = fullPath + $".{Guid.NewGuid():N}.tmp";
+        try
+        {
+            using (var stream = new FileStream(
+                       temporaryPath,
+                       FileMode.CreateNew,
+                       FileAccess.Write,
+                       FileShare.None))
+            {
+                JsonSerializer.Serialize(stream, value, JsonOptions);
+                stream.Flush(true);
+            }
+            File.Move(temporaryPath, fullPath, true);
+        }
+        finally
+        {
+            TryDeleteTemporaryFile(temporaryPath);
+        }
+    }
+
+    private static void TryDeleteTemporaryFile(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+    }
 
     private static string ComputeHash(string path)
     {
@@ -274,6 +568,46 @@ public sealed class AssetBakePipeline
         string CachePrefix,
         bool AllowProjectOverride,
         bool IsBuiltIn);
+
+    private sealed record BakeParameters(
+        string InputRoot,
+        string? AssetRegistryPath,
+        string? CacheDirectory,
+        bool RebuildAll,
+        bool GenerateMips,
+        bool PremultiplyAlpha,
+        int? MaxDimension,
+        bool MarkSrgb,
+        string TargetPlatform,
+        bool IncludeBuiltInContent);
+
+    private sealed record PreparedBlob(
+        string LogicalPath,
+        AssetType Type,
+        string Extension,
+        long Length,
+        string? BlobFile,
+        AssetBlob? Blob)
+    {
+        public static PreparedBlob FromBlob(
+            AssetBlob blob,
+            string? blobFile,
+            bool retainData) =>
+            new(
+                blob.LogicalPath,
+                blob.Type,
+                blob.Extension,
+                blob.Data.LongLength,
+                blobFile,
+                retainData ? blob : null);
+    }
+
+    private sealed record PreparedBake(
+        IReadOnlyDictionary<string, PreparedBlob> Blobs,
+        string Fingerprint,
+        int BakedCount,
+        int CacheHitCount,
+        int UnsupportedCount);
 
     private sealed class SourceAssetRegistry
     {
@@ -336,7 +670,8 @@ public sealed class AssetBakePipeline
             string key,
             string sourceHash,
             string optionSignature,
-            out AssetBlob blob)
+            bool includeData,
+            out PreparedBlob blob)
         {
             blob = null!;
             if (_directory is null ||
@@ -351,11 +686,24 @@ public sealed class AssetBakePipeline
                 return false;
             try
             {
-                blob = new AssetBlob(
+                var blobFile = "blobs/" + entry.BlobFile;
+                var length = new FileInfo(blobPath).Length;
+                AssetBlob? assetBlob = null;
+                if (includeData)
+                {
+                    assetBlob = new AssetBlob(
+                        entry.LogicalPath,
+                        entry.AssetType,
+                        entry.Extension,
+                        File.ReadAllBytes(blobPath));
+                }
+                blob = new PreparedBlob(
                     entry.LogicalPath,
                     entry.AssetType,
                     entry.Extension,
-                    File.ReadAllBytes(blobPath));
+                    length,
+                    blobFile,
+                    assetBlob);
                 return true;
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
@@ -364,21 +712,21 @@ public sealed class AssetBakePipeline
             }
         }
 
-        public void Write(
+        public string? Write(
             string key,
             string sourceHash,
             string optionSignature,
             AssetBlob blob)
         {
             if (_directory is null)
-                return;
+                return null;
             var blobDirectory = Path.Combine(_directory, "blobs");
             Directory.CreateDirectory(blobDirectory);
             var blobFile = Convert.ToHexString(
                     SHA256.HashData(Encoding.UTF8.GetBytes(key)))
                 .ToLowerInvariant() + ".blob";
             var path = Path.Combine(blobDirectory, blobFile);
-            File.WriteAllBytes(path, blob.Data);
+            WriteBytesAtomically(path, blob.Data);
             _document.Entries[key] = new BakeCacheEntry
             {
                 SourceHash = sourceHash,
@@ -388,6 +736,7 @@ public sealed class AssetBakePipeline
                 Extension = blob.Extension,
                 BlobFile = blobFile
             };
+            return "blobs/" + blobFile;
         }
 
         public void RemoveMissing(ISet<string> liveKeys)
@@ -396,38 +745,35 @@ public sealed class AssetBakePipeline
                 _document.Entries.Remove(key);
         }
 
-        public void Save()
+        public void Save(
+            IReadOnlyDictionary<string, PreparedBlob> blobs,
+            string fingerprint)
         {
             if (_directory is null || _manifestPath is null)
                 return;
             Directory.CreateDirectory(_directory);
-            var temporaryPath = _manifestPath + $".{Guid.NewGuid():N}.tmp";
-            try
+            WriteJsonAtomically(_manifestPath, _document);
+
+            var runtimeManifest = new BlobContentManifest
             {
-                using (var stream = new FileStream(
-                           temporaryPath,
-                           FileMode.CreateNew,
-                           FileAccess.Write,
-                           FileShare.None))
-                {
-                    JsonSerializer.Serialize(stream, _document, JsonOptions);
-                    stream.Flush(true);
-                }
-                File.Move(temporaryPath, _manifestPath, true);
-            }
-            finally
-            {
-                try
-                {
-                    File.Delete(temporaryPath);
-                }
-                catch (IOException)
-                {
-                }
-                catch (UnauthorizedAccessException)
-                {
-                }
-            }
+                Fingerprint = fingerprint,
+                Assets = blobs
+                    .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                    .Select(pair => new BlobContentEntry
+                    {
+                        Path = pair.Key.Replace('\\', '/').ToLowerInvariant(),
+                        Blob = pair.Value.BlobFile
+                               ?? throw new InvalidOperationException(
+                                   $"Asset '{pair.Key}' was not written to the blob cache.")
+                    })
+                    .ToList()
+            };
+            WriteJsonAtomically(
+                Path.Combine(_directory, BlobContentManifest.FileName),
+                runtimeManifest);
+            WriteTextAtomically(
+                Path.Combine(_directory, BlobContentManifest.FingerprintFileName),
+                fingerprint + Environment.NewLine);
         }
     }
 

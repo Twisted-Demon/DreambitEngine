@@ -208,7 +208,7 @@ public sealed class CustomDreambitAssetTests
             typeof(SceneBlueprint),
             typeof(Tileset),
             typeof(TextureAsset),
-            typeof(EffectAsset),
+            typeof(DreambitEffect),
             typeof(FontAsset),
             typeof(Dreambit.Scripting.Cutscene),
             typeof(Dreambit.Tiled.TmxMap),

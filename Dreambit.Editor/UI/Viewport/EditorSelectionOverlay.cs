@@ -1,9 +1,9 @@
 using Dreambit.ECS;
 using Dreambit.Editor.Scenes;
+using Dreambit.EditorApi;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
 using Vector2 = System.Numerics.Vector2;
-using Vector4 = System.Numerics.Vector4;
 using XnaVector2 = Microsoft.Xna.Framework.Vector2;
 
 namespace Dreambit.Editor.UI.Viewport;
@@ -21,7 +21,7 @@ internal sealed class EditorSelectionOverlay
         Func<Entity, RectangleF?> resolveBounds)
     {
         LastError = null;
-        var color = ImGui.GetColorU32(new Vector4(0.24f, 0.65f, 1f, 1f));
+        var color = ImGui.GetColorU32(EditorGuiTheme.PrimaryAccent);
         foreach (var entity in document.Selection.Resolve(document.Scene))
         {
             RectangleF? bounds;

@@ -8,6 +8,7 @@ using Dreambit.Scripting;
 using Dreambit.Tiled;
 using Dreambit.UI;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 
 namespace Dreambit;
 
@@ -118,6 +119,30 @@ public class Scene : IDisposable
         Core.Instance.SetNextScene(scene);
     }
 
+    public static void SetNextScene(string sceneAssetName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sceneAssetName);
+        var blueprint = Resources.LoadAsset<SceneBlueprint>(sceneAssetName)
+                        ?? throw new InvalidOperationException(
+                            $"Scene asset '{sceneAssetName}' could not be loaded.");
+
+        var scene = new Scene();
+        scene.LoadIntoSelf(blueprint);
+        SetNextScene(scene);
+    }
+
+    public static void SetNextScene<T>(string sceneAssetName) where T : Scene, new()
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sceneAssetName);
+        var blueprint = Resources.LoadAsset<SceneBlueprint>(sceneAssetName)
+                        ?? throw new InvalidOperationException(
+                            $"Scene asset '{sceneAssetName}' could not be loaded.");
+
+        var scene = new T();
+        scene.LoadIntoSelf(blueprint);
+        SetNextScene(scene);
+    }
+
     public void LoadIntoSelf(SceneBlueprint blueprint)
     {
         LoadIntoSelf(blueprint, SceneBlueprintLoadOptions.Runtime);
@@ -141,6 +166,7 @@ public class Scene : IDisposable
             MaterializeLDtkScene(ldtk, options);
         if (blueprint.Tiled is { } tiled)
             MaterializeTiledScene(tiled, options);
+        ApplySettings(blueprint.Settings);
         if (blueprint.Entities.Count == 0)
             return;
 
@@ -194,6 +220,7 @@ public class Scene : IDisposable
 
     /// <summary>Render pipeline composed of render passes.</summary>
     private RenderPipeline _renderPipeline;
+    private bool _renderPipelineInitialized;
 
     /// <summary>Tracks disposal state to avoid double-dispose.</summary>
     private bool _isDisposed;
@@ -234,6 +261,9 @@ public class Scene : IDisposable
 
     /// <summary>Post-process configuration shared with passes.</summary>
     public readonly PostProcessSettings PostProcessSettings;
+
+    /// <summary>Authorable rendering settings currently applied to this scene.</summary>
+    public readonly SceneSettings Settings = new();
 
     public readonly RenderingOptions RenderingOptions;
 
@@ -306,10 +336,9 @@ public class Scene : IDisposable
         Entity.Create("event-bus").AttachComponent<EventBus>();
 
         AmbientLight = Entity.Create("ambient-light").AttachComponent<AmbientLight2D>();
+        ApplyAmbientLightSettings();
 
-        // Setup default render passes
-        _renderPipeline.Initialize();
-        SetUpRenderPipeLine();
+        EnsureRenderPipelineInitialized(new Point(Window.Width, Window.Height));
     }
 
     /// <summary>
@@ -317,10 +346,27 @@ public class Scene : IDisposable
     /// </summary>
     protected virtual void SetUpRenderPipeLine()
     {
-        _renderPipeline.AddRenderPass<Basic2dLightingRenderPass>();
-        _renderPipeline.AddRenderPass<DebugRenderPass>();
+        _renderPipeline.AddRenderPass<SortDrawablesPass>();
+        _renderPipeline.AddRenderPass<AlbedoPass>();
+        _renderPipeline.AddRenderPass<DepthPass>();
+        _renderPipeline.AddRenderPass<DepthLightingPass>();
+        _renderPipeline.AddRenderPass<BloomPass>();
         _renderPipeline.AddRenderPass<PostProcessRenderPass>();
-        _renderPipeline.AddRenderPass<UIRenderPass>();
+        if (ExecutionMode == SceneExecutionMode.Runtime)
+        {
+            _renderPipeline.AddRenderPass<DebugRenderPass>();
+            _renderPipeline.AddRenderPass<UIRenderPass>();
+        }
+    }
+
+    private void EnsureRenderPipelineInitialized(Point viewportSize)
+    {
+        if (_renderPipelineInitialized)
+            return;
+
+        _renderPipeline.Initialize(viewportSize);
+        SetUpRenderPipeLine();
+        _renderPipelineInitialized = true;
     }
 
     /// <summary>
@@ -470,6 +516,26 @@ public class Scene : IDisposable
         Entities.FlushStructuralChanges();
     }
 
+    /// <summary>Applies serialized scene rendering settings without replacing the scene.</summary>
+    public void ApplySettings(SceneSettings? settings)
+    {
+        settings ??= new SceneSettings();
+        Settings.AmbientLightIntensity = settings.AmbientLightIntensity;
+        Settings.AmbientLightColor = settings.AmbientLightColor;
+        Settings.PostProcessing = settings.PostProcessing?.Clone() ?? new PostProcessSettings();
+        Settings.Exposure = settings.Exposure;
+
+        PostProcessSettings.HueShift = Settings.PostProcessing.HueShift;
+        PostProcessSettings.Saturation = Settings.PostProcessing.Saturation;
+        PostProcessSettings.TintColor = Settings.PostProcessing.TintColor;
+        PostProcessSettings.ToneMappingType = Settings.PostProcessing.ToneMappingType;
+        PostProcessSettings.BloomEnabled = Settings.PostProcessing.BloomEnabled;
+        PostProcessSettings.BloomIntensity = Settings.PostProcessing.BloomIntensity;
+        PostProcessSettings.BloomThreshold = Settings.PostProcessing.BloomThreshold;
+        PostProcessSettings.BloomSoftKnee =  Settings.PostProcessing.BloomSoftKnee;
+        ApplyAmbientLightSettings();
+    }
+
     /// <summary>Runs opt-in editor callbacks while keeping gameplay lifecycle suppressed.</summary>
     public void EditorTick()
     {
@@ -493,6 +559,15 @@ public class Scene : IDisposable
         MainCamera = cameraEntity.AttachComponent<Camera2D>();
         FlushStructuralChanges();
         return MainCamera;
+    }
+
+    private void ApplyAmbientLightSettings()
+    {
+        if (AmbientLight is null)
+            return;
+
+        AmbientLight.Intensity = Settings.AmbientLightIntensity;
+        AmbientLight.Color = Settings.AmbientLightColor;
     }
 
     /// <summary>Invokes component editor gizmos without running gameplay drawing callbacks.</summary>
@@ -632,6 +707,25 @@ public class Scene : IDisposable
 
         //Guard.SafeCall(_renderPipeline.OnDraw, "RenderPipeline.OnDraw");
         _renderPipeline.OnDraw();
+    }
+
+    /// <summary>
+    /// Renders this scene through its normal world and post-process passes into a
+    /// caller-owned target without running gameplay lifecycle or backbuffer UI passes.
+    /// </summary>
+    public void RenderTo(RenderTarget2D target, Camera2D camera)
+    {
+        ObjectDisposedException.ThrowIf(_isDisposed, this);
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(camera);
+        if (target.IsDisposed)
+            throw new ObjectDisposedException(nameof(target));
+        if (camera.Scene != this)
+            throw new ArgumentException("The render camera must belong to this scene.", nameof(camera));
+
+        var viewportSize = new Point(target.Width, target.Height);
+        EnsureRenderPipelineInitialized(viewportSize);
+        _renderPipeline.Render(camera, target, viewportSize, false);
     }
 
     #endregion

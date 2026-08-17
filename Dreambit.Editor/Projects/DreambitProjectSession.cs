@@ -36,7 +36,7 @@ internal sealed class DreambitProjectSession : IDisposable
                 Assets,
                 _lifetime.Token,
                 reportAssetBake);
-            Resources.SetContentSource(Path.GetDirectoryName(AssetBaking.OutputPakPath)!);
+            Resources.SetBlobContentSource(AssetBaking.CacheDirectory);
             GameCode = new GameCodeService(
                 project,
                 _lifetime.Token,
@@ -64,7 +64,7 @@ internal sealed class DreambitProjectSession : IDisposable
                 BlueprintSources,
                 reportSceneError);
             Documents = new EditorDocumentContext(Scenes, Blueprints, AssetEditing);
-            AssetBaking.BakeCompleted += OnBakeCompleted;
+            AssetBaking.ContentBaked += OnContentBaked;
             Resources.AssetRegistry = Assets;
         }
         catch
@@ -97,7 +97,7 @@ internal sealed class DreambitProjectSession : IDisposable
         _disposed = true;
         TryDispose(_lifetime.Cancel, "Could not cancel the project lifetime.");
         if (AssetBaking is not null)
-            AssetBaking.BakeCompleted -= OnBakeCompleted;
+            AssetBaking.ContentBaked -= OnContentBaked;
         TryDispose(() => Blueprints?.Dispose(), "Could not dispose Blueprint editing.");
         TryDispose(() => Scenes?.Dispose(), "Could not dispose scene documents.");
         TryDispose(() => BlueprintSources?.Dispose(), "Could not dispose Blueprint sources.");
@@ -113,7 +113,7 @@ internal sealed class DreambitProjectSession : IDisposable
         TryDispose(_lease.Dispose, "Could not release the project lock.");
     }
 
-    private void OnBakeCompleted(DreambitEngine.AssetBaker.Pipeline.AssetBakeResult _)
+    private void OnContentBaked()
     {
         AssetEditing.BeforeContentReload();
         try

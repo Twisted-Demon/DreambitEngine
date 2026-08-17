@@ -1,5 +1,5 @@
-using System.Numerics;
 using Dreambit.Editor.Logging;
+using Dreambit.EditorApi;
 using ImGuiNET;
 
 namespace Dreambit.Editor.UI.Panels;
@@ -23,58 +23,50 @@ internal sealed class ConsolePanel : EditorPanel
 
     protected override void DrawContents()
     {
-        if (ImGui.Button("Clear"))
+        if (EditorGui.Button("Console.Clear", "Clear"))
             _logs.Clear();
 
-        ImGui.SameLine();
-        ImGui.Checkbox("Trace", ref _showTrace);
-        ImGui.SameLine();
-        ImGui.Checkbox("Info", ref _showInformation);
-        ImGui.SameLine();
-        ImGui.Checkbox("Warnings", ref _showWarnings);
-        ImGui.SameLine();
-        ImGui.Checkbox("Errors", ref _showErrors);
-        ImGui.SameLine();
-        ImGui.Checkbox("Auto-scroll", ref _autoScroll);
+        EditorGui.Inline();
+        EditorGui.Checkbox("Console.ShowTrace", "Trace", ref _showTrace);
+        EditorGui.Inline();
+        EditorGui.Checkbox("Console.ShowInformation", "Info", ref _showInformation);
+        EditorGui.Inline();
+        EditorGui.Checkbox("Console.ShowWarnings", "Warnings", ref _showWarnings);
+        EditorGui.Inline();
+        EditorGui.Checkbox("Console.ShowErrors", "Errors", ref _showErrors);
+        EditorGui.Inline();
+        EditorGui.Checkbox("Console.AutoScroll", "Auto-scroll", ref _autoScroll);
 
-        ImGui.SetNextItemWidth(-1f);
-        ImGui.InputTextWithHint("##ConsoleSearch", "Filter messages", ref _search, 256);
-        ImGui.Separator();
+        EditorGui.SearchInput("Console.Search", "Filter messages", ref _search);
+        EditorGui.Separator();
 
         var snapshot = _logs.GetSnapshot();
         var receivedNewEntries = snapshot.Version != _lastSnapshotVersion;
         _lastSnapshotVersion = snapshot.Version;
 
-        if (!ImGui.BeginChild("##ConsoleEntries", Vector2.Zero, ImGuiChildFlags.None))
-        {
-            ImGui.EndChild();
+        using var entries = EditorGui.Child("Console.Entries");
+        if (!entries.IsVisible)
             return;
-        }
 
         foreach (var entry in snapshot.Entries)
         {
             if (!ShouldShow(entry) || !MatchesSearch(entry))
                 continue;
 
-            ImGui.PushStyleColor(ImGuiCol.Text, GetSeverityColor(entry.Severity));
-            ImGui.TextUnformatted(
+            EditorGui.Message(
+                GetSeverityKind(entry.Severity),
                 $"{entry.Timestamp:HH:mm:ss}  {GetSeverityLabel(entry.Severity),-5}  [{entry.Category}] {entry.Message}");
-            ImGui.PopStyleColor();
-
             if (!string.IsNullOrWhiteSpace(entry.Details) && ImGui.IsItemHovered())
             {
-                ImGui.BeginTooltip();
-                ImGui.PushTextWrapPos(MathF.Min(700f, ImGui.GetFontSize() * 60f));
-                ImGui.TextUnformatted(entry.Details);
-                ImGui.PopTextWrapPos();
-                ImGui.EndTooltip();
+                using var tooltip = EditorGui.Tooltip();
+                using var wrap = EditorGui.TextWrap(MathF.Min(700f, ImGui.GetFontSize() * 60f));
+                EditorGui.Text(entry.Details);
             }
         }
 
         if (_autoScroll && receivedNewEntries)
             ImGui.SetScrollHereY(1f);
 
-        ImGui.EndChild();
     }
 
     private bool ShouldShow(EditorLogEntry entry) => entry.Severity switch
@@ -101,12 +93,10 @@ internal sealed class ConsolePanel : EditorPanel
         _ => "LOG"
     };
 
-    private static Vector4 GetSeverityColor(EditorLogSeverity severity) => severity switch
+    private static EditorGuiMessageKind GetSeverityKind(EditorLogSeverity severity) => severity switch
     {
-        EditorLogSeverity.Trace => new Vector4(0.56f, 0.59f, 0.65f, 1f),
-        EditorLogSeverity.Information => new Vector4(0.80f, 0.82f, 0.86f, 1f),
-        EditorLogSeverity.Warning => new Vector4(0.96f, 0.72f, 0.26f, 1f),
-        EditorLogSeverity.Error => new Vector4(0.96f, 0.34f, 0.36f, 1f),
-        _ => Vector4.One
+        EditorLogSeverity.Warning => EditorGuiMessageKind.Warning,
+        EditorLogSeverity.Error => EditorGuiMessageKind.Error,
+        _ => EditorGuiMessageKind.Information
     };
 }

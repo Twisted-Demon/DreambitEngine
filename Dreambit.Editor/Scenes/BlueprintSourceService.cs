@@ -36,6 +36,10 @@ internal sealed class BlueprintSourceService : IDisposable
         if (asset.Kind != AssetKind.Blueprint)
             throw new ArgumentException("The asset is not an Entity Blueprint.", nameof(asset));
 
+        // Explicit resolution must observe the newest editor state even while routine preview
+        // synchronization is being coalesced after a burst of inspector changes.
+        _assetEditing?.FlushPendingPreview();
+
         if (_previews.TryGetValue(asset.Id, out var preview))
             return Clone(preview, asset);
 
@@ -99,7 +103,14 @@ internal sealed class BlueprintSourceService : IDisposable
         if (document.IsDirty)
             SetPreview(document.Asset, blueprint);
         else
+        {
+            var hadPreview = _previews.ContainsKey(document.Asset.Id);
             ClearPreview(document.Asset.Id);
+            // A save can happen before a coalesced dirty preview was ever published. The disk
+            // source still changed, so live scene instances must be refreshed once.
+            if (!hadPreview)
+                Changed?.Invoke();
+        }
     }
 
     private void OnAssetSaved(DreambitAssetDocument document) =>

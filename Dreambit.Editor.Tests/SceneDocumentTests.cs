@@ -6,6 +6,7 @@ using Dreambit.Editor.UI.Viewport;
 using Dreambit.LDtk;
 using Microsoft.Xna.Framework;
 using Newtonsoft.Json.Linq;
+using System.Runtime.CompilerServices;
 
 namespace Dreambit.Editor.Tests;
 
@@ -115,6 +116,38 @@ public sealed class SceneDocumentTests : IDisposable
     }
 
     [Fact]
+    public void SceneSettingsPersistAndParticipateInUndo()
+    {
+        using var document = new SceneDocument(
+            new SceneBlueprint { Name = "Lighting", Entities = [] },
+            null,
+            new SelectionService());
+
+        document.UpdateSceneSettings("Change Scene Settings", settings =>
+        {
+            settings.AmbientLightIntensity = 0.4f;
+            settings.AmbientLightColor = Color.CornflowerBlue;
+            settings.Exposure = 1.5f;
+            settings.PostProcessing.HueShift = 0.2f;
+            settings.PostProcessing.Saturation = 0.6f;
+            settings.PostProcessing.TintColor = Color.OrangeRed;
+        });
+
+        Assert.Equal(0.4f, document.Settings.AmbientLightIntensity);
+        Assert.Equal(Color.CornflowerBlue, document.Settings.AmbientLightColor);
+        Assert.Equal(1.5f, document.Settings.Exposure);
+        Assert.Equal(0.2f, document.Settings.PostProcessing.HueShift);
+        Assert.Equal(0.6f, document.Settings.PostProcessing.Saturation);
+        Assert.Equal(Color.OrangeRed, document.Settings.PostProcessing.TintColor);
+        Assert.True(document.Undo.Undo());
+        Assert.Equal(1f, document.Settings.AmbientLightIntensity);
+        Assert.Equal(1f, document.Settings.Exposure);
+        Assert.True(document.Undo.Redo());
+        Assert.Equal(1.5f, document.Settings.Exposure);
+        Assert.Equal(Color.OrangeRed, document.Settings.PostProcessing.TintColor);
+    }
+
+    [Fact]
     public void SpriteDrawerMembersWithNonPublicSettersRoundTripThroughBlueprints()
     {
         var root = new EntityBlueprint
@@ -195,6 +228,43 @@ public sealed class SceneDocumentTests : IDisposable
             out var capturedPath));
         Assert.Equal(spriteId, capturedId);
         Assert.Equal("sprites/tree", capturedPath);
+    }
+
+    [Fact]
+    public void DrawableEffectIsCapturedAsAStableAssetReference()
+    {
+        var entityId = Guid.NewGuid();
+        var effectId = AssetId.New();
+        var source = new SceneBlueprint
+        {
+            Name = "Effect",
+            Entities =
+            [
+                new EntityBlueprint
+                {
+                    Name = "Sprite",
+                    Guid = entityId,
+                    Components = [new ComponentBlueprint { Type = nameof(SpriteDrawer) }]
+                }
+            ]
+        };
+        using var scene = new TestEditorScene();
+        var effect = (DreambitEffect)RuntimeHelpers.GetUninitializedObject(typeof(DreambitEffect));
+        effect.AssetId = effectId;
+        effect.AssetName = "Effects/Outline";
+
+        var entity = scene.CreateEntity("Sprite", guidOverride: entityId);
+        entity.AttachComponent<SpriteDrawer>().Effect = effect;
+
+        var captured = SceneDocumentSerializer.Capture(scene, source, source.Name);
+        var properties = Assert.Single(Assert.Single(captured.Entities).Components).Properties;
+
+        Assert.True(DreambitAssetReferenceToken.TryRead(
+            properties[nameof(DrawableComponent.Effect)],
+            out var capturedId,
+            out var capturedPath));
+        Assert.Equal(effectId, capturedId);
+        Assert.Equal("Effects/Outline", capturedPath);
     }
 
     [Fact]
@@ -500,17 +570,35 @@ public sealed class SceneDocumentTests : IDisposable
         Assert.Contains(nameof(EditorReloadSafetyComponent.Target), component.EditorSerializationFailures);
         Assert.Contains("RetiredMember", component.EditorSerializationFailures);
 
-        document.Apply("Replace invalid count", _ =>
-        {
-            component.Count = 7;
-            component.AcknowledgeEditorSerializationFailure(nameof(EditorReloadSafetyComponent.Count));
-        });
+        document.SetComponentMember(
+            "Replace invalid count",
+            [component],
+            nameof(EditorReloadSafetyComponent.Count),
+            typeof(int),
+            7,
+            (target, value) => ((EditorReloadSafetyComponent)target).Count = (int)value!);
         document.Save();
 
         var saved = SceneDocumentSerializer.Deserialize(File.ReadAllText(scenePath));
         var properties = Assert.Single(Assert.Single(saved.Entities).Components).Properties;
         Assert.Equal(7, properties[nameof(EditorReloadSafetyComponent.Count)]!.Value<int>());
         Assert.Equal(missingTarget.ToString(), properties[nameof(EditorReloadSafetyComponent.Target)]!.Value<string>());
+        Assert.True(properties["RetiredMember"]!["stillHere"]!.Value<bool>());
+
+        document.SetComponentMember(
+            "Clear invalid target",
+            [component],
+            nameof(EditorReloadSafetyComponent.Target),
+            typeof(Entity),
+            null,
+            (target, value) => ((EditorReloadSafetyComponent)target).Target = (Entity?)value);
+        document.Save();
+
+        saved = SceneDocumentSerializer.Deserialize(File.ReadAllText(scenePath));
+        properties = Assert.Single(Assert.Single(saved.Entities).Components).Properties;
+        Assert.Equal(
+            JTokenType.Null,
+            properties[nameof(EditorReloadSafetyComponent.Target)]!.Type);
         Assert.True(properties["RetiredMember"]!["stillHere"]!.Value<bool>());
     }
 
@@ -1250,7 +1338,7 @@ public sealed class SceneDocumentTests : IDisposable
         Assert.Contains(generated, entity => entity.Name.Contains("GameplayMarkers"));
         var background = Assert.Single(
             generated.SelectMany(entity => entity.GetAllComponents()).OfType<FilledRectDrawer>());
-        Assert.True(SceneViewportRenderer.ShouldRenderDrawable(background));
+        Assert.True(SceneViewportRenderer.ShouldPickDrawable(background));
         Assert.All(generated, entity => Assert.True(entity.IsLDtkGenerated));
 
         var placed = document.CreateEmpty("Dreambit Placed");

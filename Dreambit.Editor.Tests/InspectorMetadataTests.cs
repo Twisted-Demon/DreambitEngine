@@ -1,7 +1,6 @@
 using Dreambit.ECS;
 using Dreambit.Editor.Inspection;
 using Dreambit.Editor.Assets;
-using Dreambit.Editor.UI.Panels;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -36,6 +35,19 @@ public sealed class InspectorMetadataTests
         Assert.DoesNotContain(
             members,
             member => member.SerializedName == "SpritePath");
+    }
+
+    [Fact]
+    public void DrawableComponentsExposeTheirEffectAssetReference()
+    {
+        var members = new InspectorMetadataCache().Get(
+            typeof(SpriteDrawer),
+            InspectorTargetKind.Component);
+
+        var effect = Assert.Single(
+            members,
+            member => member.SerializedName == nameof(DrawableComponent.Effect));
+        Assert.Equal(typeof(DreambitEffect), effect.ValueType);
     }
 
     [Fact]
@@ -281,7 +293,7 @@ public sealed class InspectorMetadataTests
     public void DreambitAssetTypesExposeCanonicalSourceExtensions()
     {
         Assert.Equal(".cutscene", DreambitAssetTypeRegistry.GetFileExtension(typeof(Dreambit.Scripting.Cutscene)));
-        Assert.Equal(".fx", DreambitAssetTypeRegistry.GetFileExtension(typeof(EffectAsset)));
+        Assert.Equal(".fx", DreambitAssetTypeRegistry.GetFileExtension(typeof(DreambitEffect)));
         Assert.Equal(".blueprint", DreambitAssetTypeRegistry.GetFileExtension(typeof(EntityBlueprint)));
         Assert.Equal(".scene", DreambitAssetTypeRegistry.GetFileExtension(typeof(SceneBlueprint)));
         Assert.Equal(".ttf", DreambitAssetTypeRegistry.GetFileExtension(typeof(FontAsset)));
@@ -297,7 +309,7 @@ public sealed class InspectorMetadataTests
         Assert.True(AssetTypeClassifier.CanCreateAsset(typeof(TestCustomAsset)));
         Assert.False(AssetTypeClassifier.CanCreateAsset(typeof(TextureAsset)));
         Assert.False(AssetTypeClassifier.CanCreateAsset(typeof(FontAsset)));
-        Assert.False(AssetTypeClassifier.CanCreateAsset(typeof(EffectAsset)));
+        Assert.False(AssetTypeClassifier.CanCreateAsset(typeof(DreambitEffect)));
     }
 
     [Fact]
@@ -359,13 +371,47 @@ public sealed class InspectorMetadataTests
             ]
         };
 
-        var componentCandidates = InspectorPanel.GetBlueprintReferenceCandidates(
+        var componentCandidates = BlueprintInspector.GetReferenceCandidates(
             root,
             typeof(FilledRectDrawer));
         Assert.Equal(root.Guid, Assert.Single(componentCandidates).Guid);
 
-        var entityCandidates = InspectorPanel.GetBlueprintReferenceCandidates(root, typeof(Entity));
+        var entityCandidates = BlueprintInspector.GetReferenceCandidates(root, typeof(Entity));
         Assert.Equal(2, entityCandidates.Count);
+    }
+
+    [Fact]
+    public void MultiSelectionDetectsComponentsMissingFromTheFirstEntity()
+    {
+        using var scene = new InspectorTestScene();
+        var first = scene.CreateEntity("First");
+        var second = scene.CreateEntity("Second");
+        first.AttachComponent<InspectorTestComponent>();
+        second.AttachComponent<InspectorTestComponent>();
+        second.AttachComponent<InspectorAssetReferenceComponent>();
+
+        Assert.True(SceneEntityInspector.HasPartialComponents(
+            [first, second],
+            [typeof(InspectorTestComponent)]));
+    }
+
+    [Theory]
+    [InlineData(false, true, true, false, "LDtk")]
+    [InlineData(false, true, false, true, "Tiled")]
+    [InlineData(false, true, false, false, "Imported")]
+    [InlineData(true, true, false, true, "Boxed")]
+    public void ComponentStatusDescribesTheActualSource(
+        bool readOnly,
+        bool hasGeneratedEntity,
+        bool allLDtkGenerated,
+        bool allTiledGenerated,
+        string expected)
+    {
+        Assert.Equal(expected, SceneEntityInspector.GetComponentStatus(
+            readOnly,
+            hasGeneratedEntity,
+            allLDtkGenerated,
+            allTiledGenerated));
     }
 
     [Fact]
@@ -434,6 +480,8 @@ public sealed class InspectorMetadataTests
             type.FullName,
             0,
             DateTimeOffset.UtcNow);
+
+    private sealed class InspectorTestScene() : Scene(SceneExecutionMode.Editor);
 }
 
 public sealed class InspectorTestComponent : Component

@@ -7,6 +7,7 @@ using Dreambit.Editor.Scenes;
 using Dreambit.Editor.Inspection;
 using Dreambit.Editor.Persistence;
 using Dreambit.Editor.UI;
+using Dreambit.EditorApi;
 using ImGuiNET;
 
 namespace Dreambit.Editor.UI.Panels;
@@ -90,21 +91,16 @@ internal sealed class ProjectPanel : EditorPanel
         DrawToolbar();
         DrawBreadcrumbs();
 
-        ImGui.SetNextItemWidth(-1f);
-        ImGui.InputTextWithHint(
-            "##ProjectSearch",
+        EditorGui.SearchInput(
+            "Project.Search",
             "Search by name, path, or type",
             ref _search,
             256);
 
         if (!string.IsNullOrWhiteSpace(_error))
-        {
-            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.96f, 0.44f, 0.38f, 1f));
-            ImGui.TextWrapped(_error);
-            ImGui.PopStyleColor();
-        }
+            EditorGui.Error(_error);
 
-        ImGui.Separator();
+        EditorGui.Separator();
         DrawAssetTable(snapshot);
         DrawStatus(snapshot);
         DrawOperationPopups();
@@ -113,42 +109,45 @@ internal sealed class ProjectPanel : EditorPanel
 
     private void DrawToolbar()
     {
-        ImGui.BeginDisabled(_currentFolder.Length == 0);
-        if (_icons.Button("ProjectUp", "up_arrow", "Up one folder"))
+        using (EditorGui.Disabled(_currentFolder.Length == 0))
         {
-            _currentFolder = GetParentPath(_currentFolder);
-            ClearSelection();
+            if (_icons.Button("ProjectUp", "up_arrow", "Up one folder"))
+            {
+                _currentFolder = GetParentPath(_currentFolder);
+                ClearSelection();
+            }
         }
-        ImGui.EndDisabled();
 
-        ImGui.SameLine();
+        EditorGui.Inline();
         if (_icons.Button("ProjectCreate", "add", "Create asset or folder"))
-            ImGui.OpenPopup("ProjectCreateMenu##Dreambit.Editor.Project");
+            EditorGui.OpenPopup("ProjectCreateMenu##Dreambit.Editor.Project");
 
-        if (ImGui.BeginPopup("ProjectCreateMenu##Dreambit.Editor.Project"))
+        using (var popup = EditorGui.Popup("ProjectCreateMenu##Dreambit.Editor.Project"))
         {
-            if (ImGui.MenuItem("New Folder"))
+            if (popup.IsOpen)
             {
-                _createFolderName = "New Folder";
-                _error = null;
-                _requestCreateFolderPopup = true;
+                if (EditorGui.MenuItem("New Folder"))
+                {
+                    _createFolderName = "New Folder";
+                    _error = null;
+                    _requestCreateFolderPopup = true;
+                }
+                EditorGui.Separator();
+                if (EditorGui.MenuItem("Entity Blueprint"))
+                    RequestCreateAsset(typeof(EntityBlueprint));
+                using var assetMenu = EditorGui.Menu("Dreambit Asset");
+                if (assetMenu.IsOpen)
+                {
+                    foreach (var type in _types.AssetTypes.Where(type =>
+                                 type != typeof(EntityBlueprint) &&
+                                 AssetTypeClassifier.CanCreateAsset(type)))
+                        if (EditorGui.MenuItem(type.Name))
+                            RequestCreateAsset(type);
+                }
             }
-            ImGui.Separator();
-            if (ImGui.MenuItem("Entity Blueprint"))
-                RequestCreateAsset(typeof(EntityBlueprint));
-            if (ImGui.BeginMenu("Dreambit Asset"))
-            {
-                foreach (var type in _types.AssetTypes.Where(type =>
-                             type != typeof(EntityBlueprint) &&
-                             AssetTypeClassifier.CanCreateAsset(type)))
-                    if (ImGui.MenuItem(type.Name))
-                        RequestCreateAsset(type);
-                ImGui.EndMenu();
-            }
-            ImGui.EndPopup();
         }
 
-        ImGui.SameLine();
+        EditorGui.Inline();
         if (_icons.Button("ProjectRefresh", "refresh", "Refresh project files"))
         {
             try
@@ -162,15 +161,15 @@ internal sealed class ProjectPanel : EditorPanel
             }
         }
 
-        ImGui.SameLine();
+        EditorGui.Inline();
         if (_icons.Button("ProjectReveal", "inventory_2", "Reveal in file browser"))
             RevealPath(_selectedPath ?? _currentFolder, _selectedPath is not null && !_selectedIsFolder);
     }
 
     private void DrawBreadcrumbs()
     {
-        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(3f, 4f));
-        if (ImGui.SmallButton($"Assets##ProjectBreadcrumbRoot"))
+        using var breadcrumbs = EditorGui.Breadcrumbs();
+        if (EditorGui.BreadcrumbButton("ProjectBreadcrumbRoot", "Assets"))
         {
             _currentFolder = string.Empty;
             ClearSelection();
@@ -181,30 +180,26 @@ internal sealed class ProjectPanel : EditorPanel
         foreach (var segment in _currentFolder.Split('/', StringSplitOptions.RemoveEmptyEntries))
         {
             path = path.Length == 0 ? segment : $"{path}/{segment}";
-            ImGui.SameLine();
-            ImGui.TextDisabled("/");
-            ImGui.SameLine();
-            if (ImGui.SmallButton($"{segment}##ProjectBreadcrumb:{path}"))
+            EditorGui.Inline();
+            EditorGui.MutedText("/");
+            EditorGui.Inline();
+            if (EditorGui.BreadcrumbButton($"ProjectBreadcrumb:{path}", segment))
             {
                 _currentFolder = path;
                 ClearSelection();
             }
             DrawDropTarget(path);
         }
-        ImGui.PopStyleVar();
     }
 
     private void DrawAssetTable(AssetDatabaseSnapshot snapshot)
     {
         var footerHeight = ImGui.GetTextLineHeightWithSpacing() + 8f;
-        if (!ImGui.BeginChild(
-                "##ProjectAssets",
-                new Vector2(0f, -footerHeight),
-                ImGuiChildFlags.None))
-        {
-            ImGui.EndChild();
+        using var assets = EditorGui.Child(
+            "Project.Assets",
+            new Vector2(0f, -footerHeight));
+        if (!assets.IsVisible)
             return;
-        }
 
         var tableFlags = ImGuiTableFlags.RowBg |
                          ImGuiTableFlags.BordersInnerH |
@@ -213,43 +208,45 @@ internal sealed class ProjectPanel : EditorPanel
                          ImGuiTableFlags.SizingStretchProp;
         if (ImGui.BeginTable("##ProjectAssetTable", 4, tableFlags))
         {
-            ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthStretch, 0.52f);
-            ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthStretch, 0.20f);
-            ImGui.TableSetupColumn("Modified", ImGuiTableColumnFlags.WidthStretch, 0.18f);
-            ImGui.TableSetupColumn("Size", ImGuiTableColumnFlags.WidthStretch, 0.10f);
-            ImGui.TableHeadersRow();
-
-            if (string.IsNullOrWhiteSpace(_search))
+            try
             {
-                foreach (var folder in snapshot.Folders.Where(folder =>
-                             PathEquals(folder.ParentPath, _currentFolder)))
+                ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthStretch, 0.52f);
+                ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthStretch, 0.20f);
+                ImGui.TableSetupColumn("Modified", ImGuiTableColumnFlags.WidthStretch, 0.18f);
+                ImGui.TableSetupColumn("Size", ImGuiTableColumnFlags.WidthStretch, 0.10f);
+                ImGui.TableHeadersRow();
+
+                if (string.IsNullOrWhiteSpace(_search))
                 {
-                    DrawFolderRow(folder);
+                    foreach (var folder in snapshot.Folders.Where(folder =>
+                                 PathEquals(folder.ParentPath, _currentFolder)))
+                    {
+                        DrawFolderRow(folder);
+                    }
                 }
+
+                var records = string.IsNullOrWhiteSpace(_search)
+                    ? snapshot.Assets.Where(asset => PathEquals(asset.FolderPath, _currentFolder))
+                    : _assets.Search(_search, _currentFolder, recursive: true);
+                foreach (var asset in records)
+                    DrawAssetRow(asset);
             }
-
-            var records = string.IsNullOrWhiteSpace(_search)
-                ? snapshot.Assets.Where(asset => PathEquals(asset.FolderPath, _currentFolder))
-                : _assets.Search(_search, _currentFolder, recursive: true);
-            foreach (var asset in records)
-                DrawAssetRow(asset);
-
-            ImGui.EndTable();
+            finally
+            {
+                ImGui.EndTable();
+            }
         }
 
-        if (ImGui.BeginPopupContextWindow(
-                "ProjectEmptyContext##Dreambit.Editor.Project",
-                ImGuiPopupFlags.MouseButtonRight | ImGuiPopupFlags.NoOpenOverItems))
+        using (var context = EditorGui.ContextWindow(
+                   "ProjectEmptyContext##Dreambit.Editor.Project",
+                   ImGuiPopupFlags.MouseButtonRight | ImGuiPopupFlags.NoOpenOverItems))
         {
-            if (ImGui.MenuItem("New Folder"))
+            if (context.IsOpen && EditorGui.MenuItem("New Folder"))
             {
                 _createFolderName = "New Folder";
                 _requestCreateFolderPopup = true;
             }
-            ImGui.EndPopup();
         }
-
-        ImGui.EndChild();
     }
 
     private void DrawFolderRow(AssetFolderRecord folder)
@@ -257,8 +254,9 @@ internal sealed class ProjectPanel : EditorPanel
         ImGui.TableNextRow();
         ImGui.TableSetColumnIndex(0);
         var selected = _selectedIsFolder && PathEquals(_selectedPath, folder.RelativePath);
-        var activated = ImGui.Selectable(
-                $"    {folder.Name}##folder:{folder.RelativePath}",
+        var activated = EditorGui.Selectable(
+                $"Project.Folder:{folder.RelativePath}",
+                "##FolderRow",
                 selected,
                 ImGuiSelectableFlags.SpanAllColumns | ImGuiSelectableFlags.AllowDoubleClick);
         var open = ImGui.IsItemHovered() &&
@@ -282,7 +280,7 @@ internal sealed class ProjectPanel : EditorPanel
             _currentFolder = folder.RelativePath;
             ClearSelection();
         }
-        DrawRowIcon("folder", new Vector4(0.95f, 0.72f, 0.28f, 1f));
+        DrawRowPresentation(folder.Name, "folder", new Vector4(0.95f, 0.72f, 0.28f, 1f));
 
         DrawDragSource(new ProjectItemDragPayload(
             folder.RelativePath,
@@ -293,7 +291,7 @@ internal sealed class ProjectPanel : EditorPanel
         DrawDropTarget(folder.RelativePath);
         DrawItemContextMenu(folder.RelativePath, isFolder: true);
         ImGui.TableSetColumnIndex(1);
-        ImGui.TextDisabled("Folder");
+        EditorGui.MutedText("Folder");
     }
 
     private void DrawAssetRow(AssetRecord asset)
@@ -301,8 +299,9 @@ internal sealed class ProjectPanel : EditorPanel
         ImGui.TableNextRow();
         ImGui.TableSetColumnIndex(0);
         var selected = !_selectedIsFolder && PathEquals(_selectedPath, asset.RelativePath);
-        var activated = ImGui.Selectable(
-                $"    {asset.Name}##asset:{asset.Id}",
+        var activated = EditorGui.Selectable(
+                $"Project.Asset:{asset.Id}",
+                "##AssetRow",
                 selected,
                 ImGuiSelectableFlags.SpanAllColumns | ImGuiSelectableFlags.AllowDoubleClick);
         var open = ImGui.IsItemHovered() &&
@@ -317,7 +316,7 @@ internal sealed class ProjectPanel : EditorPanel
                 _openBlueprint(asset);
                 _error = null;
             }
-            else if (asset.Kind == AssetKind.Scene)
+            else if (asset.Kind == AssetKind.Scene || IsTiledMap(asset))
             {
                 try
                 {
@@ -326,17 +325,20 @@ internal sealed class ProjectPanel : EditorPanel
                         SetError("Could not open the scene because the current asset could not be saved.");
                         return;
                     }
-                    _scenes.Open(asset.RelativePath);
+                    if (asset.Kind == AssetKind.Scene)
+                        _scenes.Open(asset.RelativePath);
+                    else
+                        _scenes.NewFromTiled(asset);
                     _documentContext.ActivateScene();
                     _error = null;
                 }
                 catch (Exception exception)
                 {
-                    SetError($"Could not open scene. {exception.Message}");
+                    SetError($"Could not open scene. {exception.Message}", exception);
                 }
             }
         }
-        DrawRowIcon(GetAssetIcon(asset.Kind));
+        DrawRowPresentation(asset.Name, GetAssetIcon(asset.Kind));
 
         DrawDragSource(new ProjectItemDragPayload(
             asset.RelativePath,
@@ -346,34 +348,41 @@ internal sealed class ProjectPanel : EditorPanel
             asset.TypeId));
         if (ImGui.IsItemHovered())
         {
-            ImGui.BeginTooltip();
-            ImGui.TextUnformatted(asset.RelativePath);
-            ImGui.TextDisabled($"ID  {asset.Id}");
+            using var tooltip = EditorGui.Tooltip();
+            EditorGui.Text(asset.RelativePath);
+            EditorGui.MutedText($"ID  {asset.Id}");
             if (!string.IsNullOrWhiteSpace(asset.TypeId))
-                ImGui.TextDisabled(asset.TypeId);
-            ImGui.EndTooltip();
+                EditorGui.MutedText(asset.TypeId);
         }
 
         DrawItemContextMenu(asset.RelativePath, isFolder: false);
         ImGui.TableSetColumnIndex(1);
-        ImGui.TextUnformatted(GetKindLabel(asset.Kind));
+        EditorGui.Text(GetKindLabel(asset.Kind));
         ImGui.TableSetColumnIndex(2);
-        ImGui.TextDisabled(asset.LastWriteUtc.ToLocalTime().ToString("g"));
+        EditorGui.MutedText(asset.LastWriteUtc.ToLocalTime().ToString("g"));
         ImGui.TableSetColumnIndex(3);
-        ImGui.TextDisabled(FormatSize(asset.Length));
+        EditorGui.MutedText(FormatSize(asset.Length));
     }
 
-    private void DrawRowIcon(string icon, Vector4? tint = null)
+    private void DrawRowPresentation(string text, string icon, Vector4? tint = null)
     {
         var minimum = ImGui.GetItemRectMin();
         var maximum = ImGui.GetItemRectMax();
         var size = MathF.Min(17f, maximum.Y - minimum.Y - 2f);
+        var iconPosition = minimum + new Vector2(5f, (maximum.Y - minimum.Y - size) * 0.5f);
+        var textPosition = new Vector2(
+            iconPosition.X + size + 6f,
+            minimum.Y + (maximum.Y - minimum.Y - ImGui.GetFontSize()) * 0.5f);
+        var drawList = ImGui.GetWindowDrawList();
+        drawList.PushClipRect(minimum, maximum, true);
         _icons.DrawAt(
-            ImGui.GetWindowDrawList(),
+            drawList,
             icon,
-            minimum + new Vector2(4f, (maximum.Y - minimum.Y - size) * 0.5f),
+            iconPosition,
             new Vector2(size),
             tint);
+        drawList.AddText(textPosition, ImGui.GetColorU32(ImGuiCol.Text), text);
+        drawList.PopClipRect();
     }
 
     private static string GetAssetIcon(AssetKind kind) => kind switch
@@ -395,37 +404,37 @@ internal sealed class ProjectPanel : EditorPanel
 
     private void DrawItemContextMenu(string path, bool isFolder)
     {
-        if (!ImGui.BeginPopupContextItem($"ProjectItemContext##{path}"))
+        using var context = EditorGui.ContextMenu($"ProjectItemContext##{path}");
+        if (!context.IsOpen)
             return;
 
         if (!TrySelectProjectItem(path, isFolder))
         {
-            ImGui.CloseCurrentPopup();
-            ImGui.EndPopup();
+            EditorGui.ClosePopup();
             return;
         }
 
-        if (isFolder && ImGui.MenuItem("Open"))
+        if (isFolder && EditorGui.MenuItem("Open"))
         {
             _currentFolder = path;
             ClearSelection();
         }
 
-        if (ImGui.MenuItem("Rename"))
+        if (EditorGui.MenuItem("Rename"))
         {
             _renameName = Path.GetFileName(path);
             _error = null;
             _requestRenamePopup = true;
         }
 
-        if (ImGui.MenuItem("Move..."))
+        if (EditorGui.MenuItem("Move..."))
         {
             _moveDestination = _currentFolder;
             _error = null;
             _requestMovePopup = true;
         }
 
-        if (ImGui.MenuItem("Duplicate"))
+        if (EditorGui.MenuItem("Duplicate"))
         {
             if (!_assets.TryDuplicate(path, out var duplicatedPath, out var error))
                 SetError(error ?? "Could not duplicate the selection.");
@@ -444,25 +453,23 @@ internal sealed class ProjectPanel : EditorPanel
             }
         }
 
-        ImGui.Separator();
-        if (ImGui.MenuItem("Copy Relative Path"))
+        EditorGui.Separator();
+        if (EditorGui.MenuItem("Copy Relative Path"))
             ImGui.SetClipboardText(path);
         if (!isFolder && _assets.TryGetAsset(path, out var asset) &&
-            ImGui.MenuItem("Copy Asset ID"))
+            EditorGui.MenuItem("Copy Asset ID"))
         {
             ImGui.SetClipboardText(asset!.Id.ToString());
         }
-        if (ImGui.MenuItem("Reveal in File Browser"))
+        if (EditorGui.MenuItem("Reveal in File Browser"))
             RevealPath(path, !isFolder);
 
-        ImGui.Separator();
-        if (ImGui.MenuItem("Delete"))
+        EditorGui.Separator();
+        if (EditorGui.MenuItem("Delete"))
         {
             _pendingDeletePath = path;
             _requestDeletePopup = true;
         }
-
-        ImGui.EndPopup();
     }
 
     private void DrawStatus(AssetDatabaseSnapshot snapshot)
@@ -473,46 +480,55 @@ internal sealed class ProjectPanel : EditorPanel
         var status = $"{visibleAssetCount} asset{(visibleAssetCount == 1 ? string.Empty : "s")}";
         if (snapshot.MissingAssetCount > 0)
             status += $"  |  {snapshot.MissingAssetCount} missing reference target(s) retained";
-        ImGui.TextDisabled(status);
+        EditorGui.MutedText(status);
     }
 
     private void DrawDragSource(ProjectItemDragPayload payload)
     {
         if (!ImGui.BeginDragDropSource())
             return;
-
-        _dragDrop.SetProjectItem(payload);
-        ImGui.SetDragDropPayload(
-            EditorDragDropService.ProjectItemPayloadType,
-            IntPtr.Zero,
-            0);
-        ImGui.TextUnformatted(payload.RelativePath);
-        ImGui.EndDragDropSource();
+        try
+        {
+            _dragDrop.SetProjectItem(payload);
+            ImGui.SetDragDropPayload(
+                EditorDragDropService.ProjectItemPayloadType,
+                IntPtr.Zero,
+                0);
+            EditorGui.Text(payload.RelativePath);
+        }
+        finally
+        {
+            ImGui.EndDragDropSource();
+        }
     }
 
     private unsafe void DrawDropTarget(string destinationFolder)
     {
         if (!ImGui.BeginDragDropTarget())
             return;
-
-        var accepted = ImGui.AcceptDragDropPayload(
-            EditorDragDropService.ProjectItemPayloadType);
-        if (accepted.NativePtr != null && _dragDrop.ProjectItem is { } payload)
+        try
         {
-            if (!_assets.TryMove(payload.RelativePath, destinationFolder, out var error))
-                SetError(error ?? "Could not move the dragged item.");
-            else
+            var accepted = ImGui.AcceptDragDropPayload(
+                EditorDragDropService.ProjectItemPayloadType);
+            if (accepted.NativePtr != null && _dragDrop.ProjectItem is { } payload)
             {
-                _selectedPath = JoinPath(destinationFolder, Path.GetFileName(payload.RelativePath));
-                _selectedIsFolder = payload.IsFolder;
-                _assetEditing.RefreshFromDatabase();
-                _error = null;
+                if (!_assets.TryMove(payload.RelativePath, destinationFolder, out var error))
+                    SetError(error ?? "Could not move the dragged item.");
+                else
+                {
+                    _selectedPath = JoinPath(destinationFolder, Path.GetFileName(payload.RelativePath));
+                    _selectedIsFolder = payload.IsFolder;
+                    _assetEditing.RefreshFromDatabase();
+                    _error = null;
+                }
+
+                _dragDrop.ClearProjectItem();
             }
-
-            _dragDrop.ClearProjectItem();
         }
-
-        ImGui.EndDragDropTarget();
+        finally
+        {
+            ImGui.EndDragDropTarget();
+        }
     }
 
     private void DrawOperationPopups()
@@ -536,133 +552,158 @@ internal sealed class ProjectPanel : EditorPanel
 
     private void DrawCreateAssetPopup()
     {
-        if (!ImGui.BeginPopupModal(
-                "Create Asset##Dreambit.Editor.Project",
-                ImGuiWindowFlags.AlwaysAutoResize))
+        using var popup = EditorGui.Modal("Create Asset##Dreambit.Editor.Project");
+        if (!popup.IsOpen)
             return;
         var createAssetType = ResolveCreateAssetType();
-        ImGui.TextUnformatted($"Create {_createAssetTypeName}");
-        ImGui.SetNextItemWidth(480f);
-        var submit = ImGui.InputText("Path", ref _createAssetPath, 1024, ImGuiInputTextFlags.EnterReturnsTrue);
-        ImGui.BeginDisabled(createAssetType is null);
-        if ((submit || ImGui.Button("Create", new Vector2(90, 0))) && createAssetType is not null)
+        EditorGui.Text($"Create {_createAssetTypeName}");
+        var submit = EditorGui.Property(
+            "CreateAsset.Path",
+            "Path",
+            ref _createAssetPath,
+            maxLength: 1024,
+            commitOnEnter: true);
+        using (EditorGui.Disabled(createAssetType is null))
         {
-            if (_assetEditing.TryCreate(createAssetType, _createAssetPath, out var error))
+            if ((submit || EditorGui.Button(
+                    "CreateAsset.Submit",
+                    "Create",
+                    new Vector2(90f, 0f),
+                    primary: true)) &&
+                createAssetType is not null)
             {
-                _selectedPath = _createAssetPath;
-                _selectedIsFolder = false;
-                _error = null;
-                _documentContext.ActivateAsset();
-                ClearCreateAssetRequest();
-                ImGui.CloseCurrentPopup();
-            }
-            else
-            {
-                SetError(error ?? "Could not create asset.");
+                if (_assetEditing.TryCreate(createAssetType, _createAssetPath, out var error))
+                {
+                    _selectedPath = _createAssetPath;
+                    _selectedIsFolder = false;
+                    _error = null;
+                    _documentContext.ActivateAsset();
+                    ClearCreateAssetRequest();
+                    EditorGui.ClosePopup();
+                }
+                else
+                {
+                    SetError(error ?? "Could not create asset.");
+                }
             }
         }
-        ImGui.EndDisabled();
         if (createAssetType is null)
-            ImGui.TextDisabled("This asset type is unavailable until game code finishes reloading.");
-        ImGui.SameLine();
-        if (ImGui.Button("Cancel", new Vector2(90, 0)))
+            EditorGui.MutedText("This asset type is unavailable until game code finishes reloading.");
+        EditorGui.Inline();
+        if (EditorGui.Button("CreateAsset.Cancel", "Cancel", new Vector2(90f, 0f)))
         {
             ClearCreateAssetRequest();
-            ImGui.CloseCurrentPopup();
+            EditorGui.ClosePopup();
         }
-        ImGui.EndPopup();
     }
 
     private void OpenRequestedPopups()
     {
         if (_requestCreateFolderPopup)
         {
-            ImGui.OpenPopup(CreateFolderPopup);
+            EditorGui.OpenPopup(CreateFolderPopup);
             _requestCreateFolderPopup = false;
         }
         if (_requestRenamePopup)
         {
-            ImGui.OpenPopup(RenamePopup);
+            EditorGui.OpenPopup(RenamePopup);
             _requestRenamePopup = false;
         }
         if (_requestMovePopup)
         {
-            ImGui.OpenPopup(MovePopup);
+            EditorGui.OpenPopup(MovePopup);
             _requestMovePopup = false;
         }
         if (_requestDeletePopup)
         {
-            ImGui.OpenPopup(DeletePopup);
+            EditorGui.OpenPopup(DeletePopup);
             _requestDeletePopup = false;
         }
         if (_requestCreateAssetPopup)
         {
-            ImGui.OpenPopup("Create Asset##Dreambit.Editor.Project");
+            EditorGui.OpenPopup("Create Asset##Dreambit.Editor.Project");
             _requestCreateAssetPopup = false;
         }
     }
 
     private void DrawCreateFolderPopup()
     {
-        if (!ImGui.BeginPopupModal(CreateFolderPopup, ImGuiWindowFlags.AlwaysAutoResize))
+        using var popup = EditorGui.Modal(CreateFolderPopup);
+        if (!popup.IsOpen)
             return;
 
-        ImGui.TextUnformatted($"Create in Assets/{_currentFolder}".TrimEnd('/'));
-        ImGui.SetNextItemWidth(360f);
-        ImGui.InputText("Name", ref _createFolderName, 256);
+        EditorGui.Text($"Create in Assets/{_currentFolder}".TrimEnd('/'));
+        EditorGui.Property("CreateFolder.Name", "Name", ref _createFolderName, maxLength: 256);
         DrawPopupError();
-        if (ImGui.Button("Create", new Vector2(90f, 0f)))
+        if (EditorGui.Button(
+                "CreateFolder.Submit",
+                "Create",
+                new Vector2(90f, 0f),
+                primary: true))
         {
             if (_assets.TryCreateFolder(_currentFolder, _createFolderName, out var error))
             {
                 _error = null;
-                ImGui.CloseCurrentPopup();
+                EditorGui.ClosePopup();
             }
             else
                 SetError(error ?? "Could not create the folder.");
         }
-        ImGui.SameLine();
-        if (ImGui.Button("Cancel", new Vector2(90f, 0f)))
-            ImGui.CloseCurrentPopup();
-        ImGui.EndPopup();
+        EditorGui.Inline();
+        if (EditorGui.Button("CreateFolder.Cancel", "Cancel", new Vector2(90f, 0f)))
+            EditorGui.ClosePopup();
     }
 
     private void DrawRenamePopup()
     {
-        if (!ImGui.BeginPopupModal(RenamePopup, ImGuiWindowFlags.AlwaysAutoResize))
+        using var popup = EditorGui.Modal(RenamePopup);
+        if (!popup.IsOpen)
             return;
 
-        ImGui.SetNextItemWidth(360f);
-        ImGui.InputText("Name", ref _renameName, 256);
+        EditorGui.Property("Rename.Name", "Name", ref _renameName, maxLength: 256);
         DrawPopupError();
-        if (ImGui.Button("Rename", new Vector2(90f, 0f)) && _selectedPath is not null)
+        if (EditorGui.Button(
+                "Rename.Submit",
+                "Rename",
+                new Vector2(90f, 0f),
+                primary: true) &&
+            _selectedPath is not null)
         {
             if (_assets.TryRename(_selectedPath, _renameName, out var error))
             {
                 _selectedPath = JoinPath(GetParentPath(_selectedPath), _renameName.Trim());
                 _assetEditing.RefreshFromDatabase();
                 _error = null;
-                ImGui.CloseCurrentPopup();
+                EditorGui.ClosePopup();
             }
             else
                 SetError(error ?? "Could not rename the selection.");
         }
-        ImGui.SameLine();
-        if (ImGui.Button("Cancel", new Vector2(90f, 0f)))
-            ImGui.CloseCurrentPopup();
-        ImGui.EndPopup();
+        EditorGui.Inline();
+        if (EditorGui.Button("Rename.Cancel", "Cancel", new Vector2(90f, 0f)))
+            EditorGui.ClosePopup();
     }
 
     private void DrawMovePopup()
     {
-        if (!ImGui.BeginPopupModal(MovePopup, ImGuiWindowFlags.AlwaysAutoResize))
+        using var popup = EditorGui.Modal(MovePopup);
+        if (!popup.IsOpen)
             return;
 
-        ImGui.TextWrapped("Destination folder, relative to Content/Assets. Leave empty for the root.");
-        ImGui.SetNextItemWidth(460f);
-        ImGui.InputTextWithHint("##MoveDestination", "characters/player", ref _moveDestination, 512);
+        EditorGui.WrappedText("Destination folder, relative to Content/Assets. Leave empty for the root.");
+        EditorGui.Property(
+            "Move.Destination",
+            "Destination",
+            ref _moveDestination,
+            maxLength: 512,
+            hint: "characters/player");
         DrawPopupError();
-        if (ImGui.Button("Move", new Vector2(90f, 0f)) && _selectedPath is not null)
+        if (EditorGui.Button(
+                "Move.Submit",
+                "Move",
+                new Vector2(90f, 0f),
+                primary: true) &&
+            _selectedPath is not null)
         {
             var name = Path.GetFileName(_selectedPath);
             if (_assets.TryMove(_selectedPath, _moveDestination, out var error))
@@ -670,27 +711,32 @@ internal sealed class ProjectPanel : EditorPanel
                 _selectedPath = JoinPath(_moveDestination.Trim().Replace('\\', '/').Trim('/'), name);
                 _assetEditing.RefreshFromDatabase();
                 _error = null;
-                ImGui.CloseCurrentPopup();
+                EditorGui.ClosePopup();
             }
             else
                 SetError(error ?? "Could not move the selection.");
         }
-        ImGui.SameLine();
-        if (ImGui.Button("Cancel", new Vector2(90f, 0f)))
-            ImGui.CloseCurrentPopup();
-        ImGui.EndPopup();
+        EditorGui.Inline();
+        if (EditorGui.Button("Move.Cancel", "Cancel", new Vector2(90f, 0f)))
+            EditorGui.ClosePopup();
     }
 
     private void DrawDeletePopup()
     {
-        if (!ImGui.BeginPopupModal(DeletePopup, ImGuiWindowFlags.AlwaysAutoResize))
+        using var popup = EditorGui.Modal(DeletePopup);
+        if (!popup.IsOpen)
             return;
 
-        ImGui.TextWrapped($"Delete '{_pendingDeletePath}' from disk?");
-        ImGui.TextDisabled("Its stable asset ID will remain as a missing-reference tombstone.");
+        EditorGui.WrappedText($"Delete '{_pendingDeletePath}' from disk?");
+        EditorGui.MutedText("Its stable asset ID will remain as a missing-reference tombstone.");
         DrawPopupError();
-        ImGui.Spacing();
-        if (ImGui.Button("Delete", new Vector2(90f, 0f)) && _pendingDeletePath is not null)
+        EditorGui.Space();
+        if (EditorGui.Button(
+                "Delete.Submit",
+                "Delete",
+                new Vector2(90f, 0f),
+                primary: true) &&
+            _pendingDeletePath is not null)
         {
             if (_assets.TryDelete(_pendingDeletePath, out var error))
             {
@@ -698,18 +744,17 @@ internal sealed class ProjectPanel : EditorPanel
                 ClearSelection();
                 _pendingDeletePath = null;
                 _error = null;
-                ImGui.CloseCurrentPopup();
+                EditorGui.ClosePopup();
             }
             else
                 SetError(error ?? "Could not delete the selection.");
         }
-        ImGui.SameLine();
-        if (ImGui.Button("Cancel", new Vector2(90f, 0f)))
+        EditorGui.Inline();
+        if (EditorGui.Button("Delete.Cancel", "Cancel", new Vector2(90f, 0f)))
         {
             _pendingDeletePath = null;
-            ImGui.CloseCurrentPopup();
+            EditorGui.ClosePopup();
         }
-        ImGui.EndPopup();
     }
 
     private void RevealPath(string relativePath, bool selectFile)
@@ -801,10 +846,17 @@ internal sealed class ProjectPanel : EditorPanel
             _workspace.LastSelectionKind = "asset";
     }
 
-    private void SetError(string message)
+    private static bool IsTiledMap(AssetRecord asset) =>
+        asset.Kind == AssetKind.TiledMap &&
+        asset.RelativePath.EndsWith(".tmx", StringComparison.OrdinalIgnoreCase);
+
+    private void SetError(string message, Exception? exception = null)
     {
         _error = message;
-        _logs.Warning("Assets", message);
+        if (exception is null)
+            _logs.Warning("Assets", message);
+        else
+            _logs.Error("Assets", message, exception);
     }
 
     private bool TrySelectAsset(AssetRecord asset)
@@ -858,9 +910,7 @@ internal sealed class ProjectPanel : EditorPanel
         if (string.IsNullOrWhiteSpace(_error))
             return;
 
-        ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.96f, 0.44f, 0.38f, 1f));
-        ImGui.TextWrapped(_error);
-        ImGui.PopStyleColor();
+        EditorGui.Error(_error);
     }
 
     private Type? ResolveCreateAssetType()

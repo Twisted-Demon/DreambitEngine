@@ -8,13 +8,13 @@ public abstract class Component : IDisposable
 {
     protected readonly ILogger Logger;
     internal bool IsDestroyed;
-    internal IReadOnlyList<Type> RequiredComponentTypes = [];
+    private IReadOnlyList<Type> _requiredComponentTypes = [];
     private bool _enabled = true;
     private bool _isDisposed;
     private readonly HashSet<string> _editorSerializationFailures =
         new(StringComparer.OrdinalIgnoreCase);
 
-    public Component()
+    protected Component()
     {
         Logger = new Logger(GetType());
     }
@@ -79,9 +79,9 @@ public abstract class Component : IDisposable
         Entity = entity;
         _enabled = enabled;
 
-        RequiredComponentTypes = GetRequiredComponents();
+        _requiredComponentTypes = GetRequiredComponents();
 
-        foreach (var cType in RequiredComponentTypes) Entity.AttachComponent(cType);
+        foreach (var cType in _requiredComponentTypes) Entity.AttachComponent(cType);
         MapRequiredFieldComponents();
         return this;
     }
@@ -104,7 +104,7 @@ public abstract class Component : IDisposable
 
         component.Entity = entity;
         component._enabled = enabled;
-        component.RequiredComponentTypes = component.GetRequiredComponents();
+        component._requiredComponentTypes = component.GetRequiredComponents();
 
 
         return component;

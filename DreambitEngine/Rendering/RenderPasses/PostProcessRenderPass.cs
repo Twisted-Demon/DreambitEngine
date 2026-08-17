@@ -17,10 +17,10 @@ public class PostProcessRenderPass : RenderPass
     public override void Initialize()
     {
         _colorCorrectionEffect = Resources.LoadAsset<Effect>("Effects/ColorCorrection");
-        _colorCorrectionPass = RenderPipeline.CreateRenderTarget();
+        _colorCorrectionPass = RenderPipeline.CreateViewportRenderTarget();
 
         _tintEffect = Resources.LoadAsset<Effect>("Effects/Tint");
-        _tintPass = RenderPipeline.CreateRenderTarget();
+        _tintPass = RenderPipeline.CreateViewportRenderTarget();
 
         _postProcessSettings = Scene.PostProcessSettings;
     }
@@ -90,14 +90,14 @@ public class PostProcessRenderPass : RenderPass
         }
     }
 
-    protected override void OnWindowResized(object sender, WindowResizedEventArgs args)
+    protected override void OnViewportResized()
     {
-        base.OnWindowResized(sender, args);
+        base.OnViewportResized();
         _colorCorrectionPass?.Dispose();
-        _colorCorrectionPass = RenderPipeline.CreateRenderTarget();
+        _colorCorrectionPass = RenderPipeline.CreateViewportRenderTarget();
 
         _tintPass?.Dispose();
-        _tintPass = RenderPipeline.CreateRenderTarget();
+        _tintPass = RenderPipeline.CreateViewportRenderTarget();
     }
 
     protected override void OnDisposing()
@@ -108,7 +108,7 @@ public class PostProcessRenderPass : RenderPass
         _tintPass?.Dispose();
         _tintPass = null;
 
-        Resources.UnloadAsset(_tintEffect.Name);
-        Resources.UnloadAsset(_colorCorrectionEffect.Name);
+        _tintEffect = null;
+        _colorCorrectionEffect = null;
     }
 }

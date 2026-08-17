@@ -2,6 +2,29 @@
 using Spectre.Console;
 using Spectre.Console.Cli;
 
+if (args is ["__compile-effect", var input, var output, var logicalRoot, var platform])
+{
+    try
+    {
+        var blob = new DreambitEngine.AssetBaker.Pipeline.Effects.EffectBaker().BakeToBytes(
+            new DreambitEngine.AssetBaker.Abstractions.BakeContext
+            {
+                InputPath = input,
+                OutputPath = output,
+                LogicalRoot = logicalRoot,
+                TargetPlatform = platform
+            });
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output))!);
+        File.WriteAllBytes(output, blob.Data);
+        return 0;
+    }
+    catch (Exception exception)
+    {
+        Console.Error.WriteLine(exception);
+        return -1;
+    }
+}
+
 var app = new CommandApp();
 
 app.Configure(cfg =>
@@ -24,6 +47,11 @@ app.Configure(cfg =>
     cfg.AddCommand<BakePakCommand>("bake-pak")
         .WithDescription("Bake assets into a pak file")
         .WithExample(new[] { "bake-pak", "/Content", "/Content/content.pak" });
+
+    cfg.AddCommand<BakeBlobsCommand>("bake-blobs")
+        .WithDescription("Bake assets into the incremental development blob store")
+        .WithExample(new[] { "bake-blobs", "/Content", "/Cache/bake" });
+
 });
 
 try

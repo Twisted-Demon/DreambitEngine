@@ -32,7 +32,6 @@ internal static class TiledGeneratedEntityOverrides
             {
                 continue;
             }
-
             if (!string.IsNullOrWhiteSpace(entityOverride.Name))
                 entity.Name = entityOverride.Name;
             if (entityOverride.Enabled.HasValue)

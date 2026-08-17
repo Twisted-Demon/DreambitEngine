@@ -8,6 +8,7 @@ dotnet build DreambitGame.sln
 dotnet run --project src/DreambitGame.VK/DreambitGame.VK.csproj
 ```
 
-Asset baking writes `.cache/dreambit/content.pak`. Build and publish copy the completed PAK
-into the launcher's `Content` directory; source assets are never baked directly into a running
-output folder.
+Asset baking maintains incremental blobs under `.cache/dreambit/bake`, and Debug builds copy those
+blobs into the launcher's `Content` directory. Before a Release build or publish, choose
+**Build > Bake Pak** in Dreambit Editor. Release verifies that the PAK matches the current blobs and
+copies it into the output.

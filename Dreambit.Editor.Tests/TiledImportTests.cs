@@ -228,12 +228,36 @@ public sealed class TiledImportTests : IDisposable
             {
                 Assert.Equal((-2, 3), (cell.X, cell.Y));
                 Assert.Equal(7u, cell.GlobalTileId);
+                Assert.Equal((-2, 3), (cell.ChunkX, cell.ChunkY));
             },
             cell =>
             {
                 Assert.Equal((-1, 3), (cell.X, cell.Y));
                 Assert.Equal(0u, cell.GlobalTileId);
+                Assert.Equal((-2, 3), (cell.ChunkX, cell.ChunkY));
             });
+    }
+
+    [Fact]
+    public void DecoderAcceptsAnEmptyCsvLayerInAnInfiniteMap()
+    {
+        var map = new TmxMap
+        {
+            Infinite = true,
+            Width = 100,
+            Height = 80,
+            TileWidth = 32,
+            TileHeight = 32
+        };
+        var layer = new TmxTileLayer
+        {
+            Name = "Empty",
+            Width = 100,
+            Height = 80,
+            Data = new TmxData { Encoding = "csv", Value = null }
+        };
+
+        Assert.Empty(TmxTileDataDecoder.DecodeLayer(map, layer));
     }
 
     [Fact]
@@ -316,6 +340,69 @@ public sealed class TiledImportTests : IDisposable
         Assert.Equal(1, layer.TileCount);
         Assert.Equal(tile, Assert.Single(layer.GetTiles(cell.X, cell.Y)));
         Assert.Empty(layer.GetTiles(0, 0));
+    }
+
+    [Fact]
+    public void SparseTilemapVisibilityVisitsOnlyOccupiedIntersectingChunks()
+    {
+        const int columns = 1_000_000;
+        const int rows = 1_000_000;
+        var nearby = new TilemapTile(
+            new Vector2(10, 10),
+            Vector2.One,
+            new Rectangle(0, 0, 1, 1),
+            Color.White,
+            Cell: new Point(10, 10));
+        var distant = new TilemapTile(
+            new Vector2(columns - 1, rows - 1),
+            Vector2.One,
+            new Rectangle(0, 0, 1, 1),
+            Color.White,
+            Cell: new Point(columns - 1, rows - 1));
+        var layer = new TilemapLayerData(
+            columns,
+            rows,
+            Vector2.One,
+            [nearby, distant]);
+        var visible = new List<TilemapChunkData>();
+
+        layer.GetVisibleChunks(new RectangleF(9, 9, 4, 4), visible);
+
+        Assert.Equal(2, layer.ChunkCount);
+        var chunk = Assert.Single(visible);
+        Assert.Equal(nearby, Assert.Single(chunk.Tiles));
+    }
+
+    [Fact]
+    public void TilemapLayerPreservesSourceChunksAndSeparatesAnimatedTiles()
+    {
+        var animation = new TilemapAnimation(
+        [
+            new TilemapAnimationFrame(new Rectangle(0, 0, 1, 1), 100)
+        ]);
+        var sourceChunk = new Point(-16, 32);
+        var staticTile = new TilemapTile(
+            Vector2.Zero,
+            Vector2.One,
+            new Rectangle(0, 0, 1, 1),
+            Color.White,
+            Cell: Point.Zero,
+            Chunk: sourceChunk);
+        var animatedTile = new TilemapTile(
+            Vector2.One,
+            Vector2.One,
+            new Rectangle(0, 0, 1, 1),
+            Color.White,
+            Animation: animation,
+            Cell: new Point(1, 1),
+            Chunk: sourceChunk);
+
+        var layer = new TilemapLayerData(2, 2, Vector2.One, [staticTile, animatedTile]);
+
+        var chunk = Assert.Single(layer.Chunks);
+        Assert.Equal(sourceChunk, chunk.Coordinate);
+        Assert.Equal(staticTile, Assert.Single(chunk.StaticTiles));
+        Assert.Equal(animatedTile, Assert.Single(chunk.AnimatedTiles));
     }
 
     [Fact]
@@ -517,22 +604,26 @@ public sealed class TiledImportTests : IDisposable
         Assert.DoesNotContain(generated, entity => entity.Name.Contains("Objects"));
         var background = Assert.Single(
             generated.SelectMany(entity => entity.GetAllComponents()).OfType<FilledRectDrawer>());
-        Assert.True(SceneViewportRenderer.ShouldRenderDrawable(background));
+        Assert.True(SceneViewportRenderer.ShouldPickDrawable(background));
+        Assert.True(SceneViewportRenderer.ShouldDeferImportedMapPick(background));
+        Assert.All(
+            generated.SelectMany(entity => entity.GetAllComponents()).OfType<TilemapRenderer>(),
+            renderer => Assert.True(SceneViewportRenderer.ShouldDeferImportedMapPick(renderer)));
 
         var placed = document.CreateEmpty("Dreambit Placed");
         var placedId = placed.Id;
         document.Apply("Move Dreambit Entity", _ =>
             placed.Transform.Position = new Vector3(12, 34, 0));
-        document.Apply("Override Tiled Background", _ =>
-        {
-            background.Entity.Transform.Position = new Vector3(5, 7, 0);
-            background.Entity.Tags.Clear();
-            background.Entity.Tags.Add("editor-override");
-            background.Width = 99f;
-            document.RecordGeneratedPosition(background.Entity);
-            document.RecordGeneratedEntityTags(background.Entity);
-            document.RecordGeneratedComponentMember(background, nameof(FilledRectDrawer.Width), background.Width);
-        });
+        document.SetEntityPosition([background.Entity], new Vector3(5, 7, 0));
+        document.SetEntityEnabled([background.Entity], false);
+        document.SetEntityTags([background.Entity], ["editor-override"]);
+        document.SetComponentMember(
+            "Override Tiled Background Width",
+            [background],
+            nameof(FilledRectDrawer.Width),
+            typeof(float),
+            99f,
+            (component, value) => ((FilledRectDrawer)component).Width = (float)value!);
 
         WriteEmptyMap(mapPath, 4, "Ground Updated", "#654321");
         document.ReimportTiled();
@@ -548,6 +639,7 @@ public sealed class TiledImportTests : IDisposable
                 .SelectMany(entity => entity.GetAllComponents())
                 .OfType<FilledRectDrawer>());
         Assert.Equal(new Vector3(5, 7, 0), reimportedBackground.Entity.Transform.Position);
+        Assert.False(reimportedBackground.Entity.LocallyEnabled);
         Assert.Contains("editor-override", reimportedBackground.Entity.Tags);
         Assert.Equal(99f, reimportedBackground.Width);
 

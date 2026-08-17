@@ -15,6 +15,7 @@ template registration is updated. To only create packages without installing
 the template:
 
 ```powershell
+Set-ExecutionPolicy Unrestricted -Scope CurrentUser
 ./scripts/publish-sdk.cmd 0.1.8 -SkipTemplateInstall
 ```
 

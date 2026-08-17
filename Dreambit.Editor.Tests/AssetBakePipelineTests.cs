@@ -64,6 +64,153 @@ public sealed class AssetBakePipelineTests : IDisposable
     }
 
     [Fact]
+    public void RuntimeRegistryIgnoresTiledEditorMetadataButKeepsRuntimeMaps()
+    {
+        var assets = Path.Combine(_root, "TiledAssets");
+        var output = Path.Combine(_root, "TiledContent", "content.pak");
+        var registry = Path.Combine(_root, ".dreambit", "tiled-assets.json");
+        Directory.CreateDirectory(Path.Combine(assets, "maps"));
+        Directory.CreateDirectory(Path.GetDirectoryName(registry)!);
+
+        File.WriteAllText(Path.Combine(assets, "maps", "Rootbound.tiled-project"), "{}");
+        File.WriteAllText(Path.Combine(assets, "maps", "Rootbound.tiled-session"), "{}");
+        File.WriteAllText(
+            Path.Combine(assets, "maps", "Rootbound.tmx"),
+            "<map version=\"1.10\" tiledversion=\"1.11.2\" orientation=\"orthogonal\" " +
+            "renderorder=\"right-down\" width=\"1\" height=\"1\" tilewidth=\"16\" tileheight=\"16\"/>");
+
+        var projectId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+        var mapId = Guid.NewGuid();
+        File.WriteAllText(
+            registry,
+            $$"""
+              {
+                "schemaVersion": 1,
+                "assets": [
+                  { "id": "{{projectId:D}}", "path": "maps/Rootbound.tiled-project", "kind": "Unknown" },
+                  { "id": "{{sessionId:D}}", "path": "maps/Rootbound.tiled-session", "kind": "Unknown" },
+                  { "id": "{{mapId:D}}", "path": "maps/Rootbound.tmx", "kind": "TiledMap" }
+                ]
+              }
+              """);
+
+        new AssetBakePipeline().BakePak(new AssetBakeRequest(assets, output, registry));
+
+        using var pak = new PakReader(output);
+        using var stream = pak.Open(RuntimeAssetRegistry.LogicalPath);
+        var runtimeRegistry = RuntimeAssetRegistry.Load(stream);
+        Assert.False(runtimeRegistry.TryResolveAssetName(new AssetId(projectId), out _));
+        Assert.False(runtimeRegistry.TryResolveAssetName(new AssetId(sessionId), out _));
+        Assert.True(runtimeRegistry.TryResolveAssetName(new AssetId(mapId), out var mapName));
+        Assert.Equal("maps/Rootbound", mapName);
+    }
+
+    [Fact]
+    public void BlobBakeWritesNoPakAndCanBeLoadedByLogicalPath()
+    {
+        var assets = Path.Combine(_root, "BlobAssets");
+        var cache = Path.Combine(_root, "BlobCache");
+        Directory.CreateDirectory(Path.Combine(assets, "levels"));
+        File.WriteAllText(
+            Path.Combine(assets, "levels", "first.scene"),
+            "{\"name\":\"From blobs\",\"entities\":[]}");
+
+        var result = new AssetBakePipeline().BakeBlobs(new AssetBlobBakeRequest(
+            assets,
+            cache,
+            RebuildAll: true));
+
+        Assert.True(File.Exists(result.ManifestPath));
+        Assert.True(File.Exists(Path.Combine(cache, BlobContentManifest.FingerprintFileName)));
+        Assert.False(File.Exists(Path.Combine(cache, "content.pak")));
+
+        var originalMode = Resources.ContentMode;
+        try
+        {
+            Resources.SetBlobContentSource(cache);
+            var loaded = Assert.IsType<SceneBlueprint>(
+                new SceneBlueprintLoader().Load(
+                    "levels/first.scene",
+                    "content.pak",
+                    Resources.UsePak,
+                    Resources.ActiveContentDirectory));
+            Assert.Equal("From blobs", loaded.Name);
+
+            Resources.RefreshContent();
+            Resources.ContentMode = AssetContentMode.Auto;
+            var autoLoaded = Assert.IsType<SceneBlueprint>(
+                new SceneBlueprintLoader().Load(
+                    "levels/first.scene",
+                    "content.pak",
+                    Resources.UsePak,
+                    Resources.ActiveContentDirectory));
+            Assert.Equal("From blobs", autoLoaded.Name);
+        }
+        finally
+        {
+            Resources.ResetContentSource();
+            Resources.ContentMode = originalMode;
+        }
+    }
+
+    [Fact]
+    public void IncrementalBlobBakeDoesNotMaterializeCachedPayloads()
+    {
+        const int payloadLength = 8 * 1024 * 1024;
+        var assets = Path.Combine(_root, "LargeBlobAssets");
+        var cache = Path.Combine(_root, "LargeBlobCache");
+        Directory.CreateDirectory(assets);
+        File.WriteAllText(
+            Path.Combine(assets, "large.txt"),
+            new string('x', payloadLength));
+
+        var pipeline = new AssetBakePipeline();
+        var request = new AssetBlobBakeRequest(assets, cache, RebuildAll: false);
+        var first = pipeline.BakeBlobs(request);
+
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var second = pipeline.BakeBlobs(request);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+
+        Assert.Equal(1, first.BakedCount);
+        Assert.Equal(1, second.CacheHitCount);
+        Assert.Equal(first.OutputLength, second.OutputLength);
+        Assert.Equal(first.ContentFingerprint, second.ContentFingerprint);
+        Assert.True(
+            allocated < payloadLength / 2,
+            $"A cached {payloadLength:N0}-byte blob allocated {allocated:N0} bytes while baking.");
+    }
+
+    [Fact]
+    public void PakFingerprintBecomesStaleWhenBlobsChange()
+    {
+        var assets = Path.Combine(_root, "FingerprintAssets");
+        var cache = Path.Combine(_root, "FingerprintCache");
+        var output = Path.Combine(_root, "FingerprintContent", "content.pak");
+        Directory.CreateDirectory(assets);
+        var source = Path.Combine(assets, "data.json");
+        File.WriteAllText(source, "{\"version\":1}");
+        var pipeline = new AssetBakePipeline();
+
+        pipeline.BakePak(new AssetBakeRequest(
+            assets,
+            output,
+            CacheDirectory: cache,
+            RebuildAll: true));
+        Assert.Equal(
+            File.ReadAllText(Path.Combine(cache, BlobContentManifest.FingerprintFileName)).Trim(),
+            File.ReadAllText(output + ".fingerprint").Trim());
+
+        File.WriteAllText(source, "{\"version\":2}");
+        pipeline.BakeBlobs(new AssetBlobBakeRequest(assets, cache));
+
+        Assert.NotEqual(
+            File.ReadAllText(Path.Combine(cache, BlobContentManifest.FingerprintFileName)).Trim(),
+            File.ReadAllText(output + ".fingerprint").Trim());
+    }
+
+    [Fact]
     public void FailedBakeDoesNotReplaceLastKnownGoodPak()
     {
         var assets = Path.Combine(_root, "Assets");
@@ -140,9 +287,21 @@ public sealed class AssetBakePipelineTests : IDisposable
         using (var stream = pak.Open("levels/first.scene.jsonb"))
             Assert.True(stream.Length > 0);
 
-        var loader = new SceneBlueprintLoader();
-        var loaded = Assert.IsType<SceneBlueprint>(
-            loader.Load("levels/first.scene", "content.pak", true, Path.GetDirectoryName(output)!));
+        var originalMode = Resources.ContentMode;
+        SceneBlueprint loaded;
+        try
+        {
+            // An explicit PAK load must remain independent of an editor preview
+            // temporarily using loose files or incremental blobs.
+            Resources.ContentMode = AssetContentMode.LooseFiles;
+            var loader = new SceneBlueprintLoader();
+            loaded = Assert.IsType<SceneBlueprint>(
+                loader.Load("levels/first.scene", "content.pak", true, Path.GetDirectoryName(output)!));
+        }
+        finally
+        {
+            Resources.ContentMode = originalMode;
+        }
         Assert.Equal("First", loaded.Name);
         Assert.Equal("levels/first.scene", loaded.AssetName);
     }
@@ -163,9 +322,24 @@ public sealed class AssetBakePipelineTests : IDisposable
         using (var stream = pak.Open("intro.cutscene.yamlb"))
             Assert.True(stream.Length > 0);
 
-        var loader = new CutsceneLoader();
-        var loaded = Assert.IsType<Dreambit.Scripting.Cutscene>(
-            loader.Load("intro.cutscene", "content.pak", true, Path.GetDirectoryName(output)!));
+        var originalMode = Resources.ContentMode;
+        Dreambit.Scripting.Cutscene loaded;
+        try
+        {
+            // An explicit PAK request must not inherit an earlier blob-preview
+            // source selected by another editor test.
+            Resources.ContentMode = AssetContentMode.LooseFiles;
+            loaded = Assert.IsType<Dreambit.Scripting.Cutscene>(
+                new CutsceneLoader().Load(
+                    "intro.cutscene",
+                    "content.pak",
+                    true,
+                    Path.GetDirectoryName(output)!));
+        }
+        finally
+        {
+            Resources.ContentMode = originalMode;
+        }
         Assert.Equal("intro.cutscene", loaded.AssetName);
         Assert.Equal("IntroAction", Assert.Single(Assert.Single(loaded.Groups).Actions).Script);
     }
@@ -242,17 +416,26 @@ public sealed class AssetBakePipelineTests : IDisposable
             IncludeBuiltInContent: true));
 
         using var pak = new PakReader(output);
-        using var effect = pak.Open("effects/forwarddiffuse.fxb");
-        using var present = pak.Open("effects/present.fxb");
-        using var deferred = pak.Open("effects/defferedrendercombine.fxb");
-        using var tint = pak.Open("effects/tint.fxb");
+        var builtInEffects = new[]
+        {
+            "effects/basiclighting2d.fxb",
+            "effects/colorcorrection.fxb",
+            "effects/depth2d.fxb",
+            "effects/depthlighting2d.fxb",
+            "effects/forwarddiffuse.fxb",
+            "effects/present.fxb",
+            "effects/tint.fxb"
+        };
+
+        foreach (var logicalPath in builtInEffects)
+        {
+            using var effect = pak.Open(logicalPath);
+            Assert.NotEqual(-1, effect.ReadByte());
+        }
+
         using var font = pak.Open("fonts/monogram.ttfb");
-        //Assert.True(effect.Length > 16);
-        //Assert.True(present.Length > 16);
-        //Assert.True(deferred.Length > 16);
-        //Assert.True(tint.Length > 16);
-        //Assert.True(font.Length > 16);
-        //Assert.True(AssetBakePipeline.HasCurrentBuiltInContent(cache));
+        Assert.NotEqual(-1, font.ReadByte());
+        Assert.True(AssetBakePipeline.HasCurrentBuiltInContent(cache));
     }
 
     public void Dispose()

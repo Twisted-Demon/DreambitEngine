@@ -210,9 +210,10 @@ content.
 ## Rendering behavior
 
 Tile layers are converted to the LDtk-independent `TilemapRenderer` and
-`TilemapLayerData` types. The renderer first culls the complete layer against
-the camera and then submits only intersecting grid cells and tiles. It respects
-the owning entity's translation, rotation, and scale.
+`TilemapLayerData` types. The renderer partitions occupied content into sparse
+chunks, culls chunks against the camera, and lazily caches static chunks at
+distant zoom levels. It respects the owning entity's translation, rotation,
+and scale. Animated tiles stay dynamic.
 
 LDtk's top-to-bottom layer definitions are mapped onto Dreambit `DrawLayer`
 values so tiles in different streamed levels use a consistent global order.

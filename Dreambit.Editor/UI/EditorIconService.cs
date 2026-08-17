@@ -1,6 +1,7 @@
 using System.Numerics;
 using System.Text.Json;
 using Dreambit.Editor.Graphics;
+using Dreambit.EditorApi;
 using ImGuiNET;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -8,7 +9,6 @@ namespace Dreambit.Editor.UI;
 
 internal sealed class EditorIconService : IDisposable
 {
-    private static readonly Vector4 ActiveButtonColor = new(0.16f, 0.39f, 0.67f, 1f);
     private readonly ImGuiRenderer _imGui;
     private readonly Dictionary<string, IconUv> _icons = new(StringComparer.OrdinalIgnoreCase);
     private Texture2D? _atlas;
@@ -63,14 +63,21 @@ internal sealed class EditorIconService : IDisposable
         string icon,
         string tooltip,
         bool active = false,
-        float size = 28f)
+        float size = EditorGuiTheme.ToolbarIconButtonSize)
     {
-        ImGui.PushID(id);
+        using var idScope = EditorGui.PushId(id);
         if (active)
-            ImGui.PushStyleColor(ImGuiCol.Button, ActiveButtonColor);
-        var clicked = ImGui.Button("##IconButton", new Vector2(size, size));
-        if (active)
-            ImGui.PopStyleColor();
+            ImGui.PushStyleColor(ImGuiCol.Button, EditorGuiTheme.SelectedBackground);
+        bool clicked;
+        try
+        {
+            clicked = ImGui.Button("##IconButton", new Vector2(size, size));
+        }
+        finally
+        {
+            if (active)
+                ImGui.PopStyleColor();
+        }
 
         if (TryGet(icon, out var uv))
         {
@@ -94,9 +101,7 @@ internal sealed class EditorIconService : IDisposable
                 "?");
         }
 
-        if (ImGui.IsItemHovered() && !string.IsNullOrWhiteSpace(tooltip))
-            ImGui.SetTooltip(tooltip);
-        ImGui.PopID();
+        EditorGui.ShowTooltip(tooltip);
         return clicked;
     }
 
