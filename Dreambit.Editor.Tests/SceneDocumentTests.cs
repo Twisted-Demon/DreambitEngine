@@ -6,6 +6,7 @@ using Dreambit.Editor.UI.Viewport;
 using Dreambit.LDtk;
 using Microsoft.Xna.Framework;
 using Newtonsoft.Json.Linq;
+using System.Runtime.CompilerServices;
 
 namespace Dreambit.Editor.Tests;
 
@@ -227,6 +228,43 @@ public sealed class SceneDocumentTests : IDisposable
             out var capturedPath));
         Assert.Equal(spriteId, capturedId);
         Assert.Equal("sprites/tree", capturedPath);
+    }
+
+    [Fact]
+    public void DrawableEffectIsCapturedAsAStableAssetReference()
+    {
+        var entityId = Guid.NewGuid();
+        var effectId = AssetId.New();
+        var source = new SceneBlueprint
+        {
+            Name = "Effect",
+            Entities =
+            [
+                new EntityBlueprint
+                {
+                    Name = "Sprite",
+                    Guid = entityId,
+                    Components = [new ComponentBlueprint { Type = nameof(SpriteDrawer) }]
+                }
+            ]
+        };
+        using var scene = new TestEditorScene();
+        var effect = (DreambitEffect)RuntimeHelpers.GetUninitializedObject(typeof(DreambitEffect));
+        effect.AssetId = effectId;
+        effect.AssetName = "Effects/Outline";
+
+        var entity = scene.CreateEntity("Sprite", guidOverride: entityId);
+        entity.AttachComponent<SpriteDrawer>().Effect = effect;
+
+        var captured = SceneDocumentSerializer.Capture(scene, source, source.Name);
+        var properties = Assert.Single(Assert.Single(captured.Entities).Components).Properties;
+
+        Assert.True(DreambitAssetReferenceToken.TryRead(
+            properties[nameof(DrawableComponent.Effect)],
+            out var capturedId,
+            out var capturedPath));
+        Assert.Equal(effectId, capturedId);
+        Assert.Equal("Effects/Outline", capturedPath);
     }
 
     [Fact]

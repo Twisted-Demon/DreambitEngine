@@ -350,24 +350,6 @@ public sealed class BloomPass : RenderPass
 
         _bloomBlendState.Dispose();
 
-        if (_extractEffect is not null)
-        {
-            Resources.UnloadAsset(
-                _extractEffect.Name);
-        }
-
-        if (_blurEffect is not null)
-        {
-            Resources.UnloadAsset(
-                _blurEffect.Name);
-        }
-
-        if (_compositeEffect is not null)
-        {
-            Resources.UnloadAsset(
-                _compositeEffect.Name);
-        }
-
         _extractEffect = null;
         _blurEffect = null;
         _compositeEffect = null;

@@ -9,6 +9,11 @@ public abstract class DrawableComponent : Component
     public virtual RectangleF Bounds => Scene.MainCamera.BoundsF;
     public virtual float SortDepth => Transform.WorldPosition.Y;
 
+    /// <summary>
+    /// Optional shader asset used when this drawable is rendered. The blueprint
+    /// stores an asset reference, never the native GPU effect instance.
+    /// </summary>
+    [DreambitSerialize]
     public DreambitEffect Effect { get; set; } = null;
 
     /// <summary>Whether this drawable currently has a usable native shader.</summary>

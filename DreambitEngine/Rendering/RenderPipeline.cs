@@ -34,11 +34,10 @@ public sealed class RenderPipeline(Scene scene) : IDisposable
         SceneRenderTarget?.Dispose();
         SceneRenderTarget = null;
 
-        if (_presentEffect is not null)
-        {
-            Resources.UnloadAsset(_presentEffect.Name);
-            _presentEffect = null;
-        }
+        // Effects returned by Resources are shared cache entries. Multiple scenes can
+        // render concurrently in editor hosts, so disposing one pipeline must not
+        // unload an effect that another live pipeline still references.
+        _presentEffect = null;
 
         ActiveCamera = null;
         _initialized = false;

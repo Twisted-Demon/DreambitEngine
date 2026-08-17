@@ -71,7 +71,7 @@ public class DepthPass : RenderPass
     protected override void OnDisposing()
     {
         CleanupDepthRenderTarget();
-        Resources.UnloadAsset(DepthFx.AssetName);
+        DepthFx = null;
     }
 
     private void CreateDepthRenderTarget()

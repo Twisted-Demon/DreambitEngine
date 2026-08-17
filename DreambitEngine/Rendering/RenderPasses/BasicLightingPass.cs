@@ -74,6 +74,6 @@ public class BasicLightingPass : RenderPass
     protected override void OnDisposing()
     {
         base.OnDisposing();
-        Resources.UnloadAsset(LightingFx.AssetName);
+        LightingFx = null;
     }
 }

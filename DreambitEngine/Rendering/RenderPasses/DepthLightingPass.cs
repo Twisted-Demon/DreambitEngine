@@ -82,6 +82,6 @@ public class DepthLightingPass : RenderPass
     protected override void OnDisposing()
     {
         base.OnDisposing();
-        Resources.UnloadAsset(LightingFx.AssetName);
+        LightingFx = null;
     }
 }

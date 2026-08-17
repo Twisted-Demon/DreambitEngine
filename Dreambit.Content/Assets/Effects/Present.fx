@@ -14,8 +14,6 @@ float Exposure;
 // Tone Mapping
 // ============================================================
 
-// Keep these values synchronized with your C# enum if you
-// expose tone mapping through SceneSettings later.
 static const int TONEMAPPER_NONE              = 0;
 static const int TONEMAPPER_REINHARD          = 1;
 static const int TONEMAPPER_REINHARD_EXTENDED = 2;

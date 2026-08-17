@@ -108,7 +108,7 @@ public class PostProcessRenderPass : RenderPass
         _tintPass?.Dispose();
         _tintPass = null;
 
-        Resources.UnloadAsset(_tintEffect.Name);
-        Resources.UnloadAsset(_colorCorrectionEffect.Name);
+        _tintEffect = null;
+        _colorCorrectionEffect = null;
     }
 }

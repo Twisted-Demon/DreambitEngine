@@ -38,6 +38,19 @@ public sealed class InspectorMetadataTests
     }
 
     [Fact]
+    public void DrawableComponentsExposeTheirEffectAssetReference()
+    {
+        var members = new InspectorMetadataCache().Get(
+            typeof(SpriteDrawer),
+            InspectorTargetKind.Component);
+
+        var effect = Assert.Single(
+            members,
+            member => member.SerializedName == nameof(DrawableComponent.Effect));
+        Assert.Equal(typeof(DreambitEffect), effect.ValueType);
+    }
+
+    [Fact]
     public void SpriteDrawerExposesSerializedMembersWithNonPublicSetters()
     {
         var members = new InspectorMetadataCache().Get(

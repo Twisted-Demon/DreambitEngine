@@ -27,8 +27,10 @@ public abstract class RenderPass : IDisposable
         if (_isDisposed) return;
 
         Window.WindowResized -= OnWindowResized;
-        Resources.UnloadAsset(DefaultEffect.Name);
         OnDisposing();
+        // Resources owns the shared effect cache. A render pass owns only its
+        // scene-specific state and must not invalidate effects used by other scenes.
+        DefaultEffect = null;
 
         _isDisposed = true;
 
