@@ -528,6 +528,7 @@ public class Scene : IDisposable
         PostProcessSettings.HueShift = Settings.PostProcessing.HueShift;
         PostProcessSettings.Saturation = Settings.PostProcessing.Saturation;
         PostProcessSettings.TintColor = Settings.PostProcessing.TintColor;
+        PostProcessSettings.ToneMappingType = Settings.PostProcessing.ToneMappingType;
         PostProcessSettings.BloomEnabled = Settings.PostProcessing.BloomEnabled;
         PostProcessSettings.BloomIntensity = Settings.PostProcessing.BloomIntensity;
         PostProcessSettings.BloomThreshold = Settings.PostProcessing.BloomThreshold;

@@ -142,6 +142,7 @@ public sealed class RenderPipeline(Scene scene) : IDisposable
         Core.Instance.GraphicsDevice.Clear(scene.BackgroundColor);
 
         _presentEffect.Parameters["Exposure"]?.SetValue(Mathf.Max(0f, scene.Settings.Exposure));
+        _presentEffect.Parameters["ToneMapper"]?.SetValue((int)scene.PostProcessSettings.ToneMappingType);
         
         Core.SpriteBatch.Begin(
             SpriteSortMode.Deferred,
@@ -166,20 +167,6 @@ public sealed class RenderPipeline(Scene scene) : IDisposable
                 if (renderer.RendersToBackBuffer)
                     renderer.OnDraw();
         }
-    }
-
-    public static RenderTarget2D CreateRenderTarget()
-    {
-        var target = new RenderTarget2D(
-            Core.Instance.GraphicsDevice,
-            Window.Width,
-            Window.Height,
-            false,
-            SceneColorFormat,
-            DepthFormat.None
-        );
-
-        return target;
     }
 
     public static RenderTarget2D CreateRenderTarget(int width, int height)

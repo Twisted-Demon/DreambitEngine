@@ -8,6 +8,18 @@ namespace Dreambit.Editor.UI.Panels;
 internal sealed class SceneSettingsPanel(EditorDocumentContext documentContext)
     : EditorPanel(EditorPanelIds.SceneSettings, "Scene Settings")
 {
+    private static readonly string[] ToneMappingNames =
+    [
+        "None",
+        "Reinhard",
+        "Reinhard Extended",
+        "Hable",
+        "ACES",
+        "Lottes",
+        "Uchimura",
+        "AgX"
+    ];
+
     private string? _error;
 
     public override bool IsAvailable =>
@@ -22,13 +34,20 @@ internal sealed class SceneSettingsPanel(EditorDocumentContext documentContext)
             return;
 
         var edited = document.Settings.Clone();
-        var postProcessing = edited.PostProcessing;
         var ambientColor = ToNumerics(edited.AmbientLightColor);
-        var tintColor = ToNumerics(postProcessing.TintColor);
         var ambientIntensity = edited.AmbientLightIntensity;
+        var exposure = edited.Exposure;
+        
+        
+        var postProcessing = edited.PostProcessing;
+        var tintColor = ToNumerics(postProcessing.TintColor);
         var hueShift = postProcessing.HueShift;
         var saturation = postProcessing.Saturation;
-        var exposure = edited.Exposure;
+        var bloomEnabled = postProcessing.BloomEnabled;
+        var bloomThreshold = postProcessing.BloomThreshold;
+        var bloomSoftKnee = postProcessing.BloomSoftKnee;
+        var bloomIntensity = postProcessing.BloomIntensity;
+        int toneMap = (int)postProcessing.ToneMappingType;
         
         var changed = false;
         string? mergeKey = null;
@@ -46,12 +65,22 @@ internal sealed class SceneSettingsPanel(EditorDocumentContext documentContext)
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.TextUnformatted("Post Processing");
+        if (ImGui.ListBox("Tone Mapping", ref toneMap, ToneMappingNames, ToneMappingNames.Length))
+            (changed, mergeKey) = (true, "SceneSettings.ToneMappingType");
         if (ImGui.DragFloat("Hue Shift", ref hueShift, 0.01f, -1f, 1f))
             (changed, mergeKey) = (true, "SceneSettings.PostProcessing.HueShift");
-        if (ImGui.DragFloat("Saturation", ref saturation, 0.01f, 0f, 4f))
+        if (ImGui.DragFloat("Saturation", ref saturation, 0.01f, 0f, 4f))   
             (changed, mergeKey) = (true, "SceneSettings.PostProcessing.Saturation");
         if (ImGui.ColorEdit4("Tint Color", ref tintColor))
             (changed, mergeKey) = (true, "SceneSettings.PostProcessing.TintColor");
+        if(ImGui.Checkbox("Bloom Enabled", ref bloomEnabled))
+            (changed, mergeKey) = (true, "SceneSettings.PostProcessing.BloomEnabled");
+        if(ImGui.DragFloat("Bloom Intensity", ref bloomIntensity, 0.01f, 0f, 10f))
+            (changed, mergeKey) = (true, "SceneSettings.PostProcessing.BloomThreshold");
+        if(ImGui.DragFloat("Bloom Threshold", ref bloomThreshold, 0.01f, 0f, 10f))
+            (changed, mergeKey) = (true, "SceneSettings.PostProcessing.BloomThreshold");
+        if(ImGui.DragFloat("Bloom SoftKnee", ref bloomSoftKnee, 0.01f, 0f, 10f))
+            (changed, mergeKey) = (true, "SceneSettings.PostProcessing.BloomSoftKnee");
         
 
         edited.AmbientLightIntensity = ambientIntensity;
@@ -60,6 +89,11 @@ internal sealed class SceneSettingsPanel(EditorDocumentContext documentContext)
         postProcessing.HueShift = hueShift;
         postProcessing.Saturation = saturation;
         postProcessing.TintColor = new Color(tintColor.X, tintColor.Y, tintColor.Z, tintColor.W);
+        postProcessing.BloomEnabled = bloomEnabled;
+        postProcessing.BloomThreshold = bloomThreshold;
+        postProcessing.BloomSoftKnee = bloomSoftKnee;
+        postProcessing.BloomIntensity = bloomIntensity;
+        postProcessing.ToneMappingType = (ToneMappingType)toneMap;
 
         if (!changed)
         {

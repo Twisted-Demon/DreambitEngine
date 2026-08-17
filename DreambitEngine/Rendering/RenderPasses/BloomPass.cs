@@ -6,6 +6,18 @@ namespace Dreambit;
 
 public sealed class BloomPass : RenderPass
 {
+    private readonly BlendState _bloomBlendState = new()
+    {
+        ColorBlendFunction = BlendFunction.Add,
+        ColorSourceBlend = Blend.One,
+        ColorDestinationBlend = Blend.One,
+
+        // Bloom should not modify the alpha already written by the scene.
+        AlphaBlendFunction = BlendFunction.Add,
+        AlphaSourceBlend = Blend.Zero,
+        AlphaDestinationBlend = Blend.One
+    };
+
     private Effect _extractEffect;
     private Effect _blurEffect;
     private Effect _compositeEffect;
@@ -13,7 +25,6 @@ public sealed class BloomPass : RenderPass
     private RenderTarget2D _brightRt;
     private RenderTarget2D _blurHorizontalRt;
     private RenderTarget2D _blurVerticalRt;
-
     private RenderTarget2D _sceneCopyRt;
 
     private PostProcessSettings _settings;
@@ -198,6 +209,8 @@ public sealed class BloomPass : RenderPass
         Device.Clear(
             Color.Transparent);
 
+        // Preserve the original HDR scene before writing
+        // the bloom result back into SceneRenderTarget.
         Core.SpriteBatch.Begin(
             SpriteSortMode.Immediate,
             BlendState.Opaque,
@@ -220,11 +233,6 @@ public sealed class BloomPass : RenderPass
     private void CompositeBloom()
     {
         _compositeEffect
-            .Parameters["BloomTexture"]
-            ?.SetValue(
-                _blurVerticalRt);
-
-        _compositeEffect
             .Parameters["BloomIntensity"]
             ?.SetValue(
                 MathF.Max(
@@ -237,16 +245,42 @@ public sealed class BloomPass : RenderPass
         Device.Clear(
             Color.Transparent);
 
+        // First restore the original HDR scene exactly.
+        //
+        // The bloom shader is NOT responsible for reconstructing
+        // the original scene.
         Core.SpriteBatch.Begin(
             SpriteSortMode.Immediate,
             BlendState.Opaque,
+            SamplerState.PointClamp,
+            DepthStencilState.None,
+            RasterizerState.CullNone);
+
+        Core.SpriteBatch.Draw(
+            _sceneCopyRt,
+            new Rectangle(
+                0,
+                0,
+                RenderPipeline.SceneRenderTarget.Width,
+                RenderPipeline.SceneRenderTarget.Height),
+            Color.White);
+
+        Core.SpriteBatch.End();
+
+        // Then add the blurred bloom contribution on top.
+        //
+        // Linear filtering is intentional here because the bloom
+        // render target is half resolution and should upscale smoothly.
+        Core.SpriteBatch.Begin(
+            SpriteSortMode.Immediate,
+            _bloomBlendState,
             SamplerState.LinearClamp,
             DepthStencilState.None,
             RasterizerState.CullNone,
             _compositeEffect);
 
         Core.SpriteBatch.Draw(
-            _sceneCopyRt,
+            _blurVerticalRt,
             new Rectangle(
                 0,
                 0,
@@ -314,17 +348,25 @@ public sealed class BloomPass : RenderPass
     {
         CleanupRenderTargets();
 
+        _bloomBlendState.Dispose();
+
         if (_extractEffect is not null)
+        {
             Resources.UnloadAsset(
                 _extractEffect.Name);
+        }
 
         if (_blurEffect is not null)
+        {
             Resources.UnloadAsset(
                 _blurEffect.Name);
+        }
 
         if (_compositeEffect is not null)
+        {
             Resources.UnloadAsset(
                 _compositeEffect.Name);
+        }
 
         _extractEffect = null;
         _blurEffect = null;

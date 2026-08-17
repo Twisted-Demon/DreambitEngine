@@ -8,7 +8,7 @@ namespace Dreambit;
 
 public static class LightingUniforms
 {
-    public const int MaxLights = 32;
+    private const int MaxLights = 32;
 
     private static readonly Vector2[] LightPos = new Vector2[MaxLights];
     private static readonly float[] LightRadius = new float[MaxLights];
