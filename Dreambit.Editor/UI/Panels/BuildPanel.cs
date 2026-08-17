@@ -1,4 +1,5 @@
 using System.Numerics;
+using Dreambit.Editor.Commands;
 using Dreambit.Editor.Compilation;
 using Dreambit.Editor.UI;
 using Dreambit.EditorApi;
@@ -7,31 +8,31 @@ namespace Dreambit.Editor.UI.Panels;
 
 internal sealed class BuildPanel : EditorPanel
 {
-    private readonly GameCodeService _gameCode;
+    private readonly EditorBuildCommands _commands;
     private readonly EditorIconService _icons;
 
-    public BuildPanel(GameCodeService gameCode, EditorIconService icons)
+    public BuildPanel(EditorBuildCommands commands, EditorIconService icons)
         : base(EditorPanelIds.Build, "Build")
     {
-        _gameCode = gameCode;
+        _commands = commands;
         _icons = icons;
     }
 
     protected override void DrawContents()
     {
-        using (EditorGui.Disabled(_gameCode.IsRunning))
+        using (EditorGui.Disabled(_commands.IsGameBuildRunning))
         {
             if (_icons.Button("BuildGame", "build", "Build game code"))
-                _gameCode.RequestBuild(rebuild: false, immediate: true);
+                _commands.BuildGame();
             EditorGui.Inline();
             if (_icons.Button("RebuildGame", "restart_alt", "Rebuild game code"))
-                _gameCode.RequestBuild(rebuild: true, immediate: true);
+                _commands.RebuildGame();
         }
 
-        var status = _gameCode.Status;
+        var status = _commands.GameBuildStatus;
         EditorGui.Inline();
         EditorGui.MutedText(status.Message);
-        var loaded = _gameCode.Assemblies.Current;
+        var loaded = _commands.Assemblies.Current;
         if (loaded is not null)
         {
             EditorGui.MutedText(
