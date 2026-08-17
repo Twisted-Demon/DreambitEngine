@@ -4,6 +4,7 @@ using Dreambit.Editor.Inspection;
 using Dreambit.Editor.Logging;
 using Dreambit.Editor.Scenes;
 using Dreambit.Editor.UI;
+using Dreambit.EditorApi;
 using ImGuiNET;
 
 namespace Dreambit.Editor.UI.Panels;
@@ -71,9 +72,7 @@ internal sealed class InspectorPanel : EditorPanel
         }
         catch (Exception exception)
         {
-            ImGui.TextColored(
-                new System.Numerics.Vector4(0.96f, 0.34f, 0.36f, 1f),
-                $"Inspector could not draw this selection: {exception.Message}");
+            EditorGui.Error($"Inspector could not draw this selection: {exception.Message}");
             LogUnhandledFailure(exception);
         }
         finally
@@ -143,9 +142,9 @@ internal sealed class InspectorPanel : EditorPanel
 
     private static void DrawNothingSelected(string heading)
     {
-        ImGui.TextDisabled(heading);
-        ImGui.Spacing();
-        ImGui.TextWrapped("Select an entity in the Hierarchy or Scene view to inspect it.");
+        EditorGui.MutedText(heading);
+        EditorGui.Space();
+        EditorGui.WrappedText("Select an entity in the Hierarchy or Scene view to inspect it.");
     }
 
     private void LogUnhandledFailure(Exception exception)

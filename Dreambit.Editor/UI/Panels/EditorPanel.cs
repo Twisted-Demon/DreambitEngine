@@ -1,3 +1,4 @@
+using Dreambit.EditorApi;
 using ImGuiNET;
 
 namespace Dreambit.Editor.UI.Panels;
@@ -32,18 +33,13 @@ internal abstract class EditorPanel : IEditorPanel
             return;
 
         var isOpen = IsOpen;
-        var visible = ImGui.Begin(WindowName, ref isOpen, WindowFlags);
-        IsOpen = isOpen;
-
-        try
+        using (var window = EditorGui.Window(WindowName, ref isOpen, WindowFlags))
         {
-            if (visible)
+            if (window.IsVisible)
                 DrawContents();
         }
-        finally
-        {
-            ImGui.End();
-        }
+
+        IsOpen = isOpen;
     }
 
     public void Dispose()

@@ -1,4 +1,5 @@
-using ImGuiNET;
+using System.Numerics;
+using Dreambit.EditorApi;
 
 namespace Dreambit.Editor.Inspection;
 
@@ -11,23 +12,22 @@ internal sealed class ComponentTypePicker
         IReadOnlyList<Type> componentTypes,
         Func<Type, bool> isDisabled)
     {
-        if (ImGui.Button($"Add Component##{popupId}.Button", new System.Numerics.Vector2(-1f, 0f)))
+        if (EditorGui.FullWidthButton($"{popupId}.Button", "Add Component", primary: true))
         {
             _search = string.Empty;
-            ImGui.OpenPopup(popupId);
+            EditorGui.OpenPopup(popupId);
         }
 
-        if (!ImGui.BeginPopup(popupId))
+        using var popup = EditorGui.Popup(popupId);
+        if (!popup.IsOpen)
             return null;
 
         Type? selected = null;
-        try
+        EditorGui.SearchInput("ComponentSearch", "Search components", ref _search);
+        EditorGui.Separator();
+        using (var child = EditorGui.Child("ComponentList", new Vector2(320f, 280f)))
         {
-            ImGui.SetNextItemWidth(320f);
-            ImGui.InputTextWithHint("##ComponentSearch", "Search components", ref _search, 128);
-            ImGui.Separator();
-            ImGui.BeginChild("##ComponentList", new System.Numerics.Vector2(320f, 280f));
-            try
+            if (child.IsVisible)
             {
                 foreach (var type in componentTypes)
                 {
@@ -35,27 +35,16 @@ internal sealed class ComponentTypePicker
                         continue;
 
                     var disabled = isDisabled(type);
-                    if (disabled)
-                        ImGui.BeginDisabled();
-                    var clicked = ImGui.Selectable(type.FullName ?? type.Name);
-                    if (disabled)
-                        ImGui.EndDisabled();
+                    using var disabledScope = EditorGui.Disabled(disabled);
+                    var clicked = EditorGui.Selectable(type.FullName ?? type.Name, type.FullName ?? type.Name);
                     if (!clicked || disabled)
                         continue;
 
                     selected = type;
-                    ImGui.CloseCurrentPopup();
+                    EditorGui.ClosePopup();
                     break;
                 }
             }
-            finally
-            {
-                ImGui.EndChild();
-            }
-        }
-        finally
-        {
-            ImGui.EndPopup();
         }
 
         return selected;

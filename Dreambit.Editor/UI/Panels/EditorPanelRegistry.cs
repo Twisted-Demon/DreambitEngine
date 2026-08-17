@@ -1,5 +1,5 @@
 using Dreambit.Editor.Persistence;
-using ImGuiNET;
+using Dreambit.EditorApi;
 
 namespace Dreambit.Editor.UI.Panels;
 
@@ -56,7 +56,7 @@ internal sealed class EditorPanelRegistry : IDisposable
             if (!panel.IsAvailable)
                 continue;
             var isOpen = panel.IsOpen;
-            if (!ImGui.MenuItem(panel.Title, string.Empty, isOpen))
+            if (!EditorGui.MenuItem(panel.Title, selected: isOpen))
                 continue;
 
             panel.IsOpen = !isOpen;

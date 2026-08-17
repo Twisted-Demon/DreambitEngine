@@ -1,5 +1,5 @@
 using Dreambit.Editor.Scenes;
-using ImGuiNET;
+using Dreambit.EditorApi;
 using Microsoft.Xna.Framework;
 using Vector4 = System.Numerics.Vector4;
 
@@ -37,8 +37,7 @@ internal sealed class SceneSettingsPanel(EditorDocumentContext documentContext)
         var ambientColor = ToNumerics(edited.AmbientLightColor);
         var ambientIntensity = edited.AmbientLightIntensity;
         var exposure = edited.Exposure;
-        
-        
+
         var postProcessing = edited.PostProcessing;
         var tintColor = ToNumerics(postProcessing.TintColor);
         var hueShift = postProcessing.HueShift;
@@ -48,40 +47,63 @@ internal sealed class SceneSettingsPanel(EditorDocumentContext documentContext)
         var bloomSoftKnee = postProcessing.BloomSoftKnee;
         var bloomIntensity = postProcessing.BloomIntensity;
         int toneMap = (int)postProcessing.ToneMappingType;
-        
+
         var changed = false;
         string? mergeKey = null;
 
-        ImGui.TextDisabled(document.DisplayName);
-        ImGui.Separator();
-        ImGui.TextUnformatted("Ambient Light");
-        if (ImGui.DragFloat("Intensity", ref ambientIntensity, 0.01f, 0f, 100f))
-            (changed, mergeKey) = (true, "SceneSettings.AmbientLightIntensity");
-        if (ImGui.ColorEdit4("Color", ref ambientColor))
-            (changed, mergeKey) = (true, "SceneSettings.AmbientLightColor");
-        if (ImGui.DragFloat("Exposure", ref exposure, 0.01f, v_min: 0, v_max: 5f))
-            (changed, mergeKey) = (true, "SceneSettings.Exposure");
+        EditorGui.Header("Scene Settings", document.DisplayName);
+        using (var ambientSection = EditorGui.Section("SceneSettings.Ambient", "Ambient Light"))
+        {
+            if (ambientSection.IsOpen)
+            {
+                if (EditorGui.Property(
+                        "SceneSettings.AmbientLightIntensity", "Intensity", ref ambientIntensity,
+                        speed: 0.01f, min: 0f, max: 100f))
+                    (changed, mergeKey) = (true, "SceneSettings.AmbientLightIntensity");
+                if (EditorGui.ColorProperty("SceneSettings.AmbientLightColor", "Color", ref ambientColor))
+                    (changed, mergeKey) = (true, "SceneSettings.AmbientLightColor");
+                if (EditorGui.Property(
+                        "SceneSettings.Exposure", "Exposure", ref exposure,
+                        speed: 0.01f, min: 0f, max: 5f))
+                    (changed, mergeKey) = (true, "SceneSettings.Exposure");
+            }
+        }
 
-        ImGui.Spacing();
-        ImGui.Separator();
-        ImGui.TextUnformatted("Post Processing");
-        if (ImGui.ListBox("Tone Mapping", ref toneMap, ToneMappingNames, ToneMappingNames.Length))
-            (changed, mergeKey) = (true, "SceneSettings.ToneMappingType");
-        if (ImGui.DragFloat("Hue Shift", ref hueShift, 0.01f, -1f, 1f))
-            (changed, mergeKey) = (true, "SceneSettings.PostProcessing.HueShift");
-        if (ImGui.DragFloat("Saturation", ref saturation, 0.01f, 0f, 4f))   
-            (changed, mergeKey) = (true, "SceneSettings.PostProcessing.Saturation");
-        if (ImGui.ColorEdit4("Tint Color", ref tintColor))
-            (changed, mergeKey) = (true, "SceneSettings.PostProcessing.TintColor");
-        if(ImGui.Checkbox("Bloom Enabled", ref bloomEnabled))
-            (changed, mergeKey) = (true, "SceneSettings.PostProcessing.BloomEnabled");
-        if(ImGui.DragFloat("Bloom Intensity", ref bloomIntensity, 0.01f, 0f, 10f))
-            (changed, mergeKey) = (true, "SceneSettings.PostProcessing.BloomThreshold");
-        if(ImGui.DragFloat("Bloom Threshold", ref bloomThreshold, 0.01f, 0f, 10f))
-            (changed, mergeKey) = (true, "SceneSettings.PostProcessing.BloomThreshold");
-        if(ImGui.DragFloat("Bloom SoftKnee", ref bloomSoftKnee, 0.01f, 0f, 10f))
-            (changed, mergeKey) = (true, "SceneSettings.PostProcessing.BloomSoftKnee");
-        
+        using (var postSection = EditorGui.Section("SceneSettings.PostProcessing", "Post Processing"))
+        {
+            if (postSection.IsOpen)
+            {
+                if (EditorGui.ChoiceProperty(
+                        "SceneSettings.ToneMappingType", "Tone Mapping", ref toneMap, ToneMappingNames))
+                    (changed, mergeKey) = (true, "SceneSettings.ToneMappingType");
+                if (EditorGui.Property(
+                        "SceneSettings.PostProcessing.HueShift", "Hue Shift", ref hueShift,
+                        speed: 0.01f, min: -1f, max: 1f))
+                    (changed, mergeKey) = (true, "SceneSettings.PostProcessing.HueShift");
+                if (EditorGui.Property(
+                        "SceneSettings.PostProcessing.Saturation", "Saturation", ref saturation,
+                        speed: 0.01f, min: 0f, max: 4f))
+                    (changed, mergeKey) = (true, "SceneSettings.PostProcessing.Saturation");
+                if (EditorGui.ColorProperty(
+                        "SceneSettings.PostProcessing.TintColor", "Tint Color", ref tintColor))
+                    (changed, mergeKey) = (true, "SceneSettings.PostProcessing.TintColor");
+                if (EditorGui.Property(
+                        "SceneSettings.PostProcessing.BloomEnabled", "Bloom Enabled", ref bloomEnabled))
+                    (changed, mergeKey) = (true, "SceneSettings.PostProcessing.BloomEnabled");
+                if (EditorGui.Property(
+                        "SceneSettings.PostProcessing.BloomIntensity", "Bloom Intensity", ref bloomIntensity,
+                        speed: 0.01f, min: 0f, max: 10f))
+                    (changed, mergeKey) = (true, "SceneSettings.PostProcessing.BloomThreshold");
+                if (EditorGui.Property(
+                        "SceneSettings.PostProcessing.BloomThreshold", "Bloom Threshold", ref bloomThreshold,
+                        speed: 0.01f, min: 0f, max: 10f))
+                    (changed, mergeKey) = (true, "SceneSettings.PostProcessing.BloomThreshold");
+                if (EditorGui.Property(
+                        "SceneSettings.PostProcessing.BloomSoftKnee", "Bloom Soft Knee", ref bloomSoftKnee,
+                        speed: 0.01f, min: 0f, max: 10f))
+                    (changed, mergeKey) = (true, "SceneSettings.PostProcessing.BloomSoftKnee");
+            }
+        }
 
         edited.AmbientLightIntensity = ambientIntensity;
         edited.AmbientLightColor = new Color(ambientColor.X, ambientColor.Y, ambientColor.Z, ambientColor.W);
@@ -123,7 +145,7 @@ internal sealed class SceneSettingsPanel(EditorDocumentContext documentContext)
     private void DrawError()
     {
         if (!string.IsNullOrWhiteSpace(_error))
-            ImGui.TextColored(new Vector4(0.96f, 0.34f, 0.36f, 1f), _error);
+            EditorGui.Error(_error);
     }
 
     private static Vector4 ToNumerics(Color color) =>

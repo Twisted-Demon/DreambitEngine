@@ -3,6 +3,7 @@ using Dreambit.Editor.Graphics;
 using Dreambit.Editor.Persistence;
 using Dreambit.Editor.Scenes;
 using Dreambit.Editor.UI.Viewport;
+using Dreambit.EditorApi;
 using ImGuiNET;
 
 namespace Dreambit.Editor.UI.Panels;
@@ -151,8 +152,8 @@ internal sealed class BlueprintViewPanel : SceneViewportPanel
 
     protected override void DrawToolbarSuffix(SceneDocument? document)
     {
-        ImGui.SameLine();
-        ImGui.TextDisabled(_asset?.RelativePath ?? "Blueprint");
+        EditorGui.Inline();
+        EditorGui.MutedText(_asset?.RelativePath ?? "Blueprint");
     }
 
     private void RefreshAssetRecord()

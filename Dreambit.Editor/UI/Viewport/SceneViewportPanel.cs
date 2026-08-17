@@ -3,6 +3,7 @@ using Dreambit.Editor.Graphics;
 using Dreambit.Editor.Persistence;
 using Dreambit.Editor.Scenes;
 using Dreambit.Editor.UI.Panels;
+using Dreambit.EditorApi;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
 using Vector2 = System.Numerics.Vector2;
@@ -67,17 +68,10 @@ internal abstract class SceneViewportPanel : EditorPanel
             ActivateDocument(document);
         }
 
-        ImGui.PushID(Id);
-        try
-        {
-            DrawToolbar(document);
-            ImGui.Separator();
-            DrawViewport(document);
-        }
-        finally
-        {
-            ImGui.PopID();
-        }
+        using var idScope = EditorGui.PushId(Id);
+        DrawToolbar(document);
+        EditorGui.Separator();
+        DrawViewport(document);
     }
 
     private void DrawViewport(SceneDocument? document)
@@ -113,7 +107,7 @@ internal abstract class SceneViewportPanel : EditorPanel
             ImGui.GetWindowDrawList().AddRectFilled(
                 canvasPosition,
                 canvasPosition + canvasSize,
-                ImGui.GetColorU32(new Vector4(0.075f, 0.082f, 0.095f, 1f)));
+                ImGui.GetColorU32(EditorGuiTheme.ViewportBackground));
         }
         if (_renderer.LastError is { } renderError)
         {
@@ -329,64 +323,65 @@ internal abstract class SceneViewportPanel : EditorPanel
         var popupId = $"View Settings##{Id}";
         if (_viewSettingsRequested)
         {
-            ImGui.OpenPopup(popupId);
+            EditorGui.OpenPopup(popupId);
             _viewSettingsRequested = false;
         }
 
         if (_icons.Button("Select", "mouse", "Select (Q)", _workspace.GizmoMode == 0))
             _workspace.GizmoMode = 0;
-        ImGui.SameLine();
+        EditorGui.Inline();
         if (_icons.Button("Move", "open_with", "Move (W)", _workspace.GizmoMode == 1))
             _workspace.GizmoMode = 1;
-        ImGui.SameLine();
+        EditorGui.Inline();
         if (_icons.Button("Rotate", "rotate_right", "Rotate (E)", _workspace.GizmoMode == 2))
             _workspace.GizmoMode = 2;
-        ImGui.SameLine();
+        EditorGui.Inline();
         if (_icons.Button("Scale", "aspect_ratio", "Scale (R)", _workspace.GizmoMode == 3))
             _workspace.GizmoMode = 3;
-        ImGui.SameLine();
-        ImGui.BeginDisabled(document?.Scene is null);
-        if (_icons.Button("Frame", "center_focus_strong", "Frame selected (F)"))
-            FrameDocument(document!);
-        ImGui.EndDisabled();
-        ImGui.SameLine();
+        EditorGui.Inline();
+        using (EditorGui.Disabled(document?.Scene is null))
+            if (_icons.Button("Frame", "center_focus_strong", "Frame selected (F)"))
+                FrameDocument(document!);
+        EditorGui.Inline();
         if (_icons.Button("Grid", "grid_on", "Toggle grid", _workspace.ShowGrid))
             _workspace.ShowGrid = !_workspace.ShowGrid;
-        ImGui.SameLine();
+        EditorGui.Inline();
 
         var snap = _workspace.SnapEnabled;
-        if (ImGui.Checkbox("Snap", ref snap))
+        if (EditorGui.Checkbox("Viewport.Snap", "Snap", ref snap))
             _workspace.SnapEnabled = snap;
         if (_workspace.SnapEnabled)
         {
-            ImGui.SameLine();
-            ImGui.SetNextItemWidth(70f);
+            EditorGui.Inline();
             if (_workspace.GizmoMode == 2)
             {
                 var value = _workspace.RotateSnapDegrees;
-                if (ImGui.DragFloat("##SnapValue", ref value, 1f, 1f, 180f, "%.0f deg"))
+                if (EditorGui.CompactFloat(
+                        "Viewport.RotateSnap", ref value, 70f, 1f, 1f, 180f, "%.0f deg"))
                     _workspace.RotateSnapDegrees = value;
             }
             else if (_workspace.GizmoMode == 3)
             {
                 var value = _workspace.ScaleSnap;
-                if (ImGui.DragFloat("##SnapValue", ref value, 0.01f, 0.01f, 10f))
+                if (EditorGui.CompactFloat(
+                        "Viewport.ScaleSnap", ref value, 70f, 0.01f, 0.01f, 10f))
                     _workspace.ScaleSnap = value;
             }
             else
             {
                 var value = _workspace.MoveSnap;
-                if (ImGui.DragFloat("##SnapValue", ref value, 0.1f, 0.01f, 1000f))
+                if (EditorGui.CompactFloat(
+                        "Viewport.MoveSnap", ref value, 70f, 0.1f, 0.01f, 1000f))
                     _workspace.MoveSnap = value;
             }
         }
 
-        ImGui.SameLine();
+        EditorGui.Inline();
         if (_icons.Button("ViewSettings", "settings", "Grid and snapping settings"))
             _viewSettingsRequested = true;
         EditorViewportUi.DrawSettingsPopup(popupId, _workspace);
-        ImGui.SameLine();
-        ImGui.TextDisabled($"Zoom {CameraZoom:0.00}x");
+        EditorGui.Inline();
+        EditorGui.MutedText($"Zoom {CameraZoom:0.00}x");
         DrawToolbarSuffix(document);
     }
 
@@ -409,17 +404,17 @@ internal abstract class SceneViewportPanel : EditorPanel
         drawList.AddRectFilled(
             position,
             position + size,
-            ImGui.GetColorU32(new Vector4(0.075f, 0.082f, 0.095f, 1f)));
+            ImGui.GetColorU32(EditorGuiTheme.ViewportBackground));
         var center = position + size * 0.5f;
         var titleSize = ImGui.CalcTextSize(title);
         var detailSize = ImGui.CalcTextSize(detail);
         drawList.AddText(
             center - new Vector2(titleSize.X * 0.5f, 18f),
-            ImGui.GetColorU32(new Vector4(0.82f, 0.84f, 0.88f, 1f)),
+            ImGui.GetColorU32(EditorGuiTheme.PrimaryText),
             title);
         drawList.AddText(
             center - new Vector2(detailSize.X * 0.5f, -6f),
-            ImGui.GetColorU32(new Vector4(0.50f, 0.53f, 0.59f, 1f)),
+            ImGui.GetColorU32(EditorGuiTheme.MutedText),
             detail);
     }
 
@@ -434,10 +429,10 @@ internal abstract class SceneViewportPanel : EditorPanel
         drawList.AddRectFilled(
             canvasPosition + new Vector2(8f),
             canvasPosition + new Vector2(canvasSize.X - 8f, 38f),
-            ImGui.GetColorU32(new Vector4(0.25f, 0.06f, 0.07f, 0.92f)));
+            ImGui.GetColorU32(EditorGuiTheme.ErrorBackground));
         drawList.AddText(
             canvasPosition + new Vector2(16f, 15f),
-            ImGui.GetColorU32(new Vector4(1f, 0.55f, 0.58f, 1f)),
+            ImGui.GetColorU32(EditorGuiTheme.Error),
             error);
     }
 

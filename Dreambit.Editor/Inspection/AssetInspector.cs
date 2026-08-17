@@ -1,5 +1,5 @@
 using Dreambit.Editor.Assets;
-using ImGuiNET;
+using Dreambit.EditorApi;
 
 namespace Dreambit.Editor.Inspection;
 
@@ -11,9 +11,9 @@ internal sealed class AssetInspector(
 {
     public void Draw(DreambitAssetDocument document)
     {
-        ImGui.TextUnformatted(document.Asset.Name + (document.IsDirty ? " *" : string.Empty));
-        ImGui.TextDisabled(document.Asset.RelativePath);
-        ImGui.Separator();
+        EditorGui.Header(
+            document.Asset.Name + (document.IsDirty ? " *" : string.Empty),
+            document.Asset.RelativePath);
 
         if (customInspectors.TryDraw(
                 document.AssetType,
@@ -41,10 +41,7 @@ internal sealed class AssetInspector(
             try
             {
                 if (!string.IsNullOrWhiteSpace(member.Header))
-                {
-                    ImGui.Spacing();
-                    ImGui.TextDisabled(member.Header);
-                }
+                    EditorGui.Header(member.Header);
 
                 var value = member.GetValue(document.Instance);
                 var result = drawers.Draw(
@@ -64,9 +61,7 @@ internal sealed class AssetInspector(
             }
             catch (Exception exception)
             {
-                ImGui.TextColored(
-                    new System.Numerics.Vector4(0.96f, 0.34f, 0.36f, 1f),
-                    $"{member.DisplayName}: {exception.Message}");
+                EditorGui.Error($"{member.DisplayName}: {exception.Message}");
             }
         }
     }

@@ -1,6 +1,5 @@
 using Dreambit.Editor.Logging;
 using Dreambit.EditorApi;
-using ImGuiNET;
 
 namespace Dreambit.Editor.Inspection;
 
@@ -21,14 +20,13 @@ internal sealed class CustomInspectorHost(
         var context = new CustomInspectorContext(targets, drawDefault, recordChange, LogExtension);
         try
         {
+            using var id = EditorGui.PushId($"CustomEditor.{targetType.FullName ?? targetType.Name}");
             customEditor!.Draw(context);
         }
         catch (Exception exception)
         {
             logs.Error("Game Editor", failureDescription, exception);
-            ImGui.TextColored(
-                new System.Numerics.Vector4(0.96f, 0.34f, 0.36f, 1f),
-                exception.Message);
+            EditorGui.Error(exception.Message);
             drawDefault();
         }
 

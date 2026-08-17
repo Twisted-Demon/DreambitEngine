@@ -1,7 +1,7 @@
 using Dreambit.ECS;
+using Dreambit.EditorApi;
 using ImGuiNET;
 using Vector2 = System.Numerics.Vector2;
-using Vector4 = System.Numerics.Vector4;
 using XnaVector2 = Microsoft.Xna.Framework.Vector2;
 
 namespace Dreambit.Editor.UI.Viewport;
@@ -29,7 +29,7 @@ internal sealed class Camera2DEditorGizmo : IEditorComponentGizmo
         frame.DrawList.AddRect(
             frame.CanvasPosition + new Vector2(topLeft.X, topLeft.Y),
             frame.CanvasPosition + new Vector2(bottomRight.X, bottomRight.Y),
-            ImGui.GetColorU32(new Vector4(0.65f, 0.42f, 1f, 0.9f)),
+            ImGui.GetColorU32(EditorGuiTheme.SecondaryAccent),
             0f,
             ImDrawFlags.None,
             2f);

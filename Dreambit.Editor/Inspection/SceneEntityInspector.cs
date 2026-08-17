@@ -1,9 +1,8 @@
 using Dreambit.ECS;
 using Dreambit.Editor.Scenes;
-using ImGuiNET;
+using Dreambit.EditorApi;
 using Microsoft.Xna.Framework;
 using Vector3 = System.Numerics.Vector3;
-using Vector4 = System.Numerics.Vector4;
 
 namespace Dreambit.Editor.Inspection;
 
@@ -21,7 +20,7 @@ internal sealed class SceneEntityInspector(
         DrawEntityHeader(document, entities);
         DrawEntityTags(document, entities);
         DrawImportedMapNotice(entities);
-        ImGui.Separator();
+        EditorGui.Separator();
         DrawTransform(document, entities);
         DrawComponents(document, entities);
         if (entities.All(entity => !entity.IsImportedMapGenerated))
@@ -35,18 +34,17 @@ internal sealed class SceneEntityInspector(
         Entity instanceRoot,
         BlueprintInstanceReference instance)
     {
-        ImGui.TextUnformatted(entity.Name);
-        ImGui.Separator();
-        ImGui.TextColored(new Vector4(0.35f, 0.72f, 1f, 1f), "Boxed Blueprint Instance");
-        ImGui.TextWrapped(instance.AssetName);
-        ImGui.TextDisabled("Source changes update this instance automatically.");
-        ImGui.TextDisabled("Right-click it in the Hierarchy and choose Unbox to edit its contents.");
-        ImGui.Separator();
+        EditorGui.Header(entity.Name);
+        EditorGui.Message(EditorGuiMessageKind.Information, "Boxed Blueprint Instance");
+        EditorGui.WrappedText(instance.AssetName);
+        EditorGui.MutedText("Source changes update this instance automatically.");
+        EditorGui.MutedText("Right-click it in the Hierarchy and choose Unbox to edit its contents.");
+        EditorGui.Separator();
 
         if (ReferenceEquals(entity, instanceRoot))
             DrawTransform(document, [entity]);
         else
-            ImGui.TextDisabled("Linked child values are read-only.");
+            EditorGui.MutedText("Linked child values are read-only.");
 
         DrawComponents(document, [entity], readOnly: true);
         DrawError();
@@ -54,10 +52,9 @@ internal sealed class SceneEntityInspector(
 
     public static void DrawSelectionContainingBoxedBlueprint(int entityCount)
     {
-        ImGui.TextUnformatted($"{entityCount} Entities");
-        ImGui.Separator();
-        ImGui.TextDisabled("A boxed Blueprint instance is included in this selection.");
-        ImGui.TextDisabled("Unbox it before editing this selection together.");
+        EditorGui.Header($"{entityCount} Entities");
+        EditorGui.Warning("A boxed Blueprint instance is included in this selection.");
+        EditorGui.MutedText("Unbox it before editing this selection together.");
     }
 
     private void DrawEntityHeader(SceneDocument document, IReadOnlyList<Entity> entities)
@@ -66,23 +63,26 @@ internal sealed class SceneEntityInspector(
         {
             var entity = entities[0];
             var name = entity.Name;
-            ImGui.SetNextItemWidth(-1f);
-            if (ImGui.InputText("##EntityName", ref name, 256, ImGuiInputTextFlags.EnterReturnsTrue))
+            if (EditorGui.InputText(
+                    "EntityName",
+                    "##EntityName",
+                    ref name,
+                    256,
+                    ImGuiNET.ImGuiInputTextFlags.EnterReturnsTrue))
                 document.Rename(entity, name);
         }
         else
         {
-            ImGui.TextUnformatted($"{entities.Count} Entities");
+            EditorGui.Header($"{entities.Count} Entities");
         }
 
         var enabled = entities[0].LocallyEnabled;
         var mixedEnabled = entities.Skip(1).Any(entity => entity.LocallyEnabled != enabled);
-        if (ImGui.Checkbox("Enabled", ref enabled))
+        if (EditorGui.Property("Entity.Enabled", "Enabled", ref enabled, mixed: mixedEnabled))
             TryMutation(() => document.SetEntityEnabled(
                 entities,
                 enabled,
                 BuildSceneMergeKey(document, "Entity.Enabled")));
-        InspectorUi.MixedValueIndicator("Enabled", mixedEnabled);
     }
 
     private void DrawEntityTags(SceneDocument document, IReadOnlyList<Entity> entities)
@@ -91,30 +91,23 @@ internal sealed class SceneEntityInspector(
         var mixed = entities.Skip(1).Any(entity => !entity.Tags.SetEquals(entities[0].Tags));
         var tags = mixed ? string.Empty : string.Join(", ", firstTags);
 
-        InspectorUi.PropertyRow("Entity.Tags", "Tags", () =>
+        if (EditorGui.Property(
+                "Entity.Tags",
+                "Tags",
+                ref tags,
+                maxLength: 1024,
+                hint: "Comma-separated tags",
+                commitOnEnter: true,
+                mixed: mixed))
         {
-            if (ImGui.InputTextWithHint(
-                    "##Value",
-                    "Comma-separated tags",
-                    ref tags,
-                    1024,
-                    ImGuiInputTextFlags.EnterReturnsTrue))
-            {
-                var updatedTags = tags
-                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
-                TryMutation(() => document.SetEntityTags(
-                    entities,
-                    updatedTags,
-                    BuildSceneMergeKey(document, "Entity.Tags")));
-            }
-
-            if (mixed)
-            {
-                ImGui.SameLine();
-                ImGui.TextDisabled("Multiple values");
-            }
-        });
+            var updatedTags = tags
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            TryMutation(() => document.SetEntityTags(
+                entities,
+                updatedTags,
+                BuildSceneMergeKey(document, "Entity.Tags")));
+        }
     }
 
     private static void DrawImportedMapNotice(IReadOnlyList<Entity> entities)
@@ -127,67 +120,54 @@ internal sealed class SceneEntityInspector(
             : entities.All(entity => entity.IsLDtkGenerated)
                 ? "LDtk-generated visualization"
                 : "Imported map visualization";
-        ImGui.TextColored(new Vector4(0.42f, 0.78f, 1f, 1f), sourceLabel);
-        ImGui.TextDisabled("Value changes are stored as Dreambit overrides and survive reimport.");
-        ImGui.TextDisabled("Hierarchy structure and components remain owned by the source map.");
+        EditorGui.Message(EditorGuiMessageKind.Information, sourceLabel);
+        EditorGui.MutedText("Value changes are stored as Dreambit overrides and survive reimport.");
+        EditorGui.MutedText("Hierarchy structure and components remain owned by the source map.");
     }
 
     private void DrawTransform(SceneDocument document, IReadOnlyList<Entity> entities)
     {
-        if (!ImGui.CollapsingHeader("Transform", ImGuiTreeNodeFlags.DefaultOpen))
+        using var section = EditorGui.Section("Transform", "Transform");
+        if (!section.IsOpen)
             return;
-        ImGui.PushID("TransformInspector");
-        try
+        EditorGui.MutedText("Drag to adjust. Double-click a number to type an exact value.");
+        var first = entities[0].Transform;
+
+        var position = new Vector3(first.Position.X, first.Position.Y, first.Position.Z);
+        var mixedPosition = entities.Skip(1).Any(entity => entity.Transform.Position != first.Position);
+        if (EditorGui.Property("Transform.Position", "Position", ref position, mixed: mixedPosition))
         {
-            ImGui.TextDisabled("Drag to adjust. Double-click a number to type an exact value.");
-            var first = entities[0].Transform;
-
-            var position = new Vector3(first.Position.X, first.Position.Y, first.Position.Z);
-            var mixedPosition = entities.Skip(1).Any(entity => entity.Transform.Position != first.Position);
-            InspectorUi.PropertyRow("Transform.Position", "Position", () =>
-            {
-                if (ImGui.DragFloat3("##Value", ref position, 0.1f))
-                {
-                    var value = new Microsoft.Xna.Framework.Vector3(position.X, position.Y, position.Z);
-                    TryMutation(() => document.SetEntityPosition(
-                        entities,
-                        value,
-                        BuildSceneMergeKey(document, "Transform.Position")));
-                }
-                InspectorUi.MixedValueIndicator("Position", mixedPosition);
-            });
-
-            var rotation = MathHelper.ToDegrees(first.Rotation2D);
-            var mixedRotation = entities.Skip(1).Any(entity =>
-                MathF.Abs(entity.Transform.Rotation2D - first.Rotation2D) > 0.0001f);
-            InspectorUi.PropertyRow("Transform.Rotation", "Rotation", () =>
-            {
-                if (ImGui.DragFloat("##Value", ref rotation, 0.25f))
-                    TryMutation(() => document.SetEntityRotation(
-                        entities,
-                        MathHelper.ToRadians(rotation),
-                        BuildSceneMergeKey(document, "Transform.Rotation")));
-                InspectorUi.MixedValueIndicator("Rotation", mixedRotation);
-            });
-
-            var scale = new Vector3(first.Scale.X, first.Scale.Y, first.Scale.Z);
-            var mixedScale = entities.Skip(1).Any(entity => entity.Transform.Scale != first.Scale);
-            InspectorUi.PropertyRow("Transform.Scale", "Scale", () =>
-            {
-                if (ImGui.DragFloat3("##Value", ref scale, 0.01f))
-                {
-                    var value = new Microsoft.Xna.Framework.Vector3(scale.X, scale.Y, scale.Z);
-                    TryMutation(() => document.SetEntityScale(
-                        entities,
-                        value,
-                        BuildSceneMergeKey(document, "Transform.Scale")));
-                }
-                InspectorUi.MixedValueIndicator("Scale", mixedScale);
-            });
+            var value = new Microsoft.Xna.Framework.Vector3(position.X, position.Y, position.Z);
+            TryMutation(() => document.SetEntityPosition(
+                entities,
+                value,
+                BuildSceneMergeKey(document, "Transform.Position")));
         }
-        finally
+
+        var rotation = MathHelper.ToDegrees(first.Rotation2D);
+        var mixedRotation = entities.Skip(1).Any(entity =>
+            MathF.Abs(entity.Transform.Rotation2D - first.Rotation2D) > 0.0001f);
+        if (EditorGui.Property(
+                "Transform.Rotation",
+                "Rotation",
+                ref rotation,
+                speed: 0.25f,
+                format: "%.3f°",
+                mixed: mixedRotation))
+            TryMutation(() => document.SetEntityRotation(
+                entities,
+                MathHelper.ToRadians(rotation),
+                BuildSceneMergeKey(document, "Transform.Rotation")));
+
+        var scale = new Vector3(first.Scale.X, first.Scale.Y, first.Scale.Z);
+        var mixedScale = entities.Skip(1).Any(entity => entity.Transform.Scale != first.Scale);
+        if (EditorGui.Property("Transform.Scale", "Scale", ref scale, speed: 0.01f, mixed: mixedScale))
         {
-            ImGui.PopID();
+            var value = new Microsoft.Xna.Framework.Vector3(scale.X, scale.Y, scale.Z);
+            TryMutation(() => document.SetEntityScale(
+                entities,
+                value,
+                BuildSceneMergeKey(document, "Transform.Scale")));
         }
     }
 
@@ -210,58 +190,49 @@ internal sealed class SceneEntityInspector(
                 .Select(entity => entity.GetComponent(componentType)!)
                 .ToArray();
 
-            ImGui.PushID(componentType.FullName);
-            try
+            var generated = entities.Any(entity => entity.IsImportedMapGenerated);
+            using var section = EditorGui.Section(
+                componentType.FullName ?? componentType.Name,
+                componentType.Name,
+                allowRemove: !readOnly && !generated,
+                statusText: GetComponentStatus(entities, readOnly));
+            if (section.RemoveRequested)
             {
-                var generated = entities.Any(entity => entity.IsImportedMapGenerated);
-                var (open, removeRequested) = InspectorUi.RemovableHeader(
-                    componentType.Name,
-                    !readOnly && !generated,
-                    GetComponentStatus(entities, readOnly));
-                if (removeRequested)
+                TryMutation(() => document.Apply($"Remove {componentType.Name}", _ =>
                 {
-                    TryMutation(() => document.Apply($"Remove {componentType.Name}", _ =>
+                    foreach (var entity in entities)
+                        if (entity.GetComponent(componentType) is { } component)
+                            entity.DetachComponent(component);
+                }));
+                continue;
+            }
+
+            if (!section.IsOpen)
+                continue;
+
+            if (readOnly)
+            {
+                DrawComponentMembers(document, components, readOnly: true);
+                continue;
+            }
+
+            if (customInspectors.TryDraw(
+                    componentType,
+                    components.Cast<object>().ToArray(),
+                    () => DrawComponentMembers(document, components),
+                    (name, mutation) => document.Apply(name, _ =>
                     {
-                        foreach (var entity in entities)
-                            if (entity.GetComponent(componentType) is { } component)
-                                entity.DetachComponent(component);
-                    }));
-                    continue;
-                }
+                        mutation();
+                        RecordGeneratedComponentValues(document, components);
+                    }),
+                    $"Custom Component Editor for '{componentType.FullName}' failed."))
+                continue;
 
-                if (!open)
-                    continue;
-
-                if (readOnly)
-                {
-                    DrawComponentMembers(document, components, readOnly: true);
-                    continue;
-                }
-
-                if (customInspectors.TryDraw(
-                        componentType,
-                        components.Cast<object>().ToArray(),
-                        () => DrawComponentMembers(document, components),
-                        (name, mutation) => document.Apply(name, _ =>
-                        {
-                            mutation();
-                            RecordGeneratedComponentValues(document, components);
-                        }),
-                        $"Custom Component Editor for '{componentType.FullName}' failed."))
-                {
-                    continue;
-                }
-
-                DrawComponentMembers(document, components);
-            }
-            finally
-            {
-                ImGui.PopID();
-            }
+            DrawComponentMembers(document, components);
         }
 
         if (entities.Count > 1 && HasPartialComponents(entities, commonTypes))
-            ImGui.TextDisabled("Components not shared by every selected entity are hidden.");
+            EditorGui.MutedText("Components not shared by every selected entity are hidden.");
     }
 
     internal static bool HasPartialComponents(
@@ -308,7 +279,7 @@ internal sealed class SceneEntityInspector(
         var members = metadata.Get(componentType, InspectorTargetKind.Component);
         if (members.Count == 0)
         {
-            ImGui.TextDisabled("No [DreambitSerialize] members.");
+            EditorGui.MutedText("No [DreambitSerialize] members.");
             return;
         }
 
@@ -317,10 +288,7 @@ internal sealed class SceneEntityInspector(
             try
             {
                 if (!string.IsNullOrWhiteSpace(member.Header))
-                {
-                    ImGui.Spacing();
-                    ImGui.TextDisabled(member.Header);
-                }
+                    EditorGui.Header(member.Header);
 
                 var first = member.GetValue(components[0]);
                 var mixed = components.Skip(1).Any(component =>
@@ -348,7 +316,7 @@ internal sealed class SceneEntityInspector(
             catch (Exception exception)
             {
                 _error = $"{componentType.Name}.{member.DisplayName}: {exception.Message}";
-                ImGui.TextColored(new Vector4(0.96f, 0.34f, 0.36f, 1f), _error);
+                EditorGui.Error(_error);
             }
         }
     }
@@ -368,7 +336,7 @@ internal sealed class SceneEntityInspector(
 
     private void DrawAddComponent(SceneDocument document, IReadOnlyList<Entity> entities)
     {
-        ImGui.Spacing();
+        EditorGui.Space(EditorGuiSpacing.Section);
         var selectedType = componentPicker.Draw(
             "Add Component##Inspector",
             types.ComponentTypes,
@@ -401,8 +369,8 @@ internal sealed class SceneEntityInspector(
     {
         if (string.IsNullOrWhiteSpace(_error))
             return;
-        ImGui.Spacing();
-        ImGui.TextColored(new Vector4(0.96f, 0.34f, 0.36f, 1f), _error);
+        EditorGui.Space(EditorGuiSpacing.Compact);
+        EditorGui.Error(_error);
     }
 
     private static string BuildSceneMergeKey(SceneDocument document, string propertyKey)

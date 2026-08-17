@@ -3,6 +3,7 @@ using Dreambit.ECS;
 using Dreambit.Editor.Assets;
 using Dreambit.Editor.Persistence;
 using Dreambit.Editor.Scenes;
+using Dreambit.EditorApi;
 using ImGuiNET;
 
 namespace Dreambit.Editor.UI.Panels;
@@ -48,20 +49,19 @@ internal sealed class HierarchyPanel : EditorPanel
             ImGui.IsWindowFocused(ImGuiFocusedFlags.RootAndChildWindows))
             _documentContext.Activate(document);
         if (_icons.Button("HierarchyCreate", "add", "Create entity"))
-            ImGui.OpenPopup("Create Entity##Hierarchy");
+            EditorGui.OpenPopup("Create Entity##Hierarchy");
 
-        ImGui.SameLine();
-        ImGui.SetNextItemWidth(-1f);
-        ImGui.InputTextWithHint("##HierarchySearch", "Search entities", ref _search, 128);
+        EditorGui.Inline();
+        EditorGui.SearchInput("Hierarchy.Search", "Search entities", ref _search, 128);
 
         DrawCreateMenu(document);
-        ImGui.Separator();
+        EditorGui.Separator();
 
         if (document?.Scene is not { } scene)
         {
-            ImGui.Spacing();
-            ImGui.TextDisabled("No scene is open.");
-            ImGui.TextWrapped("Create or open a .scene file from the File menu.");
+            EditorGui.Space();
+            EditorGui.MutedText("No scene is open.");
+            EditorGui.WrappedText("Create or open a .scene file from the File menu.");
             return;
         }
 
@@ -81,8 +81,8 @@ internal sealed class HierarchyPanel : EditorPanel
             _workspace.LastSelectionKind = "entity";
         if (!string.IsNullOrWhiteSpace(_error))
         {
-            ImGui.Spacing();
-            ImGui.TextColored(new Vector4(0.96f, 0.34f, 0.36f, 1f), _error);
+            EditorGui.Space();
+            EditorGui.Error(_error);
         }
     }
 
@@ -94,91 +94,92 @@ internal sealed class HierarchyPanel : EditorPanel
     }
 
     private void DrawEntity(SceneDocument document, Entity entity)
-{
-    if (!MatchesSearch(entity, _search))
-        return;
-
-    var hasVisibleChildren =
-        entity.Children.Any(child => MatchesSearch(child, _search));
-
-    var flags =
-        ImGuiTreeNodeFlags.SpanAvailWidth |
-        ImGuiTreeNodeFlags.OpenOnArrow |
-        ImGuiTreeNodeFlags.OpenOnDoubleClick;
-
-    if (!hasVisibleChildren)
     {
-        flags |=
-            ImGuiTreeNodeFlags.Leaf |
-            ImGuiTreeNodeFlags.NoTreePushOnOpen;
+        if (!MatchesSearch(entity, _search))
+            return;
+
+        var hasVisibleChildren =
+            entity.Children.Any(child => MatchesSearch(child, _search));
+
+        var flags =
+            ImGuiTreeNodeFlags.SpanAvailWidth |
+            ImGuiTreeNodeFlags.OpenOnArrow |
+            ImGuiTreeNodeFlags.OpenOnDoubleClick;
+
+        if (!hasVisibleChildren)
+        {
+            flags |=
+                ImGuiTreeNodeFlags.Leaf |
+                ImGuiTreeNodeFlags.NoTreePushOnOpen;
+        }
+
+        if (document.Selection.Contains(entity))
+            flags |= ImGuiTreeNodeFlags.Selected;
+
+        var boxedRoot =
+            document.IsBlueprintInstanceRoot(entity);
+
+        var displayName = entity.IsTiledGenerated
+            ? $"[Tiled] {entity.Name}"
+            : entity.IsLDtkGenerated
+                ? $"[LDtk] {entity.Name}"
+                : entity.Name;
+
+        bool open;
+        using (EditorGui.Muted(!entity.LocallyEnabled))
+        {
+            ImGui.SetNextItemOpen(
+                _workspace.HierarchyExpandedEntityIds.Contains(entity.Id),
+                ImGuiCond.Once);
+
+            // The label is hidden because we draw the visible icon/name ourselves.
+            // TreeNodeEx remains the actual interactive hierarchy item.
+            open = ImGui.TreeNodeEx(
+                $"##Hierarchy.{entity.Id}",
+                flags);
+
+            DrawEntityLabel(
+                boxedRoot
+                    ? "view_in_ar"
+                    : "account_tree",
+                displayName);
+
+            if (ImGui.IsItemToggledOpen())
+            {
+                if (open)
+                    _workspace.HierarchyExpandedEntityIds.Add(entity.Id);
+                else
+                    _workspace.HierarchyExpandedEntityIds.Remove(entity.Id);
+            }
+        }
+
+        try
+        {
+            if (ImGui.IsItemClicked() &&
+                !ImGui.IsItemToggledOpen())
+            {
+                document.Selection.Set(
+                    entity,
+                    ImGui.GetIO().KeyCtrl);
+            }
+
+            DrawDragSource(document, entity);
+            DrawDropTarget(document, entity);
+            DrawContextMenu(document, entity);
+
+            if (open && hasVisibleChildren)
+            {
+                foreach (var child in entity.Children.ToArray())
+                    DrawEntity(document, child);
+            }
+        }
+        finally
+        {
+            if (open && hasVisibleChildren)
+                ImGui.TreePop();
+        }
+
     }
-
-    if (document.Selection.Contains(entity))
-        flags |= ImGuiTreeNodeFlags.Selected;
-
-    if (!entity.LocallyEnabled)
-    {
-        ImGui.PushStyleColor(
-            ImGuiCol.Text,
-            new Vector4(0.52f, 0.55f, 0.60f, 1f));
-    }
-
-    ImGui.SetNextItemOpen(
-        _workspace.HierarchyExpandedEntityIds.Contains(entity.Id),
-        ImGuiCond.Once);
-
-    var boxedRoot =
-        document.IsBlueprintInstanceRoot(entity);
-
-    var displayName = entity.IsTiledGenerated
-        ? $"[Tiled] {entity.Name}"
-        : entity.IsLDtkGenerated
-            ? $"[LDtk] {entity.Name}"
-            : entity.Name;
-
-    // The label is hidden because we draw the visible icon/name ourselves.
-    // TreeNodeEx remains the actual interactive hierarchy item.
-    var open = ImGui.TreeNodeEx(
-        $"##Hierarchy.{entity.Id}",
-        flags);
-
-    DrawEntityLabel(
-        boxedRoot
-            ? "view_in_ar"
-            : "account_tree",
-        displayName);
-
-    if (ImGui.IsItemToggledOpen())
-    {
-        if (open)
-            _workspace.HierarchyExpandedEntityIds.Add(entity.Id);
-        else
-            _workspace.HierarchyExpandedEntityIds.Remove(entity.Id);
-    }
-
-    if (!entity.LocallyEnabled)
-        ImGui.PopStyleColor();
-
-    if (ImGui.IsItemClicked() &&
-        !ImGui.IsItemToggledOpen())
-    {
-        document.Selection.Set(
-            entity,
-            ImGui.GetIO().KeyCtrl);
-    }
-
-    DrawDragSource(document, entity);
-    DrawDropTarget(document, entity);
-    DrawContextMenu(document, entity);
-
-    if (open && hasVisibleChildren)
-    {
-        foreach (var child in entity.Children.ToArray())
-            DrawEntity(document, child);
-
-        ImGui.TreePop();
-    }
-}
 
     private void DrawEntityLabel(
         string icon,
@@ -228,26 +229,27 @@ internal sealed class HierarchyPanel : EditorPanel
 
     private void DrawCreateMenu(SceneDocument? document)
     {
-        if (!ImGui.BeginPopup("Create Entity##Hierarchy"))
+        using var popup = EditorGui.Popup("Create Entity##Hierarchy");
+        if (!popup.IsOpen)
             return;
-        ImGui.BeginDisabled(document is null);
-        if (ImGui.MenuItem("Create Empty"))
-            TryEdit(() => document!.CreateEmpty(
-                "Entity",
-                _documentContext.IsBlueprint ? _documentContext.Blueprints.Root : null));
-        if (ImGui.MenuItem("Create From Blueprint"))
+        using (EditorGui.Disabled(document is null))
         {
-            _blueprintSearch = string.Empty;
-            _requestBlueprintPicker = true;
+            if (EditorGui.MenuItem("Create Empty"))
+                TryEdit(() => document!.CreateEmpty(
+                    "Entity",
+                    _documentContext.IsBlueprint ? _documentContext.Blueprints.Root : null));
+            if (EditorGui.MenuItem("Create From Blueprint"))
+            {
+                _blueprintSearch = string.Empty;
+                _requestBlueprintPicker = true;
+            }
         }
-
-        ImGui.EndDisabled();
-        ImGui.EndPopup();
     }
 
     private void DrawContextMenu(SceneDocument document, Entity entity)
     {
-        if (!ImGui.BeginPopupContextItem($"HierarchyContext##{entity.Id}"))
+        using var context = EditorGui.ContextMenu($"HierarchyContext##{entity.Id}");
+        if (!context.IsOpen)
             return;
 
         var linked = document.TryGetBlueprintInstanceRoot(entity, out var instanceRoot, out var instance);
@@ -256,38 +258,43 @@ internal sealed class HierarchyPanel : EditorPanel
                               ReferenceEquals(entity, _documentContext.Blueprints.Root);
         if (entity.IsImportedMapGenerated)
         {
-            ImGui.TextDisabled(entity.IsTiledGenerated
+            EditorGui.MutedText(entity.IsTiledGenerated
                 ? "Generated from the linked Tiled map"
                 : "Generated from the linked LDtk project");
-            ImGui.Separator();
+            EditorGui.Separator();
         }
 
-        ImGui.BeginDisabled(linked || entity.IsImportedMapGenerated);
-        if (ImGui.MenuItem("Create Child"))
-            TryEdit(() => document.CreateEmpty("Entity", entity));
-        ImGui.EndDisabled();
-        ImGui.BeginDisabled(linked);
-        if (ImGui.MenuItem("Rename", "F2"))
-            RequestRename(entity);
-        ImGui.EndDisabled();
-        ImGui.BeginDisabled(isBlueprintRoot || entity.IsImportedMapGenerated || (linked && !isInstanceRoot));
-        if (ImGui.MenuItem("Duplicate", "Ctrl+D"))
-            TryEdit(() => document.Duplicate(entity));
-        ImGui.EndDisabled();
+        using (EditorGui.Disabled(linked || entity.IsImportedMapGenerated))
+        {
+            if (EditorGui.MenuItem("Create Child"))
+                TryEdit(() => document.CreateEmpty("Entity", entity));
+        }
+        using (EditorGui.Disabled(linked))
+        {
+            if (EditorGui.MenuItem("Rename", "F2"))
+                RequestRename(entity);
+        }
+        using (EditorGui.Disabled(
+                   isBlueprintRoot || entity.IsImportedMapGenerated || (linked && !isInstanceRoot)))
+        {
+            if (EditorGui.MenuItem("Duplicate", "Ctrl+D"))
+                TryEdit(() => document.Duplicate(entity));
+        }
         if (linked)
         {
-            ImGui.Separator();
-            ImGui.TextDisabled(instance.AssetName);
-            if (ImGui.MenuItem("Unbox Blueprint Instance"))
+            EditorGui.Separator();
+            EditorGui.MutedText(instance.AssetName);
+            if (EditorGui.MenuItem("Unbox Blueprint Instance"))
                 TryEdit(() => document.UnboxBlueprint(instanceRoot));
         }
 
-        ImGui.Separator();
-        ImGui.BeginDisabled(isBlueprintRoot || entity.IsImportedMapGenerated || (linked && !isInstanceRoot));
-        if (ImGui.MenuItem("Delete", "Delete"))
-            RequestDelete([entity]);
-        ImGui.EndDisabled();
-        ImGui.EndPopup();
+        EditorGui.Separator();
+        using (EditorGui.Disabled(
+                   isBlueprintRoot || entity.IsImportedMapGenerated || (linked && !isInstanceRoot)))
+        {
+            if (EditorGui.MenuItem("Delete", "Delete"))
+                RequestDelete([entity]);
+        }
     }
 
     private void DrawDragSource(SceneDocument document, Entity entity)
@@ -301,10 +308,16 @@ internal sealed class HierarchyPanel : EditorPanel
             return;
         if (!ImGui.BeginDragDropSource())
             return;
-        _dragDrop.SetHierarchyEntity(entity.Id);
-        ImGui.SetDragDropPayload(EditorDragDropService.HierarchyEntityPayloadType, IntPtr.Zero, 0);
-        ImGui.TextUnformatted(entity.Name);
-        ImGui.EndDragDropSource();
+        try
+        {
+            _dragDrop.SetHierarchyEntity(entity.Id);
+            ImGui.SetDragDropPayload(EditorDragDropService.HierarchyEntityPayloadType, IntPtr.Zero, 0);
+            EditorGui.Text(entity.Name);
+        }
+        finally
+        {
+            ImGui.EndDragDropSource();
+        }
     }
 
     private unsafe void DrawDropTarget(SceneDocument document, Entity parent)
@@ -315,15 +328,20 @@ internal sealed class HierarchyPanel : EditorPanel
             return;
         if (!ImGui.BeginDragDropTarget())
             return;
-        var payload = ImGui.AcceptDragDropPayload(EditorDragDropService.HierarchyEntityPayloadType);
-        if (payload.NativePtr != null && _dragDrop.HierarchyEntityId is { } id &&
-            document.Scene?.FindEntity(id) is { } entity)
+        try
         {
-            TryReparent(document, entity, parent);
-            _dragDrop.ClearHierarchyEntity();
+            var payload = ImGui.AcceptDragDropPayload(EditorDragDropService.HierarchyEntityPayloadType);
+            if (payload.NativePtr != null && _dragDrop.HierarchyEntityId is { } id &&
+                document.Scene?.FindEntity(id) is { } entity)
+            {
+                TryReparent(document, entity, parent);
+                _dragDrop.ClearHierarchyEntity();
+            }
         }
-
-        ImGui.EndDragDropTarget();
+        finally
+        {
+            ImGui.EndDragDropTarget();
+        }
     }
 
     private unsafe void DrawRootDropTarget(SceneDocument document)
@@ -331,18 +349,23 @@ internal sealed class HierarchyPanel : EditorPanel
         ImGui.InvisibleButton("##HierarchyRootDrop", new Vector2(-1f, 5f));
         if (!ImGui.BeginDragDropTarget())
             return;
-        var payload = ImGui.AcceptDragDropPayload(EditorDragDropService.HierarchyEntityPayloadType);
-        if (payload.NativePtr != null && _dragDrop.HierarchyEntityId is { } id &&
-            document.Scene?.FindEntity(id) is { } entity)
+        try
         {
-            TryReparent(
-                document,
-                entity,
-                _documentContext.IsBlueprint ? _documentContext.Blueprints.Root : null);
-            _dragDrop.ClearHierarchyEntity();
+            var payload = ImGui.AcceptDragDropPayload(EditorDragDropService.HierarchyEntityPayloadType);
+            if (payload.NativePtr != null && _dragDrop.HierarchyEntityId is { } id &&
+                document.Scene?.FindEntity(id) is { } entity)
+            {
+                TryReparent(
+                    document,
+                    entity,
+                    _documentContext.IsBlueprint ? _documentContext.Blueprints.Root : null);
+                _dragDrop.ClearHierarchyEntity();
+            }
         }
-
-        ImGui.EndDragDropTarget();
+        finally
+        {
+            ImGui.EndDragDropTarget();
+        }
     }
 
     private void TryReparent(SceneDocument document, Entity entity, Entity? parent)
@@ -354,71 +377,88 @@ internal sealed class HierarchyPanel : EditorPanel
     {
         _renameEntityId = entity.Id;
         _rename = entity.Name;
-        ImGui.OpenPopup("Rename Entity##Hierarchy");
+        EditorGui.OpenPopup("Rename Entity##Hierarchy");
     }
 
     private void DrawRenamePopup(SceneDocument document)
     {
-        if (!ImGui.BeginPopupModal("Rename Entity##Hierarchy", ImGuiWindowFlags.AlwaysAutoResize))
+        using var popup = EditorGui.Modal("Rename Entity##Hierarchy");
+        if (!popup.IsOpen)
             return;
-        ImGui.SetNextItemWidth(320f);
-        var submit = ImGui.InputText("Name", ref _rename, 256, ImGuiInputTextFlags.EnterReturnsTrue);
+        var submit = EditorGui.Property(
+            "Hierarchy.Rename.Name",
+            "Name",
+            ref _rename,
+            maxLength: 256,
+            commitOnEnter: true);
         var entity = _renameEntityId is { } id ? document.Scene?.FindEntity(id) : null;
-        if ((submit || ImGui.Button("Rename")) && entity is not null && !string.IsNullOrWhiteSpace(_rename))
+        if ((submit || EditorGui.Button("Hierarchy.Rename.Submit", "Rename", primary: true)) &&
+            entity is not null && !string.IsNullOrWhiteSpace(_rename))
             if (TryEdit(() => document.Rename(entity, _rename)))
-                ImGui.CloseCurrentPopup();
-        ImGui.SameLine();
-        if (ImGui.Button("Cancel"))
-            ImGui.CloseCurrentPopup();
-        ImGui.EndPopup();
+                EditorGui.ClosePopup();
+        EditorGui.Inline();
+        if (EditorGui.Button("Hierarchy.Rename.Cancel", "Cancel"))
+            EditorGui.ClosePopup();
     }
 
     private void DrawBlueprintPicker(SceneDocument document)
     {
         if (_requestBlueprintPicker)
         {
-            ImGui.OpenPopup("Create From Blueprint##Hierarchy");
+            EditorGui.OpenPopup("Create From Blueprint##Hierarchy");
             _requestBlueprintPicker = false;
         }
 
-        if (!ImGui.BeginPopupModal(
-                "Create From Blueprint##Hierarchy",
-                ImGuiWindowFlags.AlwaysAutoResize))
+        using var popup = EditorGui.Modal("Create From Blueprint##Hierarchy");
+        if (!popup.IsOpen)
             return;
 
-        ImGui.SetNextItemWidth(420f);
-        ImGui.InputTextWithHint("##BlueprintSearch", "Search Blueprints", ref _blueprintSearch, 256);
-        ImGui.BeginChild("##BlueprintResults", new Vector2(420f, 280f), ImGuiChildFlags.Borders);
+        EditorGui.SearchInput(
+            "Hierarchy.BlueprintSearch",
+            "Search Blueprints",
+            ref _blueprintSearch);
         var blueprints = _assets.GetSnapshot().Assets
             .Where(asset => asset.Kind == AssetKind.Blueprint &&
                             (string.IsNullOrWhiteSpace(_blueprintSearch) ||
                              asset.RelativePath.Contains(_blueprintSearch, StringComparison.OrdinalIgnoreCase)))
             .ToArray();
-        if (blueprints.Length == 0)
-            ImGui.TextDisabled("No matching Entity Blueprints.");
-        foreach (var blueprint in blueprints)
+        using (var results = EditorGui.Child(
+                   "Hierarchy.BlueprintResults",
+                   new Vector2(420f, 280f),
+                   ImGuiChildFlags.Borders))
         {
-            if (!ImGui.Selectable(blueprint.RelativePath))
-                continue;
-            try
+            if (results.IsVisible)
             {
-                using var source = _blueprintSources.Load(blueprint);
-                document.InstantiateBlueprint(
-                    source,
-                    parent: _documentContext.IsBlueprint ? _documentContext.Blueprints.Root : null);
-                _error = null;
-                ImGui.CloseCurrentPopup();
-            }
-            catch (Exception exception)
-            {
-                _error = $"Could not instantiate Blueprint. {exception.Message}";
+                if (blueprints.Length == 0)
+                    EditorGui.MutedText("No matching Entity Blueprints.");
+                foreach (var blueprint in blueprints)
+                {
+                    if (!EditorGui.Selectable(
+                            $"Hierarchy.Blueprint:{blueprint.Id}",
+                            blueprint.RelativePath))
+                        continue;
+                    try
+                    {
+                        using var source = _blueprintSources.Load(blueprint);
+                        document.InstantiateBlueprint(
+                            source,
+                            parent: _documentContext.IsBlueprint ? _documentContext.Blueprints.Root : null);
+                        _error = null;
+                        EditorGui.ClosePopup();
+                    }
+                    catch (Exception exception)
+                    {
+                        _error = $"Could not instantiate Blueprint. {exception.Message}";
+                    }
+                }
             }
         }
 
-        ImGui.EndChild();
-        if (ImGui.Button("Cancel", new Vector2(90f, 0f)))
-            ImGui.CloseCurrentPopup();
-        ImGui.EndPopup();
+        if (EditorGui.Button(
+                "Hierarchy.BlueprintPicker.Cancel",
+                "Cancel",
+                new Vector2(90f, 0f)))
+            EditorGui.ClosePopup();
     }
 
     private void RequestDelete(IEnumerable<Entity> entities)
@@ -431,37 +471,42 @@ internal sealed class HierarchyPanel : EditorPanel
     {
         if (_requestDeletePopup)
         {
-            ImGui.OpenPopup("Delete Entities##Hierarchy");
+            EditorGui.OpenPopup("Delete Entities##Hierarchy");
             _requestDeletePopup = false;
         }
 
-        if (!ImGui.BeginPopupModal("Delete Entities##Hierarchy", ImGuiWindowFlags.AlwaysAutoResize))
+        using var popup = EditorGui.Modal("Delete Entities##Hierarchy");
+        if (!popup.IsOpen)
             return;
 
         var entities = _pendingDeleteIds
             .Select(id => document.Scene?.FindEntity(id))
             .OfType<Entity>()
             .ToArray();
-        ImGui.TextWrapped(entities.Length == 1
+        EditorGui.WrappedText(entities.Length == 1
             ? $"Delete '{entities[0].Name}' and all of its children?"
             : $"Delete {entities.Length} selected entities and all of their children?");
-        ImGui.TextDisabled("This action can be undone with Ctrl+Z.");
-        ImGui.Spacing();
-        if (ImGui.Button("Delete", new Vector2(90f, 0f)))
+        EditorGui.MutedText("This action can be undone with Ctrl+Z.");
+        EditorGui.Space();
+        if (EditorGui.Button(
+                "Hierarchy.Delete.Submit",
+                "Delete",
+                new Vector2(90f, 0f)))
             if (TryEdit(() => document.Delete(entities)))
             {
                 _pendingDeleteIds = [];
-                ImGui.CloseCurrentPopup();
+                EditorGui.ClosePopup();
             }
 
-        ImGui.SameLine();
-        if (ImGui.Button("Cancel", new Vector2(90f, 0f)))
+        EditorGui.Inline();
+        if (EditorGui.Button(
+                "Hierarchy.Delete.Cancel",
+                "Cancel",
+                new Vector2(90f, 0f)))
         {
             _pendingDeleteIds = [];
-            ImGui.CloseCurrentPopup();
+            EditorGui.ClosePopup();
         }
-
-        ImGui.EndPopup();
     }
 
     private void HandleKeyboard(SceneDocument document)

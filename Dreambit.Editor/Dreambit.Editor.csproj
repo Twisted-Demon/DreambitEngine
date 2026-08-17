@@ -18,7 +18,7 @@
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
     <ApplicationManifest>app.manifest</ApplicationManifest>
 
-    <DreambitSdkVersion>0.3.13</DreambitSdkVersion>
+    <DreambitSdkVersion>0.3.14</DreambitSdkVersion>
     <BundleDreambitSdkOnPublish Condition="'$(BundleDreambitSdkOnPublish)' == ''">true</BundleDreambitSdkOnPublish>
   </PropertyGroup>
 
@@ -42,6 +42,10 @@
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
     <Content Include="Icons/atlas_32_manifest.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="Fonts/Inter-VariableFont_opsz,wght.ttf">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>

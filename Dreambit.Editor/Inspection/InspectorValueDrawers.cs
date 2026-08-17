@@ -4,6 +4,7 @@ using System.Reflection;
 using Dreambit.ECS;
 using Dreambit.Editor.Assets;
 using Dreambit.Editor.UI;
+using Dreambit.EditorApi;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
 using Newtonsoft.Json;
@@ -78,41 +79,7 @@ internal sealed class InspectorValueDrawerRegistry
         InspectorValueDrawContext context)
     {
         var drawer = _drawers.First(candidate => candidate.CanDraw(type));
-        if (context.ReadOnly)
-            ImGui.BeginDisabled();
-        try
-        {
-            // Containers own a tree of child controls. Rendering one inside a
-            // value cell would make every child start in that already-narrow
-            // column, so draw their header full-width and let children begin
-            // fresh property rows below it.
-            var isContainer = drawer is DictionaryValueDrawer ||
-                              drawer is CollectionValueDrawer ||
-                              drawer is NestedObjectValueDrawer ||
-                              drawer is NullableValueDrawer ||
-                              drawer is EnumValueDrawer &&
-                              type.GetCustomAttributes(typeof(FlagsAttribute), true).Length > 0;
-            if (isContainer)
-            {
-                var result = drawer.Draw(this, label, type, value, context);
-                if (!string.IsNullOrWhiteSpace(context.Metadata.Tooltip) && ImGui.IsItemHovered())
-                    ImGui.SetTooltip(context.Metadata.Tooltip);
-                return result;
-            }
-
-            // Keep generated properties in a predictable label/value layout.
-            // Drawers get an ID-only label so controls do not add a second label.
-            return InspectorUi.PropertyRow(
-                context.Id,
-                label,
-                () => drawer.Draw(this, $"##{context.Id}", type, value, context),
-                context.Metadata.Tooltip);
-        }
-        finally
-        {
-            if (context.ReadOnly)
-                ImGui.EndDisabled();
-        }
+        return drawer.Draw(this, label, type, value, context);
     }
 
     private sealed class ObjectReferenceValueDrawer(
@@ -148,27 +115,28 @@ internal sealed class InspectorValueDrawerRegistry
 
             var changedValue = value;
             var changed = false;
-
-            var clearWidth = ImGui.GetFrameHeight();
-            var fieldWidth = MathF.Max(
-                1f,
-                ImGui.GetContentRegionAvail().X - clearWidth - ImGui.GetStyle().ItemSpacing.X);
-            if (ImGui.Button($"{display}##{context.Id}", new Vector2(fieldWidth, 0f)))
+            var action = EditorGui.ReferenceProperty(
+                context.Id,
+                label,
+                display,
+                mixed: context.Mixed,
+                readOnly: context.ReadOnly,
+                canClear: value is not null,
+                acceptDrop: () => AcceptDrop(type, ref changedValue),
+                tooltip: context.Metadata.Tooltip);
+            switch (action)
             {
-                _search = string.Empty;
-                ImGui.OpenPopup($"Object Picker##{context.Id}");
-            }
-
-            // This must remain immediately after the field because ImGui uses
-            // the previously drawn item as the drag-drop target.
-            if (AcceptDrop(type, ref changedValue))
-                changed = true;
-
-            ImGui.SameLine();
-            if (ImGui.SmallButton($"×##{context.Id}.Clear"))
-            {
-                changedValue = null;
-                changed = true;
+                case EditorGuiReferenceAction.Select:
+                    _search = string.Empty;
+                    EditorGui.OpenPopup($"Object Picker##{context.Id}");
+                    break;
+                case EditorGuiReferenceAction.Clear:
+                    changedValue = null;
+                    changed = true;
+                    break;
+                case EditorGuiReferenceAction.DropAccepted:
+                    changed = true;
+                    break;
             }
 
             if (DrawPicker(type, context.Id, ref changedValue))
@@ -230,58 +198,46 @@ internal sealed class InspectorValueDrawerRegistry
 
         private bool DrawPicker(Type type, string id, ref object? value)
         {
-            if (!ImGui.BeginPopup($"Object Picker##{id}"))
+            using var popup = EditorGui.Popup($"Object Picker##{id}");
+            if (!popup.IsOpen)
                 return false;
             var changed = false;
-            try
-            {
-                ImGui.SetNextItemWidth(360f);
-                ImGui.InputTextWithHint("##PickerSearch", "Search", ref _search, 128);
-                ImGui.Separator();
-                ImGui.BeginChild("##PickerItems", new Vector2(360f, 260f));
-                try
+            EditorGui.SearchInput("PickerSearch", "Search", ref _search, 128);
+            EditorGui.Separator();
+            using var child = EditorGui.Child("PickerItems", new Vector2(360f, 260f));
+            if (!child.IsVisible)
+                return false;
+            if (typeof(DreambitAsset).IsAssignableFrom(type))
+                foreach (var asset in assets.GetSnapshot().Assets)
                 {
-                    if (typeof(DreambitAsset).IsAssignableFrom(type))
-                        foreach (var asset in assets.GetSnapshot().Assets)
-                        {
-                            if (!AssetTypeClassifier.IsCompatibleWith(asset, type))
-                                continue;
-                            if (!string.IsNullOrWhiteSpace(_search) &&
-                                !asset.RelativePath.Contains(_search, StringComparison.OrdinalIgnoreCase))
-                                continue;
-                            if (!ImGui.Selectable(asset.RelativePath))
-                                continue;
-                            var loaded = Resources.LoadDreambitAsset(asset.Id, asset.LogicalAssetName, type);
-                            if (loaded is not null && type.IsInstanceOfType(loaded))
-                            {
-                                value = loaded;
-                                changed = true;
-                                ImGui.CloseCurrentPopup();
-                            }
-                        }
-                    else if (sceneProvider() is { } scene)
-                        foreach (var entity in scene.GetAllEntities().Where(entity => !entity.IsEditorOnly))
-                        {
-                            if (!string.IsNullOrWhiteSpace(_search) &&
-                                !entity.Name.Contains(_search, StringComparison.OrdinalIgnoreCase))
-                                continue;
-                            object? candidate = type == typeof(Entity) ? entity : entity.GetComponent(type);
-                            if (candidate is null || !ImGui.Selectable(entity.Name))
-                                continue;
-                            value = candidate;
-                            changed = true;
-                            ImGui.CloseCurrentPopup();
-                        }
+                    if (!AssetTypeClassifier.IsCompatibleWith(asset, type))
+                        continue;
+                    if (!string.IsNullOrWhiteSpace(_search) &&
+                        !asset.RelativePath.Contains(_search, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    if (!EditorGui.Selectable(asset.Id.ToString(), asset.RelativePath))
+                        continue;
+                    var loaded = Resources.LoadDreambitAsset(asset.Id, asset.LogicalAssetName, type);
+                    if (loaded is not null && type.IsInstanceOfType(loaded))
+                    {
+                        value = loaded;
+                        changed = true;
+                        EditorGui.ClosePopup();
+                    }
                 }
-                finally
+            else if (sceneProvider() is { } scene)
+                foreach (var entity in scene.GetAllEntities().Where(entity => !entity.IsEditorOnly))
                 {
-                    ImGui.EndChild();
+                    if (!string.IsNullOrWhiteSpace(_search) &&
+                        !entity.Name.Contains(_search, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    object? candidate = type == typeof(Entity) ? entity : entity.GetComponent(type);
+                    if (candidate is null || !EditorGui.Selectable(entity.Id.ToString("N"), entity.Name))
+                        continue;
+                    value = candidate;
+                    changed = true;
+                    EditorGui.ClosePopup();
                 }
-            }
-            finally
-            {
-                ImGui.EndPopup();
-            }
 
             return changed;
         }
@@ -305,19 +261,28 @@ internal sealed class InspectorValueDrawerRegistry
         {
             var underlying = Nullable.GetUnderlyingType(type)!;
             var hasValue = value is not null;
-            if (ImGui.Checkbox($"##{context.Id}.HasValue", ref hasValue))
+            if (EditorGui.Property(
+                    $"{context.Id}.HasValue",
+                    label,
+                    ref hasValue,
+                    mixed: context.Mixed,
+                    readOnly: context.ReadOnly,
+                    tooltip: context.Metadata.Tooltip))
                 return new InspectorValueDrawResult(
                     true,
                     hasValue ? Activator.CreateInstance(underlying) : null);
-            ImGui.SameLine();
             return hasValue
-                ? registry.Draw(label, underlying, value, context with { Id = context.Id + ".Value" })
-                : DrawNull(label, value);
+                ? registry.Draw("Value", underlying, value, context with { Id = context.Id + ".Value" })
+                : DrawNull(value, context);
         }
 
-        private static InspectorValueDrawResult DrawNull(string label, object? value)
+        private static InspectorValueDrawResult DrawNull(object? value, InspectorValueDrawContext context)
         {
-            ImGui.TextDisabled($"{label}: null");
+            EditorGui.ReadOnlyProperty(
+                $"{context.Id}.Value",
+                "Value",
+                "None",
+                tooltip: context.Metadata.Tooltip);
             return InspectorValueDrawResult.Unchanged(value);
         }
     }
@@ -339,7 +304,13 @@ internal sealed class InspectorValueDrawerRegistry
             InspectorValueDrawContext context)
         {
             var current = value is true;
-            return ImGui.Checkbox($"{label}##{context.Id}", ref current)
+            return EditorGui.Property(
+                    context.Id,
+                    label,
+                    ref current,
+                    mixed: context.Mixed,
+                    readOnly: context.ReadOnly,
+                    tooltip: context.Metadata.Tooltip)
                 ? new InspectorValueDrawResult(true, current)
                 : InspectorValueDrawResult.Unchanged(value);
         }
@@ -365,8 +336,13 @@ internal sealed class InspectorValueDrawerRegistry
             if (type.GetCustomAttributes(typeof(FlagsAttribute), true).Length > 0)
             {
                 var bits = Convert.ToUInt64(value, CultureInfo.InvariantCulture);
-                var changed = false;
-                if (ImGui.TreeNodeEx($"{label}##{context.Id}", ImGuiTreeNodeFlags.SpanAvailWidth))
+                var flagsChanged = false;
+                using var disabled = EditorGui.Disabled(context.ReadOnly);
+                using var group = EditorGui.CollapsibleGroup(
+                    context.Id,
+                    label,
+                    tooltip: context.Metadata.Tooltip);
+                if (group.IsOpen)
                 {
                     foreach (var option in Enum.GetValues(type))
                     {
@@ -374,42 +350,35 @@ internal sealed class InspectorValueDrawerRegistry
                         if (optionBits == 0)
                             continue;
                         var selected = (bits & optionBits) == optionBits;
-                        if (ImGui.Checkbox($"{option}##{context.Id}.{optionBits}", ref selected))
+                        if (EditorGui.Checkbox(optionBits.ToString(CultureInfo.InvariantCulture), option.ToString()!, ref selected))
                         {
                             bits = selected ? bits | optionBits : bits & ~optionBits;
-                            changed = true;
+                            flagsChanged = true;
                         }
                     }
-
-                    ImGui.TreePop();
                 }
 
-                return changed
+                return flagsChanged
                     ? new InspectorValueDrawResult(true, Enum.ToObject(type, bits))
                     : InspectorValueDrawResult.Unchanged(value);
             }
 
             var names = Enum.GetNames(type);
             var currentName = Enum.GetName(type, value!) ?? value!.ToString() ?? string.Empty;
-            if (!ImGui.BeginCombo($"{label}##{context.Id}", currentName))
-                return InspectorValueDrawResult.Unchanged(value);
-            var selectedValue = value;
-            var changedValue = false;
-            foreach (var name in names)
-            {
-                var selected = name == currentName;
-                if (ImGui.Selectable(name, selected))
-                {
-                    selectedValue = Enum.Parse(type, name);
-                    changedValue = true;
-                }
-
-                if (selected)
-                    ImGui.SetItemDefaultFocus();
-            }
-
-            ImGui.EndCombo();
-            return new InspectorValueDrawResult(changedValue, selectedValue);
+            var selectedIndex = Array.IndexOf(names, currentName);
+            if (selectedIndex < 0)
+                selectedIndex = 0;
+            var changed = EditorGui.ChoiceProperty(
+                context.Id,
+                label,
+                ref selectedIndex,
+                names,
+                mixed: context.Mixed,
+                readOnly: context.ReadOnly,
+                tooltip: context.Metadata.Tooltip);
+            return changed
+                ? new InspectorValueDrawResult(true, Enum.Parse(type, names[selectedIndex]))
+                : InspectorValueDrawResult.Unchanged(value);
         }
     }
 
@@ -439,17 +408,18 @@ internal sealed class InspectorValueDrawerRegistry
             if (type == typeof(float))
             {
                 var current = Convert.ToSingle(value, CultureInfo.InvariantCulture);
-                var changed = range is null
-                    ? ImGui.DragFloat($"{label}##{context.Id}", ref current, 0.1f)
-                    : ImGui.DragFloat(
-                        $"{label}##{context.Id}",
-                        ref current,
-                        0.1f,
-                        (float)range.Minimum,
-                        (float)range.Maximum,
-                        "%.3f",
-                        ImGuiSliderFlags.AlwaysClamp);
-                DrawExactEntryTooltip();
+                var changed = EditorGui.Property(
+                    context.Id,
+                    label,
+                    ref current,
+                    speed: 0.1f,
+                    min: range is null ? 0f : (float)range.Minimum,
+                    max: range is null ? 0f : (float)range.Maximum,
+                    mixed: context.Mixed,
+                    readOnly: context.ReadOnly,
+                    tooltip: NumericTooltip(context.Metadata.Tooltip));
+                if (changed && range is not null)
+                    current = Math.Clamp(current, (float)range.Minimum, (float)range.Maximum);
                 return changed
                     ? new InspectorValueDrawResult(true, current)
                     : InspectorValueDrawResult.Unchanged(value);
@@ -458,8 +428,17 @@ internal sealed class InspectorValueDrawerRegistry
             if (type == typeof(double) || type == typeof(decimal))
             {
                 var current = Convert.ToDouble(value, CultureInfo.InvariantCulture);
-                var changed = ImGui.InputDouble($"{label}##{context.Id}", ref current, 0.1, 1.0, "%.6g");
-                if (range is not null)
+                var changed = EditorGui.Property(
+                    context.Id,
+                    label,
+                    ref current,
+                    step: 0.1,
+                    stepFast: 1.0,
+                    format: "%.6g",
+                    mixed: context.Mixed,
+                    readOnly: context.ReadOnly,
+                    tooltip: context.Metadata.Tooltip);
+                if (changed && range is not null)
                     current = Math.Clamp(current, range.Minimum, range.Maximum);
                 object converted = type == typeof(decimal) ? Convert.ToDecimal(current) : current;
                 return changed
@@ -470,24 +449,37 @@ internal sealed class InspectorValueDrawerRegistry
             if (type == typeof(int))
             {
                 var current = Convert.ToInt32(value, CultureInfo.InvariantCulture);
-                var changed = range is null
-                    ? ImGui.DragInt($"{label}##{context.Id}", ref current, 1f)
-                    : ImGui.DragInt(
-                        $"{label}##{context.Id}",
-                        ref current,
-                        1f,
-                        (int)Math.Ceiling(range.Minimum),
-                        (int)Math.Floor(range.Maximum),
-                        "%d",
-                        ImGuiSliderFlags.AlwaysClamp);
-                DrawExactEntryTooltip();
+                var minimum = range is null ? 0 : (int)Math.Ceiling(range.Minimum);
+                var maximum = range is null ? 0 : (int)Math.Floor(range.Maximum);
+                var changed = EditorGui.Property(
+                    context.Id,
+                    label,
+                    ref current,
+                    min: minimum,
+                    max: maximum,
+                    mixed: context.Mixed,
+                    readOnly: context.ReadOnly,
+                    tooltip: NumericTooltip(context.Metadata.Tooltip));
+                if (changed && range is not null)
+                    current = Math.Clamp(current, minimum, maximum);
                 return changed
                     ? new InspectorValueDrawResult(true, current)
                     : InspectorValueDrawResult.Unchanged(value);
             }
 
             var text = Convert.ToString(value, CultureInfo.InvariantCulture) ?? "0";
-            if (!ImGui.InputText($"{label}##{context.Id}", ref text, 64, ImGuiInputTextFlags.CharsDecimal))
+            if (!EditorGui.CustomProperty(
+                    context.Id,
+                    label,
+                    () => EditorGui.InputText(
+                        "NumericValue",
+                        "##Value",
+                        ref text,
+                        64,
+                        ImGuiInputTextFlags.CharsDecimal),
+                    mixed: context.Mixed,
+                    readOnly: context.ReadOnly,
+                    tooltip: context.Metadata.Tooltip))
                 return InspectorValueDrawResult.Unchanged(value);
             try
             {
@@ -500,11 +492,8 @@ internal sealed class InspectorValueDrawerRegistry
             }
         }
 
-        private static void DrawExactEntryTooltip()
-        {
-            if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Drag to adjust. Double-click or Ctrl+click to type an exact value.");
-        }
+        private static string NumericTooltip(string? tooltip) =>
+            tooltip ?? "Drag to adjust. Double-click or Ctrl+click to type an exact value.";
     }
 
     private sealed class StringValueDrawer : IInspectorValueDrawer
@@ -524,7 +513,14 @@ internal sealed class InspectorValueDrawerRegistry
             InspectorValueDrawContext context)
         {
             var current = value?.ToString() ?? string.Empty;
-            if (!ImGui.InputText($"{label}##{context.Id}", ref current, 4096))
+            if (!EditorGui.Property(
+                    context.Id,
+                    label,
+                    ref current,
+                    maxLength: 4096,
+                    mixed: context.Mixed,
+                    readOnly: context.ReadOnly,
+                    tooltip: context.Metadata.Tooltip))
                 return InspectorValueDrawResult.Unchanged(value);
             return new InspectorValueDrawResult(true, type == typeof(char) ? current.FirstOrDefault() : current);
         }
@@ -555,7 +551,13 @@ internal sealed class InspectorValueDrawerRegistry
                     ? vector
                     : Microsoft.Xna.Framework.Vector2.Zero;
                 var current = new Vector2(source.X, source.Y);
-                return ImGui.DragFloat2($"{label}##{context.Id}", ref current, 0.1f)
+                return EditorGui.Property(
+                        context.Id,
+                        label,
+                        ref current,
+                        mixed: context.Mixed,
+                        readOnly: context.ReadOnly,
+                        tooltip: context.Metadata.Tooltip)
                     ? new InspectorValueDrawResult(true, new Microsoft.Xna.Framework.Vector2(current.X, current.Y))
                     : InspectorValueDrawResult.Unchanged(value);
             }
@@ -566,7 +568,13 @@ internal sealed class InspectorValueDrawerRegistry
                     ? vector
                     : Microsoft.Xna.Framework.Vector3.Zero;
                 var current = new Vector3(source.X, source.Y, source.Z);
-                return ImGui.DragFloat3($"{label}##{context.Id}", ref current, 0.1f)
+                return EditorGui.Property(
+                        context.Id,
+                        label,
+                        ref current,
+                        mixed: context.Mixed,
+                        readOnly: context.ReadOnly,
+                        tooltip: context.Metadata.Tooltip)
                     ? new InspectorValueDrawResult(true,
                         new Microsoft.Xna.Framework.Vector3(current.X, current.Y, current.Z))
                     : InspectorValueDrawResult.Unchanged(value);
@@ -578,7 +586,14 @@ internal sealed class InspectorValueDrawerRegistry
                 Quaternion quaternion => new Vector4(quaternion.X, quaternion.Y, quaternion.Z, quaternion.W),
                 _ => Vector4.Zero
             };
-            if (!ImGui.DragFloat4($"{label}##{context.Id}", ref source4, 0.01f))
+            if (!EditorGui.Property(
+                    context.Id,
+                    label,
+                    ref source4,
+                    speed: 0.01f,
+                    mixed: context.Mixed,
+                    readOnly: context.ReadOnly,
+                    tooltip: context.Metadata.Tooltip))
                 return InspectorValueDrawResult.Unchanged(value);
             return new InspectorValueDrawResult(
                 true,
@@ -606,7 +621,13 @@ internal sealed class InspectorValueDrawerRegistry
         {
             var source = value is Color color ? color : Color.White;
             var current = new Vector4(source.R / 255f, source.G / 255f, source.B / 255f, source.A / 255f);
-            return ImGui.ColorEdit4($"{label}##{context.Id}", ref current)
+            return EditorGui.ColorProperty(
+                    context.Id,
+                    label,
+                    ref current,
+                    mixed: context.Mixed,
+                    readOnly: context.ReadOnly,
+                    tooltip: context.Metadata.Tooltip)
                 ? new InspectorValueDrawResult(true, new Color(current))
                 : InspectorValueDrawResult.Unchanged(value);
         }
@@ -633,58 +654,52 @@ internal sealed class InspectorValueDrawerRegistry
                 : [];
             var changed = false;
 
-            if (!ImGui.TreeNodeEx($"{label} ({entries.Count})##{context.Id}", ImGuiTreeNodeFlags.SpanAvailWidth))
+            using var group = EditorGui.CollapsibleGroup(
+                context.Id,
+                $"{label} ({entries.Count})",
+                tooltip: context.Metadata.Tooltip);
+            if (!group.IsOpen)
                 return InspectorValueDrawResult.Unchanged(value);
 
-            try
+            int? removeIndex = null;
+            for (var index = 0; index < entries.Count; index++)
             {
-                int? removeIndex = null;
-                for (var index = 0; index < entries.Count; index++)
+                using var entryId = EditorGui.PushId(index.ToString(CultureInfo.InvariantCulture));
+                var entry = entries[index];
+                var keyResult = registry.Draw("Key", types.Key, entry.Key, context with
                 {
-                    ImGui.PushID($"{context.Id}.{index}");
-                    try
-                    {
-                        var entry = entries[index];
-                        var keyResult = registry.Draw("Key", types.Key, entry.Key, context with
-                        {
-                            Id = $"{context.Id}.{index}.Key", Mixed = false, Depth = context.Depth + 1
-                        });
-                        var valueResult = registry.Draw("Value", types.Value, entry.Value, context with
-                        {
-                            Id = $"{context.Id}.{index}.Value", Mixed = false, Depth = context.Depth + 1
-                        });
-                        if (keyResult.Changed || valueResult.Changed)
-                        {
-                            entries[index] = new DictionaryEntryValue(
-                                keyResult.Changed ? keyResult.Value : entry.Key,
-                                valueResult.Changed ? valueResult.Value : entry.Value);
-                            changed = true;
-                        }
-
-                        if (ImGui.SmallButton("Remove") && !context.ReadOnly)
-                            removeIndex = index;
-                    }
-                    finally
-                    {
-                        ImGui.PopID();
-                    }
-                }
-
-                if (removeIndex.HasValue)
+                    Id = $"{context.Id}.{index}.Key",
+                    Mixed = false,
+                    Depth = context.Depth + 1
+                });
+                var valueResult = registry.Draw("Value", types.Value, entry.Value, context with
                 {
-                    entries.RemoveAt(removeIndex.Value);
+                    Id = $"{context.Id}.{index}.Value",
+                    Mixed = false,
+                    Depth = context.Depth + 1
+                });
+                if (keyResult.Changed || valueResult.Changed)
+                {
+                    entries[index] = new DictionaryEntryValue(
+                        keyResult.Changed ? keyResult.Value : entry.Key,
+                        valueResult.Changed ? valueResult.Value : entry.Value);
                     changed = true;
                 }
 
-                if (ImGui.SmallButton($"+ Add##{context.Id}") && !context.ReadOnly)
-                {
-                    entries.Add(new DictionaryEntryValue(CreateKey(types.Key, entries), CreateDefault(types.Value)));
-                    changed = true;
-                }
+                if (EditorGui.Button("Remove", "Remove", enabled: !context.ReadOnly))
+                    removeIndex = index;
             }
-            finally
+
+            if (removeIndex.HasValue)
             {
-                ImGui.TreePop();
+                entries.RemoveAt(removeIndex.Value);
+                changed = true;
+            }
+
+            if (EditorGui.Button("Add", "+ Add", primary: true, enabled: !context.ReadOnly))
+            {
+                entries.Add(new DictionaryEntryValue(CreateKey(types.Key, entries), CreateDefault(types.Value)));
+                changed = true;
             }
 
             return changed
@@ -756,7 +771,7 @@ internal sealed class InspectorValueDrawerRegistry
         {
             if (context.Depth >= 8)
             {
-                ImGui.TextDisabled($"{label}: maximum nesting depth reached");
+                EditorGui.ReadOnlyProperty(context.Id, label, "Maximum nesting depth reached", tooltip: context.Metadata.Tooltip);
                 return InspectorValueDrawResult.Unchanged(value);
             }
 
@@ -765,15 +780,16 @@ internal sealed class InspectorValueDrawerRegistry
                 ? enumerable.Cast<object?>().ToList()
                 : [];
             var changed = false;
-            if (ImGui.TreeNodeEx(
-                    $"{label} ({items.Count})##{context.Id}",
-                    ImGuiTreeNodeFlags.SpanAvailWidth))
-            try
+            using var group = EditorGui.CollapsibleGroup(
+                context.Id,
+                $"{label} ({items.Count})",
+                tooltip: context.Metadata.Tooltip);
+            if (group.IsOpen)
             {
                 int? removeIndex = null;
                 for (var index = 0; index < items.Count; index++)
                 {
-                    ImGui.PushID($"{context.Id}.{index}");
+                    using var elementId = EditorGui.PushId(index.ToString(CultureInfo.InvariantCulture));
                     var result = registry.Draw(
                         $"Element {index}",
                         elementType,
@@ -792,9 +808,8 @@ internal sealed class InspectorValueDrawerRegistry
 
                     // Keep destructive actions beneath the element instead of
                     // attempting to append them after a full-width row.
-                    if (ImGui.SmallButton("Remove") && !context.ReadOnly)
+                    if (EditorGui.Button("Remove", "Remove", enabled: !context.ReadOnly))
                         removeIndex = index;
-                    ImGui.PopID();
                 }
 
                 if (removeIndex.HasValue)
@@ -803,14 +818,12 @@ internal sealed class InspectorValueDrawerRegistry
                     changed = true;
                 }
 
-                if (ImGui.SmallButton($"+ Add##{context.Id}") && !context.ReadOnly)
+                if (EditorGui.Button("Add", "+ Add", primary: true, enabled: !context.ReadOnly))
                 {
                     items.Add(CreateDefault(elementType));
                     changed = true;
                 }
-
             }
-            finally { ImGui.TreePop(); }
 
             return changed
                 ? new InspectorValueDrawResult(true, BuildCollection(type, elementType, items))
@@ -904,16 +917,20 @@ internal sealed class InspectorValueDrawerRegistry
         {
             if (value is null)
             {
-                ImGui.TextDisabled($"{label}: null");
-                ImGui.SameLine();
-                if (!context.ReadOnly && ImGui.SmallButton($"Create##{context.Id}"))
+                var create = EditorGui.CustomProperty(
+                    context.Id,
+                    label,
+                    () => EditorGui.Button("Create", "Create", primary: true, enabled: !context.ReadOnly),
+                    readOnly: context.ReadOnly,
+                    tooltip: context.Metadata.Tooltip);
+                if (create)
                     try
                     {
                         return new InspectorValueDrawResult(true, Activator.CreateInstance(type));
                     }
                     catch
                     {
-                        ImGui.SetTooltip($"{type.Name} needs a parameterless constructor.");
+                        EditorGui.Error($"{type.Name} needs a parameterless constructor.");
                     }
 
                 return InspectorValueDrawResult.Unchanged(value);
@@ -921,48 +938,45 @@ internal sealed class InspectorValueDrawerRegistry
 
             if (context.Depth >= 8)
             {
-                ImGui.TextDisabled($"{label}: maximum nesting depth reached");
+                EditorGui.ReadOnlyProperty(context.Id, label, "Maximum nesting depth reached", tooltip: context.Metadata.Tooltip);
                 return InspectorValueDrawResult.Unchanged(value);
             }
 
-            if (!ImGui.TreeNodeEx($"{label}##{context.Id}", ImGuiTreeNodeFlags.SpanAvailWidth))
+            using var group = EditorGui.CollapsibleGroup(
+                context.Id,
+                label,
+                tooltip: context.Metadata.Tooltip);
+            if (!group.IsOpen)
                 return InspectorValueDrawResult.Unchanged(value);
 
             var editable = value;
             var cloned = false;
             var changed = false;
-            try
+            foreach (var member in DiscoverMembers(type))
             {
-                foreach (var member in DiscoverMembers(type))
-                {
-                    var memberValue = member.GetValue(editable);
-                    var result = registry.Draw(
-                        member.DisplayName,
-                        member.ValueType,
-                        memberValue,
-                        context with
-                        {
-                            Id = $"{context.Id}.{member.SerializedName}",
-                            Metadata = member,
-                            Mixed = false,
-                            ReadOnly = context.ReadOnly || member.IsReadOnly,
-                            Depth = context.Depth + 1
-                        });
-                    if (!result.Changed || member.IsReadOnly)
-                        continue;
-                    if (!cloned)
+                var memberValue = member.GetValue(editable);
+                var result = registry.Draw(
+                    member.DisplayName,
+                    member.ValueType,
+                    memberValue,
+                    context with
                     {
-                        editable = Clone(value, type);
-                        cloned = true;
-                    }
-
-                    member.SetValue(editable!, result.Value);
-                    changed = true;
+                        Id = $"{context.Id}.{member.SerializedName}",
+                        Metadata = member,
+                        Mixed = false,
+                        ReadOnly = context.ReadOnly || member.IsReadOnly,
+                        Depth = context.Depth + 1
+                    });
+                if (!result.Changed || member.IsReadOnly)
+                    continue;
+                if (!cloned)
+                {
+                    editable = Clone(value, type);
+                    cloned = true;
                 }
-            }
-            finally
-            {
-                ImGui.TreePop();
+
+                member.SetValue(editable!, result.Value);
+                changed = true;
             }
             return changed
                 ? new InspectorValueDrawResult(true, editable)
@@ -1049,7 +1063,12 @@ internal sealed class InspectorValueDrawerRegistry
             object? value,
             InspectorValueDrawContext context)
         {
-            ImGui.TextDisabled($"{label}: {value ?? "null"} ({type.Name})");
+            EditorGui.ReadOnlyProperty(
+                context.Id,
+                label,
+                $"{value ?? "null"} ({type.Name})",
+                mixed: context.Mixed,
+                tooltip: context.Metadata.Tooltip);
             return InspectorValueDrawResult.Unchanged(value);
         }
     }

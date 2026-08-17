@@ -1,10 +1,10 @@
 using Dreambit.ECS;
 using Dreambit.Editor.Persistence;
 using Dreambit.Editor.Scenes;
+using Dreambit.EditorApi;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
 using Vector2 = System.Numerics.Vector2;
-using Vector4 = System.Numerics.Vector4;
 using XnaVector2 = Microsoft.Xna.Framework.Vector2;
 
 namespace Dreambit.Editor.UI;
@@ -162,10 +162,10 @@ internal sealed class EditorTransformGizmo : IDisposable
         Vector2 mouseScreen,
         int mode)
     {
-        var red = ImGui.GetColorU32(new Vector4(0.95f, 0.28f, 0.30f, 1f));
-        var green = ImGui.GetColorU32(new Vector4(0.32f, 0.86f, 0.42f, 1f));
-        var yellow = ImGui.GetColorU32(new Vector4(1f, 0.78f, 0.22f, 1f));
-        var cyan = ImGui.GetColorU32(new Vector4(0.25f, 0.72f, 1f, 1f));
+        var red = ImGui.GetColorU32(EditorGuiTheme.GizmoAxisX);
+        var green = ImGui.GetColorU32(EditorGuiTheme.GizmoAxisY);
+        var yellow = ImGui.GetColorU32(EditorGuiTheme.GizmoRotation);
+        var cyan = ImGui.GetColorU32(EditorGuiTheme.GizmoScale);
 
         switch (mode)
         {

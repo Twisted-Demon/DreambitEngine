@@ -1,6 +1,6 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
-using Dreambit.Editor.UI;
+using Dreambit.EditorApi;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -38,6 +38,7 @@ internal sealed class ImGuiRenderer : IDisposable
     private int _nextTextureId = 1;
     private nint _fontTextureId;
     private Texture2D? _fontTexture;
+    private bool _fontAtlasConfigured;
     private int _scrollWheelValue;
     private int _horizontalScrollWheelValue;
     private bool _disposed;
@@ -68,7 +69,7 @@ internal sealed class ImGuiRenderer : IDisposable
         };
 
         _game.Window.TextInput += OnTextInput;
-        ImGuiTheme.Apply();
+        EditorGui.ApplyTheme();
         RebuildFontAtlas();
 
         if (File.Exists(_layoutPath))
@@ -95,6 +96,7 @@ internal sealed class ImGuiRenderer : IDisposable
         ImGui.SetCurrentContext(_context);
 
         var io = ImGui.GetIO();
+        ConfigureFontAtlas(io);
         io.Fonts.GetTexDataAsRGBA32(
             out byte* pixelData,
             out var width,
@@ -121,6 +123,44 @@ internal sealed class ImGuiRenderer : IDisposable
         _fontTextureId = BindTexture(_fontTexture);
         io.Fonts.SetTexID(_fontTextureId);
         io.Fonts.ClearTexData();
+    }
+
+    private void ConfigureFontAtlas(ImGuiIOPtr io)
+    {
+        if (_fontAtlasConfigured)
+            return;
+
+        io.Fonts.Clear();
+        var fontPath = FindEditorFont();
+        if (fontPath is null)
+            io.Fonts.AddFontDefault();
+        else
+            io.Fonts.AddFontFromFileTTF(fontPath, EditorGuiTheme.FontSize);
+
+        _fontAtlasConfigured = true;
+    }
+
+    private static string? FindEditorFont()
+    {
+        var bundledInter = Path.Combine(
+            AppContext.BaseDirectory,
+            "Fonts",
+            "Inter-VariableFont_opsz,wght.ttf");
+        if (File.Exists(bundledInter))
+            return bundledInter;
+
+        string[] candidates =
+        [
+            @"C:\Windows\Fonts\segoeui.ttf",
+            "/System/Library/Fonts/Supplemental/Arial.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+        ];
+
+        foreach (var candidate in candidates)
+            if (File.Exists(candidate))
+                return candidate;
+
+        return null;
     }
 
     public void BeginLayout(GameTime gameTime)

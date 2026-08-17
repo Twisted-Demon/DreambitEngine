@@ -1,5 +1,6 @@
 using Dreambit.Editor.Assets;
 using Dreambit.Editor.Graphics;
+using Dreambit.EditorApi;
 using ImGuiNET;
 
 namespace Dreambit.Editor.Inspection;
@@ -8,9 +9,8 @@ internal sealed class AssetPreviewInspector(AssetPreviewService previews)
 {
     public void Draw(AssetRecord asset)
     {
-        ImGui.TextUnformatted(asset.Name);
-        ImGui.TextDisabled(asset.RelativePath);
-        ImGui.Spacing();
+        EditorGui.Header(asset.Name, asset.RelativePath);
+        EditorGui.Space();
         try
         {
             if (previews.TryGetTexture(asset, out var texture, out var width, out var height))
@@ -25,18 +25,16 @@ internal sealed class AssetPreviewInspector(AssetPreviewService previews)
                 }
 
                 ImGui.Image(texture, new System.Numerics.Vector2(previewWidth, previewHeight));
-                ImGui.TextDisabled($"{width} × {height}");
+                EditorGui.MutedText($"{width} × {height}");
                 return;
             }
         }
         catch (Exception exception)
         {
-            ImGui.TextColored(
-                new System.Numerics.Vector4(0.96f, 0.34f, 0.36f, 1f),
-                exception.Message);
+            EditorGui.Error(exception.Message);
         }
 
-        ImGui.TextWrapped(
+        EditorGui.WrappedText(
             asset.Kind == AssetKind.Scene
                 ? "Double-click this scene to open it."
                 : "No loaded Dreambit asset type is available for this file. Its data remains untouched.");

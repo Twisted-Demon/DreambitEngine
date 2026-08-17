@@ -1,6 +1,7 @@
 using System.Numerics;
 using Dreambit.Editor.Persistence;
 using Dreambit.Editor.Projects;
+using Dreambit.EditorApi;
 using ImGuiNET;
 
 namespace Dreambit.Editor.UI;
@@ -51,85 +52,93 @@ internal sealed class ProjectLauncherView
             ImGuiWindowFlags.NoResize |
             ImGuiWindowFlags.NoDocking;
 
-        if (!ImGui.Begin("Dreambit Projects##Dreambit.Editor.ProjectLauncher", flags))
+        using (var window = EditorGui.Window(
+                   "Dreambit Projects##Dreambit.Editor.ProjectLauncher",
+                   flags))
         {
-            ImGui.End();
-            return;
-        }
+            if (!window.IsVisible)
+                return;
 
-        ImGui.Text("Dreambit Editor");
-        ImGui.TextDisabled("Create and open portable Dreambit projects");
-        ImGui.Spacing();
-        ImGui.Separator();
-        ImGui.Spacing();
+            EditorGui.Header("Dreambit Editor", "Create and open portable Dreambit projects");
+            EditorGui.Space();
 
-        ImGui.Text("Open Existing Project");
-        ImGui.SetNextItemWidth(-100f);
-        ImGui.InputTextWithHint(
-            "##ProjectPath",
-            "Project directory containing .dreambit/project.json",
-            ref _projectPath,
-            1_024);
-        ImGui.SameLine();
-        if (ImGui.Button("Open", new Vector2(88f, 0f)))
-            _error = launchProject(_projectPath) ? null : _error;
-
-        DrawError(_error);
-
-        ImGui.Spacing();
-        ImGui.Text("Recent Projects");
-        ImGui.Separator();
-
-        if (_globalState.RecentProjects.Count == 0)
-        {
-            ImGui.TextDisabled("No recent projects yet.");
-        }
-        else
-        {
-            var childVisible = ImGui.BeginChild(
-                "##RecentProjects",
-                new Vector2(0f, -72f),
-                ImGuiChildFlags.None);
-            if (childVisible)
+            EditorGui.Header("Open Existing Project");
+            EditorGui.InputText(
+                "ProjectLauncher.ProjectPath",
+                "##Path",
+                ref _projectPath,
+                maxLength: 1_024,
+                width: -100f,
+                hint: "Project directory containing .dreambit/project.json");
+            EditorGui.Inline();
+            if (EditorGui.Button(
+                    "ProjectLauncher.Open",
+                    "Open",
+                    new Vector2(88f, 0f),
+                    primary: true))
             {
-                for (var i = 0; i < _globalState.RecentProjects.Count; i++)
+                _error = launchProject(_projectPath) ? null : _error;
+            }
+
+            DrawError(_error);
+
+            EditorGui.Space();
+            EditorGui.Header("Recent Projects");
+
+            if (_globalState.RecentProjects.Count == 0)
+            {
+                EditorGui.MutedText("No recent projects yet.");
+            }
+            else
+            {
+                using var recentProjects = EditorGui.Child(
+                    "ProjectLauncher.RecentProjects",
+                    new Vector2(0f, -72f));
+                if (recentProjects.IsVisible)
                 {
-                    var project = _globalState.RecentProjects[i];
+                    for (var i = 0; i < _globalState.RecentProjects.Count; i++)
+                    {
+                        var project = _globalState.RecentProjects[i];
 
-                    var displayName = string.IsNullOrWhiteSpace(project.Name)
-                        ? Path.GetFileName(project.Path)
-                        : project.Name;
-                    var sdk = string.IsNullOrWhiteSpace(project.SdkVersion)
-                        ? "Unknown SDK"
-                        : $"SDK {project.SdkVersion}";
-                    var missing = !Directory.Exists(project.Path);
-                    var label = missing
-                        ? $"{displayName}  (Missing)\n{project.Path}##Recent:{project.Path}"
-                        : $"{displayName}  |  {sdk}\n{project.Path}##Recent:{project.Path}";
+                        var displayName = string.IsNullOrWhiteSpace(project.Name)
+                            ? Path.GetFileName(project.Path)
+                            : project.Name;
+                        var sdk = string.IsNullOrWhiteSpace(project.SdkVersion)
+                            ? "Unknown SDK"
+                            : $"SDK {project.SdkVersion}";
+                        var missing = !Directory.Exists(project.Path);
+                        var label = missing
+                            ? $"{displayName}  (Missing)\n{project.Path}"
+                            : $"{displayName}  |  {sdk}\n{project.Path}";
 
-                    if (!ImGui.Selectable(label))
-                        continue;
+                        if (!EditorGui.Selectable(
+                                $"ProjectLauncher.Recent:{project.Path}",
+                                label))
+                            continue;
 
-                    _projectPath = project.Path;
-                    _error = launchProject(project.Path) ? null : _error;
+                        _projectPath = project.Path;
+                        _error = launchProject(project.Path) ? null : _error;
 
-                    // The launch callback may reorder RecentProjects by moving the
-                    // selected project to the front. Do not inspect the collection
-                    // again during this frame.
-                    break;
+                        // The launch callback may reorder RecentProjects by moving the
+                        // selected project to the front. Do not inspect the collection
+                        // again during this frame.
+                        break;
+                    }
                 }
             }
 
-            ImGui.EndChild();
+            EditorGui.Space();
+            if (EditorGui.Button(
+                    "ProjectLauncher.CreateProject",
+                    "Create Project",
+                    new Vector2(130f, 0f)))
+            {
+                _openCreatePopup = true;
+            }
+
+            EditorGui.Inline();
+            EditorGui.MutedText($"Dreambit SDK {DreambitSdkConstants.CurrentVersion} / DesktopVK");
         }
-
-        ImGui.Spacing();
-        if (ImGui.Button("Create Project", new Vector2(130f, 0f)))
-            _openCreatePopup = true;
-
-        ImGui.SameLine();
-        ImGui.TextDisabled($"Dreambit SDK {DreambitSdkConstants.CurrentVersion} / DesktopVK");
-        ImGui.End();
 
         DrawCreateProjectPopup(createProject, creationStatus);
     }
@@ -145,79 +154,76 @@ internal sealed class ProjectLauncherView
     {
         if (_openCreatePopup)
         {
-            ImGui.OpenPopup("Create Dreambit Project##Dreambit.Editor.CreateProject");
+            EditorGui.OpenPopup("Create Dreambit Project##Dreambit.Editor.CreateProject");
             _openCreatePopup = false;
         }
 
         var isOpen = true;
-        if (!ImGui.BeginPopupModal(
+        using var popup = EditorGui.Modal(
                 "Create Dreambit Project##Dreambit.Editor.CreateProject",
                 ref isOpen,
-                ImGuiWindowFlags.AlwaysAutoResize))
-        {
+                ImGuiWindowFlags.AlwaysAutoResize);
+        if (!popup.IsOpen)
             return;
-        }
 
-        DrawInput("Project Name", "##CreateProjectName", ref _projectName);
-        DrawInput("Game Title", "##CreateGameTitle", ref _gameTitle);
-        DrawInput("Location", "##CreateProjectLocation", ref _projectLocation, 1_024);
+        EditorGui.Property("CreateProject.Name", "Project Name", ref _projectName);
+        EditorGui.Property("CreateProject.Title", "Game Title", ref _gameTitle);
+        EditorGui.Property(
+            "CreateProject.Location",
+            "Location",
+            ref _projectLocation,
+            maxLength: 1_024);
 
-        ImGui.Text("Target Renderer");
-        ImGui.SameLine(150f);
-        ImGui.TextDisabled("DesktopVK");
-        ImGui.Text("Dreambit SDK");
-        ImGui.SameLine(150f);
-        ImGui.TextDisabled(DreambitSdkConstants.CurrentVersion);
-        ImGui.Spacing();
-        ImGui.TextDisabled("The matching SDK packages are installed into the Editor cache on first use.");
+        EditorGui.ReadOnlyProperty("CreateProject.Renderer", "Target Renderer", "DesktopVK");
+        EditorGui.ReadOnlyProperty(
+            "CreateProject.Sdk",
+            "Dreambit SDK",
+            DreambitSdkConstants.CurrentVersion);
+        EditorGui.Space();
+        EditorGui.MutedText("The matching SDK packages are installed into the Editor cache on first use.");
 
         if (!string.IsNullOrWhiteSpace(creationStatus.Message))
         {
-            ImGui.Spacing();
-            if (creationStatus.IsError)
-                ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.96f, 0.34f, 0.36f, 1f));
-            else
-                ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.38f, 0.78f, 0.52f, 1f));
-            ImGui.TextWrapped(creationStatus.Message);
-            ImGui.PopStyleColor();
+            EditorGui.Space();
+            EditorGui.Message(
+                creationStatus.IsError
+                    ? EditorGuiMessageKind.Error
+                    : EditorGuiMessageKind.Success,
+                creationStatus.Message);
         }
 
-        ImGui.Spacing();
-        ImGui.BeginDisabled(creationStatus.IsRunning);
-        if (ImGui.Button("Create", new Vector2(96f, 0f)))
+        EditorGui.Space();
+        using (EditorGui.Disabled(creationStatus.IsRunning))
         {
-            createProject(new CreateProjectRequest(
-                _projectName,
-                _projectLocation,
-                _gameTitle,
-                "DesktopVK",
-                DreambitSdkConstants.CurrentVersion));
-        }
+            if (EditorGui.Button(
+                    "CreateProject.Submit",
+                    "Create",
+                    new Vector2(96f, 0f),
+                    primary: true))
+            {
+                createProject(new CreateProjectRequest(
+                    _projectName,
+                    _projectLocation,
+                    _gameTitle,
+                    "DesktopVK",
+                    DreambitSdkConstants.CurrentVersion));
+            }
 
-        ImGui.SameLine();
-        if (ImGui.Button("Cancel", new Vector2(96f, 0f)))
-            ImGui.CloseCurrentPopup();
-        ImGui.EndDisabled();
+            EditorGui.Inline();
+            if (EditorGui.Button(
+                    "CreateProject.Cancel",
+                    "Cancel",
+                    new Vector2(96f, 0f)))
+            {
+                EditorGui.ClosePopup();
+            }
+        }
 
         if (creationStatus.IsRunning)
         {
-            ImGui.SameLine();
-            ImGui.TextDisabled("Creating project...");
+            EditorGui.Inline();
+            EditorGui.MutedText("Creating project...");
         }
-
-        ImGui.EndPopup();
-    }
-
-    private static void DrawInput(
-        string label,
-        string id,
-        ref string value,
-        uint capacity = 256)
-    {
-        ImGui.Text(label);
-        ImGui.SameLine(150f);
-        ImGui.SetNextItemWidth(440f);
-        ImGui.InputText(id, ref value, capacity);
     }
 
     private static void DrawError(string? error)
@@ -225,9 +231,7 @@ internal sealed class ProjectLauncherView
         if (string.IsNullOrWhiteSpace(error))
             return;
 
-        ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.96f, 0.34f, 0.36f, 1f));
-        ImGui.TextWrapped(error);
-        ImGui.PopStyleColor();
+        EditorGui.Error(error);
     }
 
     private static string GetDefaultProjectLocation()

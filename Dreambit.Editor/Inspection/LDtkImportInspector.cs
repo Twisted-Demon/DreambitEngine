@@ -1,6 +1,6 @@
 using Dreambit.Editor.Scenes;
+using Dreambit.EditorApi;
 using Dreambit.LDtk;
-using ImGuiNET;
 
 namespace Dreambit.Editor.Inspection;
 
@@ -11,40 +11,9 @@ internal sealed class LDtkImportInspector
     public void Draw(SceneDocument document)
     {
         var edited = (document.LDtkReference?.ImportOptions ?? new LDtkImportOptions()).Clone();
-        var pixelsPerUnit = edited.PixelsPerUnit;
-        var baseDrawLayer = edited.BaseDrawLayer;
-        var drawLayerStep = edited.DrawLayerStep;
-        var worldDepthStride = edited.WorldDepthDrawLayerStride;
-        var renderBackgroundColor = edited.RenderLevelBackgroundColor;
-        var renderBackgroundImage = edited.RenderLevelBackgroundImage;
-        var includeInvisibleLayers = edited.IncludeInvisibleLayers;
-        var changed = false;
-        string? mergeKey = null;
+        var mergeKey = ImportOptionsEditorGui.Draw(edited);
 
-        if (ImGui.DragFloat("Pixels Per Unit", ref pixelsPerUnit, 0.1f, 0.001f, 100000f))
-            (changed, mergeKey) = (true, "LDtk.PixelsPerUnit");
-        if (ImGui.DragInt("Base Draw Layer", ref baseDrawLayer, 1f))
-            (changed, mergeKey) = (true, "LDtk.BaseDrawLayer");
-        if (ImGui.DragInt("Draw Layer Step", ref drawLayerStep, 1f, 1, 100000))
-            (changed, mergeKey) = (true, "LDtk.DrawLayerStep");
-        if (ImGui.DragInt("World Depth Stride", ref worldDepthStride, 1f, 1, int.MaxValue))
-            (changed, mergeKey) = (true, "LDtk.WorldDepthStride");
-        if (ImGui.Checkbox("Render Level Background Color", ref renderBackgroundColor))
-            (changed, mergeKey) = (true, "LDtk.RenderBackgroundColor");
-        if (ImGui.Checkbox("Render Level Background Image", ref renderBackgroundImage))
-            (changed, mergeKey) = (true, "LDtk.RenderBackgroundImage");
-        if (ImGui.Checkbox("Include Invisible Layers", ref includeInvisibleLayers))
-            (changed, mergeKey) = (true, "LDtk.IncludeInvisibleLayers");
-
-        edited.PixelsPerUnit = pixelsPerUnit;
-        edited.BaseDrawLayer = baseDrawLayer;
-        edited.DrawLayerStep = drawLayerStep;
-        edited.WorldDepthDrawLayerStride = worldDepthStride;
-        edited.RenderLevelBackgroundColor = renderBackgroundColor;
-        edited.RenderLevelBackgroundImage = renderBackgroundImage;
-        edited.IncludeInvisibleLayers = includeInvisibleLayers;
-
-        if (changed)
+        if (mergeKey is not null)
         {
             TryMutation(() => document.UpdateLDtkImportOptions(
                 "Change LDtk Import Options",
@@ -61,11 +30,11 @@ internal sealed class LDtkImportInspector
                 mergeKey));
         }
 
-        ImGui.Spacing();
-        if (ImGui.Button("Reimport LDtk Now", new System.Numerics.Vector2(-1f, 0f)))
+        EditorGui.Space(EditorGuiSpacing.Section);
+        if (EditorGui.FullWidthButton("LDtk.Reimport", "Reimport LDtk Now", primary: true))
             TryMutation(document.ReimportLDtk);
 
-        ImGui.TextDisabled("Live sync watches the .ldtk project and its external level files.");
+        EditorGui.MutedText("Live sync watches the .ldtk project and its external level files.", wrapped: true);
         DrawError();
     }
 
@@ -85,6 +54,6 @@ internal sealed class LDtkImportInspector
     private void DrawError()
     {
         if (!string.IsNullOrWhiteSpace(_error))
-            ImGui.TextColored(new System.Numerics.Vector4(0.96f, 0.34f, 0.36f, 1f), _error);
+            EditorGui.Error(_error);
     }
 }

@@ -3,6 +3,7 @@ using System.Numerics;
 using Dreambit.Editor.Assets;
 using Dreambit.Editor.Compilation;
 using Dreambit.Editor.Infrastructure;
+using Dreambit.Editor.Inspection;
 using Dreambit.Editor.Graphics;
 using Dreambit.Editor.Logging;
 using Dreambit.Editor.Persistence;
@@ -10,6 +11,7 @@ using Dreambit.Editor.Projects;
 using Dreambit.Editor.Scenes;
 using Dreambit.Editor.UI;
 using Dreambit.Editor.UI.Panels;
+using Dreambit.EditorApi;
 using Dreambit.LDtk;
 using Dreambit.Tiled;
 using ImGuiNET;
@@ -314,167 +316,172 @@ internal sealed class EditorApplication : IDisposable
 
     private void DrawMainMenu()
     {
-        if (!ImGui.BeginMenuBar())
+        using var menuBar = EditorGui.MenuBar();
+        if (!menuBar.IsOpen)
             return;
 
-        if (ImGui.BeginMenu("File"))
+        using (var menu = EditorGui.Menu("File"))
         {
-            ImGui.BeginDisabled(_project is null);
-            if (ImGui.MenuItem("New Scene", "Ctrl+N"))
-                _newScenePopupRequested = true;
-            if (ImGui.MenuItem("New LDtk Scene..."))
+            if (menu.IsOpen)
             {
-                _ldtkSearch = string.Empty;
-                _newLdtkImportOptions = new LDtkImportOptions();
-                _newLdtkScenePopupRequested = true;
-            }
-            if (ImGui.MenuItem("New Tiled Scene..."))
-            {
-                _tiledSearch = string.Empty;
-                _newTiledImportOptions = new TiledImportOptions();
-                _newTiledScenePopupRequested = true;
-            }
-            if (ImGui.MenuItem("Open Scene...", "Ctrl+Shift+O"))
-                _openScenePopupRequested = true;
-            if (ImGui.MenuItem("Save", "Ctrl+S"))
-                SaveCurrentDocument();
-            if (ImGui.MenuItem("Save As...", "Ctrl+Shift+S"))
-                RequestSaveSceneAs();
-            ImGui.EndDisabled();
-            ImGui.Separator();
-
-            if (ImGui.MenuItem("Open Project...", "Ctrl+O"))
-                _openProjectPopupRequested = true;
-
-            if (_project is not null && ImGui.MenuItem("Close Project"))
-                _requestExit();
-
-            ImGui.Separator();
-            if (ImGui.MenuItem("Exit"))
-                _requestExit();
-            ImGui.EndMenu();
-        }
-
-        if (ImGui.BeginMenu("Edit"))
-        {
-            var undo = _projectManager.CurrentSession?.Documents.Undo;
-            ImGui.BeginDisabled(undo?.CanUndo != true);
-            if (ImGui.MenuItem(undo?.UndoName is { } undoName ? $"Undo {undoName}" : "Undo", "Ctrl+Z"))
-                TryChangeHistory(redo: false);
-            ImGui.EndDisabled();
-            ImGui.BeginDisabled(undo?.CanRedo != true);
-            if (ImGui.MenuItem(undo?.RedoName is { } redoName ? $"Redo {redoName}" : "Redo", "Ctrl+Y"))
-                TryChangeHistory(redo: true);
-            ImGui.EndDisabled();
-            ImGui.Separator();
-            var autoSave = _workspaceState.AutoSave;
-            if (ImGui.MenuItem("Auto Save", string.Empty, ref autoSave))
-                _workspaceState.AutoSave = autoSave;
-            ImGui.EndMenu();
-        }
-
-        if (ImGui.BeginMenu("Assets"))
-        {
-            ImGui.BeginDisabled(_project is null);
-            if (ImGui.BeginMenu("Create"))
-            {
-                var projectPanel = _project is null
-                    ? null
-                    : (ProjectPanel)_panels.GetRequired(EditorPanelIds.Project);
-                if (ImGui.MenuItem("Entity Blueprint"))
-                    projectPanel!.RequestCreateAsset(typeof(EntityBlueprint));
-                if (ImGui.BeginMenu("Dreambit Asset"))
+                using (EditorGui.Disabled(_project is null))
                 {
-                    foreach (var type in _projectManager.CurrentSession!.EditorTypes.AssetTypes
-                                 .Where(type =>
-                                     type != typeof(EntityBlueprint) &&
-                                     AssetTypeClassifier.CanCreateAsset(type)))
-                        if (ImGui.MenuItem(type.Name))
-                            projectPanel!.RequestCreateAsset(type);
-                    ImGui.EndMenu();
+                    if (EditorGui.MenuItem("New Scene", "Ctrl+N"))
+                        _newScenePopupRequested = true;
+                    if (EditorGui.MenuItem("New LDtk Scene..."))
+                    {
+                        _ldtkSearch = string.Empty;
+                        _newLdtkImportOptions = new LDtkImportOptions();
+                        _newLdtkScenePopupRequested = true;
+                    }
+                    if (EditorGui.MenuItem("New Tiled Scene..."))
+                    {
+                        _tiledSearch = string.Empty;
+                        _newTiledImportOptions = new TiledImportOptions();
+                        _newTiledScenePopupRequested = true;
+                    }
+                    if (EditorGui.MenuItem("Open Scene...", "Ctrl+Shift+O"))
+                        _openScenePopupRequested = true;
+                    if (EditorGui.MenuItem("Save", "Ctrl+S"))
+                        SaveCurrentDocument();
+                    if (EditorGui.MenuItem("Save As...", "Ctrl+Shift+S"))
+                        RequestSaveSceneAs();
                 }
-                ImGui.EndMenu();
+                EditorGui.Separator();
+                if (EditorGui.MenuItem("Open Project...", "Ctrl+O"))
+                    _openProjectPopupRequested = true;
+                if (_project is not null && EditorGui.MenuItem("Close Project"))
+                    _requestExit();
+                EditorGui.Separator();
+                if (EditorGui.MenuItem("Exit"))
+                    _requestExit();
             }
-            ImGui.EndDisabled();
-            if (_project is not null && ImGui.MenuItem("Update Blobs"))
-                _projectManager.CurrentSession!.AssetBaking.RequestBake(false);
-            if (_project is not null && ImGui.MenuItem("Rebuild All Blobs"))
-                _projectManager.CurrentSession!.AssetBaking.RequestBake(true);
-            ImGui.EndMenu();
         }
 
-        if (ImGui.BeginMenu("Entity"))
+        using (var menu = EditorGui.Menu("Edit"))
         {
-            var session = _projectManager.CurrentSession;
-            var document = session is null || session.Documents.IsAsset
-                ? null
-                : session.Documents.Current;
-            ImGui.BeginDisabled(document is null);
-            if (ImGui.MenuItem("Create Empty"))
+            if (menu.IsOpen)
             {
-                TryEditActiveDocument(
-                    document!,
-                    () => document!.CreateEmpty(
-                        "Entity",
-                        session!.Documents.IsBlueprint ? session.Blueprints.Root : null),
-                    "Could not create the entity.");
+                var undo = _projectManager.CurrentSession?.Documents.Undo;
+                using (EditorGui.Disabled(undo?.CanUndo != true))
+                    if (EditorGui.MenuItem(
+                            undo?.UndoName is { } undoName ? $"Undo {undoName}" : "Undo",
+                            "Ctrl+Z"))
+                        TryChangeHistory(redo: false);
+                using (EditorGui.Disabled(undo?.CanRedo != true))
+                    if (EditorGui.MenuItem(
+                            undo?.RedoName is { } redoName ? $"Redo {redoName}" : "Redo",
+                            "Ctrl+Y"))
+                        TryChangeHistory(redo: true);
+                EditorGui.Separator();
+                var autoSave = _workspaceState.AutoSave;
+                if (EditorGui.MenuItem("Auto Save", ref autoSave))
+                    _workspaceState.AutoSave = autoSave;
             }
-            if (ImGui.MenuItem("Create From Blueprint"))
-            {
-                _blueprintSearch = string.Empty;
-                _createFromBlueprintPopupRequested = true;
-            }
-            ImGui.EndDisabled();
-            ImGui.EndMenu();
         }
 
-        if (ImGui.BeginMenu("Window"))
+        using (var menu = EditorGui.Menu("Assets"))
         {
-            if (_project is null)
+            if (menu.IsOpen)
             {
-                ImGui.TextDisabled("Open a project to show editor panels.");
+                using (EditorGui.Disabled(_project is null))
+                {
+                    using var create = EditorGui.Menu("Create");
+                    if (create.IsOpen)
+                    {
+                        var projectPanel = _project is null
+                            ? null
+                            : (ProjectPanel)_panels.GetRequired(EditorPanelIds.Project);
+                        if (EditorGui.MenuItem("Entity Blueprint"))
+                            projectPanel!.RequestCreateAsset(typeof(EntityBlueprint));
+                        using var assets = EditorGui.Menu("Dreambit Asset");
+                        if (assets.IsOpen)
+                            foreach (var type in _projectManager.CurrentSession!.EditorTypes.AssetTypes
+                                         .Where(type => type != typeof(EntityBlueprint) &&
+                                                        AssetTypeClassifier.CanCreateAsset(type)))
+                                if (EditorGui.MenuItem(type.Name))
+                                    projectPanel!.RequestCreateAsset(type);
+                    }
+                }
+                if (_project is not null && EditorGui.MenuItem("Update Blobs"))
+                    _projectManager.CurrentSession!.AssetBaking.RequestBake(false);
+                if (_project is not null && EditorGui.MenuItem("Rebuild All Blobs"))
+                    _projectManager.CurrentSession!.AssetBaking.RequestBake(true);
             }
-            else
-            {
-                _panels.DrawWindowMenu();
-                ImGui.Separator();
-                if (ImGui.MenuItem("Reset Layout"))
-                    _rebuildDockLayout = true;
-            }
-            ImGui.EndMenu();
         }
 
-        if (ImGui.BeginMenu("Build"))
+        using (var menu = EditorGui.Menu("Entity"))
         {
-            if (_project is not null && ImGui.MenuItem("Build Game"))
-                _projectManager.CurrentSession!.GameCode.RequestBuild(false, true);
-            if (_project is not null && ImGui.MenuItem("Rebuild Game"))
-                _projectManager.CurrentSession!.GameCode.RequestBuild(true, true);
-            ImGui.Separator();
-            if (_project is not null && ImGui.MenuItem("Bake Pak"))
-                _projectManager.CurrentSession!.AssetBaking.RequestPakBake();
-            ImGui.EndMenu();
+            if (menu.IsOpen)
+            {
+                var session = _projectManager.CurrentSession;
+                var document = session is null || session.Documents.IsAsset
+                    ? null
+                    : session.Documents.Current;
+                using (EditorGui.Disabled(document is null))
+                {
+                    if (EditorGui.MenuItem("Create Empty"))
+                        TryEditActiveDocument(
+                            document!,
+                            () => document!.CreateEmpty(
+                                "Entity",
+                                session!.Documents.IsBlueprint ? session.Blueprints.Root : null),
+                            "Could not create the entity.");
+                    if (EditorGui.MenuItem("Create From Blueprint"))
+                    {
+                        _blueprintSearch = string.Empty;
+                        _createFromBlueprintPopupRequested = true;
+                    }
+                }
+            }
         }
 
-        if (ImGui.BeginMenu("Help"))
+        using (var menu = EditorGui.Menu("Window"))
         {
-            if (ImGui.MenuItem("About Dreambit Editor"))
+            if (menu.IsOpen)
+            {
+                if (_project is null)
+                    EditorGui.MutedText("Open a project to show editor panels.");
+                else
+                {
+                    _panels.DrawWindowMenu();
+                    EditorGui.Separator();
+                    if (EditorGui.MenuItem("Reset Layout"))
+                        _rebuildDockLayout = true;
+                }
+            }
+        }
+
+        using (var menu = EditorGui.Menu("Build"))
+        {
+            if (menu.IsOpen)
+            {
+                if (_project is not null && EditorGui.MenuItem("Build Game"))
+                    _projectManager.CurrentSession!.GameCode.RequestBuild(false, true);
+                if (_project is not null && EditorGui.MenuItem("Rebuild Game"))
+                    _projectManager.CurrentSession!.GameCode.RequestBuild(true, true);
+                EditorGui.Separator();
+                if (_project is not null && EditorGui.MenuItem("Bake Pak"))
+                    _projectManager.CurrentSession!.AssetBaking.RequestPakBake();
+            }
+        }
+
+        using (var menu = EditorGui.Menu("Help"))
+        {
+            if (menu.IsOpen && EditorGui.MenuItem("About Dreambit Editor"))
                 _showAbout = true;
-            ImGui.EndMenu();
         }
-
-        ImGui.EndMenuBar();
     }
 
     private void DrawStatusBar()
     {
-        ImGui.Separator();
+        EditorGui.Separator();
         ImGui.SetCursorPosY(ImGui.GetCursorPosY() + 3f);
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 8f);
         var projectStatus = _project is null
             ? "No project open"
             : BuildProjectStatus();
-        ImGui.TextDisabled(projectStatus);
+        EditorGui.MutedText(projectStatus);
 
         var status = _projectCreationStatus.IsRunning
             ? "Creating project..."
@@ -482,8 +489,8 @@ internal sealed class EditorApplication : IDisposable
                 ? _projectManager.CurrentSession.GameCode.Status.Message
                 : _projectManager.CurrentSession?.AssetBaking.Status.Message ?? "Ready";
         var statusWidth = ImGui.CalcTextSize(status).X;
-        ImGui.SameLine(MathF.Max(0f, ImGui.GetWindowWidth() - statusWidth - 16f));
-        ImGui.TextDisabled(status);
+        EditorGui.Inline(MathF.Max(0f, ImGui.GetWindowWidth() - statusWidth - 16f));
+        EditorGui.MutedText(status);
     }
 
     private void HandleShortcuts()
@@ -562,27 +569,27 @@ internal sealed class EditorApplication : IDisposable
     {
         if (_newScenePopupRequested)
         {
-            ImGui.OpenPopup("New Scene##Dreambit.Editor");
+            EditorGui.OpenPopup("New Scene##Dreambit.Editor");
             _newScenePopupRequested = false;
         }
         if (_newLdtkScenePopupRequested)
         {
-            ImGui.OpenPopup("New LDtk Scene##Dreambit.Editor");
+            EditorGui.OpenPopup("New LDtk Scene##Dreambit.Editor");
             _newLdtkScenePopupRequested = false;
         }
         if (_newTiledScenePopupRequested)
         {
-            ImGui.OpenPopup("New Tiled Scene##Dreambit.Editor");
+            EditorGui.OpenPopup("New Tiled Scene##Dreambit.Editor");
             _newTiledScenePopupRequested = false;
         }
         if (_openScenePopupRequested)
         {
-            ImGui.OpenPopup("Open Scene##Dreambit.Editor");
+            EditorGui.OpenPopup("Open Scene##Dreambit.Editor");
             _openScenePopupRequested = false;
         }
         if (_saveSceneAsPopupRequested)
         {
-            ImGui.OpenPopup("Save Scene As##Dreambit.Editor");
+            EditorGui.OpenPopup("Save Scene As##Dreambit.Editor");
             _saveSceneAsPopupRequested = false;
         }
 
@@ -596,18 +603,24 @@ internal sealed class EditorApplication : IDisposable
 
     private void DrawNewScenePopup()
     {
-        if (!ImGui.BeginPopupModal("New Scene##Dreambit.Editor", ImGuiWindowFlags.AlwaysAutoResize))
+        using var popup = EditorGui.Modal("New Scene##Dreambit.Editor");
+        if (!popup.IsOpen)
             return;
-        ImGui.SetNextItemWidth(360f);
-        ImGui.InputText("Name", ref _newSceneName, 128);
-        if (ImGui.Button("Create", new Vector2(90f, 0f)) && !string.IsNullOrWhiteSpace(_newSceneName))
+
+        EditorGui.Property("NewScene.Name", "Name", ref _newSceneName, maxLength: 128);
+        if (EditorGui.Button(
+                "NewScene.Create",
+                "Create",
+                new Vector2(90f, 0f),
+                primary: true,
+                enabled: !string.IsNullOrWhiteSpace(_newSceneName)))
         {
             try
             {
                 _projectManager.CurrentSession!.Scenes.New(_newSceneName.Trim());
                 _projectManager.CurrentSession.Documents.ActivateScene();
                 _sceneOperationError = null;
-                ImGui.CloseCurrentPopup();
+                EditorGui.ClosePopup();
             }
             catch (Exception exception)
             {
@@ -616,238 +629,206 @@ internal sealed class EditorApplication : IDisposable
             }
         }
         if (!string.IsNullOrWhiteSpace(_sceneOperationError))
-            ImGui.TextColored(new Vector4(0.96f, 0.34f, 0.36f, 1f), _sceneOperationError);
-        ImGui.SameLine();
-        if (ImGui.Button("Cancel", new Vector2(90f, 0f)))
-            ImGui.CloseCurrentPopup();
-        ImGui.EndPopup();
+            EditorGui.Error(_sceneOperationError);
+        EditorGui.Inline();
+        if (EditorGui.Button("NewScene.Cancel", "Cancel", new Vector2(90f, 0f)))
+            EditorGui.ClosePopup();
     }
 
     private void DrawNewLDtkScenePopup()
     {
-        if (!ImGui.BeginPopupModal(
-                "New LDtk Scene##Dreambit.Editor",
-                ImGuiWindowFlags.AlwaysAutoResize))
+        using var popup = EditorGui.Modal("New LDtk Scene##Dreambit.Editor");
+        if (!popup.IsOpen)
             return;
 
         var session = _projectManager.CurrentSession!;
-        ImGui.TextWrapped(
+        EditorGui.WrappedText(
             "Choose an LDtk project/world. Its tilemap stays linked and entities placed " +
             "in Dreambit are preserved when LDtk is reimported.");
-        var pixelsPerUnit = _newLdtkImportOptions.PixelsPerUnit;
-        var baseDrawLayer = _newLdtkImportOptions.BaseDrawLayer;
-        var drawLayerStep = _newLdtkImportOptions.DrawLayerStep;
-        var worldDepthStride = _newLdtkImportOptions.WorldDepthDrawLayerStride;
-        var renderBackgroundColor = _newLdtkImportOptions.RenderLevelBackgroundColor;
-        var renderBackgroundImage = _newLdtkImportOptions.RenderLevelBackgroundImage;
-        var includeInvisibleLayers = _newLdtkImportOptions.IncludeInvisibleLayers;
-        ImGui.SetNextItemWidth(240f);
-        ImGui.DragFloat("Pixels Per Unit##NewLDtk", ref pixelsPerUnit, 0.1f, 0.001f, 100000f);
-        ImGui.SetNextItemWidth(240f);
-        ImGui.DragInt("Base Draw Layer##NewLDtk", ref baseDrawLayer, 1f);
-        ImGui.SetNextItemWidth(240f);
-        ImGui.DragInt("Draw Layer Step##NewLDtk", ref drawLayerStep, 1f, 1, 100000);
-        ImGui.SetNextItemWidth(240f);
-        ImGui.DragInt("World Depth Stride##NewLDtk", ref worldDepthStride, 1f, 1, int.MaxValue);
-        ImGui.Checkbox("Render Background Color##NewLDtk", ref renderBackgroundColor);
-        ImGui.Checkbox("Render Background Image##NewLDtk", ref renderBackgroundImage);
-        ImGui.Checkbox("Include Invisible Layers##NewLDtk", ref includeInvisibleLayers);
-        _newLdtkImportOptions.PixelsPerUnit = pixelsPerUnit;
-        _newLdtkImportOptions.BaseDrawLayer = baseDrawLayer;
-        _newLdtkImportOptions.DrawLayerStep = drawLayerStep;
-        _newLdtkImportOptions.WorldDepthDrawLayerStride = worldDepthStride;
-        _newLdtkImportOptions.RenderLevelBackgroundColor = renderBackgroundColor;
-        _newLdtkImportOptions.RenderLevelBackgroundImage = renderBackgroundImage;
-        _newLdtkImportOptions.IncludeInvisibleLayers = includeInvisibleLayers;
-        ImGui.Separator();
-        ImGui.SetNextItemWidth(520f);
-        ImGui.InputTextWithHint("##LDtkSearch", "Search LDtk projects", ref _ldtkSearch, 256);
-        ImGui.BeginChild("##LDtkResults", new Vector2(520f, 300f), ImGuiChildFlags.Borders);
-        var projects = session.Assets.GetSnapshot().Assets
-            .Where(asset => asset.Kind == AssetKind.Ldtk &&
-                            asset.RelativePath.EndsWith(".ldtk", StringComparison.OrdinalIgnoreCase) &&
-                            (string.IsNullOrWhiteSpace(_ldtkSearch) ||
-                             asset.RelativePath.Contains(_ldtkSearch, StringComparison.OrdinalIgnoreCase)))
-            .ToArray();
-        if (projects.Length == 0)
-            ImGui.TextDisabled("No matching .ldtk projects were found under Assets.");
-        foreach (var asset in projects)
+        ImportOptionsEditorGui.Draw(_newLdtkImportOptions, "NewLDtk");
+        EditorGui.Separator();
+        EditorGui.SearchInput("NewLDtk.Search", "Search LDtk projects", ref _ldtkSearch);
+        using (var results = EditorGui.Child(
+                   "##LDtkResults",
+                   new Vector2(520f, 300f),
+                   ImGuiChildFlags.Borders))
         {
-            try
+            if (results.IsVisible)
             {
-                foreach (var world in session.Scenes.GetLDtkWorldChoices(asset))
+                var projects = session.Assets.GetSnapshot().Assets
+                    .Where(asset => asset.Kind == AssetKind.Ldtk &&
+                                    asset.RelativePath.EndsWith(".ldtk", StringComparison.OrdinalIgnoreCase) &&
+                                    (string.IsNullOrWhiteSpace(_ldtkSearch) ||
+                                     asset.RelativePath.Contains(
+                                         _ldtkSearch,
+                                         StringComparison.OrdinalIgnoreCase)))
+                    .ToArray();
+                if (projects.Length == 0)
+                    EditorGui.MutedText("No matching .ldtk projects were found under Assets.");
+                foreach (var asset in projects)
                 {
-                    var label = $"{asset.RelativePath}  /  {world.DisplayName}##{asset.Id.Value:N}-{world.WorldIid:N}";
-                    if (!ImGui.Selectable(label))
-                        continue;
-                    if (!session.AssetEditing.Clear())
+                    try
                     {
-                        _sceneOperationError =
-                            "Could not create the LDtk scene because the current asset could not be saved.";
-                        continue;
+                        foreach (var world in session.Scenes.GetLDtkWorldChoices(asset))
+                        {
+                            var choiceId = $"{asset.Id.Value:N}-{world.WorldIid:N}";
+                            if (!EditorGui.Selectable(
+                                    choiceId,
+                                    $"{asset.RelativePath}  /  {world.DisplayName}"))
+                                continue;
+                            if (!session.AssetEditing.Clear())
+                            {
+                                _sceneOperationError =
+                                    "Could not create the LDtk scene because the current asset could not be saved.";
+                                continue;
+                            }
+                            session.Scenes.NewFromLDtk(
+                                asset,
+                                world.WorldIid,
+                                world.DisplayName,
+                                _newLdtkImportOptions);
+                            session.Documents.ActivateScene();
+                            _sceneOperationError = null;
+                            EditorGui.ClosePopup();
+                        }
                     }
-                    session.Scenes.NewFromLDtk(
-                        asset,
-                        world.WorldIid,
-                        world.DisplayName,
-                        _newLdtkImportOptions);
-                    session.Documents.ActivateScene();
-                    _sceneOperationError = null;
-                    ImGui.CloseCurrentPopup();
+                    catch (Exception exception)
+                    {
+                        EditorGui.Error($"{asset.RelativePath}: {exception.Message}");
+                    }
                 }
             }
-            catch (Exception exception)
-            {
-                ImGui.TextColored(
-                    new Vector4(0.96f, 0.34f, 0.36f, 1f),
-                    $"{asset.RelativePath}: {exception.Message}");
-            }
         }
-        ImGui.EndChild();
         if (!string.IsNullOrWhiteSpace(_sceneOperationError))
-            ImGui.TextColored(new Vector4(0.96f, 0.34f, 0.36f, 1f), _sceneOperationError);
-        if (ImGui.Button("Cancel", new Vector2(90f, 0f)))
-            ImGui.CloseCurrentPopup();
-        ImGui.EndPopup();
+            EditorGui.Error(_sceneOperationError);
+        if (EditorGui.Button("NewLDtk.Cancel", "Cancel", new Vector2(90f, 0f)))
+            EditorGui.ClosePopup();
     }
 
     private void DrawNewTiledScenePopup()
     {
-        if (!ImGui.BeginPopupModal(
-                "New Tiled Scene##Dreambit.Editor",
-                ImGuiWindowFlags.AlwaysAutoResize))
+        using var popup = EditorGui.Modal("New Tiled Scene##Dreambit.Editor");
+        if (!popup.IsOpen)
             return;
 
         var session = _projectManager.CurrentSession!;
-        ImGui.TextWrapped(
+        EditorGui.WrappedText(
             "Choose a Tiled TMX map. Its tile layers stay linked while entities placed in " +
             "Dreambit are preserved on reimport. Object and image layers are ignored.");
-        var pixelsPerUnit = _newTiledImportOptions.PixelsPerUnit;
-        var baseDrawLayer = _newTiledImportOptions.BaseDrawLayer;
-        var drawLayerStep = _newTiledImportOptions.DrawLayerStep;
-        var worldDepth = _newTiledImportOptions.WorldDepth;
-        var worldDepthStride = _newTiledImportOptions.WorldDepthDrawLayerStride;
-        var renderBackgroundColor = _newTiledImportOptions.RenderMapBackgroundColor;
-        var includeInvisibleLayers = _newTiledImportOptions.IncludeInvisibleLayers;
-        ImGui.SetNextItemWidth(240f);
-        ImGui.DragFloat("Pixels Per Unit##NewTiled", ref pixelsPerUnit, 0.1f, 0.001f, 100000f);
-        ImGui.SetNextItemWidth(240f);
-        ImGui.DragInt("Base Draw Layer##NewTiled", ref baseDrawLayer, 1f);
-        ImGui.SetNextItemWidth(240f);
-        ImGui.DragInt("Draw Layer Step##NewTiled", ref drawLayerStep, 1f, 1, 100000);
-        ImGui.SetNextItemWidth(240f);
-        ImGui.DragInt("World Depth##NewTiled", ref worldDepth, 1f);
-        ImGui.SetNextItemWidth(240f);
-        ImGui.DragInt("World Depth Stride##NewTiled", ref worldDepthStride, 1f, 1, int.MaxValue);
-        ImGui.Checkbox("Render Background Color##NewTiled", ref renderBackgroundColor);
-        ImGui.Checkbox("Include Invisible Layers##NewTiled", ref includeInvisibleLayers);
-        _newTiledImportOptions.PixelsPerUnit = pixelsPerUnit;
-        _newTiledImportOptions.BaseDrawLayer = baseDrawLayer;
-        _newTiledImportOptions.DrawLayerStep = drawLayerStep;
-        _newTiledImportOptions.WorldDepth = worldDepth;
-        _newTiledImportOptions.WorldDepthDrawLayerStride = worldDepthStride;
-        _newTiledImportOptions.RenderMapBackgroundColor = renderBackgroundColor;
-        _newTiledImportOptions.IncludeInvisibleLayers = includeInvisibleLayers;
-        ImGui.Separator();
-        ImGui.SetNextItemWidth(520f);
-        ImGui.InputTextWithHint("##TiledSearch", "Search TMX maps", ref _tiledSearch, 256);
-        ImGui.BeginChild("##TiledResults", new Vector2(520f, 300f), ImGuiChildFlags.Borders);
-        var maps = session.Assets.GetSnapshot().Assets
-            .Where(asset => asset.Kind == AssetKind.TiledMap &&
-                            asset.RelativePath.EndsWith(".tmx", StringComparison.OrdinalIgnoreCase) &&
-                            (string.IsNullOrWhiteSpace(_tiledSearch) ||
-                             asset.RelativePath.Contains(_tiledSearch, StringComparison.OrdinalIgnoreCase)))
-            .ToArray();
-        if (maps.Length == 0)
-            ImGui.TextDisabled("No matching .tmx maps were found under Assets.");
-        foreach (var asset in maps)
+        ImportOptionsEditorGui.Draw(_newTiledImportOptions, "NewTiled");
+        EditorGui.Separator();
+        EditorGui.SearchInput("NewTiled.Search", "Search TMX maps", ref _tiledSearch);
+        using (var results = EditorGui.Child(
+                   "##TiledResults",
+                   new Vector2(520f, 300f),
+                   ImGuiChildFlags.Borders))
         {
-            if (!ImGui.Selectable($"{asset.RelativePath}##{asset.Id.Value:N}"))
-                continue;
-            try
+            if (results.IsVisible)
             {
-                if (!session.AssetEditing.Clear())
+                var maps = session.Assets.GetSnapshot().Assets
+                    .Where(asset => asset.Kind == AssetKind.TiledMap &&
+                                    asset.RelativePath.EndsWith(".tmx", StringComparison.OrdinalIgnoreCase) &&
+                                    (string.IsNullOrWhiteSpace(_tiledSearch) ||
+                                     asset.RelativePath.Contains(
+                                         _tiledSearch,
+                                         StringComparison.OrdinalIgnoreCase)))
+                    .ToArray();
+                if (maps.Length == 0)
+                    EditorGui.MutedText("No matching .tmx maps were found under Assets.");
+                foreach (var asset in maps)
                 {
-                    _sceneOperationError =
-                        "Could not create the Tiled scene because the current asset could not be saved.";
-                    continue;
+                    if (!EditorGui.Selectable(asset.Id.Value.ToString("N"), asset.RelativePath))
+                        continue;
+                    try
+                    {
+                        if (!session.AssetEditing.Clear())
+                        {
+                            _sceneOperationError =
+                                "Could not create the Tiled scene because the current asset could not be saved.";
+                            continue;
+                        }
+                        session.Scenes.NewFromTiled(asset, _newTiledImportOptions);
+                        session.Documents.ActivateScene();
+                        _sceneOperationError = null;
+                        EditorGui.ClosePopup();
+                    }
+                    catch (Exception exception)
+                    {
+                        _sceneOperationError =
+                            $"Could not create a Tiled scene from '{asset.RelativePath}'. {exception.Message}";
+                        _logs.Error(
+                            "Tiled",
+                            $"Could not create a Tiled scene from '{asset.RelativePath}'.",
+                            exception);
+                        EditorGui.Error($"{asset.RelativePath}: {exception.Message}");
+                    }
                 }
-                session.Scenes.NewFromTiled(asset, _newTiledImportOptions);
-                session.Documents.ActivateScene();
-                _sceneOperationError = null;
-                ImGui.CloseCurrentPopup();
-            }
-            catch (Exception exception)
-            {
-                _sceneOperationError =
-                    $"Could not create a Tiled scene from '{asset.RelativePath}'. {exception.Message}";
-                _logs.Error(
-                    "Tiled",
-                    $"Could not create a Tiled scene from '{asset.RelativePath}'.",
-                    exception);
-                ImGui.TextColored(
-                    new Vector4(0.96f, 0.34f, 0.36f, 1f),
-                    $"{asset.RelativePath}: {exception.Message}");
             }
         }
-        ImGui.EndChild();
         if (!string.IsNullOrWhiteSpace(_sceneOperationError))
-            ImGui.TextColored(new Vector4(0.96f, 0.34f, 0.36f, 1f), _sceneOperationError);
-        if (ImGui.Button("Cancel", new Vector2(90f, 0f)))
-            ImGui.CloseCurrentPopup();
-        ImGui.EndPopup();
+            EditorGui.Error(_sceneOperationError);
+        if (EditorGui.Button("NewTiled.Cancel", "Cancel", new Vector2(90f, 0f)))
+            EditorGui.ClosePopup();
     }
 
     private void DrawCreateFromBlueprintPopup()
     {
         if (_createFromBlueprintPopupRequested)
         {
-            ImGui.OpenPopup("Create From Blueprint##Dreambit.Editor");
+            EditorGui.OpenPopup("Create From Blueprint##Dreambit.Editor");
             _createFromBlueprintPopupRequested = false;
         }
-        if (!ImGui.BeginPopupModal(
-                "Create From Blueprint##Dreambit.Editor",
-                ImGuiWindowFlags.AlwaysAutoResize))
+        using var popup = EditorGui.Modal("Create From Blueprint##Dreambit.Editor");
+        if (!popup.IsOpen)
             return;
 
         var session = _projectManager.CurrentSession!;
         var document = session.Documents.IsAsset
             ? null
             : session.Documents.Current;
-        ImGui.SetNextItemWidth(460f);
-        ImGui.InputTextWithHint("##BlueprintSearch", "Search Blueprints", ref _blueprintSearch, 256);
-        ImGui.BeginChild("##BlueprintResults", new Vector2(460f, 300f), ImGuiChildFlags.Borders);
-        var blueprints = session.Assets.GetSnapshot().Assets
-            .Where(asset => asset.Kind == AssetKind.Blueprint &&
-                            (string.IsNullOrWhiteSpace(_blueprintSearch) ||
-                             asset.RelativePath.Contains(_blueprintSearch, StringComparison.OrdinalIgnoreCase)))
-            .ToArray();
-        if (blueprints.Length == 0)
-            ImGui.TextDisabled("No matching Entity Blueprints.");
-        foreach (var blueprint in blueprints)
+        EditorGui.SearchInput("CreateBlueprint.Search", "Search Blueprints", ref _blueprintSearch);
+        using (var results = EditorGui.Child(
+                   "##BlueprintResults",
+                   new Vector2(460f, 300f),
+                   ImGuiChildFlags.Borders))
         {
-            if (!ImGui.Selectable(blueprint.RelativePath))
-                continue;
-            try
+            if (results.IsVisible)
             {
-                using var source = session.BlueprintSources.Load(blueprint);
-                document!.InstantiateBlueprint(
-                    source,
-                    parent: session.Documents.IsBlueprint ? session.Blueprints.Root : null);
-                _sceneOperationError = null;
-                ImGui.CloseCurrentPopup();
-            }
-            catch (Exception exception)
-            {
-                _sceneOperationError = exception.Message;
+                var blueprints = session.Assets.GetSnapshot().Assets
+                    .Where(asset => asset.Kind == AssetKind.Blueprint &&
+                                    (string.IsNullOrWhiteSpace(_blueprintSearch) ||
+                                     asset.RelativePath.Contains(
+                                         _blueprintSearch,
+                                         StringComparison.OrdinalIgnoreCase)))
+                    .ToArray();
+                if (blueprints.Length == 0)
+                    EditorGui.MutedText("No matching Entity Blueprints.");
+                foreach (var blueprint in blueprints)
+                {
+                    if (!EditorGui.Selectable(
+                            blueprint.Id.Value.ToString("N"),
+                            blueprint.RelativePath))
+                        continue;
+                    try
+                    {
+                        using var source = session.BlueprintSources.Load(blueprint);
+                        document!.InstantiateBlueprint(
+                            source,
+                            parent: session.Documents.IsBlueprint ? session.Blueprints.Root : null);
+                        _sceneOperationError = null;
+                        EditorGui.ClosePopup();
+                    }
+                    catch (Exception exception)
+                    {
+                        _sceneOperationError = exception.Message;
+                    }
+                }
             }
         }
-        ImGui.EndChild();
         if (!string.IsNullOrWhiteSpace(_sceneOperationError))
-            ImGui.TextColored(new Vector4(0.96f, 0.34f, 0.36f, 1f), _sceneOperationError);
-        if (ImGui.Button("Cancel", new Vector2(90f, 0f)))
-            ImGui.CloseCurrentPopup();
-        ImGui.EndPopup();
+            EditorGui.Error(_sceneOperationError);
+        if (EditorGui.Button("CreateBlueprint.Cancel", "Cancel", new Vector2(90f, 0f)))
+            EditorGui.ClosePopup();
     }
 
     private void TryEditActiveDocument(
@@ -869,23 +850,27 @@ internal sealed class EditorApplication : IDisposable
 
     private void DrawScenePathPopup(string popupName, string action, Func<string, bool> execute)
     {
-        if (!ImGui.BeginPopupModal(popupName, ImGuiWindowFlags.AlwaysAutoResize))
+        using var popup = EditorGui.Modal(popupName);
+        if (!popup.IsOpen)
             return;
-        ImGui.TextDisabled("Path is relative to the project's raw Assets folder.");
-        ImGui.SetNextItemWidth(520f);
-        var submit = ImGui.InputText(
-            "##ScenePath",
+        EditorGui.MutedText("Path is relative to the project's raw Assets folder.");
+        var submit = EditorGui.Property(
+            $"{popupName}.Path",
+            "Path",
             ref _scenePath,
-            1024,
-            ImGuiInputTextFlags.EnterReturnsTrue);
+            maxLength: 1024,
+            commitOnEnter: true);
         if (!string.IsNullOrWhiteSpace(_sceneOperationError))
-            ImGui.TextColored(new Vector4(0.96f, 0.34f, 0.36f, 1f), _sceneOperationError);
-        if ((submit || ImGui.Button(action, new Vector2(90f, 0f))) && execute(_scenePath))
-            ImGui.CloseCurrentPopup();
-        ImGui.SameLine();
-        if (ImGui.Button("Cancel", new Vector2(90f, 0f)))
-            ImGui.CloseCurrentPopup();
-        ImGui.EndPopup();
+            EditorGui.Error(_sceneOperationError);
+        if ((submit || EditorGui.Button(
+                 $"{popupName}.Submit",
+                 action,
+                 new Vector2(90f, 0f),
+                 primary: true)) && execute(_scenePath))
+            EditorGui.ClosePopup();
+        EditorGui.Inline();
+        if (EditorGui.Button($"{popupName}.Cancel", "Cancel", new Vector2(90f, 0f)))
+            EditorGui.ClosePopup();
     }
 
     private bool TryOpenScene(string path)
@@ -1015,67 +1000,62 @@ internal sealed class EditorApplication : IDisposable
     {
         if (_openProjectPopupRequested)
         {
-            ImGui.OpenPopup("Open Project##Dreambit.Editor.OpenProject");
+            EditorGui.OpenPopup("Open Project##Dreambit.Editor.OpenProject");
             _openProjectPopupRequested = false;
         }
 
         var isOpen = true;
-        if (!ImGui.BeginPopupModal(
-                "Open Project##Dreambit.Editor.OpenProject",
-                ref isOpen,
-                ImGuiWindowFlags.AlwaysAutoResize))
+        using var popup = EditorGui.Modal(
+            "Open Project##Dreambit.Editor.OpenProject",
+            ref isOpen);
+        if (!popup.IsOpen)
             return;
 
-        ImGui.Text("Open a project in a new Dreambit Editor process.");
-        ImGui.SetNextItemWidth(520f);
-        ImGui.InputTextWithHint(
-            "##OpenProjectPath",
-            "Project directory",
+        EditorGui.WrappedText("Open a project in a new Dreambit Editor process.");
+        EditorGui.Property(
+            "OpenProject.Path",
+            "Project",
             ref _openProjectPath,
-            1_024);
+            maxLength: 1_024,
+            hint: "Project directory");
 
         if (!string.IsNullOrWhiteSpace(_openProjectError))
-        {
-            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.96f, 0.34f, 0.36f, 1f));
-            ImGui.TextWrapped(_openProjectError);
-            ImGui.PopStyleColor();
-        }
+            EditorGui.Error(_openProjectError);
 
-        if (ImGui.Button("Open", new Vector2(90f, 0f)) &&
+        if (EditorGui.Button(
+                "OpenProject.Submit",
+                "Open",
+                new Vector2(90f, 0f),
+                primary: true) &&
             TryLaunchProject(_openProjectPath))
         {
             _openProjectError = null;
-            ImGui.CloseCurrentPopup();
+            EditorGui.ClosePopup();
         }
 
-        ImGui.SameLine();
-        if (ImGui.Button("Cancel", new Vector2(90f, 0f)))
-            ImGui.CloseCurrentPopup();
-
-        ImGui.EndPopup();
+        EditorGui.Inline();
+        if (EditorGui.Button("OpenProject.Cancel", "Cancel", new Vector2(90f, 0f)))
+            EditorGui.ClosePopup();
     }
 
     private void DrawAboutPopup()
     {
         if (_showAbout)
         {
-            ImGui.OpenPopup("About Dreambit Editor");
+            EditorGui.OpenPopup("About Dreambit Editor");
             _showAbout = false;
         }
 
-        if (!ImGui.BeginPopupModal(
-                "About Dreambit Editor",
-                ImGuiWindowFlags.AlwaysAutoResize))
+        using var popup = EditorGui.Modal("About Dreambit Editor");
+        if (!popup.IsOpen)
             return;
 
-        ImGui.Text("Dreambit Editor");
-        ImGui.TextDisabled("MonoGame 3.8.5 / DesktopVK / ImGui.NET");
-        ImGui.Spacing();
-        ImGui.TextWrapped("A focused visual authoring environment for DreambitEngine.");
-        ImGui.Spacing();
-        if (ImGui.Button("Close", new Vector2(90f, 0f)))
-            ImGui.CloseCurrentPopup();
-        ImGui.EndPopup();
+        EditorGui.Header("Dreambit Editor", "MonoGame 3.8.5 / DesktopVK / ImGui.NET");
+        EditorGui.Space();
+        EditorGui.WrappedText("A focused visual authoring environment for DreambitEngine.");
+        EditorGui.Space();
+        if (EditorGui.Button("About.Close", "Close", new Vector2(90f, 0f), primary: true))
+            EditorGui.ClosePopup();
     }
 
     private bool TryLaunchProjectFromLauncher(string projectPath)
@@ -1150,51 +1130,50 @@ internal sealed class EditorApplication : IDisposable
     {
         if (_projectUpgradePopupRequested)
         {
-            ImGui.OpenPopup("Update Dreambit Project##Dreambit.Editor.ProjectUpdate");
+            EditorGui.OpenPopup("Update Dreambit Project##Dreambit.Editor.ProjectUpdate");
             _projectUpgradePopupRequested = false;
         }
 
-        if (!ImGui.BeginPopupModal(
-                "Update Dreambit Project##Dreambit.Editor.ProjectUpdate",
-                ImGuiWindowFlags.AlwaysAutoResize))
-        {
+        using var popup = EditorGui.Modal(
+            "Update Dreambit Project##Dreambit.Editor.ProjectUpdate");
+        if (!popup.IsOpen)
             return;
-        }
 
         var candidate = _projectUpgradeCandidate;
         if (candidate is null)
         {
-            ImGui.CloseCurrentPopup();
-            ImGui.EndPopup();
+            EditorGui.ClosePopup();
             return;
         }
 
-        ImGui.TextWrapped(
+        EditorGui.WrappedText(
             $"'{candidate.ProjectName}' uses Dreambit SDK {candidate.CurrentVersion}, but this " +
             $"Editor provides {DreambitSdkConstants.CurrentVersion}.");
-        ImGui.Spacing();
-        ImGui.TextWrapped(
+        EditorGui.Space();
+        EditorGui.WrappedText(
             "Would you like Dreambit to update the project and restore its matching packages before opening it?");
 
         if (!string.IsNullOrWhiteSpace(_projectUpgradeMessage))
         {
-            ImGui.Spacing();
-            ImGui.PushStyleColor(
-                ImGuiCol.Text,
+            EditorGui.Space();
+            EditorGui.Message(
                 _projectUpgradeIsError
-                    ? new Vector4(0.96f, 0.34f, 0.36f, 1f)
-                    : new Vector4(0.38f, 0.78f, 0.52f, 1f));
-            ImGui.TextWrapped(_projectUpgradeMessage);
-            ImGui.PopStyleColor();
+                    ? EditorGuiMessageKind.Error
+                    : EditorGuiMessageKind.Success,
+                _projectUpgradeMessage);
         }
 
         var updating = _projectUpgradeTask is not null;
         if (updating)
         {
-            ImGui.Spacing();
-            ImGui.TextDisabled("Updating project and restoring packages...");
+            EditorGui.Space();
+            EditorGui.MutedText("Updating project and restoring packages...");
         }
-        else if (ImGui.Button("Update and Open", new Vector2(130f, 0f)))
+        else if (EditorGui.Button(
+                     "ProjectUpdate.Confirm",
+                     "Update and Open",
+                     new Vector2(130f, 0f),
+                     primary: true))
         {
             _projectUpgradeMessage = "Updating project and restoring packages...";
             _projectUpgradeIsError = false;
@@ -1203,21 +1182,22 @@ internal sealed class EditorApplication : IDisposable
                 _projectUpgradeLifetime.Token);
         }
 
-        ImGui.SameLine();
-        if (!updating && ImGui.Button("Not Now", new Vector2(90f, 0f)))
+        EditorGui.Inline();
+        if (!updating && EditorGui.Button(
+                "ProjectUpdate.Cancel",
+                "Not Now",
+                new Vector2(90f, 0f)))
         {
             _projectUpgradeCandidate = null;
             _projectUpgradeMessage = null;
-            ImGui.CloseCurrentPopup();
+            EditorGui.ClosePopup();
         }
 
         if (_closeProjectUpgradePopup)
         {
             _closeProjectUpgradePopup = false;
-            ImGui.CloseCurrentPopup();
+            EditorGui.ClosePopup();
         }
-
-        ImGui.EndPopup();
     }
 
     private void CaptureCurrentWindowPlacement()

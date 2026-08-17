@@ -1,6 +1,7 @@
 using System.Numerics;
 using Dreambit.ECS;
 using Dreambit.Editor.Persistence;
+using Dreambit.EditorApi;
 using ImGuiNET;
 using XnaVector2 = Microsoft.Xna.Framework.Vector2;
 
@@ -25,41 +26,49 @@ internal static class EditorViewportUi
 
     public static void DrawSettingsPopup(string id, EditorWorkspaceState workspace)
     {
-        if (!ImGui.BeginPopup(id))
+        using var popup = EditorGui.Popup(id);
+        if (!popup.IsOpen)
             return;
 
-        ImGui.TextUnformatted("Scene View");
-        ImGui.Separator();
+        EditorGui.Header("Scene View", "Grid and transform snapping");
 
         var showGrid = workspace.ShowGrid;
-        if (ImGui.Checkbox("Show Grid", ref showGrid))
+        if (EditorGui.Property("Viewport.ShowGrid", "Show Grid", ref showGrid))
             workspace.ShowGrid = showGrid;
 
         var gridSize = NormalizeGridSize(workspace.GridSize);
-        ImGui.SetNextItemWidth(150f);
-        if (ImGui.DragFloat("Grid Size", ref gridSize, 0.05f, 0.001f, 0f, "%.3f"))
+        if (EditorGui.Property(
+                "Viewport.GridSize",
+                "Grid Size",
+                ref gridSize,
+                speed: 0.05f,
+                min: 0.001f,
+                format: "%.3f",
+                tooltip: "World units between grid lines. Ctrl+click to type an exact value."))
             workspace.GridSize = NormalizeGridSize(gridSize);
-        if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("World units between grid lines. Ctrl+click to type an exact value.");
 
-        ImGui.Spacing();
+        EditorGui.Space(EditorGuiSpacing.Compact);
         var snap = workspace.SnapEnabled;
-        if (ImGui.Checkbox("Enable Snapping", ref snap))
+        if (EditorGui.Property("Viewport.SnapEnabled", "Enable Snapping", ref snap))
             workspace.SnapEnabled = snap;
 
-        ImGui.BeginDisabled(!workspace.SnapEnabled);
-        var moveSnap = workspace.MoveSnap;
-        if (DrawPositiveSetting("Move Step", ref moveSnap, 0.05f, 0.001f, "%.3f"))
-            workspace.MoveSnap = moveSnap;
-        var rotateSnap = workspace.RotateSnapDegrees;
-        if (DrawPositiveSetting("Rotation Step", ref rotateSnap, 1f, 0.1f, "%.1f deg"))
-            workspace.RotateSnapDegrees = rotateSnap;
-        var scaleSnap = workspace.ScaleSnap;
-        if (DrawPositiveSetting("Scale Step", ref scaleSnap, 0.01f, 0.001f, "%.3f"))
-            workspace.ScaleSnap = scaleSnap;
-        ImGui.EndDisabled();
+        using (EditorGui.Disabled(!workspace.SnapEnabled))
+        {
+            var moveSnap = workspace.MoveSnap;
+            if (DrawPositiveSetting(
+                    "Viewport.MoveSnap", "Move Step", ref moveSnap, 0.05f, 0.001f, "%.3f"))
+                workspace.MoveSnap = moveSnap;
+            var rotateSnap = workspace.RotateSnapDegrees;
+            if (DrawPositiveSetting(
+                    "Viewport.RotateSnap", "Rotation Step", ref rotateSnap, 1f, 0.1f, "%.1f deg"))
+                workspace.RotateSnapDegrees = rotateSnap;
+            var scaleSnap = workspace.ScaleSnap;
+            if (DrawPositiveSetting(
+                    "Viewport.ScaleSnap", "Scale Step", ref scaleSnap, 0.01f, 0.001f, "%.3f"))
+                workspace.ScaleSnap = scaleSnap;
+        }
 
-        if (ImGui.Button("Reset View Settings"))
+        if (EditorGui.FullWidthButton("Viewport.Reset", "Reset View Settings"))
         {
             workspace.ShowGrid = true;
             workspace.GridSize = 1f;
@@ -68,8 +77,6 @@ internal static class EditorViewportUi
             workspace.RotateSnapDegrees = 15f;
             workspace.ScaleSnap = 0.1f;
         }
-
-        ImGui.EndPopup();
     }
 
     public static void DrawGrid(
@@ -97,8 +104,8 @@ internal static class EditorViewportUi
 
         var minimumX = MathF.Floor(bounds.Left / step) * step;
         var minimumY = MathF.Floor(bounds.Top / step) * step;
-        var color = ImGui.GetColorU32(new Vector4(0.72f, 0.76f, 0.84f, 0.10f));
-        var axisColor = ImGui.GetColorU32(new Vector4(0.34f, 0.68f, 1f, 0.34f));
+        var color = ImGui.GetColorU32(EditorGuiTheme.Grid);
+        var axisColor = ImGui.GetColorU32(EditorGuiTheme.GridAxis);
 
         var lineCount = 0;
         for (var worldX = minimumX;
@@ -132,6 +139,7 @@ internal static class EditorViewportUi
     }
 
     private static bool DrawPositiveSetting(
+        string id,
         string label,
         ref float value,
         float speed,
@@ -139,8 +147,7 @@ internal static class EditorViewportUi
         string format)
     {
         var edited = float.IsFinite(value) ? MathF.Max(minimum, value) : minimum;
-        ImGui.SetNextItemWidth(150f);
-        if (!ImGui.DragFloat(label, ref edited, speed, minimum, 0f, format))
+        if (!EditorGui.Property(id, label, ref edited, speed, minimum, format: format))
             return false;
         value = float.IsFinite(edited) ? MathF.Max(minimum, edited) : minimum;
         return true;

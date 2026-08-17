@@ -1,9 +1,8 @@
 using Dreambit.ECS;
 using Dreambit.Editor.Assets;
-using ImGuiNET;
+using Dreambit.EditorApi;
 using Newtonsoft.Json.Linq;
 using Vector3 = System.Numerics.Vector3;
-using Vector4 = System.Numerics.Vector4;
 
 namespace Dreambit.Editor.Inspection;
 
@@ -21,103 +20,76 @@ internal sealed class BlueprintInspector(
         var context = new DrawContext(blueprint, assets);
 
         var name = blueprint.Name;
-        InspectorUi.PropertyRow("Blueprint.Name", "Name", () =>
-        {
-            if (ImGui.InputText("##Value", ref name, 256))
-                document.Apply(
-                    "Rename Blueprint",
-                    asset => ((EntityBlueprint)asset).Name = name,
-                    $"Blueprint.{blueprint.Guid:N}.Name");
-        });
+        if (EditorGui.Property("Blueprint.Name", "Name", ref name, maxLength: 256))
+            document.Apply(
+                "Rename Blueprint",
+                asset => ((EntityBlueprint)asset).Name = name,
+                $"Blueprint.{blueprint.Guid:N}.Name");
 
         var enabled = blueprint.Enabled;
-        InspectorUi.PropertyRow("Blueprint.Enabled", "Enabled", () =>
-        {
-            if (ImGui.Checkbox("##Value", ref enabled))
-                document.Apply(
-                    "Set Blueprint Enabled",
-                    asset => ((EntityBlueprint)asset).Enabled = enabled,
-                    $"Blueprint.{blueprint.Guid:N}.Enabled");
-        });
+        if (EditorGui.Property("Blueprint.Enabled", "Enabled", ref enabled))
+            document.Apply(
+                "Set Blueprint Enabled",
+                asset => ((EntityBlueprint)asset).Enabled = enabled,
+                $"Blueprint.{blueprint.Guid:N}.Enabled");
 
-        ImGui.TextDisabled("Drag to adjust. Double-click a number to type an exact value.");
+        EditorGui.MutedText("Drag to adjust. Double-click a number to type an exact value.");
         var position = new Vector3(blueprint.Position.X, blueprint.Position.Y, blueprint.Position.Z);
-        InspectorUi.PropertyRow("Blueprint.Position", "Position", () =>
-        {
-            if (ImGui.DragFloat3("##Value", ref position, 0.1f))
-                document.Apply(
-                    "Change Blueprint Position",
-                    asset => ((EntityBlueprint)asset).Position =
-                        new Microsoft.Xna.Framework.Vector3(position.X, position.Y, position.Z),
-                    $"Blueprint.{blueprint.Guid:N}.Position");
-        });
+        if (EditorGui.Property("Blueprint.Position", "Position", ref position))
+            document.Apply(
+                "Change Blueprint Position",
+                asset => ((EntityBlueprint)asset).Position =
+                    new Microsoft.Xna.Framework.Vector3(position.X, position.Y, position.Z),
+                $"Blueprint.{blueprint.Guid:N}.Position");
 
         var rotation = new Vector3(blueprint.Rotation.X, blueprint.Rotation.Y, blueprint.Rotation.Z);
-        InspectorUi.PropertyRow("Blueprint.Rotation", "Rotation", () =>
-        {
-            if (ImGui.DragFloat3("##Value", ref rotation, 0.01f))
-                document.Apply(
-                    "Change Blueprint Rotation",
-                    asset => ((EntityBlueprint)asset).Rotation =
-                        new Microsoft.Xna.Framework.Vector3(rotation.X, rotation.Y, rotation.Z),
-                    $"Blueprint.{blueprint.Guid:N}.Rotation");
-        });
+        if (EditorGui.Property("Blueprint.Rotation", "Rotation", ref rotation, speed: 0.01f))
+            document.Apply(
+                "Change Blueprint Rotation",
+                asset => ((EntityBlueprint)asset).Rotation =
+                    new Microsoft.Xna.Framework.Vector3(rotation.X, rotation.Y, rotation.Z),
+                $"Blueprint.{blueprint.Guid:N}.Rotation");
 
         var scale = new Vector3(blueprint.Scale.X, blueprint.Scale.Y, blueprint.Scale.Z);
-        InspectorUi.PropertyRow("Blueprint.Scale", "Scale", () =>
+        if (EditorGui.Property("Blueprint.Scale", "Scale", ref scale, speed: 0.01f))
+            document.Apply(
+                "Change Blueprint Scale",
+                asset => ((EntityBlueprint)asset).Scale =
+                    new Microsoft.Xna.Framework.Vector3(scale.X, scale.Y, scale.Z),
+                $"Blueprint.{blueprint.Guid:N}.Scale");
+
+        EditorGui.Header("Components");
+        var components = blueprint.Components.ToArray();
+        for (var componentIndex = 0; componentIndex < components.Length; componentIndex++)
         {
-            if (ImGui.DragFloat3("##Value", ref scale, 0.01f))
+            var component = components[componentIndex];
+            var componentType = context.ResolveComponentType(component);
+            var title = componentType?.Name ?? $"Missing: {component.Type}";
+            using var section = EditorGui.Section(
+                $"Blueprint.Component.{component.Type}.{componentIndex}",
+                title,
+                allowRemove: true);
+            if (section.RemoveRequested)
+            {
                 document.Apply(
-                    "Change Blueprint Scale",
-                    asset => ((EntityBlueprint)asset).Scale =
-                        new Microsoft.Xna.Framework.Vector3(scale.X, scale.Y, scale.Z),
-                    $"Blueprint.{blueprint.Guid:N}.Scale");
-        });
-
-        ImGui.SeparatorText("Components");
-        foreach (var component in blueprint.Components.ToArray())
-        {
-            ImGui.PushID(component.GetHashCode());
-            try
-            {
-                var componentType = context.ResolveComponentType(component);
-                var title = componentType?.Name ?? $"Missing: {component.Type}";
-                var (open, removeRequested) = InspectorUi.RemovableHeader(title);
-                if (removeRequested)
-                {
-                    document.Apply(
-                        $"Remove {title}",
-                        asset => ((EntityBlueprint)asset).Components.Remove(component));
-                    continue;
-                }
-
-                if (!open)
-                    continue;
-
-                var componentEnabled = component.Enabled;
-                InspectorUi.PropertyRow("BlueprintComponent.Enabled", "Enabled", () =>
-                {
-                    if (ImGui.Checkbox("##Value", ref componentEnabled))
-                        document.Apply(
-                            "Set Component Enabled",
-                            _ => component.Enabled = componentEnabled,
-                            $"Blueprint.{blueprint.Guid:N}.{component.Type}.Enabled");
-                });
-                if (componentType is null)
-                {
-                    ImGui.TextColored(
-                        new Vector4(1f, 0.68f, 0.28f, 1f),
-                        "Type unavailable. Serialized properties are preserved.");
-                }
-                else
-                {
-                    DrawComponentMembers(document, blueprint, component, componentType, context);
-                }
+                    $"Remove {title}",
+                    asset => ((EntityBlueprint)asset).Components.Remove(component));
+                continue;
             }
-            finally
-            {
-                ImGui.PopID();
-            }
+
+            if (!section.IsOpen)
+                continue;
+
+            var componentEnabled = component.Enabled;
+            if (EditorGui.Property("BlueprintComponent.Enabled", "Enabled", ref componentEnabled))
+                document.Apply(
+                    "Set Component Enabled",
+                    _ => component.Enabled = componentEnabled,
+                    $"Blueprint.{blueprint.Guid:N}.{component.Type}.Enabled");
+            if (componentType is null)
+                EditorGui.Warning("Type unavailable. Serialized properties are preserved.");
+            else
+                DrawComponentMembers(document, blueprint, component, componentType, context);
         }
 
         var selectedType = componentPicker.Draw(
@@ -136,7 +108,7 @@ internal sealed class BlueprintInspector(
         }
 
         if (blueprint.Children.Count > 0)
-            ImGui.TextDisabled($"{blueprint.Children.Count} child blueprint(s) are preserved in this asset.");
+            EditorGui.MutedText($"{blueprint.Children.Count} child blueprint(s) are preserved in this asset.");
     }
 
     internal static IReadOnlyList<EntityBlueprint> GetReferenceCandidates(
@@ -181,9 +153,7 @@ internal sealed class BlueprintInspector(
                 }
                 catch
                 {
-                    ImGui.TextColored(
-                        new Vector4(1f, 0.68f, 0.28f, 1f),
-                        $"{member.DisplayName}: serialized reference/value retained");
+                    EditorGui.Warning($"{member.DisplayName}: serialized reference/value retained");
                     continue;
                 }
             }
@@ -240,64 +210,58 @@ internal sealed class BlueprintInspector(
                               : "Invalid inline asset");
         var pickerId = $"BlueprintAsset.{component.Type}.{member.SerializedName}";
 
-        InspectorUi.ReferenceField(
+        var referenceAction = EditorGui.ReferenceProperty(
             pickerId,
             member.DisplayName,
             display,
-            token is null || member.IsReadOnly,
-            () =>
-            {
-                _referenceSearch = string.Empty;
-                ImGui.OpenPopup($"Blueprint Asset Picker##{pickerId}");
-            },
-            () => document.Apply(
-                $"Clear {member.DisplayName}",
-                _ => component.Properties.Remove(member.SerializedName)));
-
-        if (!ImGui.BeginPopup($"Blueprint Asset Picker##{pickerId}"))
-            return;
-        try
+            canClear: token is not null && !member.IsReadOnly);
+        if (referenceAction == EditorGuiReferenceAction.Select)
         {
-            ImGui.TextDisabled($"Select a {member.ValueType.Name} asset.");
-            ImGui.SetNextItemWidth(420f);
-            ImGui.InputTextWithHint(
-                "##BlueprintAssetSearch",
-                $"Search {member.ValueType.Name} assets",
-                ref _referenceSearch,
-                128);
-            ImGui.Separator();
-            ImGui.BeginChild("##BlueprintAssetItems", new System.Numerics.Vector2(420f, 260f));
-            try
-            {
-                foreach (var candidate in snapshot.Assets)
-                {
-                    if (!AssetTypeClassifier.IsCompatibleWith(candidate, member.ValueType) ||
-                        !MatchesReferenceSearch(candidate.RelativePath))
-                    {
-                        continue;
-                    }
-
-                    if (!ImGui.Selectable(
-                            $"{candidate.RelativePath}##{candidate.Id}",
-                            candidate.Id == selected?.Id) || member.IsReadOnly)
-                    {
-                        continue;
-                    }
-
-                    document.Apply($"Change {member.DisplayName}", _ =>
-                        component.Properties[member.SerializedName] =
-                            DreambitAssetReferenceToken.Create(candidate.Id, candidate.LogicalAssetName));
-                    ImGui.CloseCurrentPopup();
-                }
-            }
-            finally
-            {
-                ImGui.EndChild();
-            }
+            _referenceSearch = string.Empty;
+            EditorGui.OpenPopup($"Blueprint Asset Picker##{pickerId}");
         }
-        finally
+        else if (referenceAction == EditorGuiReferenceAction.Clear)
         {
-            ImGui.EndPopup();
+            document.Apply(
+                $"Clear {member.DisplayName}",
+                _ => component.Properties.Remove(member.SerializedName));
+        }
+
+        using var popup = EditorGui.Popup($"Blueprint Asset Picker##{pickerId}");
+        if (!popup.IsOpen)
+            return;
+        EditorGui.MutedText($"Select a {member.ValueType.Name} asset.");
+        EditorGui.SearchInput(
+            "BlueprintAssetSearch",
+            $"Search {member.ValueType.Name} assets",
+            ref _referenceSearch,
+            128);
+        EditorGui.Separator();
+        using var child = EditorGui.Child(
+            "BlueprintAssetItems",
+            new System.Numerics.Vector2(420f, 260f));
+        if (!child.IsVisible)
+            return;
+        foreach (var candidate in snapshot.Assets)
+        {
+            if (!AssetTypeClassifier.IsCompatibleWith(candidate, member.ValueType) ||
+                !MatchesReferenceSearch(candidate.RelativePath))
+            {
+                continue;
+            }
+
+            if (!EditorGui.Selectable(
+                    candidate.Id.ToString(),
+                    candidate.RelativePath,
+                    candidate.Id == selected?.Id) || member.IsReadOnly)
+            {
+                continue;
+            }
+
+            document.Apply($"Change {member.DisplayName}", _ =>
+                component.Properties[member.SerializedName] =
+                    DreambitAssetReferenceToken.Create(candidate.Id, candidate.LogicalAssetName));
+            EditorGui.ClosePopup();
         }
     }
 
@@ -324,64 +288,56 @@ internal sealed class BlueprintInspector(
                 : "None";
         var pickerId = $"BlueprintReference.{component.Type}.{member.SerializedName}";
 
-        InspectorUi.ReferenceField(
+        var referenceAction = EditorGui.ReferenceProperty(
             pickerId,
             member.DisplayName,
             display,
-            !hasReference || member.IsReadOnly,
-            () =>
-            {
-                _referenceSearch = string.Empty;
-                ImGui.OpenPopup($"Blueprint Reference Picker##{pickerId}");
-            },
-            () => document.Apply(
-                $"Clear {member.DisplayName}",
-                _ => component.Properties.Remove(member.SerializedName)));
-
-        if (!ImGui.BeginPopup($"Blueprint Reference Picker##{pickerId}"))
-            return;
-        try
+            canClear: hasReference && !member.IsReadOnly);
+        if (referenceAction == EditorGuiReferenceAction.Select)
         {
-            ImGui.TextDisabled(
-                member.ValueType == typeof(Entity)
-                    ? "Select an entity from this Blueprint."
-                    : $"Select an entity in this Blueprint containing {member.ValueType.Name}.");
-            ImGui.SetNextItemWidth(360f);
-            ImGui.InputTextWithHint(
-                "##BlueprintReferenceSearch",
-                "Search Blueprint entities",
-                ref _referenceSearch,
-                128);
-            ImGui.Separator();
-            ImGui.BeginChild("##BlueprintReferenceItems", new System.Numerics.Vector2(360f, 260f));
-            try
-            {
-                foreach (var candidate in candidates)
-                {
-                    if (!MatchesReferenceSearch(candidate.Name))
-                        continue;
-
-                    if (!ImGui.Selectable(
-                            $"{candidate.Name}##{candidate.Guid:N}",
-                            candidate.Guid == referencedGuid) || member.IsReadOnly)
-                    {
-                        continue;
-                    }
-
-                    document.Apply($"Change {member.DisplayName}", _ =>
-                        component.Properties[member.SerializedName] =
-                            new JValue(candidate.Guid.ToString()));
-                    ImGui.CloseCurrentPopup();
-                }
-            }
-            finally
-            {
-                ImGui.EndChild();
-            }
+            _referenceSearch = string.Empty;
+            EditorGui.OpenPopup($"Blueprint Reference Picker##{pickerId}");
         }
-        finally
+        else if (referenceAction == EditorGuiReferenceAction.Clear)
         {
-            ImGui.EndPopup();
+            document.Apply(
+                $"Clear {member.DisplayName}",
+                _ => component.Properties.Remove(member.SerializedName));
+        }
+
+        using var popup = EditorGui.Popup($"Blueprint Reference Picker##{pickerId}");
+        if (!popup.IsOpen)
+            return;
+        EditorGui.MutedText(
+            member.ValueType == typeof(Entity)
+                ? "Select an entity from this Blueprint."
+                : $"Select an entity in this Blueprint containing {member.ValueType.Name}.");
+        EditorGui.SearchInput(
+            "BlueprintReferenceSearch",
+            "Search Blueprint entities",
+            ref _referenceSearch,
+            128);
+        EditorGui.Separator();
+        using var child = EditorGui.Child(
+            "BlueprintReferenceItems",
+            new System.Numerics.Vector2(360f, 260f));
+        if (!child.IsVisible)
+            return;
+        foreach (var candidate in candidates)
+        {
+            if (!MatchesReferenceSearch(candidate.Name))
+                continue;
+
+            if (!EditorGui.Selectable(
+                    candidate.Guid.ToString("N"),
+                    candidate.Name,
+                    candidate.Guid == referencedGuid) || member.IsReadOnly)
+                continue;
+
+            document.Apply($"Change {member.DisplayName}", _ =>
+                component.Properties[member.SerializedName] =
+                    new JValue(candidate.Guid.ToString()));
+            EditorGui.ClosePopup();
         }
     }
 

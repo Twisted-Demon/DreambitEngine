@@ -1,3 +1,4 @@
+using System.Numerics;
 using Dreambit.ECS;
 using Dreambit.Editor.Compilation;
 using Dreambit.Editor.Inspection;
@@ -86,6 +87,20 @@ public sealed class GameCompilationTests : IDisposable
 
         Assert.True(registry.TryGet(target, out var editor));
         Assert.Equal(typeof(ReloadTestCustomEditor).FullName, editor!.GetType().FullName);
+    }
+
+    [Fact]
+    public void GameDefinedEditorGuiCustomEditorRemainsDiscoverableWithoutDrawingUi()
+    {
+        using var loader = new GameAssemblyLoadService(_root);
+        using var registry = new CustomEditorRegistry(loader);
+        Assert.True(loader.TryLoad(typeof(GameCompilationTests).Assembly.Location, out var error), error);
+        var target = Assert.Single(
+            loader.Current!.Types.ComponentTypes,
+            type => type.FullName == typeof(EditorGuiApiTestComponent).FullName);
+
+        Assert.True(registry.TryGet(target, out var editor));
+        Assert.Equal(typeof(EditorGuiApiTestCustomEditor).FullName, editor!.GetType().FullName);
     }
 
     [Fact]
@@ -262,4 +277,100 @@ public sealed class ThrowingDisposeReloadTestCustomEditor : IDreambitCustomEdito
     public void Draw(IEditorInspectorContext context) => context.DrawDefaultInspector();
 
     public void Dispose() => throw new InvalidOperationException("Custom Editor dispose failed for testing.");
+}
+
+public sealed class EditorGuiApiTestComponent : Component
+{
+    public float Speed { get; set; } = 1f;
+    public int Radius { get; set; } = 8;
+    public string DisplayName { get; set; } = "Mover";
+    public Vector2 Offset { get; set; }
+}
+
+[DreambitCustomEditor(typeof(EditorGuiApiTestComponent))]
+public sealed class EditorGuiApiTestCustomEditor : IDreambitCustomEditor
+{
+    public void Draw(IEditorInspectorContext context)
+    {
+        var component = (EditorGuiApiTestComponent)context.ActiveTarget!;
+        using var section = EditorGui.Section(
+            "EditorGuiApiTest.Settings",
+            "Movement Settings",
+            description: "EditorGui contract coverage for game-defined custom editors.");
+        if (!section.IsOpen)
+            return;
+
+        var enabled = component.Enabled;
+        if (EditorGui.Property(
+                "EditorGuiApiTest.Enabled",
+                "Enabled",
+                ref enabled,
+                tooltip: "Whether the component is active."))
+        {
+            context.RecordChange(
+                "Change Enabled",
+                () => SetForAll(context, component => component.Enabled = enabled));
+        }
+
+        var speed = component.Speed;
+        if (EditorGui.Property(
+                "EditorGuiApiTest.Speed",
+                "Speed",
+                ref speed,
+                speed: 0.05f,
+                min: 0f,
+                tooltip: "Maximum movement speed."))
+        {
+            context.RecordChange(
+                "Change Speed",
+                () => SetForAll(context, component => component.Speed = speed));
+        }
+
+        var radius = component.Radius;
+        if (EditorGui.Property(
+                "EditorGuiApiTest.Radius",
+                "Radius",
+                ref radius,
+                min: 0,
+                tooltip: "Movement radius."))
+        {
+            context.RecordChange(
+                "Change Radius",
+                () => SetForAll(context, component => component.Radius = radius));
+        }
+
+        var displayName = component.DisplayName;
+        if (EditorGui.Property(
+                "EditorGuiApiTest.DisplayName",
+                "Display Name",
+                ref displayName,
+                maxLength: 128,
+                hint: "Component name"))
+        {
+            context.RecordChange(
+                "Change Display Name",
+                () => SetForAll(context, component => component.DisplayName = displayName));
+        }
+
+        var offset = component.Offset;
+        if (EditorGui.Property(
+                "EditorGuiApiTest.Offset",
+                "Offset",
+                ref offset,
+                speed: 0.05f))
+        {
+            context.RecordChange(
+                "Change Offset",
+                () => SetForAll(context, component => component.Offset = offset));
+        }
+    }
+
+    private static void SetForAll(
+        IEditorInspectorContext context,
+        Action<EditorGuiApiTestComponent> mutation)
+    {
+        foreach (var target in context.Targets)
+            if (target is EditorGuiApiTestComponent component)
+                mutation(component);
+    }
 }

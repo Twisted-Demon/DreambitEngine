@@ -58,3 +58,6 @@ packages/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# other
+.agent-artifacts/
