@@ -32,7 +32,8 @@ internal sealed class SceneDocument : IDisposable
         Func<BlueprintInstanceReference, EntityBlueprint>? blueprintInstanceResolver = null,
         Func<LDtkSceneReference, LDtkFile>? ldtkProjectResolver = null,
         SceneDocumentHistoryOwnership historyOwnership = SceneDocumentHistoryOwnership.Document,
-        Func<TiledSceneReference, TmxMap>? tiledMapResolver = null)
+        Func<TiledSceneReference, TmxMap>? tiledMapResolver = null,
+        Func<EditorScene>? sceneFactory = null)
     {
         _source = source;
         Path = path;
@@ -43,7 +44,8 @@ internal sealed class SceneDocument : IDisposable
             reportError,
             blueprintInstanceResolver,
             ldtkProjectResolver,
-            tiledMapResolver);
+            tiledMapResolver,
+            sceneFactory);
         _history = new SceneEditHistory(historyOwnership);
         RebuildLiveScene();
         // Dirty comparisons operate on captured snapshots, so establish the saved

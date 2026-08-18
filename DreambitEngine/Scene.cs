@@ -34,7 +34,7 @@ public class Scene : IDisposable
 
         PostProcessSettings = new PostProcessSettings();
         RenderingOptions = new RenderingOptions();
-    
+
         _renderPipeline = new RenderPipeline(this);
         State = SceneState.Created;
     }
@@ -162,16 +162,16 @@ public class Scene : IDisposable
     {
         ArgumentNullException.ThrowIfNull(blueprint);
         ArgumentNullException.ThrowIfNull(options);
-        
+
         if (blueprint.LDtk is { } ldtk)
             MaterializeLDtkScene(ldtk, options);
-        
+
         if (blueprint.Tiled is { } tiled)
             MaterializeTiledScene(tiled, options);
-        
+
         if (options.ApplySceneSettings)
             ApplySettings(blueprint.Settings);
-        
+
         if (blueprint.Entities.Count == 0)
             return;
 
@@ -225,10 +225,12 @@ public class Scene : IDisposable
 
     /// <summary>Render pipeline composed of render passes.</summary>
     private RenderPipeline _renderPipeline;
+
     private bool _renderPipelineInitialized;
 
     /// <summary>Tracks disposal state to avoid double-dispose.</summary>
     private bool _isDisposed;
+
     private bool _isDisposing;
 
     private bool _hasBegun;
@@ -351,16 +353,16 @@ public class Scene : IDisposable
     /// </summary>
     protected virtual void SetUpRenderPipeLine()
     {
-        _renderPipeline.AddRenderPass<SortDrawablesPass>();
-        _renderPipeline.AddRenderPass<AlbedoPass>();
-        _renderPipeline.AddRenderPass<DepthPass>();
-        _renderPipeline.AddRenderPass<DepthLightingPass>();
-        _renderPipeline.AddRenderPass<BloomPass>();
-        _renderPipeline.AddRenderPass<PostProcessRenderPass>();
+        AddRenderPass<SortDrawablesPass>();
+        AddRenderPass<AlbedoPass>();
+        AddRenderPass<DepthPass>();
+        AddRenderPass<DepthLightingPass>();
+        AddRenderPass<BloomPass>();
+        AddRenderPass<PostProcessRenderPass>();
         if (ExecutionMode == SceneExecutionMode.Runtime)
         {
-            _renderPipeline.AddRenderPass<DebugRenderPass>();
-            _renderPipeline.AddRenderPass<UIRenderPass>();
+            AddRenderPass<DebugRenderPass>();
+            AddRenderPass<UIRenderPass>();
         }
     }
 
@@ -374,7 +376,12 @@ public class Scene : IDisposable
         _renderPipelineInitialized = true;
     }
 
-    /// <summary>
+    protected void AddRenderPass<T>() where T : RenderPass, new()
+    {
+        _renderPipeline.AddRenderPass<T>();
+    }
+
+/// <summary>
     ///     Updates internal services/managers each frame (scripting, ECS tick).
     /// </summary>
     private void UpdateInternals()

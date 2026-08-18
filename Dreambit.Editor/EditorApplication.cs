@@ -349,7 +349,9 @@ internal sealed class EditorApplication : IDisposable
             ImGuiWindowFlags.NoResize |
             ImGuiWindowFlags.NoMove |
             ImGuiWindowFlags.NoBringToFrontOnFocus |
-            ImGuiWindowFlags.NoNavFocus;
+            ImGuiWindowFlags.NoNavFocus |
+            ImGuiWindowFlags.NoScrollbar |
+            ImGuiWindowFlags.NoScrollWithMouse;
 
         ImGui.Begin(DockHostName, flags);
         ImGui.PopStyleVar(3);
@@ -358,10 +360,27 @@ internal sealed class EditorApplication : IDisposable
 
         var dockspaceSize = ImGui.GetContentRegionAvail();
         dockspaceSize.Y = MathF.Max(1f, dockspaceSize.Y - StatusBarHeight);
+
+        // The dock host is fixed application chrome rather than ordinary flowing UI.
+        // Normal panel ItemSpacing would otherwise be added after the dockspace,
+        // separator, and status text, making the host taller than the viewport.
+        var style = ImGui.GetStyle();
+        ImGui.PushStyleVar(
+            ImGuiStyleVar.ItemSpacing,
+            new Vector2(style.ItemSpacing.X, 0f));
+
         var dockspaceId = ImGui.GetID(DockspaceName);
         _projectWorkspace?.ApplyPendingDockLayout(dockspaceId, dockspaceSize);
-        ImGui.DockSpace(dockspaceId, dockspaceSize, ImGuiDockNodeFlags.None);
+
+        ImGui.DockSpace(
+            dockspaceId,
+            dockspaceSize,
+            ImGuiDockNodeFlags.None);
+
         DrawStatusBar();
+
+        ImGui.PopStyleVar();
+
         ImGui.End();
     }
 

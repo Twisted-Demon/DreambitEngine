@@ -105,12 +105,17 @@ internal sealed class BlueprintEditingService : IDisposable
             clone.AssetName = assetDocument.Asset.LogicalAssetName;
             var rootEntityId = clone.Guid;
             var replacement = new SceneDocument(
-                new SceneBlueprint { Name = clone.Name, Entities = [clone] },
+                new SceneBlueprint
+                {
+                    Name = clone.Name,
+                    Entities = [clone]
+                },
                 null,
                 Selection,
                 _reportError,
                 ResolveBlueprintInstance,
-                historyOwnership: SceneDocumentHistoryOwnership.External);
+                historyOwnership: SceneDocumentHistoryOwnership.External,
+                sceneFactory: static () => new BlueprintEditorScene());
             replacement.Changed += OnSceneDocumentChanged;
             var previous = Current;
             Current = replacement;

@@ -13,17 +13,21 @@ internal sealed class SceneRuntime : IDisposable
     private readonly Func<BlueprintInstanceReference, EntityBlueprint>? _blueprintInstanceResolver;
     private readonly Func<LDtkSceneReference, LDtkFile>? _ldtkProjectResolver;
     private readonly Func<TiledSceneReference, TmxMap>? _tiledMapResolver;
+    private readonly Func<EditorScene> _sceneFactory;
 
     public SceneRuntime(
         Action<string, Exception?>? reportError = null,
         Func<BlueprintInstanceReference, EntityBlueprint>? blueprintInstanceResolver = null,
         Func<LDtkSceneReference, LDtkFile>? ldtkProjectResolver = null,
-        Func<TiledSceneReference, TmxMap>? tiledMapResolver = null)
+        Func<TiledSceneReference, TmxMap>? tiledMapResolver = null,
+        Func<EditorScene>? sceneFactory = null)
     {
         _reportError = reportError;
         _blueprintInstanceResolver = blueprintInstanceResolver;
         _ldtkProjectResolver = ldtkProjectResolver;
         _tiledMapResolver = tiledMapResolver;
+        _sceneFactory = sceneFactory ?? (static () => new EditorScene());
+
         EditorLoadOptions = CreateEditorLoadOptions();
     }
 
@@ -35,7 +39,11 @@ internal sealed class SceneRuntime : IDisposable
     public EditorScene Build(SceneBlueprint source)
     {
         ArgumentNullException.ThrowIfNull(source);
-        var scene = new EditorScene();
+
+        var scene = _sceneFactory()
+                    ?? throw new InvalidOperationException(
+                        "The editor scene factory returned null.");
+
         try
         {
             scene.LoadIntoSelf(source, EditorLoadOptions);
