@@ -370,7 +370,7 @@ internal sealed class SceneDocument : IDisposable
             {
                 scene.LoadIntoSelf(
                     new SceneBlueprint { Name = Name, Entities = [clone] },
-                    _runtime.EditorLoadOptions);
+                    _runtime.CreateEditorLoadOptions(applySceneSettings: false));
             }
             catch
             {
