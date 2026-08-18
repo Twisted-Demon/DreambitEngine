@@ -15,34 +15,34 @@ using ImGuiNET;
 namespace Dreambit.Editor;
 
 /// <summary>
-/// The editor application's thin lifetime and frame coordinator. Project workflows, panel
-/// composition, command implementation, dialog state, diagnostics, and persistence live in
-/// their own focused owners.
+///     The editor application's thin lifetime and frame coordinator. Project workflows, panel
+///     composition, command implementation, dialog state, diagnostics, and persistence live in
+///     their own focused owners.
 /// </summary>
 internal sealed class EditorApplication : IDisposable
 {
     private const string DockspaceName = "Dreambit.Editor.DockSpace";
     private const string DockHostName = "Dreambit Editor##Dreambit.Editor.DockHost";
     private const float StatusBarHeight = 23f;
+    private readonly EditorAboutDialog _aboutDialog = new();
+    private readonly EditorAssetCommands? _assetCommands;
+    private readonly EditorBuildCommands? _buildCommands;
+    private readonly EditorDiagnosticsBridge _diagnostics;
+    private readonly EditorDocumentCommands? _documentCommands;
+    private readonly EditorIconService _icons;
+    private readonly EditorLogService _logs;
+    private readonly ProjectLaunchDialogs _projectLaunchDialogs;
+    private readonly ProjectLauncherView _projectLauncher;
+    private readonly EditorProjectWorkspace? _projectWorkspace;
+    private readonly ProjectLaunchCoordinator _projects;
+    private readonly RecentProjectHistory _recentProjects;
 
     private readonly Action _requestExit;
-    private readonly EditorWorkspaceState _workspaceState;
-    private readonly EditorLogService _logs;
-    private readonly EditorDiagnosticsBridge _diagnostics;
-    private readonly EditorWindowPlacementPersistence _windowPlacement;
-    private readonly RecentProjectHistory _recentProjects;
-    private readonly ProjectLaunchCoordinator _projects;
-    private readonly EditorIconService _icons;
-    private readonly ProjectLauncherView _projectLauncher;
-    private readonly ProjectLaunchDialogs _projectLaunchDialogs;
-    private readonly EditorAboutDialog _aboutDialog = new();
-    private readonly EditorProjectWorkspace? _projectWorkspace;
-    private readonly EditorWorkspaceSelectionPersistence? _workspaceSelection;
-    private readonly EditorDocumentCommands? _documentCommands;
-    private readonly EditorBuildCommands? _buildCommands;
-    private readonly EditorAssetCommands? _assetCommands;
     private readonly SceneDocumentDialogs? _sceneDialogs;
     private readonly EditorShortcutHandler _shortcuts;
+    private readonly EditorWindowPlacementPersistence _windowPlacement;
+    private readonly EditorWorkspaceSelectionPersistence? _workspaceSelection;
+    private readonly EditorWorkspaceState _workspaceState;
     private bool _disposed;
 
     public EditorApplication(
@@ -63,100 +63,207 @@ internal sealed class EditorApplication : IDisposable
             workspaceState,
             globalState,
             _logs);
-        _recentProjects = new RecentProjectHistory(stateStore, globalState, _logs);
-        _icons = new EditorIconService(Core.Instance.GraphicsDevice, imGuiRenderer);
-
-        var projectManager = new DreambitProjectManager(
-            paths,
-            reportAssetDiagnostic: _diagnostics.ReportAssetDiagnostic,
-            reportAssetBake: _diagnostics.ReportAssetBake,
-            reportGameCode: _diagnostics.ReportGameCode,
-            reportSceneError: _diagnostics.ReportSceneError);
-        var sdkManager = new DreambitSdkManager(paths, _logs);
-        _projects = new ProjectLaunchCoordinator(
-            projectManager,
-            new ProjectCreationService(sdkManager, _logs),
-            new ProjectUpgradeService(sdkManager, _logs),
-            _recentProjects,
-            _windowPlacement.CaptureCurrentWindowPlacement,
+        _recentProjects = new RecentProjectHistory(
+            stateStore,
+            globalState,
             _logs);
+
+        EditorIconService? icons = null;
+        DreambitProjectManager? projectManager = null;
+        ProjectLaunchCoordinator? projects = null;
+        EditorProjectWorkspace? projectWorkspace = null;
 
         try
         {
-            var startup = _projects.OpenStartupProject(options.ProjectPath);
-            _projectLauncher = new ProjectLauncherView(globalState, startup.Error);
-            _projectLaunchDialogs = new ProjectLaunchDialogs(_projects);
+            /*
+             * Keep ownership local until construction succeeds.
+             *
+             * This is intentional: if any later constructor or startup operation throws,
+             * the partially constructed EditorApplication never becomes responsible for
+             * fields whose initialization may not have completed. The catch block below
+             * can dispose exactly the resources whose constructors actually succeeded.
+             */
+            icons = new EditorIconService(
+                Core.Instance.GraphicsDevice,
+                imGuiRenderer);
 
-            if (_projects.CurrentSession is { } session)
+            projectManager = new DreambitProjectManager(
+                paths,
+                reportAssetDiagnostic: _diagnostics.ReportAssetDiagnostic,
+                reportAssetBake: _diagnostics.ReportAssetBake,
+                reportGameCode: _diagnostics.ReportGameCode,
+                reportSceneError: _diagnostics.ReportSceneError);
+
+            var sdkManager = new DreambitSdkManager(paths, _logs);
+
+            projects = new ProjectLaunchCoordinator(
+                projectManager,
+                new ProjectCreationService(sdkManager, _logs),
+                new ProjectUpgradeService(sdkManager, _logs),
+                _recentProjects,
+                _windowPlacement.CaptureCurrentWindowPlacement,
+                _logs);
+
+            /*
+             * ProjectLaunchCoordinator now owns DreambitProjectManager.
+             * From this point onward it is responsible for disposing the manager/session.
+             */
+            projectManager = null;
+
+            var startup = projects.OpenStartupProject(options.ProjectPath);
+            var projectLauncher = new ProjectLauncherView(
+                globalState,
+                startup.Error);
+            var projectLaunchDialogs = new ProjectLaunchDialogs(projects);
+
+            EditorWorkspaceSelectionPersistence? workspaceSelection = null;
+            EditorDocumentCommands? documentCommands = null;
+            EditorBuildCommands? buildCommands = null;
+            EditorAssetCommands? assetCommands = null;
+            SceneDocumentDialogs? sceneDialogs = null;
+
+            if (projects.CurrentSession is { } session)
             {
-                _workspaceSelection = new EditorWorkspaceSelectionPersistence(workspaceState);
-                _documentCommands = new EditorDocumentCommands(
+                workspaceSelection =
+                    new EditorWorkspaceSelectionPersistence(workspaceState);
+
+                documentCommands = new EditorDocumentCommands(
                     session.Scenes,
                     session.Documents,
                     session.AssetEditing,
                     session.BlueprintSources,
-                    _workspaceSelection,
+                    workspaceSelection,
                     _logs);
-                _buildCommands = new EditorBuildCommands(session.GameCode, session.AssetBaking);
-                _projectWorkspace = new EditorProjectWorkspace(
+
+                buildCommands = new EditorBuildCommands(
+                    session.GameCode,
+                    session.AssetBaking);
+
+                projectWorkspace = new EditorProjectWorkspace(
                     session,
                     workspaceState,
                     Core.Instance.GraphicsDevice,
                     imGuiRenderer,
-                    _icons,
+                    icons,
                     _logs,
-                    _buildCommands,
+                    buildCommands,
                     _diagnostics.ReportSceneError);
-                _assetCommands = new EditorAssetCommands(
+
+                assetCommands = new EditorAssetCommands(
                     session.EditorTypes,
-                    _buildCommands,
-                    _projectWorkspace.RequestAssetCreation);
-                _sceneDialogs = new SceneDocumentDialogs(
-                    _documentCommands,
+                    buildCommands,
+                    projectWorkspace.RequestAssetCreation);
+
+                sceneDialogs = new SceneDocumentDialogs(
+                    documentCommands,
                     session.Assets,
                     session.Scenes);
 
                 if (!string.IsNullOrWhiteSpace(workspaceState.LastScenePath) &&
                     File.Exists(workspaceState.LastScenePath))
-                {
-                    _documentCommands.OpenScene(workspaceState.LastScenePath);
-                }
+                    documentCommands.OpenScene(workspaceState.LastScenePath);
 
-                _workspaceSelection.RestoreAssetSelection(
+                workspaceSelection.RestoreAssetSelection(
                     session.Assets,
                     session.AssetEditing,
                     session.Documents);
             }
 
-            _shortcuts = new EditorShortcutHandler(
-                _documentCommands,
-                _sceneDialogs,
-                _projectLaunchDialogs);
+            var shortcuts = new EditorShortcutHandler(
+                documentCommands,
+                sceneDialogs,
+                projectLaunchDialogs);
 
             foreach (var warning in stateStore.LoadWarnings)
                 _logs.Warning("State", warning);
 
-            _logs.Info("Editor", "Dreambit Editor shell initialized.");
-            if (_projects.CurrentSession is { } openedSession)
-            {
+            _logs.Info(
+                "Editor",
+                "Dreambit Editor shell initialized.");
+
+            if (projects.CurrentSession is { } openedSession)
                 _logs.Info(
                     "Project",
                     $"Opened '{openedSession.Project.Metadata.Name}' with Dreambit SDK " +
                     $"{openedSession.Project.Metadata.Sdk.Version}.");
-            }
 
             _diagnostics.Subscribe();
+
+            /*
+             * Construction has completed successfully.
+             *
+             * Transfer local ownership into the application only after every startup
+             * operation above has succeeded.
+             */
+            _icons = icons;
+            _projects = projects;
+            _projectLauncher = projectLauncher;
+            _projectLaunchDialogs = projectLaunchDialogs;
+            _projectWorkspace = projectWorkspace;
+            _workspaceSelection = workspaceSelection;
+            _documentCommands = documentCommands;
+            _buildCommands = buildCommands;
+            _assetCommands = assetCommands;
+            _sceneDialogs = sceneDialogs;
+            _shortcuts = shortcuts;
         }
         catch
         {
-            DisposeAfterConstructionFailure(_diagnostics.Dispose, "Could not unsubscribe editor diagnostics.");
+            /*
+             * Dispose in dependency order:
+             *
+             * diagnostics -> UI workspace -> graphics resources -> project/session.
+             *
+             * If ProjectLaunchCoordinator was never successfully constructed,
+             * projectManager still owns the project lifetime and is disposed directly.
+             */
             DisposeAfterConstructionFailure(
-                () => _projectWorkspace?.Dispose(),
+                _diagnostics.Dispose,
+                "Could not unsubscribe editor diagnostics.");
+
+            DisposeAfterConstructionFailure(
+                () => projectWorkspace?.Dispose(),
                 "Could not dispose editor panels.");
-            DisposeAfterConstructionFailure(_icons.Dispose, "Could not dispose editor icons.");
-            DisposeAfterConstructionFailure(_projects.Dispose, "Could not dispose project launch state.");
+
+            DisposeAfterConstructionFailure(
+                () => icons?.Dispose(),
+                "Could not dispose editor icons.");
+
+            if (projects is not null)
+                DisposeAfterConstructionFailure(
+                    projects.Dispose,
+                    "Could not dispose project launch state.");
+            else
+                DisposeAfterConstructionFailure(
+                    () => projectManager?.Dispose(),
+                    "Could not dispose project manager.");
+
             throw;
         }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+
+        _disposed = true;
+        RunShutdownStep(_diagnostics.Dispose, "Could not unsubscribe editor diagnostics.");
+
+        if (_projects.CurrentSession is { } session)
+            _workspaceSelection?.CaptureCurrentScene(session.Scenes);
+        _projectWorkspace?.CapturePanelVisibility();
+
+        RunShutdownStep(
+            () => _projectWorkspace?.Dispose(),
+            "Could not dispose all editor panels.");
+        RunShutdownStep(_icons.Dispose, "Could not dispose editor icons.");
+        RunShutdownStep(_projects.Dispose, "Could not dispose project launch state.");
+
+        if (!_recentProjects.TryPersist(out var globalError))
+            Console.Error.WriteLine(globalError);
+        if (!_windowPlacement.TrySaveWorkspaceState(out var workspaceError))
+            Console.Error.WriteLine(workspaceError);
     }
 
     public void Draw()
@@ -170,6 +277,7 @@ internal sealed class EditorApplication : IDisposable
             _projectLauncher.SetError(workflowError);
             _projectLaunchDialogs.SetOpenProjectError(workflowError);
         }
+
         DrawDockHost();
 
         if (_projects.CurrentSession is not { } session)
@@ -200,8 +308,10 @@ internal sealed class EditorApplication : IDisposable
             _requestExit();
     }
 
-    public void CaptureWindowBounds(int x, int y, int width, int height) =>
+    public void CaptureWindowBounds(int x, int y, int width, int height)
+    {
         _windowPlacement.CaptureWindowBounds(x, y, width, height);
+    }
 
     private void UpdateProjectSession(DreambitProjectSession session)
     {
@@ -314,9 +424,7 @@ internal sealed class EditorApplication : IDisposable
             if (EditorGui.MenuItem(
                     commands?.UndoName is { } undoName ? $"Undo {undoName}" : "Undo",
                     "Ctrl+Z"))
-            {
                 commands!.Undo();
-            }
         }
 
         using (EditorGui.Disabled(commands?.CanRedo != true))
@@ -324,9 +432,7 @@ internal sealed class EditorApplication : IDisposable
             if (EditorGui.MenuItem(
                     commands?.RedoName is { } redoName ? $"Redo {redoName}" : "Redo",
                     "Ctrl+Y"))
-            {
                 commands!.Redo();
-            }
         }
 
         EditorGui.Separator();
@@ -351,13 +457,9 @@ internal sealed class EditorApplication : IDisposable
                     commands.RequestEntityBlueprintCreation();
                 using var assets = EditorGui.Menu("Dreambit Asset");
                 if (assets.IsOpen)
-                {
                     foreach (var type in commands.CreatableAssetTypes)
-                    {
                         if (EditorGui.MenuItem(type.Name))
                             commands.RequestAssetCreation(type);
-                    }
-                }
             }
         }
 
@@ -463,30 +565,6 @@ internal sealed class EditorApplication : IDisposable
         return document is null
             ? project
             : $"{project}  |  {document.DisplayName}{(document.IsDirty ? " *" : string.Empty)}";
-    }
-
-    public void Dispose()
-    {
-        if (_disposed)
-            return;
-
-        _disposed = true;
-        RunShutdownStep(_diagnostics.Dispose, "Could not unsubscribe editor diagnostics.");
-
-        if (_projects.CurrentSession is { } session)
-            _workspaceSelection?.CaptureCurrentScene(session.Scenes);
-        _projectWorkspace?.CapturePanelVisibility();
-
-        RunShutdownStep(
-            () => _projectWorkspace?.Dispose(),
-            "Could not dispose all editor panels.");
-        RunShutdownStep(_icons.Dispose, "Could not dispose editor icons.");
-        RunShutdownStep(_projects.Dispose, "Could not dispose project launch state.");
-
-        if (!_recentProjects.TryPersist(out var globalError))
-            Console.Error.WriteLine(globalError);
-        if (!_windowPlacement.TrySaveWorkspaceState(out var workspaceError))
-            Console.Error.WriteLine(workspaceError);
     }
 
     private void RunShutdownStep(Action action, string message)
