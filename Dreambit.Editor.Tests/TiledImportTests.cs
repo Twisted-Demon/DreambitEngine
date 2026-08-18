@@ -603,13 +603,22 @@ public sealed class TiledImportTests : IDisposable
         Assert.All(generated, entity => Assert.True(entity.IsTiledGenerated));
         Assert.DoesNotContain(generated, entity => entity.Name.Contains("Objects"));
         var background = Assert.Single(
-            generated.SelectMany(entity => entity.GetAllComponents()).OfType<FilledRectDrawer>());
-        Assert.True(SceneViewportRenderer.ShouldPickDrawable(background));
-        Assert.True(SceneViewportRenderer.ShouldDeferImportedMapPick(background));
-        Assert.All(
-            generated.SelectMany(entity => entity.GetAllComponents()).OfType<TilemapRenderer>(),
-            renderer => Assert.True(SceneViewportRenderer.ShouldDeferImportedMapPick(renderer)));
+            generated
+                .SelectMany(entity => entity.GetAllComponents())
+                .OfType<FilledRectDrawer>());
 
+        Assert.False(
+            SceneViewportRenderer.ShouldPickDrawable(
+                background));
+
+        Assert.All(
+            generated
+                .SelectMany(entity => entity.GetAllComponents())
+                .OfType<TilemapRenderer>(),
+            renderer =>
+                Assert.False(
+                    SceneViewportRenderer.ShouldPickDrawable(
+                        renderer)));
         var placed = document.CreateEmpty("Dreambit Placed");
         var placedId = placed.Id;
         document.Apply("Move Dreambit Entity", _ =>

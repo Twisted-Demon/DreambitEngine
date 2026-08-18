@@ -124,7 +124,9 @@ internal sealed class BlueprintEditingService : IDisposable
         {
             Error = exception.Message;
             _reportError?.Invoke("Could not open the Blueprint hierarchy.", exception);
-            CloseDocument();
+            // Keep the previous preview intact when replacement construction fails. It remains
+            // the only live object graph until a new preview has fully materialized; disposing it
+            // here would turn a transient resolver/load failure into lost editor context.
         }
     }
 

@@ -64,6 +64,7 @@ internal sealed class InspectorValueDrawerRegistry
         Register(new CollectionValueDrawer());
         Register(new NestedObjectValueDrawer());
         Register(new UnsupportedValueDrawer());
+        Register(new Curve1DValueDrawer());
     }
 
     public void Register(IInspectorValueDrawer drawer)

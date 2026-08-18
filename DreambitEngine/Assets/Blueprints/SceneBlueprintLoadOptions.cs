@@ -57,4 +57,6 @@ public sealed class SceneBlueprintLoadOptions
     /// LDtk remains a tilemap authoring source while Dreambit owns gameplay entity placement.
     /// </summary>
     public bool MaterializeLDtkEntities { get; init; } = true;
+
+    public bool ApplySceneSettings { get; set; } = true;
 }

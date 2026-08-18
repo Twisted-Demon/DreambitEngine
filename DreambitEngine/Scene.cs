@@ -162,11 +162,16 @@ public class Scene : IDisposable
     {
         ArgumentNullException.ThrowIfNull(blueprint);
         ArgumentNullException.ThrowIfNull(options);
+        
         if (blueprint.LDtk is { } ldtk)
             MaterializeLDtkScene(ldtk, options);
+        
         if (blueprint.Tiled is { } tiled)
             MaterializeTiledScene(tiled, options);
-        ApplySettings(blueprint.Settings);
+        
+        if (options.ApplySceneSettings)
+            ApplySettings(blueprint.Settings);
+        
         if (blueprint.Entities.Count == 0)
             return;
 
