@@ -83,7 +83,7 @@ public sealed class SceneRuntimeTests
         AttachThrowingComponent(scene);
         runtime.Replace(scene, "Could not dispose the initial editor scene.");
 
-        Assert.Throws<InvalidOperationException>(() => runtime.Dispose());
+        Assert.Throws<AggregateException>(() => runtime.Dispose());
 
         Assert.Null(runtime.Scene);
         Assert.Equal(2, runtime.Generation);
