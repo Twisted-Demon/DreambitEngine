@@ -1555,6 +1555,11 @@ public sealed class SceneDocumentTests : IDisposable
         public void BoxHandle(Component component, string memberName, Color color, float thickness = 1)
         {
         }
+
+        public void PolygonHandle(Component component, string memberName, Color color, float thickness = 1)
+        {
+            
+        }
     }
 }
 

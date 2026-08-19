@@ -18,7 +18,8 @@ public class RigidBody2D : Component
     {
         if (Collider is null)
         {
-            if (_warnedUser) return;
+            if (_warnedUser)
+                return;
 
             Logger.Warn("Collider is null!");
             _warnedUser = true;
@@ -27,26 +28,50 @@ public class RigidBody2D : Component
         }
 
         Transform.CaptureLastWorldPosition();
-        Transform.TranslateWorld2D(Velocity * Time.PhysicsDeltaTime);
+
+        Transform.TranslateWorld2D(
+            Velocity *
+            Time.PhysicsDeltaTime);
+
+        /*
+         * Keep the broadphase current immediately after moving.
+         *
+         * Collider itself may also receive OnPhysicsUpdate during this physics
+         * step, but its world-geometry cache makes that later refresh a cheap
+         * no-op when nothing changed.
+         */
         Collider.RefreshSpatialHash();
 
-        if (CheckForCollision(out _))
-        {
-            // reset position if we did collide
-            Transform.WorldPosition = Transform.LastWorldPosition;
-            Collider.RefreshSpatialHash();
-        }
+        /*
+         * This uses a boolean-only physics query and therefore does not allocate
+         * CollisionResult/List storage every rigidbody step.
+         */
+        if (!CheckForCollision())
+            return;
+
+        // Restore the previous position if the movement overlapped something.
+        Transform.WorldPosition =
+            Transform.LastWorldPosition;
+
+        Collider.RefreshSpatialHash();
     }
 
     #endregion
 
     #region Internal Helper Functions
 
-    private bool CheckForCollision(out CollisionResult result)
+    private bool CheckForCollision()
     {
-        return InterestedTags.Count == 0
-            ? PhysicsSystem.Instance.ColliderCast(Collider, out result)
-            : PhysicsSystem.Instance.ColliderCastByTag(Collider, out result, [.. InterestedTags]);
+        if (InterestedTags.Count == 0)
+        {
+            return PhysicsSystem.Instance
+                .ColliderCastAny(Collider);
+        }
+
+        return PhysicsSystem.Instance
+            .ColliderCastAnyByTag(
+                Collider,
+                InterestedTags);
     }
 
     #endregion
@@ -56,7 +81,8 @@ public class RigidBody2D : Component
     [DreambitSerialize]
     public Collider Collider { get; private set; }
 
-    [DreambitSerialize] public Vector2 Velocity = Vector2.Zero;
+    [DreambitSerialize]
+    public Vector2 Velocity = Vector2.Zero;
 
     [DreambitSerialize]
     public HashSet<string> InterestedTags { get; private set; } = [];
@@ -65,12 +91,15 @@ public class RigidBody2D : Component
 
     #region Public Functions
 
-    public void SetInterestedTags(params string[] tags)
+    public void SetInterestedTags(
+        params string[] tags)
     {
-        foreach (var tag in tags) InterestedTags.Add(tag);
+        foreach (var tag in tags)
+            InterestedTags.Add(tag);
     }
 
-    public void SetCollider(Collider collider)
+    public void SetCollider(
+        Collider collider)
     {
         Collider = collider;
         _warnedUser = false;

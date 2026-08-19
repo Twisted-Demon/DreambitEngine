@@ -47,7 +47,7 @@ internal sealed class EditorPickProxyBuffer
             var proxy = _proxies[index];
 
             if (!proxy.Contains(screenPosition))
-                return null;
+                continue;
             
             var entity = scene.FindEntity(proxy.EntityId);
 
