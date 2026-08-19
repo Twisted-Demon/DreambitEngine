@@ -262,10 +262,29 @@ public static class BlueprintValidator
             return;
 
         if (!availableTypesByBlueprint.TryGetValue(targetBlueprint, out var availableTypes) ||
-            !availableTypes.Contains(targetType))
+            !ContainsCompatibleComponentType(availableTypes, targetType))
+        {
             errors.Add(
                 $"{path}: target entity '{targetBlueprint.Name}' does not create component " +
                 $"'{targetType.FullName}'.");
+        }
+    }
+
+    private static bool ContainsCompatibleComponentType(
+        HashSet<Type> availableTypes,
+        Type targetType)
+    {
+        // Preserve the fast path for exact component references.
+        if (availableTypes.Contains(targetType))
+            return true;
+
+        foreach (var availableType in availableTypes)
+        {
+            if (targetType.IsAssignableFrom(availableType))
+                return true;
+        }
+
+        return false;
     }
 
     private static IEnumerable<(EntityBlueprint Blueprint, string Path)> Walk(

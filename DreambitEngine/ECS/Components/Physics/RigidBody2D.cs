@@ -29,9 +29,19 @@ public class RigidBody2D : Component
 
         Transform.CaptureLastWorldPosition();
 
+        var translateX = Velocity.X * Time.PhysicsDeltaTime;
+        var translateY = Velocity.Y * Time.PhysicsDeltaTime;
+        
+        //check x and y separately
+        CheckTranslation(new Vector2(translateX, 0));
+        CheckTranslation(new Vector2(0, translateY));
+        
+    }
+
+    private void CheckTranslation(Vector2 translation)
+    {
         Transform.TranslateWorld2D(
-            Velocity *
-            Time.PhysicsDeltaTime);
+            translation);
 
         /*
          * Keep the broadphase current immediately after moving.
