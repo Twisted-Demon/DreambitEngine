@@ -5,36 +5,72 @@ using Microsoft.Xna.Framework;
 namespace Dreambit.ECS;
 
 /// <summary>
-///     Physics collider component. Can act as a trigger, participate in spatial queries,
-///     and raise collision callbacks (enter/stay/exit). Rendering of bounds is available in debug.
+/// Physics collider component. Can act as a trigger, participate in spatial queries,
+/// and raise collision callbacks (enter/stay/exit).
 /// </summary>
 [BlueprintType(nameof(Collider))]
 public class Collider : Component
 {
     #region Debug
 
-    /// <summary>Draws the collider outline in editor-hosted scene and blueprint views.</summary>
-    public override void OnEditorDrawGizmos(IEditorGizmoContext context)
+    public override void OnEditorDrawGizmos(
+        IEditorGizmoContext context)
     {
-        //DrawEditorOutline(context, new Color(82, 235, 140, 150), 1.5f);
     }
 
-    /// <summary>Emphasizes the collider when its entity is selected in the editor.</summary>
-    public override void OnEditorDrawGizmosSelected(IEditorGizmoContext context)
+    public override void OnEditorDrawGizmosSelected(
+        IEditorGizmoContext context)
     {
         DrawEditorOutline(
             context,
-            new Color(82, 235, 140, 150),
+            new Color(
+                82,
+                235,
+                140,
+                150),
             1.5f);
     }
 
-    /// <summary>Renders polygon outline for debugging purposes.</summary>
     public override void OnDebugDraw()
     {
-        Core.SpriteBatch.DrawPolygon(
-            WorldPolygon2D.Vertices,
-            Color.White,
-            Scene.Instance.MainCamera.WorldUnitsPerScreenPixel);
+        var geometry =
+            WorldGeometry2D;
+
+        if (!geometry.IsValid)
+            return;
+
+        var thickness =
+            Scene.Instance.MainCamera
+                .WorldUnitsPerScreenPixel;
+
+        switch (geometry.Kind)
+        {
+            case ColliderGeometryKind.Polygon:
+                Core.SpriteBatch.DrawPolygon(
+                    geometry.Polygon.Vertices,
+                    Color.White,
+                    thickness);
+
+                break;
+
+            case ColliderGeometryKind.Circle:
+                Core.SpriteBatch.DrawCircle(
+                    geometry.Circle.Center,
+                    geometry.Circle.Radius,
+                    Color.White,
+                    32,
+                    thickness);
+
+                break;
+
+            case ColliderGeometryKind.Capsule:
+                DrawDebugCapsule(
+                    geometry.Capsule,
+                    Color.White,
+                    thickness);
+
+                break;
+        }
     }
 
     private void DrawEditorOutline(
@@ -42,66 +78,215 @@ public class Collider : Component
         Color color,
         float thickness)
     {
-        var vertices = WorldPolygon2D.Vertices;
+        var geometry =
+            WorldGeometry2D;
 
-        if (vertices is null || vertices.Length < 2)
+        if (!geometry.IsValid)
             return;
 
-        for (var index = 0; index < vertices.Length; index++)
+        switch (geometry.Kind)
         {
-            context.Line(
-                vertices[index],
-                vertices[(index + 1) % vertices.Length],
+            case ColliderGeometryKind.Polygon:
+            {
+                var vertices =
+                    geometry.Polygon.Vertices;
+
+                if (vertices is not { Length: >= 2 })
+                    return;
+
+                for (var index = 0;
+                     index < vertices.Length;
+                     index++)
+                {
+                    context.Line(
+                        vertices[index],
+                        vertices[
+                            (index + 1) %
+                            vertices.Length],
+                        color,
+                        thickness);
+                }
+
+                break;
+            }
+
+            case ColliderGeometryKind.Circle:
+                context.Circle(
+                    geometry.Circle.Center,
+                    geometry.Circle.Radius,
+                    color,
+                    thickness);
+
+                break;
+
+            case ColliderGeometryKind.Capsule:
+                DrawEditorCapsule(
+                    context,
+                    geometry.Capsule,
+                    color,
+                    thickness);
+
+                break;
+        }
+    }
+
+    private static void DrawEditorCapsule(
+        IEditorGizmoContext context,
+        Capsule2D capsule,
+        Color color,
+        float thickness)
+    {
+        var axis =
+            capsule.End -
+            capsule.Start;
+
+        var length =
+            axis.Length();
+
+        if (length <= Mathf.Epsilon)
+        {
+            context.Circle(
+                capsule.Start,
+                capsule.Radius,
                 color,
                 thickness);
+
+            return;
         }
+
+        var normal =
+            new Vector2(
+                -axis.Y,
+                axis.X) /
+            length;
+
+        var offset =
+            normal *
+            capsule.Radius;
+
+        context.Line(
+            capsule.Start + offset,
+            capsule.End + offset,
+            color,
+            thickness);
+
+        context.Line(
+            capsule.Start - offset,
+            capsule.End - offset,
+            color,
+            thickness);
+
+        context.Circle(
+            capsule.Start,
+            capsule.Radius,
+            color,
+            thickness);
+
+        context.Circle(
+            capsule.End,
+            capsule.Radius,
+            color,
+            thickness);
+    }
+
+    private static void DrawDebugCapsule(
+        Capsule2D capsule,
+        Color color,
+        float thickness)
+    {
+        var axis =
+            capsule.End -
+            capsule.Start;
+
+        var length =
+            axis.Length();
+
+        if (length <= Mathf.Epsilon)
+        {
+            Core.SpriteBatch.DrawCircle(
+                capsule.Start,
+                capsule.Radius,
+                color,
+                32,
+                thickness);
+
+            return;
+        }
+
+        var normal =
+            new Vector2(
+                -axis.Y,
+                axis.X) /
+            length;
+
+        var offset =
+            normal *
+            capsule.Radius;
+
+        Core.SpriteBatch.DrawLine(
+            capsule.Start + offset,
+            capsule.End + offset,
+            color,
+            thickness);
+
+        Core.SpriteBatch.DrawLine(
+            capsule.Start - offset,
+            capsule.End - offset,
+            color,
+            thickness);
+
+        Core.SpriteBatch.DrawCircle(
+            capsule.Start,
+            capsule.Radius,
+            color,
+            32,
+            thickness);
+
+        Core.SpriteBatch.DrawCircle(
+            capsule.End,
+            capsule.Radius,
+            color,
+            32,
+            thickness);
     }
 
     #endregion
 
     #region Trigger Collision Checks
 
-    /// <summary>
-    ///     Performs trigger overlap checks and dispatches Enter/Exit/Stay events.
-    ///     Uses tag filtering if <see cref="InterestedIn" /> is populated.
-    /// </summary>
     private void CheckForTriggerCollisions()
     {
-        // Fill the reusable overlap set directly.
-        // This avoids allocating a CollisionResult + List every trigger update.
         if (InterestedIn.Count == 0)
         {
-            PhysicsSystem.Instance.CollectColliderOverlaps(
-                this,
-                _overlapsCurr);
+            PhysicsSystem.Instance
+                .CollectColliderOverlaps(
+                    this,
+                    _overlapsCurr);
         }
         else
         {
-            PhysicsSystem.Instance.CollectColliderOverlapsByTag(
-                this,
-                _overlapsCurr,
-                InterestedIn);
+            PhysicsSystem.Instance
+                .CollectColliderOverlapsByTag(
+                    this,
+                    _overlapsCurr,
+                    InterestedIn);
         }
 
-        // Enter = curr \ prev
         foreach (var collider in _overlapsCurr)
         {
             if (!_overlapsPrev.Contains(collider))
                 OnCollisionEnter?.Invoke(collider);
         }
 
-        // Exit = prev \ curr
         foreach (var collider in _overlapsPrev)
         {
             if (!_overlapsCurr.Contains(collider))
                 OnCollisionExit?.Invoke(collider);
         }
 
-        // Stay = everything currently overlapping.
         foreach (var collider in _overlapsCurr)
             OnCollisionStay?.Invoke(collider);
 
-        // Swap conceptually by copying into the already-allocated set.
         _overlapsPrev.Clear();
 
         foreach (var collider in _overlapsCurr)
@@ -112,7 +297,8 @@ public class Collider : Component
 
     #region Collision Casting Checks
 
-    public virtual void ColliderCast(out CollisionResult hits)
+    public virtual void ColliderCast(
+        out CollisionResult hits)
     {
         PhysicsSystem.Instance.ColliderCast(
             this,
@@ -133,150 +319,129 @@ public class Collider : Component
 
     #region Broadphase / Spatial Hash Participation
 
-    /// <summary>
-    ///     Notifies the physics system when the collider's transform/shape changes.
-    ///
-    ///     World polygon storage is cached and reused. Static colliders therefore
-    ///     do not allocate a new vertex array every physics step.
-    /// </summary>
     internal void RefreshSpatialHash()
     {
         if (!_isAttached ||
             !Enabled ||
             !IsQueryable ||
-            Bounds == null)
+            !HasCollisionGeometry)
         {
             DeregisterFromPhysics();
             return;
         }
 
-        var previousAabb = AABB;
+        var previousAabb =
+            AABB;
 
         var geometryChanged =
             EnsureWorldGeometry();
 
+        if (!_hasCachedWorldGeometry)
+        {
+            DeregisterFromPhysics();
+            return;
+        }
+
         /*
-         * Preserve the existing contract that SetAabb() is evaluated during
-         * collider maintenance, including for future Collider subclasses that
-         * override it.
-         *
-         * If geometry changed, EnsureWorldGeometry already called SetAabb().
+         * EnsureWorldGeometry() calls SetAabb() whenever geometry is rebuilt.
+         * Preserve the existing virtual SetAabb contract even when the cached
+         * geometry itself did not need rebuilding.
          */
         if (!geometryChanged)
             SetAabb();
 
         var aabbChanged =
-            !AabbEquals(previousAabb, AABB);
+            !AabbEquals(
+                previousAabb,
+                AABB);
 
         if (!_isRegistered)
         {
-            PhysicsSystem.Instance.RegisterCollider(this);
+            PhysicsSystem.Instance
+                .RegisterCollider(this);
+
             _isRegistered = true;
             return;
         }
 
-        /*
-         * SpatialHash.InsertOrUpdate() already early-outs when the occupied
-         * CellRange did not change, so touching here is cheap even if the
-         * polygon rotated inside the same cells.
-         */
-        if (geometryChanged || aabbChanged)
-            PhysicsSystem.Instance.Touch(this);
+        if (geometryChanged ||
+            aabbChanged)
+        {
+            PhysicsSystem.Instance
+                .Touch(this);
+        }
     }
 
-    /// <summary>
-    ///     Calculates the current broadphase bounds.
-    ///     Override for specialized collider types when appropriate.
-    /// </summary>
     protected virtual void SetAabb()
     {
-        if (_cachedWorldPolygon.Vertices is not { Length: > 0 })
+        if (!_hasCachedWorldGeometry ||
+            !_cachedWorldGeometry.IsValid)
         {
             AABB = default;
             return;
         }
 
-        AABB = _cachedWorldPolygon.ComputeAabb();
+        AABB =
+            _cachedWorldGeometry.Aabb;
     }
 
     /// <summary>
-    /// Ensures the reusable world-space polygon matches the current Bounds and Transform.
-    /// Returns true only when the cached geometry was rebuilt.
+    /// Whether the authored collider currently contains valid local geometry.
+    /// Specialized collider types override this instead of requiring Bounds.
     /// </summary>
-    private bool EnsureWorldGeometry()
+    protected virtual bool HasLocalGeometry =>
+        Bounds?.GetVertices()
+            is { Length: >= 3 };
+
+    /// <summary>
+    /// Hash of authored local geometry used to detect in-place changes.
+    /// </summary>
+    protected virtual int GetLocalGeometryHash()
     {
-        if (Bounds == null)
-        {
-            _cachedWorldPolygon = default;
-            _cachedBounds = null;
-            _hasCachedWorldGeometry = false;
-            _worldGeometryDirty = true;
-            AABB = default;
+        return Bounds == null
+            ? 0
+            : ComputeShapeHash(
+                Bounds.GetVertices());
+    }
 
-            return false;
-        }
+    /// <summary>
+    /// Builds world-space geometry from local authored state.
+    ///
+    /// previousGeometry is supplied so polygon colliders can preserve and
+    /// reuse their transformed vertex array rather than allocating each step.
+    /// </summary>
+    protected virtual ColliderGeometry2D BuildWorldGeometry(
+        Matrix worldMatrix,
+        ColliderGeometry2D previousGeometry)
+    {
+        var localVertices =
+            Bounds.GetVertices();
 
-        var localVertices = Bounds.GetVertices();
-
-        if (localVertices is not { Length: >= 3 })
-        {
-            _cachedWorldPolygon = default;
-            _cachedBounds = Bounds;
-            _hasCachedWorldGeometry = false;
-            _worldGeometryDirty = true;
-            AABB = default;
-
-            return false;
-        }
-
-        /*
-         * WorldMatrix is deliberately evaluated once per collider check,
-         * not once per polygon vertex.
-         */
-        var worldMatrix =
-            Transform.WorldMatrix;
-
-        /*
-         * GetVertices() currently exposes the backing array publicly.
-         * The hash keeps caching compatible with callers that modify those
-         * vertices in-place rather than assigning a new Bounds object.
-         */
-        var shapeHash =
-            ComputeShapeHash(localVertices);
-
-        var needsRebuild =
-            !_hasCachedWorldGeometry ||
-            _worldGeometryDirty ||
-            !ReferenceEquals(_cachedBounds, Bounds) ||
-            !_cachedWorldMatrix.Equals(worldMatrix) ||
-            _cachedShapeHash != shapeHash;
-
-        if (!needsRebuild)
-            return false;
+        var worldPolygon =
+            previousGeometry.Kind ==
+            ColliderGeometryKind.Polygon
+                ? previousGeometry.Polygon
+                : default;
 
         var worldVertices =
-            _cachedWorldPolygon.Vertices;
+            worldPolygon.Vertices;
 
         if (worldVertices == null ||
-            worldVertices.Length != localVertices.Length)
+            worldVertices.Length !=
+            localVertices.Length)
         {
             worldVertices =
-                new Vector2[localVertices.Length];
+                new Vector2[
+                    localVertices.Length];
 
-            _cachedWorldPolygon =
+            worldPolygon =
                 new Polygon2D
                 {
-                    Vertices = worldVertices
+                    Vertices =
+                        worldVertices
                 };
         }
 
-        /*
-         * Reuse the same world-space vertex array.
-         *
-         * This is the important allocation fix:
-         * moving colliders update their existing vertices instead of creating
-         * a new Vector2[] on every transform.
-         */
         for (var index = 0;
              index < localVertices.Length;
              index++)
@@ -297,33 +462,192 @@ public class Collider : Component
                     transformed.Y);
         }
 
-        _cachedBounds = Bounds;
-        _cachedWorldMatrix = worldMatrix;
-        _cachedShapeHash = shapeHash;
-        _hasCachedWorldGeometry = true;
-        _worldGeometryDirty = false;
+        return ColliderGeometry2D
+            .FromPolygon(worldPolygon);
+    }
+
+    private bool EnsureWorldGeometry()
+    {
+        if (!HasLocalGeometry)
+        {
+            _cachedWorldGeometry =
+                default;
+
+            _hasCachedWorldGeometry =
+                false;
+
+            _worldGeometryDirty =
+                true;
+
+            AABB =
+                default;
+
+            return false;
+        }
+
+        var worldMatrix =
+            Transform.WorldMatrix;
+
+        var shapeHash =
+            GetLocalGeometryHash();
+
+        var needsRebuild =
+            !_hasCachedWorldGeometry ||
+            _worldGeometryDirty ||
+            !_cachedWorldMatrix.Equals(
+                worldMatrix) ||
+            _cachedShapeHash !=
+            shapeHash;
+
+        if (!needsRebuild)
+            return false;
 
         try
         {
-            /*
-             * Metadata has already been committed above so an overridden
-             * SetAabb() can safely access WorldPolygon2D without causing
-             * recursive geometry rebuilding.
-             */
+            _cachedWorldGeometry =
+                BuildWorldGeometry(
+                    worldMatrix,
+                    _cachedWorldGeometry);
+
+            _cachedWorldMatrix =
+                worldMatrix;
+
+            _cachedShapeHash =
+                shapeHash;
+
+            _hasCachedWorldGeometry =
+                _cachedWorldGeometry.IsValid;
+
+            _worldGeometryDirty =
+                false;
+
+            if (!_hasCachedWorldGeometry)
+            {
+                AABB = default;
+                return true;
+            }
+
             SetAabb();
+
+            return true;
         }
         catch
         {
-            _worldGeometryDirty = true;
+            _worldGeometryDirty =
+                true;
+
             throw;
         }
-
-        return true;
     }
 
     private void InvalidateWorldGeometry()
     {
-        _worldGeometryDirty = true;
+        _worldGeometryDirty =
+            true;
+    }
+
+    /// <summary>
+    /// Call from specialized collider property setters after local geometry
+    /// has changed.
+    /// </summary>
+    protected void NotifyGeometryChanged()
+    {
+        InvalidateWorldGeometry();
+        RefreshSpatialHash();
+    }
+
+    protected static Vector2 TransformPointToWorld(
+        Vector2 point,
+        Matrix worldMatrix)
+    {
+        var transformed =
+            Vector3.Transform(
+                new Vector3(
+                    point,
+                    0f),
+                worldMatrix);
+
+        return new Vector2(
+            transformed.X,
+            transformed.Y);
+    }
+
+    /// <summary>
+    /// Circles and capsules remain mathematically circles/capsules only under
+    /// uniform, non-sheared scaling.
+    /// </summary>
+    protected static float ResolveUniformWorldScale(
+        Matrix worldMatrix,
+        string colliderType)
+    {
+        var xAxis =
+            new Vector2(
+                worldMatrix.M11,
+                worldMatrix.M12);
+
+        var yAxis =
+            new Vector2(
+                worldMatrix.M21,
+                worldMatrix.M22);
+
+        var scaleX =
+            xAxis.Length();
+
+        var scaleY =
+            yAxis.Length();
+
+        if (!float.IsFinite(scaleX) ||
+            !float.IsFinite(scaleY))
+        {
+            throw new InvalidOperationException(
+                $"{colliderType} encountered a non-finite world transform.");
+        }
+
+        if (scaleX <= Mathf.Epsilon &&
+            scaleY <= Mathf.Epsilon)
+        {
+            return 0f;
+        }
+
+        var scaleTolerance =
+            0.0001f *
+            MathF.Max(
+                1f,
+                MathF.Max(
+                    scaleX,
+                    scaleY));
+
+        if (MathF.Abs(
+                scaleX -
+                scaleY) >
+            scaleTolerance)
+        {
+            throw new InvalidOperationException(
+                $"{colliderType} requires uniform world scale. " +
+                $"Current world scale is approximately " +
+                $"({scaleX:0.####}, {scaleY:0.####}).");
+        }
+
+        var orthogonalityTolerance =
+            0.0001f *
+            MathF.Max(
+                1f,
+                scaleX * scaleY);
+
+        if (MathF.Abs(
+                Vector2.Dot(
+                    xAxis,
+                    yAxis)) >
+            orthogonalityTolerance)
+        {
+            throw new InvalidOperationException(
+                $"{colliderType} does not support a sheared world transform.");
+        }
+
+        return (
+                   scaleX +
+                   scaleY) *
+               0.5f;
     }
 
     private static int ComputeShapeHash(
@@ -360,15 +684,12 @@ public class Collider : Component
 
     #region Flags & Configuration
 
-    /// <summary>When true, collider acts as a trigger (no physical response, events only).</summary>
     [DreambitSerialize]
     public bool IsTrigger { get; set; }
 
-    /// <summary>When true, suppresses trigger event generation.</summary>
     [DreambitSerialize]
     public bool IsSilent { get; set; }
 
-    /// <summary>When false, collider is ignored by spatial queries / broadphase.</summary>
     [DreambitSerialize]
     public bool IsQueryable
     {
@@ -384,7 +705,6 @@ public class Collider : Component
         }
     }
 
-    /// <summary>Optional filter: limit trigger checks to these tags. Empty = all.</summary>
     [DreambitSerialize]
     public List<string> InterestedIn = [];
 
@@ -392,20 +712,22 @@ public class Collider : Component
 
     #region Events / Callbacks
 
-    /// <summary>Raised when this trigger begins overlapping another collider.</summary>
     public Action<Collider> OnCollisionEnter;
 
-    /// <summary>Raised while this trigger stays overlapping another collider.</summary>
     public Action<Collider> OnCollisionStay;
 
-    /// <summary>Raised when this trigger stops overlapping another collider.</summary>
     public Action<Collider> OnCollisionExit;
 
     #endregion
 
     #region Bounds & Shape
 
-    /// <summary>Local-space shape used for collision/trigger checks.</summary>
+    /// <summary>
+    /// Polygon-backed collider shape.
+    ///
+    /// Specialized native collider types such as CircleCollider and
+    /// CapsuleCollider do not require Bounds.
+    /// </summary>
     [DreambitSerialize]
     public Shape2D Bounds
     {
@@ -413,21 +735,47 @@ public class Collider : Component
 
         set
         {
-            if (ReferenceEquals(_bounds, value))
+            if (ReferenceEquals(
+                    _bounds,
+                    value))
+            {
                 return;
+            }
 
             _bounds = value;
 
-            InvalidateWorldGeometry();
-            RefreshSpatialHash();
+            NotifyGeometryChanged();
         }
     }
 
     public AABB AABB { get; set; }
 
     /// <summary>
-    /// World-space polygon computed from Bounds and the current transform.
-    /// The returned polygon references reusable collider-owned storage.
+    /// Native world-space collider geometry.
+    /// </summary>
+    public ColliderGeometry2D WorldGeometry2D
+    {
+        get
+        {
+            EnsureWorldGeometry();
+
+            return _hasCachedWorldGeometry
+                ? _cachedWorldGeometry
+                : default;
+        }
+    }
+
+    /// <summary>
+    /// True when this collider has usable authored collision geometry.
+    /// </summary>
+    public bool HasCollisionGeometry =>
+        HasLocalGeometry;
+
+    /// <summary>
+    /// Backwards-compatible polygon access.
+    ///
+    /// CircleCollider and CapsuleCollider return an empty/default polygon.
+    /// New generic physics code should use WorldGeometry2D.
     /// </summary>
     public Polygon2D WorldPolygon2D =>
         GetTransformedPolygon();
@@ -442,28 +790,31 @@ public class Collider : Component
     private bool _isQueryable = true;
     private bool _isRegistered;
 
-    /*
-     * Cached world geometry.
-     *
-     * Vector storage is reused across physics steps. The polygon is rebuilt
-     * only when the transform or authored shape actually changes.
-     */
-    private Polygon2D _cachedWorldPolygon;
-    private Matrix _cachedWorldMatrix;
-    private Shape2D _cachedBounds;
-    private int _cachedShapeHash;
-    private bool _hasCachedWorldGeometry;
-    private bool _worldGeometryDirty = true;
+    private ColliderGeometry2D
+        _cachedWorldGeometry;
 
-    // Reused sets for trigger enter/stay/exit detection.
-    private readonly HashSet<Collider> _overlapsPrev = [];
-    private readonly HashSet<Collider> _overlapsCurr = [];
+    private Matrix
+        _cachedWorldMatrix;
+
+    private int
+        _cachedShapeHash;
+
+    private bool
+        _hasCachedWorldGeometry;
+
+    private bool
+        _worldGeometryDirty = true;
+
+    private readonly HashSet<Collider>
+        _overlapsPrev = [];
+
+    private readonly HashSet<Collider>
+        _overlapsCurr = [];
 
     #endregion
 
     #region Lifecycle Overrides
 
-    /// <summary>Registers this collider with the physics system.</summary>
     public override void OnAddedToEntity()
     {
         _isAttached = true;
@@ -473,7 +824,6 @@ public class Collider : Component
         Transform.CaptureLastWorldPosition();
     }
 
-    /// <summary>Ensures deregistration and clears callbacks on destruction.</summary>
     public override void OnDestroyed()
     {
         _isAttached = false;
@@ -490,7 +840,6 @@ public class Collider : Component
         InvalidateWorldGeometry();
     }
 
-    /// <summary>Deregister when removed from entity.</summary>
     public override void OnRemovedFromEntity()
     {
         _isAttached = false;
@@ -501,13 +850,11 @@ public class Collider : Component
         _overlapsCurr.Clear();
     }
 
-    /// <summary>Deregister while disabled.</summary>
     public override void OnDisabled()
     {
         DeregisterFromPhysics();
     }
 
-    /// <summary>Re-register when enabled.</summary>
     public override void OnEnabled()
     {
         RefreshSpatialHash();
@@ -515,18 +862,16 @@ public class Collider : Component
         Transform.CaptureLastWorldPosition();
     }
 
-    /// <summary>Per-frame update; drives trigger collision checks when enabled.</summary>
     public override void OnUpdate()
     {
         if (IsTrigger &&
-            Bounds != null &&
+            HasCollisionGeometry &&
             !IsSilent)
         {
             CheckForTriggerCollisions();
         }
     }
 
-    /// <summary>Physics-step update; maintains spatial hash participation.</summary>
     public override void OnPhysicsUpdate()
     {
         RefreshSpatialHash();
@@ -537,22 +882,21 @@ public class Collider : Component
     #region Helpers
 
     /// <summary>
-    /// Returns the collider's current world polygon using reusable cached storage.
+    /// Backwards-compatible polygon access.
     /// </summary>
     public Polygon2D GetTransformedPolygon()
     {
-        if (Bounds == null)
-            return default;
+        var geometry =
+            WorldGeometry2D;
 
-        EnsureWorldGeometry();
-
-        return _cachedWorldPolygon;
+        return geometry.Kind ==
+               ColliderGeometryKind.Polygon
+            ? geometry.Polygon
+            : default;
     }
 
     /// <summary>
-    /// Returns world-space polygon transformed as if the collider were at desiredPos.
-    /// Intended for speculative queries; unlike the regular world polygon this creates
-    /// temporary polygon storage.
+    /// Polygon-only speculative transform API retained for compatibility.
     /// </summary>
     public Polygon2D GetTransformedPolyWithDesiredPos(
         Vector3 desiredPos)
@@ -570,16 +914,21 @@ public class Collider : Component
         if (!_isRegistered)
             return;
 
-        PhysicsSystem.Instance.DeregisterCollider(this);
-        _isRegistered = false;
+        PhysicsSystem.Instance
+            .DeregisterCollider(this);
+
+        _isRegistered =
+            false;
     }
 
     private static bool AabbEquals(
         AABB left,
         AABB right)
     {
-        return left.Min == right.Min &&
-               left.Max == right.Max;
+        return left.Min ==
+               right.Min &&
+               left.Max ==
+               right.Max;
     }
 
     #endregion

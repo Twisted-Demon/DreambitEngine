@@ -20,7 +20,8 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
     public void RegisterCollider(
         Collider collider)
     {
-        if (collider?.Bounds == null ||
+        if (collider == null ||
+            !collider.HasCollisionGeometry ||
             !collider.IsQueryable)
         {
             return;
@@ -40,13 +41,11 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         _grid.Remove(collider);
     }
 
-    /// <summary>
-    /// Called when a registered collider's world bounds may have changed.
-    /// </summary>
     public void Touch(
         Collider collider)
     {
-        if (collider?.Bounds == null ||
+        if (collider == null ||
+            !collider.HasCollisionGeometry ||
             !collider.IsQueryable)
         {
             return;
@@ -77,10 +76,13 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         if (!IsColliderValid(collider))
             return false;
 
-        _candidateSet.Clear();
+        var geometry =
+            collider.WorldGeometry2D;
 
-        var polygon =
-            collider.GetTransformedPolygon();
+        if (!geometry.IsValid)
+            return false;
+
+        _candidateSet.Clear();
 
         _grid.QueryAABB(
             collider.AABB,
@@ -88,17 +90,22 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
 
         foreach (var other in _candidateSet)
         {
-            if (ReferenceEquals(other, collider))
+            if (ReferenceEquals(
+                    other,
+                    collider))
+            {
                 continue;
+            }
 
             if (!IsColliderValid(other))
                 continue;
 
-            var otherPolygon =
-                other.GetTransformedPolygon();
-
-            if (!polygon.Intersects(otherPolygon))
+            if (!Collision2D.Intersects(
+                    geometry,
+                    other.WorldGeometry2D))
+            {
                 continue;
+            }
 
             result.Collisions.Add(other);
         }
@@ -116,10 +123,13 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         if (!IsColliderValid(collider))
             return false;
 
-        _candidateSet.Clear();
+        var geometry =
+            collider.WorldGeometry2D;
 
-        var polygon =
-            collider.GetTransformedPolygon();
+        if (!geometry.IsValid)
+            return false;
+
+        _candidateSet.Clear();
 
         _grid.QueryAABB(
             collider.AABB,
@@ -127,8 +137,12 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
 
         foreach (var other in _candidateSet)
         {
-            if (ReferenceEquals(other, collider))
+            if (ReferenceEquals(
+                    other,
+                    collider))
+            {
                 continue;
+            }
 
             if (!IsColliderValid(other))
                 continue;
@@ -136,11 +150,12 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
             if (!other.Entity.HasAnyTag(tags))
                 continue;
 
-            var otherPolygon =
-                other.GetTransformedPolygon();
-
-            if (!polygon.Intersects(otherPolygon))
+            if (!Collision2D.Intersects(
+                    geometry,
+                    other.WorldGeometry2D))
+            {
                 continue;
+            }
 
             result.Collisions.Add(other);
         }
@@ -148,20 +163,19 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         return result.Collisions.Count > 0;
     }
 
-    /// <summary>
-    /// Boolean-only collider query for hot paths such as RigidBody2D.
-    /// Does not allocate a CollisionResult or result List.
-    /// </summary>
     internal bool ColliderCastAny(
         Collider collider)
     {
         if (!IsColliderValid(collider))
             return false;
 
-        _candidateSet.Clear();
+        var geometry =
+            collider.WorldGeometry2D;
 
-        var polygon =
-            collider.GetTransformedPolygon();
+        if (!geometry.IsValid)
+            return false;
+
+        _candidateSet.Clear();
 
         _grid.QueryAABB(
             collider.AABB,
@@ -169,26 +183,27 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
 
         foreach (var other in _candidateSet)
         {
-            if (ReferenceEquals(other, collider))
+            if (ReferenceEquals(
+                    other,
+                    collider))
+            {
                 continue;
+            }
 
             if (!IsColliderValid(other))
                 continue;
 
-            var otherPolygon =
-                other.GetTransformedPolygon();
-
-            if (polygon.Intersects(otherPolygon))
+            if (Collision2D.Intersects(
+                    geometry,
+                    other.WorldGeometry2D))
+            {
                 return true;
+            }
         }
 
         return false;
     }
 
-    /// <summary>
-    /// HashSet-specialized tagged boolean cast used by RigidBody2D.
-    /// Avoids converting InterestedTags to a temporary array.
-    /// </summary>
     internal bool ColliderCastAnyByTag(
         Collider collider,
         HashSet<string> tags)
@@ -196,10 +211,13 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         if (!IsColliderValid(collider))
             return false;
 
-        _candidateSet.Clear();
+        var geometry =
+            collider.WorldGeometry2D;
 
-        var polygon =
-            collider.GetTransformedPolygon();
+        if (!geometry.IsValid)
+            return false;
+
+        _candidateSet.Clear();
 
         _grid.QueryAABB(
             collider.AABB,
@@ -207,8 +225,12 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
 
         foreach (var other in _candidateSet)
         {
-            if (ReferenceEquals(other, collider))
+            if (ReferenceEquals(
+                    other,
+                    collider))
+            {
                 continue;
+            }
 
             if (!IsColliderValid(other))
                 continue;
@@ -220,20 +242,17 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
                 continue;
             }
 
-            var otherPolygon =
-                other.GetTransformedPolygon();
-
-            if (polygon.Intersects(otherPolygon))
+            if (Collision2D.Intersects(
+                    geometry,
+                    other.WorldGeometry2D))
+            {
                 return true;
+            }
         }
 
         return false;
     }
 
-    /// <summary>
-    /// Fills reusable trigger storage directly.
-    /// The destination set is cleared before use.
-    /// </summary>
     internal bool CollectColliderOverlaps(
         Collider collider,
         HashSet<Collider> destination)
@@ -243,10 +262,13 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         if (!IsColliderValid(collider))
             return false;
 
-        _candidateSet.Clear();
+        var geometry =
+            collider.WorldGeometry2D;
 
-        var polygon =
-            collider.GetTransformedPolygon();
+        if (!geometry.IsValid)
+            return false;
+
+        _candidateSet.Clear();
 
         _grid.QueryAABB(
             collider.AABB,
@@ -254,17 +276,22 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
 
         foreach (var other in _candidateSet)
         {
-            if (ReferenceEquals(other, collider))
+            if (ReferenceEquals(
+                    other,
+                    collider))
+            {
                 continue;
+            }
 
             if (!IsColliderValid(other))
                 continue;
 
-            var otherPolygon =
-                other.GetTransformedPolygon();
-
-            if (!polygon.Intersects(otherPolygon))
+            if (!Collision2D.Intersects(
+                    geometry,
+                    other.WorldGeometry2D))
+            {
                 continue;
+            }
 
             destination.Add(other);
         }
@@ -272,9 +299,6 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         return destination.Count > 0;
     }
 
-    /// <summary>
-    /// Tagged reusable trigger query.
-    /// </summary>
     internal bool CollectColliderOverlapsByTag(
         Collider collider,
         HashSet<Collider> destination,
@@ -285,10 +309,13 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         if (!IsColliderValid(collider))
             return false;
 
-        _candidateSet.Clear();
+        var geometry =
+            collider.WorldGeometry2D;
 
-        var polygon =
-            collider.GetTransformedPolygon();
+        if (!geometry.IsValid)
+            return false;
+
+        _candidateSet.Clear();
 
         _grid.QueryAABB(
             collider.AABB,
@@ -296,8 +323,12 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
 
         foreach (var other in _candidateSet)
         {
-            if (ReferenceEquals(other, collider))
+            if (ReferenceEquals(
+                    other,
+                    collider))
+            {
                 continue;
+            }
 
             if (!IsColliderValid(other))
                 continue;
@@ -305,11 +336,12 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
             if (!other.Entity.HasAnyTag(tags))
                 continue;
 
-            var otherPolygon =
-                other.GetTransformedPolygon();
-
-            if (!polygon.Intersects(otherPolygon))
+            if (!Collision2D.Intersects(
+                    geometry,
+                    other.WorldGeometry2D))
+            {
                 continue;
+            }
 
             destination.Add(other);
         }
@@ -327,13 +359,17 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
     {
         result = new CollisionResult();
 
+        var geometry =
+            ColliderGeometry2D
+                .FromPolygon(polygon);
+
+        if (!geometry.IsValid)
+            return false;
+
         _candidateSet.Clear();
 
-        var aabb =
-            polygon.ComputeAabb();
-
         _grid.QueryAABB(
-            aabb,
+            geometry.Aabb,
             _candidateSet);
 
         foreach (var other in _candidateSet)
@@ -341,11 +377,12 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
             if (!IsColliderValid(other))
                 continue;
 
-            var otherPolygon =
-                other.GetTransformedPolygon();
-
-            if (!polygon.Intersects(otherPolygon))
+            if (!Collision2D.Intersects(
+                    geometry,
+                    other.WorldGeometry2D))
+            {
                 continue;
+            }
 
             result.Collisions.Add(other);
         }
@@ -360,13 +397,17 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
     {
         result = new CollisionResult();
 
+        var geometry =
+            ColliderGeometry2D
+                .FromPolygon(polygon);
+
+        if (!geometry.IsValid)
+            return false;
+
         _candidateSet.Clear();
 
-        var aabb =
-            polygon.ComputeAabb();
-
         _grid.QueryAABB(
-            aabb,
+            geometry.Aabb,
             _candidateSet);
 
         foreach (var other in _candidateSet)
@@ -377,11 +418,12 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
             if (!other.Entity.HasAnyTag(tags))
                 continue;
 
-            var otherPolygon =
-                other.GetTransformedPolygon();
-
-            if (!polygon.Intersects(otherPolygon))
+            if (!Collision2D.Intersects(
+                    geometry,
+                    other.WorldGeometry2D))
+            {
                 continue;
+            }
 
             result.Collisions.Add(other);
         }
@@ -405,11 +447,6 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
             point,
             _candidateList);
 
-        /*
-         * QueryPoint touches exactly one grid cell.
-         * A collider only occurs once in a given cell, so there is no need
-         * to copy the list through a HashSet first.
-         */
         for (var index = 0;
              index < _candidateList.Count;
              index++)
@@ -420,11 +457,12 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
             if (!IsColliderValid(other))
                 continue;
 
-            var polygon =
-                other.GetTransformedPolygon();
-
-            if (!polygon.ContainsPoint(point))
+            if (!Collision2D.ContainsPoint(
+                    other.WorldGeometry2D,
+                    point))
+            {
                 continue;
+            }
 
             result.Collisions.Add(other);
         }
@@ -458,11 +496,12 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
             if (!other.Entity.HasAnyTag(tags))
                 continue;
 
-            var polygon =
-                other.GetTransformedPolygon();
-
-            if (!polygon.ContainsPoint(point))
+            if (!Collision2D.ContainsPoint(
+                    other.WorldGeometry2D,
+                    point))
+            {
                 continue;
+            }
 
             result.Collisions.Add(other);
         }
@@ -487,10 +526,6 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
             ray.End,
             _candidateList);
 
-        /*
-         * A ray visits many cells, so the same collider can occur multiple
-         * times. Deduplicate once here.
-         */
         _candidateSet.Clear();
 
         for (var index = 0;
@@ -506,13 +541,9 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
             if (!IsColliderValid(other))
                 continue;
 
-            var polygon =
-                other.GetTransformedPolygon();
-
-            if (!polygon.RayIntersects(
-                    ray.Start,
-                    ray.End,
-                    out _))
+            if (!Collision2D.IntersectsRay(
+                    other.WorldGeometry2D,
+                    ray))
             {
                 continue;
             }
@@ -555,13 +586,9 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
             if (!other.Entity.HasAnyTag(tags))
                 continue;
 
-            var polygon =
-                other.GetTransformedPolygon();
-
-            if (!polygon.RayIntersects(
-                    ray.Start,
-                    ray.End,
-                    out _))
+            if (!Collision2D.IntersectsRay(
+                    other.WorldGeometry2D,
+                    ray))
             {
                 continue;
             }
@@ -584,25 +611,25 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
     {
         result = new CollisionResult();
 
-        if (radius <= 0f)
+        if (!float.IsFinite(radius) ||
+            radius <= 0f)
+        {
+            return false;
+        }
+
+        var geometry =
+            ColliderGeometry2D.FromCircle(
+                new Circle2D(
+                    center,
+                    radius));
+
+        if (!geometry.IsValid)
             return false;
 
         _candidateSet.Clear();
 
-        aabb ??=
-            new AABB
-            {
-                Min = new Vector2(
-                    center.X - radius,
-                    center.Y - radius),
-
-                Max = new Vector2(
-                    center.X + radius,
-                    center.Y + radius)
-            };
-
         _grid.QueryAABB(
-            aabb.Value,
+            aabb ?? geometry.Aabb,
             _candidateSet);
 
         foreach (var other in _candidateSet)
@@ -610,12 +637,9 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
             if (!IsColliderValid(other))
                 continue;
 
-            var polygon =
-                other.GetTransformedPolygon();
-
-            if (!polygon.IntersectsCircle(
-                    center,
-                    radius))
+            if (!Collision2D.Intersects(
+                    geometry,
+                    other.WorldGeometry2D))
             {
                 continue;
             }
@@ -634,25 +658,25 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
     {
         result = new CollisionResult();
 
-        if (radius <= 0f)
+        if (!float.IsFinite(radius) ||
+            radius <= 0f)
+        {
+            return false;
+        }
+
+        var geometry =
+            ColliderGeometry2D.FromCircle(
+                new Circle2D(
+                    center,
+                    radius));
+
+        if (!geometry.IsValid)
             return false;
 
         _candidateSet.Clear();
 
-        var aabb =
-            new AABB
-            {
-                Min = new Vector2(
-                    center.X - radius,
-                    center.Y - radius),
-
-                Max = new Vector2(
-                    center.X + radius,
-                    center.Y + radius)
-            };
-
         _grid.QueryAABB(
-            aabb,
+            geometry.Aabb,
             _candidateSet);
 
         foreach (var other in _candidateSet)
@@ -663,12 +687,113 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
             if (!other.Entity.HasAnyTag(tags))
                 continue;
 
-            var polygon =
-                other.GetTransformedPolygon();
+            if (!Collision2D.Intersects(
+                    geometry,
+                    other.WorldGeometry2D))
+            {
+                continue;
+            }
 
-            if (!polygon.IntersectsCircle(
-                    center,
-                    radius))
+            result.Collisions.Add(other);
+        }
+
+        return result.Collisions.Count > 0;
+    }
+
+    #endregion
+
+    #region Capsule Cast
+
+    public bool CapsuleCast(
+        Vector2 start,
+        Vector2 end,
+        float radius,
+        out CollisionResult result)
+    {
+        result = new CollisionResult();
+
+        if (!float.IsFinite(radius) ||
+            radius <= 0f)
+        {
+            return false;
+        }
+
+        var geometry =
+            ColliderGeometry2D.FromCapsule(
+                new Capsule2D(
+                    start,
+                    end,
+                    radius));
+
+        if (!geometry.IsValid)
+            return false;
+
+        _candidateSet.Clear();
+
+        _grid.QueryAABB(
+            geometry.Aabb,
+            _candidateSet);
+
+        foreach (var other in _candidateSet)
+        {
+            if (!IsColliderValid(other))
+                continue;
+
+            if (!Collision2D.Intersects(
+                    geometry,
+                    other.WorldGeometry2D))
+            {
+                continue;
+            }
+
+            result.Collisions.Add(other);
+        }
+
+        return result.Collisions.Count > 0;
+    }
+
+    public bool CapsuleCastByTag(
+        Vector2 start,
+        Vector2 end,
+        float radius,
+        out CollisionResult result,
+        IReadOnlyList<string> tags)
+    {
+        result = new CollisionResult();
+
+        if (!float.IsFinite(radius) ||
+            radius <= 0f)
+        {
+            return false;
+        }
+
+        var geometry =
+            ColliderGeometry2D.FromCapsule(
+                new Capsule2D(
+                    start,
+                    end,
+                    radius));
+
+        if (!geometry.IsValid)
+            return false;
+
+        _candidateSet.Clear();
+
+        _grid.QueryAABB(
+            geometry.Aabb,
+            _candidateSet);
+
+        foreach (var other in _candidateSet)
+        {
+            if (!IsColliderValid(other))
+                continue;
+
+            if (!other.Entity.HasAnyTag(tags))
+                continue;
+
+            if (!Collision2D.Intersects(
+                    geometry,
+                    other.WorldGeometry2D))
             {
                 continue;
             }
@@ -687,7 +812,7 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
         Collider collider)
     {
         return collider != null &&
-               collider.Bounds != null &&
+               collider.HasCollisionGeometry &&
                collider.IsQueryable &&
                collider.Enabled &&
                collider.Entity?.Enabled == true;
@@ -704,10 +829,6 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
             return false;
         }
 
-        /*
-         * Iterate the requested tags because InterestedTags is normally tiny.
-         * HashSet.Contains on Entity.Tags remains O(1) average.
-         */
         foreach (var tag in tags)
         {
             if (entity.Tags.Contains(tag))
