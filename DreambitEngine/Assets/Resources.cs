@@ -87,20 +87,54 @@ public class Resources : Singleton<Resources>
     /// <summary>Restores the game's default Content directory and automatic source selection.</summary>
     public static void ResetContentSource()
     {
-        RefreshContent();
-        _contentDirectoryOverride = null;
-        PakName = "content.pak";
-        _contentMode = AssetContentMode.Auto;
+        try
+        {
+            RefreshContent();
+        }
+        finally
+        {
+            // RefreshContent drains ownership even when one Dispose reports failure,
+            // so leaving the old source configured would be misleading.
+            _contentDirectoryOverride = null;
+            PakName = "content.pak";
+            _contentMode = AssetContentMode.Auto;
+        }
     }
 
     /// <summary>Releases cached assets and PAK readers so newly baked content can be opened.</summary>
     public static void RefreshContent()
     {
-        Instance.ReleaseEntries(Instance.ContentCollection.Drain());
+        var cleanupErrors =
+            new List<Exception>();
+
+        var entries =
+            Instance.ContentCollection.Drain();
+
+        try
+        {
+            Instance.ReleaseEntries(entries);
+        }
+        catch (Exception exception)
+        {
+            cleanupErrors.Add(exception);
+        }
+
         foreach (var reader in Instance._pakReaders.Values)
-            reader.Dispose();
+        {
+            TryDispose(
+                cleanupErrors,
+                reader);
+        }
+
         Instance._pakReaders.Clear();
         Instance._blobReaders.Clear();
+
+        if (cleanupErrors.Count > 0)
+        {
+            throw new AggregateException(
+                "One or more cached resources failed while refreshing content.",
+                cleanupErrors);
+        }
     }
 
     public void Init()
@@ -396,9 +430,36 @@ public class Resources : Singleton<Resources>
 
     internal void CleanUp()
     {
-        ResetContentSource();
-        _xnbReader?.Dispose();
+        var cleanupErrors =
+            new List<Exception>();
+
+        try
+        {
+            ResetContentSource();
+        }
+        catch (Exception exception)
+        {
+            cleanupErrors.Add(exception);
+        }
+
+        var xnbReader =
+            _xnbReader;
+
         _xnbReader = null;
+
+        if (xnbReader is not null)
+        {
+            TryDispose(
+                cleanupErrors,
+                xnbReader);
+        }
+
+        if (cleanupErrors.Count > 0)
+        {
+            throw new AggregateException(
+                "One or more resource-system objects failed during shutdown.",
+                cleanupErrors);
+        }
     }
 
     internal static void ReleaseAssembly(Assembly assembly)
@@ -428,21 +489,66 @@ public class Resources : Singleton<Resources>
         return $"{assetName}#font-size={fontSize:R}";
     }
 
-    private void ReleaseEntries(IReadOnlyList<DreambitContentCollection.Entry> entries)
+    private void ReleaseEntries(
+        IReadOnlyList<DreambitContentCollection.Entry> entries)
     {
-        var disposed = new HashSet<object>(ReferenceEqualityComparer.Instance);
+        var disposed =
+            new HashSet<object>(
+                ReferenceEqualityComparer.Instance);
+
+        var cleanupErrors =
+            new List<Exception>();
 
         foreach (var entry in entries)
         {
             if (entry.OwnedDisposables != null)
-                foreach (var ownedDisposable in entry.OwnedDisposables)
-                    if (ownedDisposable != null && disposed.Add(ownedDisposable))
-                        ownedDisposable.Dispose();
+            {
+                foreach (var ownedDisposable in
+                         entry.OwnedDisposables)
+                {
+                    if (ownedDisposable == null ||
+                        !disposed.Add(ownedDisposable))
+                    {
+                        continue;
+                    }
 
-            if (entry.OwnsAsset &&
-                entry.Asset is IDisposable disposable &&
-                disposed.Add(entry.Asset))
-                disposable.Dispose();
+                    TryDispose(
+                        cleanupErrors,
+                        ownedDisposable);
+                }
+            }
+
+            if (!entry.OwnsAsset ||
+                entry.Asset is not IDisposable disposable ||
+                !disposed.Add(entry.Asset))
+            {
+                continue;
+            }
+
+            TryDispose(
+                cleanupErrors,
+                disposable);
+        }
+
+        if (cleanupErrors.Count > 0)
+        {
+            throw new AggregateException(
+                "One or more Dreambit-owned assets failed to dispose.",
+                cleanupErrors);
+        }
+    }
+    
+    private static void TryDispose(
+        List<Exception> cleanupErrors,
+        IDisposable disposable)
+    {
+        try
+        {
+            disposable.Dispose();
+        }
+        catch (Exception exception)
+        {
+            cleanupErrors.Add(exception);
         }
     }
 

@@ -65,8 +65,14 @@ public abstract class Component : IDisposable
 
     public void Dispose()
     {
-        Dispose(true);
-        GC.SuppressFinalize(this);
+        try
+        {
+            Dispose(true);
+        }
+        finally
+        {
+            GC.SuppressFinalize(this);
+        }
     }
 
     ~Component()
@@ -397,7 +403,8 @@ public abstract class Component : IDisposable
 
     internal void RemoveFromEntity()
     {
-        if (IsFaulted() || Scene?.ExecutionMode == SceneExecutionMode.Editor) return;
+        if (Scene?.ExecutionMode == SceneExecutionMode.Editor)
+            return;
 
         try
         {
@@ -439,18 +446,22 @@ public abstract class Component : IDisposable
 
     internal void Destroy()
     {
-        if (IsFaulted()) return;
+        if (IsDestroyed) return;
 
         try
         {
-            if (Scene?.ExecutionMode == SceneExecutionMode.Editor)
+            if(Scene?.ExecutionMode == SceneExecutionMode.Editor)
                 OnEditorDestroyed();
             else
                 OnDestroyed();
         }
         catch (Exception exception)
         {
-            HandleCallbackException(nameof(OnDestroyed), exception);
+            HandleCallbackException(
+                Scene?.ExecutionMode == SceneExecutionMode.Editor
+                    ? nameof(OnEditorDestroyed)
+                    : nameof(OnDestroyed),
+                exception);
         }
     }
 
@@ -532,11 +543,18 @@ public abstract class Component : IDisposable
     private void Dispose(bool disposing)
     {
         if (_isDisposed) return;
-        if (disposing) OnDisposing();
 
-        IsDestroyed = true;
-        _isDisposed = true;
-        Entity = null;
+        try
+        {
+            if(disposing)
+                OnDisposing();
+        }
+        finally
+        {
+            IsDestroyed = true;
+            _isDisposed = true;
+            Entity = null;
+        }
     }
 }
 

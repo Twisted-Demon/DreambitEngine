@@ -78,14 +78,6 @@ public struct Polygon2D
         /*
          * SAT requires axes perpendicular to every edge of both polygons.
          *
-         * The old implementation materialized:
-         *
-         *     Vector2[] edgesA
-         *     Vector2[] edgesB
-         *     List<Vector2> axes
-         *
-         * for every collision pair.
-         *
          * We can test each axis immediately instead.
          */
         if (!TestSatAxes(

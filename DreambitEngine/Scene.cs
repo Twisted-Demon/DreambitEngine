@@ -366,14 +366,50 @@ public class Scene : IDisposable
         }
     }
 
-    private void EnsureRenderPipelineInitialized(Point viewportSize)
+    private void EnsureRenderPipelineInitialized(
+        Point viewportSize)
     {
         if (_renderPipelineInitialized)
             return;
 
-        _renderPipeline.Initialize(viewportSize);
-        SetUpRenderPipeLine();
-        _renderPipelineInitialized = true;
+        try
+        {
+            _renderPipeline.Initialize(
+                viewportSize);
+
+            SetUpRenderPipeLine();
+
+            _renderPipelineInitialized = true;
+        }
+        catch (Exception initializationException)
+        {
+            // Remove the failed pipeline from Scene ownership immediately.
+            var failedPipeline =
+                _renderPipeline;
+
+            _renderPipeline =
+                new RenderPipeline(this);
+
+            _renderPipelineInitialized =
+                false;
+
+            try
+            {
+                failedPipeline?.Dispose();
+            }
+            catch (Exception cleanupException)
+            {
+                throw new AggregateException(
+                    "Scene render pipeline initialization failed and cleanup also failed.",
+                    new[]
+                    {
+                        initializationException,
+                        cleanupException
+                    });
+            }
+
+            throw;
+        }
     }
 
     protected void AddRenderPass<T>() where T : RenderPass, new()
@@ -457,13 +493,65 @@ public class Scene : IDisposable
     /// </summary>
     private void Cleanup()
     {
-        _coroutineScheduler.StopAllCoroutines();
-        ScriptingManager.CleanUp();
-        Entities.ClearLists();
-        Drawables.ClearLists();
+        var cleanupErrors =
+            new List<Exception>();
 
-        _renderPipeline?.Dispose();
+        TryCleanup(
+            cleanupErrors,
+            _coroutineScheduler.StopAllCoroutines);
+
+        TryCleanup(
+            cleanupErrors,
+            ScriptingManager.CleanUp);
+
+        TryCleanup(
+            cleanupErrors,
+            Entities.ClearLists);
+
+        TryCleanup(
+            cleanupErrors,
+            Drawables.ClearLists);
+
+        // Break Scene -> RenderPipeline ownership before invoking potentially
+        // user-defined pass cleanup.
+        var renderPipeline =
+            _renderPipeline;
+
         _renderPipeline = null;
+        _renderPipelineInitialized = false;
+
+        if (renderPipeline is not null)
+        {
+            TryCleanup(
+                cleanupErrors,
+                renderPipeline.Dispose);
+        }
+
+        // Do not keep disposed components alive through convenience fields.
+        MainCamera = null;
+        UiCamera = null;
+        AmbientLight = null;
+
+        if (cleanupErrors.Count > 0)
+        {
+            throw new AggregateException(
+                "One or more resources failed while disposing the scene.",
+                cleanupErrors);
+        }
+
+        static void TryCleanup(
+            List<Exception> errors,
+            Action cleanup)
+        {
+            try
+            {
+                cleanup();
+            }
+            catch (Exception exception)
+            {
+                errors.Add(exception);
+            }
+        }
     }
 
     #endregion

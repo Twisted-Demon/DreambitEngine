@@ -1,4 +1,5 @@
-﻿using System.Collections.Concurrent;
+﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -18,10 +19,10 @@ public class ComponentRepository
     private readonly HashSet<Component> _componentsToAttach = [];
     private readonly HashSet<Component> _componentsToDetach = [];
 
-    private readonly HashSet<Component> _updatableComponents = [];
+    private readonly Logger<ComponentRepository> _logger = new();
     private readonly HashSet<Component> _physicsUpdatableComponents = [];
 
-    private readonly Logger<ComponentRepository> _logger = new();
+    private readonly HashSet<Component> _updatableComponents = [];
 
     private Scene _scene;
 
@@ -56,24 +57,24 @@ public class ComponentRepository
     {
         if (component == null)
         {
-            _logger.Warn(
-                "Could not destroy component, component is null");
+            _logger.Warn("Could not destroy component, component is null");
 
             return;
         }
 
         if (_componentsToDetach.Contains(component))
         {
-            _logger.Trace(
-                "ComponentList: {0} is already being removed",
-                component.GetType().Name);
+            _logger.Trace("ComponentList: {0} is already being removed", component.GetType().Name);
 
             return;
         }
 
-        if (_componentsToAttach.Contains(component))
+        if (_componentsToAttach.Remove(component))
         {
-            _componentsToAttach.Remove(component);
+            DestroyComponentNow(
+                component,
+                false);
+
             return;
         }
 
@@ -83,57 +84,60 @@ public class ComponentRepository
 
     internal void DestroyAllComponentsNow()
     {
+        var cleanupErrors = new List<Exception>();
+
         foreach (var component in _componentsToAttach)
         {
             if (_attachedComponents.Contains(component))
                 continue;
 
-            component.RemoveFromEntity();
-            component.Destroy();
-
-            component.Entity = null;
-
-            component.Dispose();
+            try
+            {
+                DestroyComponentNow(
+                    component,
+                    false);
+            }
+            catch (Exception exception)
+            {
+                cleanupErrors.Add(exception);
+            }
         }
-
-        _componentsToAttach.Clear();
 
         foreach (var component in _attachedComponents)
-        {
-            if (component is DrawableComponent drawable &&
-                _scene != null)
+            try
             {
-                _scene.Drawables.Remove(drawable);
+                DestroyComponentNow(
+                    component,
+                    true);
+            }
+            catch (Exception exception)
+            {
+                cleanupErrors.Add(exception);
             }
 
-            component.RemoveFromEntity();
-            component.Destroy();
-
-            component.Entity = null;
-
-            component.Dispose();
-        }
-
+        // Ownership is gone regardless of individual cleanup failures.
+        _componentsToAttach.Clear();
         _attachedComponents.Clear();
         _updatableComponents.Clear();
         _physicsUpdatableComponents.Clear();
         _componentsToDetach.Clear();
+
+        if (cleanupErrors.Count > 0)
+            throw new AggregateException(
+                "One or more components failed while being destroyed.",
+                cleanupErrors);
     }
 
     public T GetComponent<T>()
         where T : Component
     {
         foreach (var component in _attachedComponents)
-        {
             if (component is T typed)
                 return typed;
-        }
 
         foreach (var component in _componentsToAttach)
-        {
             if (component is T typed)
                 return typed;
-        }
 
         return null;
     }
@@ -145,22 +149,14 @@ public class ComponentRepository
             return false;
 
         foreach (var component in _attachedComponents)
-        {
             if (type.IsAssignableFrom(
                     component.GetType()))
-            {
                 return true;
-            }
-        }
 
         foreach (var component in _componentsToAttach)
-        {
             if (type.IsAssignableFrom(
                     component.GetType()))
-            {
                 return true;
-            }
-        }
 
         return false;
     }
@@ -173,39 +169,25 @@ public class ComponentRepository
 
         if (!typeof(Component)
                 .IsAssignableFrom(type))
-        {
             return null;
-        }
 
         foreach (var component in _attachedComponents)
-        {
             if (component.GetType() == type)
                 return component;
-        }
 
         foreach (var component in _componentsToAttach)
-        {
             if (component.GetType() == type)
                 return component;
-        }
 
         foreach (var component in _attachedComponents)
-        {
             if (type.IsAssignableFrom(
                     component.GetType()))
-            {
                 return component;
-            }
-        }
 
         foreach (var component in _componentsToAttach)
-        {
             if (type.IsAssignableFrom(
                     component.GetType()))
-            {
                 return component;
-            }
-        }
 
         return null;
     }
@@ -224,10 +206,8 @@ public class ComponentRepository
                 _attachedComponents.Count);
 
         foreach (var component in _attachedComponents)
-        {
             if (component.Enabled)
                 list.Add(component);
-        }
 
         return list;
     }
@@ -244,16 +224,12 @@ public class ComponentRepository
             new HashSet<Component>();
 
         foreach (var component in _componentsToAttach)
-        {
             if (seen.Add(component))
                 list.Add(component);
-        }
 
         foreach (var component in _attachedComponents)
-        {
             if (seen.Add(component))
                 list.Add(component);
-        }
 
         return list;
     }
@@ -285,19 +261,15 @@ public class ComponentRepository
     public void UpdateComponents()
     {
         foreach (var component in _updatableComponents)
-        {
             if (component.Enabled)
                 component.Update();
-        }
     }
 
     internal void EditorUpdateComponents()
     {
         foreach (var component in _attachedComponents)
-        {
             if (component.Enabled)
                 component.EditorUpdate();
-        }
     }
 
     public void PhysicsUpdateComponents()
@@ -307,10 +279,8 @@ public class ComponentRepository
          * participate in the fixed physics loop.
          */
         foreach (var component in _physicsUpdatableComponents)
-        {
             if (component.Enabled)
                 component.PhysicsUpdate();
-        }
     }
 
     public void UpdateLists()
@@ -323,15 +293,11 @@ public class ComponentRepository
 
             if (component is DrawableComponent drawable &&
                 _scene != null)
-            {
                 _scene.Drawables.Add(drawable);
-            }
 
             if (_scene?.ExecutionMode ==
                 SceneExecutionMode.Runtime)
-            {
                 component.AddToEntity();
-            }
 
             var componentType =
                 component.GetType();
@@ -346,6 +312,8 @@ public class ComponentRepository
         _componentsToAttach.Clear();
 
         // Handle deletion.
+        var cleanupErrors = new List<Exception>();
+
         foreach (var component in _componentsToDetach)
         {
             if (!_attachedComponents.Remove(component))
@@ -354,21 +322,73 @@ public class ComponentRepository
             _updatableComponents.Remove(component);
             _physicsUpdatableComponents.Remove(component);
 
-            if (component is DrawableComponent drawable &&
-                _scene != null)
+            try
             {
-                _scene.Drawables.Remove(drawable);
+                DestroyComponentNow(
+                    component,
+                    true);
             }
-
-            component.RemoveFromEntity();
-            component.Destroy();
-
-            component.Entity = null;
-
-            component.Dispose();
+            catch (Exception exception)
+            {
+                cleanupErrors.Add(exception);
+            }
         }
 
         _componentsToDetach.Clear();
+
+        if (cleanupErrors.Count > 0)
+            throw new AggregateException(
+                "One or more components failed while being detached.",
+                cleanupErrors);
+    }
+
+    private void DestroyComponentNow(
+        Component component,
+        bool removeDrawable)
+    {
+        var cleanupErrors = new List<Exception>();
+
+        if (removeDrawable &&
+            component is DrawableComponent drawable &&
+            _scene != null)
+            TryCleanup(
+                cleanupErrors,
+                () => _scene.Drawables.Remove(drawable));
+
+        TryCleanup(
+            cleanupErrors,
+            component.RemoveFromEntity);
+
+        TryCleanup(
+            cleanupErrors,
+            component.Destroy);
+
+        // Preserve the existing lifetime contract: OnDisposing does not
+        // depend on Entity/Scene remaining attached.
+        component.Entity = null;
+
+        TryCleanup(
+            cleanupErrors,
+            component.Dispose);
+
+        if (cleanupErrors.Count > 0)
+            throw new AggregateException(
+                $"Component '{component.GetType().FullName}' failed during cleanup.",
+                cleanupErrors);
+    }
+
+    private static void TryCleanup(
+        List<Exception> errors,
+        Action cleanup)
+    {
+        try
+        {
+            cleanup();
+        }
+        catch (Exception exception)
+        {
+            errors.Add(exception);
+        }
     }
 
     private static bool OverridesOnUpdate(
@@ -431,21 +451,17 @@ public class ComponentRepository
                      .Where(type =>
                          type.Assembly == assembly)
                      .ToArray())
-        {
             HasOnUpdateOverrideByType.TryRemove(
                 type,
                 out _);
-        }
 
         foreach (var type in
                  HasOnPhysicsUpdateOverrideByType.Keys
                      .Where(type =>
                          type.Assembly == assembly)
                      .ToArray())
-        {
             HasOnPhysicsUpdateOverrideByType.TryRemove(
                 type,
                 out _);
-        }
     }
 }

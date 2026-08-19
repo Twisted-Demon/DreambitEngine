@@ -236,15 +236,19 @@ public class Entity : IDisposable
 
     public static void Destroy(Entity entity)
     {
-        if (entity == null || entity._isDestroyed) return;
+        if (entity is null || entity._isDead || entity._isDestroyed)
+            return;
 
-        Core.Instance.CurrentScene.DestroyEntity(entity);
         entity._isDead = true;
 
-        if (entity._children.Count <= 0) return;
+        var children = new Entity[entity._children.Count];
 
-        foreach (var child in entity._children)
-            Destroy(child);
+        entity._children.CopyTo(children);
+
+        for (var i = 0; i < children.Length; i++)
+            Destroy(children[i]);
+
+        entity.Scene?.DestroyEntity(entity);
     }
 
     public static bool IsDestroyed(Entity entity)
@@ -692,10 +696,47 @@ public class Entity : IDisposable
 
     internal void Destroy()
     {
+        if (_isDestroyed)
+            return;
+
         _isDestroyed = true;
-        ComponentRepository.DestroyAllComponentsNow();
-        ComponentRepository.ClearLists();
-        Scene = null;
+        _isDead = true;
+
+        try
+        {
+            ComponentRepository.DestroyAllComponentsNow();
+        }
+        finally
+        {
+            // Never allow component cleanup failure to leave repository state alive.
+            ComponentRepository.ClearLists();
+
+            // Sever the upward hierarchy reference.
+            if (_parent != null)
+            {
+                _parent._children.Remove(this);
+                _parent = null;
+            }
+
+            // Scene.DestroyEntity(entity) historically destroys only that entity.
+            // Therefore, surviving children become roots rather than being implicitly
+            // destroyed here. Public Entity.Destroy() performs recursive destruction.
+            for (var i = 0; i < _children.Count; i++)
+            {
+                var child = _children[i];
+
+                if (ReferenceEquals(
+                        child._parent,
+                        this))
+                {
+                    child._parent = null;
+                }
+            }
+
+            _children.Clear();
+
+            Scene = null;
+        }
     }
 
     internal void Quarantine(Component source, string callback, Exception exception)

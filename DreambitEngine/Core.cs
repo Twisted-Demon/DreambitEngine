@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -135,29 +136,164 @@ public class Core : Game
 
     protected override void OnExiting(object sender, ExitingEventArgs args)
     {
-        CurrentScene?.Terminate();
-        Resources.Instance.CleanUp();
-        SpriteBatch?.Dispose();
-        base.OnExiting(sender, args);
-        Dreambit.Window.Shutdown();
+        var cleanupErrors =
+            new List<Exception>();
+
+        var currentScene =
+            CurrentScene;
+
+        var pendingScene =
+            NextScene;
+
+        NextScene = null;
+
+        if (currentScene is not null)
+        {
+            TryCleanup(
+                cleanupErrors,
+                currentScene.Terminate);
+        }
+
+        if (pendingScene is not null &&
+            !ReferenceEquals(
+                pendingScene,
+                currentScene))
+        {
+            TryCleanup(
+                cleanupErrors,
+                pendingScene.Terminate);
+        }
+
+        CurrentScene = null;
+
+        TryCleanup(
+            cleanupErrors,
+            Resources.Instance.CleanUp);
+
+        var spriteBatch =
+            SpriteBatch;
+
+        SpriteBatch = null;
+
+        if (spriteBatch is not null)
+        {
+            TryCleanup(
+                cleanupErrors,
+                spriteBatch.Dispose);
+        }
+
+        TryCleanup(
+            cleanupErrors,
+            () => base.OnExiting(
+                sender,
+                args));
+
+        TryCleanup(
+            cleanupErrors,
+            Dreambit.Window.Shutdown);
+
+        if (cleanupErrors.Count > 0)
+        {
+            throw new AggregateException(
+                "One or more resources failed during engine shutdown.",
+                cleanupErrors);
+        }
     }
 
     private void ChangeScenes()
     {
-        Logger.Info("Changing Scenes");
-        CurrentScene?.Terminate();
-        CurrentScene = NextScene;
-        NextScene = null;
-        _accumulatedPhysicsTime = 0f;
+        Logger.Info(
+            "Changing Scenes");
 
-        PhysicsSystem.Instance.CleanUp();
-        AudioSystem.Instance.CleanUp();
-        Time.SceneLoaded();
+        var incomingScene =
+            NextScene;
+
+        var outgoingScene =
+            CurrentScene;
+
+        // Core takes the pending scene out of the queue immediately.
+        NextScene = null;
+
+        var cleanupErrors =
+            new List<Exception>();
+
+        if (outgoingScene is not null)
+        {
+            TryCleanup(
+                cleanupErrors,
+                outgoingScene.Terminate);
+        }
+
+        // Drop the old scene reference even if its custom cleanup reported errors.
+        CurrentScene =
+            incomingScene;
+
+        _accumulatedPhysicsTime =
+            0f;
+
+        TryCleanup(
+            cleanupErrors,
+            PhysicsSystem.Instance.CleanUp);
+
+        TryCleanup(
+            cleanupErrors,
+            AudioSystem.Instance.CleanUp);
+
+        TryCleanup(
+            cleanupErrors,
+            Time.SceneLoaded);
+
+        if (cleanupErrors.Count > 0)
+        {
+            throw new AggregateException(
+                "One or more cleanup operations failed while changing scenes.",
+                cleanupErrors);
+        }
+    }
+    
+    private static void TryCleanup(
+        List<Exception> cleanupErrors,
+        Action cleanup)
+    {
+        try
+        {
+            cleanup();
+        }
+        catch (Exception exception)
+        {
+            cleanupErrors.Add(exception);
+        }
     }
 
-    internal void SetNextScene(Scene scene)
+    internal void SetNextScene(
+        Scene scene)
     {
-        NextScene = scene;
+        ArgumentNullException.ThrowIfNull(scene);
+
+        if (ReferenceEquals(
+                NextScene,
+                scene))
+        {
+            return;
+        }
+
+        var displacedScene =
+            NextScene;
+
+        NextScene =
+            scene;
+
+        if (displacedScene is null ||
+            ReferenceEquals(
+                displacedScene,
+                CurrentScene))
+        {
+            return;
+        }
+
+        // Core owned the pending scene. Replacing it transfers ownership
+        // to the new scene, so the displaced one must be terminated.
+        displacedScene.Terminate();
     }
 
 #if DEBUG || RELEASE
