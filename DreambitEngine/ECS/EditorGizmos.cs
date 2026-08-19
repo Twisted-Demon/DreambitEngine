@@ -26,4 +26,10 @@ public interface IEditorGizmoContext
         string memberName,
         Color color,
         float thickness = 1f);
+
+    void PolygonHandle(
+        Component component,
+        string memberName,
+        Color color,
+        float thickness = 1f);
 }

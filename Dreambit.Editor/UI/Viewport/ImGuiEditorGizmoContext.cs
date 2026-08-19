@@ -147,6 +147,19 @@ internal sealed class ImGuiEditorGizmoContext(
             thickness);
     }
 
+    public void PolygonHandle(
+        Component component,
+        string memberName,
+        Color color,
+        float thickness = 1f)
+    {
+        componentGizmos.RegisterPolygonHandle(
+            component,
+            memberName,
+            color,
+            thickness);
+    }
+
     private bool TryDrawIcon(
         string icon,
         XnaVector2 position,

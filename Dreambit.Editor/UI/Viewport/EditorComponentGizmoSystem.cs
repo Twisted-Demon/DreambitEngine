@@ -52,6 +52,12 @@ internal sealed class EditorComponentGizmoSystem : IDisposable
 
     private const float BoxHandleHalfSize = 4f;
     private const float BoxHitRadius = 9f;
+    
+    private const float PolygonHandleRadius = 4f;
+    private const float PolygonHandleOutlineRadius = 6f;
+    private const float PolygonHitRadius = 9;
+    private const float PolygonInsertHandleRadius = 2f;
+    private const float PolygonInsertHitRadius = 8f;
 
     private readonly EditorWorkspaceState _workspace;
     private readonly Action<string, Exception?>? _reportError;
@@ -61,6 +67,7 @@ internal sealed class EditorComponentGizmoSystem : IDisposable
 
     private readonly List<RadiusHandleRequest> _radiusHandles = [];
     private readonly List<BoxHandleRequest> _boxHandles = [];
+    private readonly List<PolygonHandleRequest> _polygonHandles = [];
 
     private IEditorComponentGizmoInteraction? _activeInteraction;
     private string? _lastReportedFailure;
@@ -138,6 +145,26 @@ internal sealed class EditorComponentGizmoSystem : IDisposable
                 color,
                 thickness));
     }
+    
+    internal void RegisterPolygonHandle(
+        Component component,
+        string memberName,
+        XnaColor color,
+        float thickness)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(component);
+        ArgumentException.ThrowIfNullOrWhiteSpace(memberName);
+
+        if (component.Entity is null)
+            return;
+
+        _polygonHandles.Add(
+            new PolygonHandleRequest(
+                CreateBinding(component, memberName),
+                color,
+                thickness));
+    }
 
     /// <summary>
     /// Draws all declared handles and advances at most one active interaction.
@@ -184,6 +211,12 @@ internal sealed class EditorComponentGizmoSystem : IDisposable
                 consumed,
                 ref failed,
                 ref startedInteraction);
+            
+            DrawPolygonHandles(
+                frame,
+                consumed,
+                ref failed,
+                ref startedInteraction);
 
             if (startedInteraction is not null)
             {
@@ -204,6 +237,230 @@ internal sealed class EditorComponentGizmoSystem : IDisposable
         {
             ClearFrameRequests();
         }
+    }
+    
+    private void DrawPolygonHandles(
+        EditorComponentGizmoFrame frame,
+        bool consumed,
+        ref bool failed,
+        ref IEditorComponentGizmoInteraction? startedInteraction)
+    {
+        foreach (var request in _polygonHandles)
+        {
+            try
+            {
+                DrawPolygonHandle(
+                    frame,
+                    request,
+                    !consumed &&
+                    _activeInteraction is null &&
+                    startedInteraction is null,
+                    ref startedInteraction);
+            }
+            catch (Exception exception)
+            {
+                failed = true;
+
+                ReportFailure(
+                    $"Could not draw the " +
+                    $"{request.Binding.ComponentDisplayName} polygon handle.",
+                    exception);
+            }
+        }
+    }
+    
+    private void DrawPolygonHandle(
+    EditorComponentGizmoFrame frame,
+    PolygonHandleRequest request,
+    bool allowInteraction,
+    ref IEditorComponentGizmoInteraction? startedInteraction)
+{
+    if (!TryResolveHandleTarget(
+            frame.Document,
+            request.Binding,
+            out var entity,
+            out var component))
+    {
+        return;
+    }
+
+    var polygon =
+        ReadPolygonMember(
+            component,
+            request.Binding.MemberName);
+
+    var localVertices =
+        polygon.GetVertices();
+
+    if (localVertices is not { Length: >= 3 })
+    {
+        throw new InvalidOperationException(
+            $"{request.Binding.ComponentDisplayName}.{request.Binding.MemberName} " +
+            "must contain at least three polygon vertices.");
+    }
+
+    var worldVertices =
+        polygon.TransformPolygon(component.Transform).Vertices;
+
+    var color =
+        ColorU32(request.Color);
+
+    var thickness =
+        NormalizeThickness(request.Thickness);
+
+    // Always draw the authored polygon, including read-only linked Blueprint instances.
+    for (var index = 0; index < worldVertices.Length; index++)
+    {
+        var current =
+            frame.WorldToCanvas(worldVertices[index]);
+
+        var next =
+            frame.WorldToCanvas(
+                worldVertices[
+                    (index + 1) % worldVertices.Length]);
+
+        frame.DrawList.AddLine(
+            current,
+            next,
+            color,
+            thickness);
+    }
+
+    if (!CanEditComponents(frame.Document, entity))
+        return;
+
+    for (var index = 0; index < worldVertices.Length; index++)
+    {
+        var handle =
+            frame.WorldToCanvas(
+                worldVertices[index]);
+
+        frame.DrawList.AddCircleFilled(
+            handle,
+            PolygonHandleRadius,
+            color,
+            16);
+
+        frame.DrawList.AddCircle(
+            handle,
+            PolygonHandleOutlineRadius,
+            color,
+            20,
+            1.5f);
+
+        if (!allowInteraction ||
+            startedInteraction is not null ||
+            !frame.Hovered ||
+            Vector2.Distance(
+                frame.MouseScreen,
+                handle) > PolygonHitRadius ||
+            !ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+        {
+            continue;
+        }
+
+        startedInteraction =
+            new PolygonVertexMoveInteraction(
+                frame.Document,
+                request.Binding,
+                index,
+                _workspace);
+    }
+}
+    
+    internal static PolyShape2D InsertPolygonVertex(
+        PolyShape2D polygon,
+        int edgeIndex,
+        XnaVector2 localPosition)
+    {
+        ArgumentNullException.ThrowIfNull(polygon);
+
+        var source =
+            polygon.GetVertices();
+
+        if (source.Length < 3)
+        {
+            throw new InvalidOperationException(
+                "A polygon must contain at least three vertices.");
+        }
+
+        if ((uint)edgeIndex >= (uint)source.Length)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(edgeIndex));
+        }
+
+        var insertionIndex =
+            edgeIndex + 1;
+
+        var vertices =
+            new XnaVector2[source.Length + 1];
+
+        Array.Copy(
+            source,
+            0,
+            vertices,
+            0,
+            insertionIndex);
+
+        vertices[insertionIndex] =
+            localPosition;
+
+        Array.Copy(
+            source,
+            insertionIndex,
+            vertices,
+            insertionIndex + 1,
+            source.Length - insertionIndex);
+
+        return PolyShape2D.Create(vertices);
+    }
+    
+    internal static PolyShape2D RemovePolygonVertex(
+        PolyShape2D polygon,
+        int vertexIndex)
+    {
+        ArgumentNullException.ThrowIfNull(polygon);
+
+        var source =
+            polygon.GetVertices();
+
+        if (source.Length <= 3)
+        {
+            throw new InvalidOperationException(
+                "A polygon cannot contain fewer than three vertices.");
+        }
+
+        if ((uint)vertexIndex >= (uint)source.Length)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(vertexIndex));
+        }
+
+        var vertices =
+            new XnaVector2[source.Length - 1];
+
+        if (vertexIndex > 0)
+        {
+            Array.Copy(
+                source,
+                0,
+                vertices,
+                0,
+                vertexIndex);
+        }
+
+        if (vertexIndex < source.Length - 1)
+        {
+            Array.Copy(
+                source,
+                vertexIndex + 1,
+                vertices,
+                vertexIndex,
+                source.Length - vertexIndex - 1);
+        }
+
+        return PolyShape2D.Create(vertices);
     }
 
     private void DrawLegacyGizmos(
@@ -563,6 +820,76 @@ internal sealed class EditorComponentGizmoSystem : IDisposable
             halfWidth,
             halfHeight);
     }
+    
+    internal static PolyShape2D CalculateMovedPolygonShape(
+        Transform transform,
+        PolyShape2D polygon,
+        int vertexIndex,
+        XnaVector2 cursorWorld,
+        bool snapEnabled,
+        float snapSize)
+    {
+        ArgumentNullException.ThrowIfNull(transform);
+        ArgumentNullException.ThrowIfNull(polygon);
+
+        var source =
+            polygon.GetVertices();
+
+        if ((uint)vertexIndex >= (uint)source.Length)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(vertexIndex));
+        }
+
+        var cursorLocal =
+            transform.InverseTransformPoint2D(
+                cursorWorld);
+
+        if (snapEnabled)
+        {
+            var snap =
+                NormalizeSnap(snapSize);
+
+            cursorLocal.X =
+                MathF.Round(cursorLocal.X / snap) * snap;
+
+            cursorLocal.Y =
+                MathF.Round(cursorLocal.Y / snap) * snap;
+        }
+
+        if (!IsFinite(cursorLocal))
+            return polygon;
+
+        // Do not allow a zero-length edge to be authored by dragging a vertex
+        // exactly onto either of its immediate neighbors.
+        var previousIndex =
+            (vertexIndex - 1 + source.Length) %
+            source.Length;
+
+        var nextIndex =
+            (vertexIndex + 1) %
+            source.Length;
+
+        const float minimumEdgeLengthSquared = 0.000001f;
+
+        if (XnaVector2.DistanceSquared(
+                cursorLocal,
+                source[previousIndex]) <= minimumEdgeLengthSquared ||
+            XnaVector2.DistanceSquared(
+                cursorLocal,
+                source[nextIndex]) <= minimumEdgeLengthSquared)
+        {
+            return polygon;
+        }
+
+        var vertices =
+            (XnaVector2[])source.Clone();
+
+        vertices[vertexIndex] =
+            cursorLocal;
+
+        return PolyShape2D.Create(vertices);
+    }
 
     private static void ApplyRadiusResize(
         SceneDocument document,
@@ -643,6 +970,46 @@ internal sealed class EditorComponentGizmoSystem : IDisposable
             SceneDocumentSerializer.GetComponentTypeId(componentType),
             componentType.Name,
             memberName);
+    }
+    
+    private static void ApplyPolygonVertexMove(
+        SceneDocument document,
+        EditorScene scene,
+        ComponentMemberBinding binding,
+        int vertexIndex,
+        XnaVector2 cursorWorld,
+        bool snapEnabled,
+        float snapSize)
+    {
+        var component =
+            ResolveComponent(
+                scene,
+                binding);
+
+        var polygon =
+            ReadPolygonMember(
+                component,
+                binding.MemberName);
+
+        var updated =
+            CalculateMovedPolygonShape(
+                component.Transform,
+                polygon,
+                vertexIndex,
+                cursorWorld,
+                snapEnabled,
+                snapSize);
+
+        var storedValue =
+            SetMemberValue(
+                component,
+                binding.MemberName,
+                updated);
+
+        document.RecordGeneratedComponentMember(
+            component,
+            binding.MemberName,
+            storedValue);
     }
 
     private static bool TryResolveHandleTarget(
@@ -761,6 +1128,29 @@ internal sealed class EditorComponentGizmoSystem : IDisposable
         throw new InvalidOperationException(
             $"{component.GetType().Name}.{memberName} must currently contain " +
             $"a {nameof(Box2D)} to use {nameof(IEditorGizmoContext.BoxHandle)}.");
+    }
+    
+    private static PolyShape2D ReadPolygonMember(
+        Component component,
+        string memberName)
+    {
+        var member =
+            ResolveMember(
+                component,
+                memberName);
+
+        var value =
+            GetMemberValue(
+                component,
+                member);
+
+        if (value is PolyShape2D polygon)
+            return polygon;
+
+        throw new InvalidOperationException(
+            $"{component.GetType().Name}.{memberName} must currently contain " +
+            $"a {nameof(PolyShape2D)} to use " +
+            $"{nameof(IEditorGizmoContext.PolygonHandle)}.");
     }
 
     private static object? SetMemberValue(
@@ -1080,6 +1470,7 @@ internal sealed class EditorComponentGizmoSystem : IDisposable
     {
         _radiusHandles.Clear();
         _boxHandles.Clear();
+        _polygonHandles.Clear();
     }
 
     private void ReportFailure(
@@ -1149,6 +1540,11 @@ internal sealed class EditorComponentGizmoSystem : IDisposable
         ComponentMemberBinding Binding,
         XnaColor Color,
         float Thickness);
+    
+    private readonly record struct PolygonHandleRequest(
+        ComponentMemberBinding Binding,
+        XnaColor Color,
+        float Thickness);
 
     private sealed class RadiusResizeInteraction
         : IEditorComponentGizmoInteraction
@@ -1209,6 +1605,66 @@ internal sealed class EditorComponentGizmoSystem : IDisposable
         public void Abandon() =>
             _transaction.Abandon();
     }
+    
+    private sealed class PolygonVertexMoveInteraction
+        : IEditorComponentGizmoInteraction
+    {
+        private readonly ComponentMemberBinding _binding;
+        private readonly int _vertexIndex;
+        private readonly EditorWorkspaceState _workspace;
+        private readonly SceneDocument.SceneEditTransaction _transaction;
+
+        public PolygonVertexMoveInteraction(
+            SceneDocument document,
+            ComponentMemberBinding binding,
+            int vertexIndex,
+            EditorWorkspaceState workspace)
+        {
+            Document = document;
+            SceneGeneration = document.SceneGeneration;
+
+            _binding = binding;
+            _vertexIndex = vertexIndex;
+            _workspace = workspace;
+
+            _transaction =
+                document.BeginTransaction(
+                    $"Edit {binding.ComponentDisplayName} {binding.MemberName}");
+        }
+
+        public string DisplayName =>
+            $"{_binding.ComponentDisplayName} polygon vertex";
+
+        public SceneDocument Document { get; }
+
+        public int SceneGeneration { get; }
+
+        public void Update(EditorComponentGizmoFrame frame)
+        {
+            var cursorWorld =
+                frame.MouseWorld;
+
+            _transaction.Update(
+                scene =>
+                    ApplyPolygonVertexMove(
+                        Document,
+                        scene,
+                        _binding,
+                        _vertexIndex,
+                        cursorWorld,
+                        _workspace.SnapEnabled,
+                        _workspace.MoveSnap));
+        }
+
+        public void Commit() =>
+            _transaction.Commit();
+
+        public void Cancel() =>
+            _transaction.Cancel();
+
+        public void Abandon() =>
+            _transaction.Abandon();
+    }
 
     private sealed class BoxResizeInteraction
         : IEditorComponentGizmoInteraction
@@ -1235,6 +1691,66 @@ internal sealed class EditorComponentGizmoSystem : IDisposable
                 document.BeginTransaction(
                     $"Resize {binding.ComponentDisplayName} {binding.MemberName}");
         }
+        
+        private sealed class PolygonVertexMoveInteraction
+    : IEditorComponentGizmoInteraction
+{
+    private readonly ComponentMemberBinding _binding;
+    private readonly int _vertexIndex;
+    private readonly EditorWorkspaceState _workspace;
+    private readonly SceneDocument.SceneEditTransaction _transaction;
+
+    public PolygonVertexMoveInteraction(
+        SceneDocument document,
+        ComponentMemberBinding binding,
+        int vertexIndex,
+        EditorWorkspaceState workspace)
+    {
+        Document = document;
+        SceneGeneration = document.SceneGeneration;
+
+        _binding = binding;
+        _vertexIndex = vertexIndex;
+        _workspace = workspace;
+
+        _transaction =
+            document.BeginTransaction(
+                $"Edit {binding.ComponentDisplayName} {binding.MemberName}");
+    }
+
+    public string DisplayName =>
+        $"{_binding.ComponentDisplayName} polygon vertex";
+
+    public SceneDocument Document { get; }
+
+    public int SceneGeneration { get; }
+
+    public void Update(EditorComponentGizmoFrame frame)
+    {
+        var cursorWorld =
+            frame.MouseWorld;
+
+        _transaction.Update(
+            scene =>
+                ApplyPolygonVertexMove(
+                    Document,
+                    scene,
+                    _binding,
+                    _vertexIndex,
+                    cursorWorld,
+                    _workspace.SnapEnabled,
+                    _workspace.MoveSnap));
+    }
+
+    public void Commit() =>
+        _transaction.Commit();
+
+    public void Cancel() =>
+        _transaction.Cancel();
+
+    public void Abandon() =>
+        _transaction.Abandon();
+}
 
         public string DisplayName =>
             $"{_binding.ComponentDisplayName} box resize";
@@ -1270,6 +1786,7 @@ internal sealed class EditorComponentGizmoSystem : IDisposable
             _transaction.Abandon();
     }
 }
+
 
 /// <summary>
 /// Legacy component-specific editor gizmo interface.

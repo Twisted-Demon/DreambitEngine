@@ -232,27 +232,28 @@ public struct Polygon2D
 
     public bool Intersects(Polygon2D other)
     {
-        var axes = new List<Vector2>();
-
-        foreach (var edge in GetEdges())
-            axes.Add(new Vector2(-edge.Y, edge.X));
-
-        foreach (var edge in other.GetEdges())
-            axes.Add(new Vector2(-edge.Y, edge.X));
-
-        foreach (var axis in axes)
+        if (Vertices is not { Length: >= 3 } ||
+            other.Vertices is not { Length: >= 3 })
         {
-            if (axis != Vector2.Zero)
-                axis.Normalize();
-
-            var (minA, maxA) = ProjectOntoAxis(axis);
-            var (minB, maxB) = other.ProjectOntoAxis(axis);
-
-            if (maxA < minB || maxB < minA)
-                return false;
+            return false;
         }
 
-        return true;
+        if (!IsConcave() &&
+            !other.IsConcave())
+        {
+            var axis = Vector2.Zero;
+            var depth = float.MaxValue;
+
+            return IntersectsSAT(
+                other,
+                ref axis,
+                ref depth);
+        }
+
+        return IntersectsGeneral(
+            other,
+            out _,
+            out _);
     }
 
     public bool IsPointInside(Vector2 point)
