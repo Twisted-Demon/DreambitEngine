@@ -29,6 +29,7 @@ public class Scene : IDisposable
 
         Entities = new EntityRepository(this);
         Drawables = new DrawableRepository();
+        Services = new SceneServiceCollection(this);
         ScriptingManager = new ScriptingManager();
         _coroutineScheduler = new CoroutineScheduler();
 
@@ -256,6 +257,9 @@ public class Scene : IDisposable
 
     /// <summary>Whether this scene is executing gameplay or hosted for authoring.</summary>
     public SceneExecutionMode ExecutionMode { get; }
+
+    /// <summary>Component-backed services owned by this scene.</summary>
+    public SceneServiceCollection Services { get; }
 
     /// <summary>Enables engine-level debug drawing and diagnostics.</summary>
     public bool DebugMode { get; set; }
@@ -580,6 +584,7 @@ public class Scene : IDisposable
                 Transition(SceneState.Initializing);
                 InitializeInternals();
                 OnInitialize();
+                Services.ActivateAll();
                 Transition(SceneState.Starting);
                 _hasBegun = true;
                 OnBegin();

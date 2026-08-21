@@ -183,6 +183,59 @@ public sealed class SceneDocumentTests : IDisposable
     }
 
     [Fact]
+    public void SettingEntityReferenceInBlueprintPreviewStoresTheTargetGuid()
+    {
+        var rootId = Guid.NewGuid();
+        var childId = Guid.NewGuid();
+        using var document = new SceneDocument(
+            new SceneBlueprint
+            {
+                Name = "Entity Reference",
+                Entities =
+                [
+                    new EntityBlueprint
+                    {
+                        Name = "Root",
+                        Guid = rootId,
+                        Children =
+                        [
+                            new EntityBlueprint
+                            {
+                                Name = "Reference Holder",
+                                Guid = childId,
+                                Components =
+                                [
+                                    new ComponentBlueprint
+                                    {
+                                        Type = $"{typeof(EditorReloadSafetyComponent).Assembly.GetName().Name}." +
+                                               nameof(EditorReloadSafetyComponent)
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            },
+            null,
+            new SelectionService());
+        var root = document.Scene!.FindEntity(rootId)!;
+        var component = document.Scene.FindEntity(childId)!
+            .GetComponent<EditorReloadSafetyComponent>()!;
+
+        document.SetComponentMember(
+            "Set anchor",
+            [component],
+            nameof(EditorReloadSafetyComponent.Target),
+            typeof(Entity),
+            root,
+            (target, value) => ((EditorReloadSafetyComponent)target).Target = (Entity)value!);
+
+        var captured = document.CaptureSingleRoot();
+        var properties = Assert.Single(Assert.Single(captured.Children).Components).Properties;
+        Assert.Equal(rootId.ToString(), properties[nameof(EditorReloadSafetyComponent.Target)]!.Value<string>());
+    }
+
+    [Fact]
     public void NewSpriteDrawerDefaultsToOpaqueWhiteAndSerializesThoseDefaults()
     {
         var root = new EntityBlueprint

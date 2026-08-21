@@ -384,7 +384,7 @@ internal static class SceneDocumentSerializer
         return attribute is not null && attribute.FormerNames.Any(properties.ContainsKey);
     }
 
-    private static JToken SerializeValue(object? value, Type declaredType)
+    internal static JToken SerializeValue(object? value, Type declaredType)
     {
         if (value is null)
             return JValue.CreateNull();

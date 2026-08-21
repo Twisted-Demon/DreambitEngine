@@ -6,6 +6,37 @@ namespace Dreambit.ECS;
 [BlueprintType(nameof(RigidBody2D))]
 public class RigidBody2D : Component
 {
+    #region Constants
+
+    /*
+     * Multiple contacts can exist at once:
+     *
+     *     | wall
+     *     |
+     *   O |____ floor
+     *
+     * Resolve one contact, refresh the collider, then query again.
+     *
+     * Six iterations is intentionally small and deterministic. Normal
+     * character/world contacts usually settle in one or two.
+     */
+    private const int MaxResolutionIterations =
+        6;
+
+    /*
+     * Keep the resolved collider microscopically outside the surface.
+     *
+     * Without a separation skin, floating-point error can leave two shapes
+     * barely intersecting and cause repeated zero-distance corrections.
+     */
+    private const float SkinWidth =
+        0.0001f;
+
+    private const float NormalEpsilonSquared =
+        0.000000000001f;
+
+    #endregion
+
     #region Private Members / Fields
 
     private bool _warnedUser;
@@ -21,67 +52,169 @@ public class RigidBody2D : Component
             if (_warnedUser)
                 return;
 
-            Logger.Warn("Collider is null!");
-            _warnedUser = true;
+            Logger.Warn(
+                "Collider is null!");
+
+            _warnedUser =
+                true;
 
             return;
         }
 
-        Transform.CaptureLastWorldPosition();
-
-        var translateX = Velocity.X * Time.PhysicsDeltaTime;
-        var translateY = Velocity.Y * Time.PhysicsDeltaTime;
-        
-        //check x and y separately
-        CheckTranslation(new Vector2(translateX, 0));
-        CheckTranslation(new Vector2(0, translateY));
-        
-    }
-
-    private void CheckTranslation(Vector2 translation)
-    {
-        Transform.TranslateWorld2D(
-            translation);
-
         /*
-         * Keep the broadphase current immediately after moving.
+         * Preserve the beginning-of-step position for interpolation and
+         * external systems that inspect Transform.LastWorldPosition.
          *
-         * Collider itself may also receive OnPhysicsUpdate during this physics
-         * step, but its world-geometry cache makes that later refresh a cheap
-         * no-op when nothing changed.
+         * Collision resolution no longer rolls back to this position.
          */
-        Collider.RefreshSpatialHash();
+        Transform
+            .CaptureLastWorldPosition();
 
-        /*
-         * This uses a boolean-only physics query and therefore does not allocate
-         * CollisionResult/List storage every rigidbody step.
-         */
-        if (!CheckForCollision())
+        var translation =
+            Velocity *
+            Time.PhysicsDeltaTime;
+
+        if (!float.IsFinite(
+                translation.X) ||
+            !float.IsFinite(
+                translation.Y))
+        {
+            Logger.Warn(
+                "RigidBody2D velocity produced a non-finite physics translation.");
+
             return;
+        }
 
-        // Restore the previous position if the movement overlapped something.
-        Transform.WorldPosition =
-            Transform.LastWorldPosition;
-
-        Collider.RefreshSpatialHash();
+        MoveAndResolve(
+            translation);
     }
 
     #endregion
 
-    #region Internal Helper Functions
+    #region Movement / Resolution
 
-    private bool CheckForCollision()
+    private void MoveAndResolve(
+        Vector2 translation)
     {
-        if (InterestedTags.Count == 0)
+        /*
+         * Apply the entire intended movement first.
+         *
+         * This is important.
+         *
+         * Consider moving diagonally into a slope:
+         *
+         *          /
+         *       O /
+         *        /
+         *
+         * The attempted movement contains:
+         *
+         *     1. a component INTO the slope
+         *     2. a component ALONG the slope
+         *
+         * After the move, depenetrating only along the collision normal
+         * removes component #1 while preserving component #2.
+         *
+         * The result is natural sliding without separately testing world X/Y.
+         */
+        if (translation !=
+            Vector2.Zero)
         {
-            return PhysicsSystem.Instance
-                .ColliderCastAny(Collider);
+            Transform
+                .TranslateWorld2D(
+                    translation);
+
+            /*
+             * The transform changed, so immediately update cached world
+             * geometry and the spatial hash before asking for contacts.
+             */
+            Collider
+                .RefreshSpatialHash();
+        }
+        else
+        {
+            /*
+             * Still refresh before resolution. This allows the rigidbody to
+             * recover from an externally teleported/edited overlap even if
+             * its current velocity is zero.
+             */
+            Collider
+                .RefreshSpatialHash();
         }
 
-        return PhysicsSystem.Instance
-            .ColliderCastAnyByTag(
-                Collider,
-                InterestedTags);
+        ResolvePenetrations();
+    }
+
+    private void ResolvePenetrations()
+    {
+        for (var iteration = 0;
+             iteration <
+             MaxResolutionIterations;
+             iteration++)
+        {
+            if (!PhysicsSystem.Instance
+                    .TryGetBestSolidContact(
+                        Collider,
+                        InterestedTags,
+                        out var normal,
+                        out var penetration))
+            {
+                return;
+            }
+
+            if (!float.IsFinite(
+                    penetration) ||
+                penetration <= 0f)
+            {
+                return;
+            }
+
+            var normalLengthSquared =
+                normal.LengthSquared();
+
+            if (!float.IsFinite(
+                    normalLengthSquared) ||
+                normalLengthSquared <=
+                NormalEpsilonSquared)
+            {
+                return;
+            }
+
+            /*
+             * Manifold normals should already be normalized.
+             *
+             * Normalize again only if numerical error has meaningfully moved
+             * it away from unit length. This avoids unnecessary sqrt calls in
+             * the normal case.
+             */
+            if (normalLengthSquared <
+                    0.9999f ||
+                normalLengthSquared >
+                    1.0001f)
+            {
+                normal /=
+                    Mathf.Sqrt(
+                        normalLengthSquared);
+            }
+
+            var correction =
+                normal *
+                (
+                    penetration +
+                    SkinWidth
+                );
+
+            Transform
+                .TranslateWorld2D(
+                    correction);
+
+            /*
+             * The next iteration must query the corrected geometry, not the
+             * geometry from before positional resolution.
+             */
+            Collider
+                .RefreshSpatialHash();
+        }
     }
 
     #endregion
@@ -89,13 +222,22 @@ public class RigidBody2D : Component
     #region Public Properties / Fields
 
     [DreambitSerialize]
-    public Collider Collider { get; private set; }
+    public Collider Collider
+    {
+        get;
+        private set;
+    }
 
     [DreambitSerialize]
-    public Vector2 Velocity = Vector2.Zero;
+    public Vector2 Velocity =
+        Vector2.Zero;
 
     [DreambitSerialize]
-    public HashSet<string> InterestedTags { get; private set; } = [];
+    public HashSet<string> InterestedTags
+    {
+        get;
+        private set;
+    } = [];
 
     #endregion
 
@@ -111,8 +253,11 @@ public class RigidBody2D : Component
     public void SetCollider(
         Collider collider)
     {
-        Collider = collider;
-        _warnedUser = false;
+        Collider =
+            collider;
+
+        _warnedUser =
+            false;
     }
 
     #endregion

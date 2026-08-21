@@ -19,7 +19,7 @@ public class Entity : IDisposable
     private bool _isDestroyed;
     private bool _isDisposed;
 
-    private Entity _parent;
+    private Entity? _parent;
 
     internal Entity(Guid id, string name, HashSet<string> tags, bool enabled, Scene scene)
     {
@@ -58,7 +58,7 @@ public class Entity : IDisposable
     public HashSet<string> Tags { get; } = [];
     internal Scene Scene { get; private set; }
 
-    public Entity Parent
+    public Entity? Parent
     {
         get => _parent;
         set
@@ -140,6 +140,8 @@ public class Entity : IDisposable
 
     public void Dispose()
     {
+        Scene?.Services.EnsureCanRemove(this);
+
         Dispose(true);
         GC.SuppressFinalize(this);
     }
@@ -238,6 +240,8 @@ public class Entity : IDisposable
     {
         if (entity is null || entity._isDead || entity._isDestroyed)
             return;
+
+        entity.Scene?.Services.EnsureCanRemove(entity);
 
         entity._isDead = true;
 
@@ -545,6 +549,49 @@ public class Entity : IDisposable
         ComponentRepository.DetachComponent(componentToRemove);
     }
 
+    internal bool ContainsSceneService()
+    {
+        foreach (var component in
+                 ComponentRepository.GetAllComponents())
+        {
+            if (component is SceneServiceComponent)
+                return true;
+        }
+
+        return false;
+    }
+
+    internal bool ContainsNonSceneService()
+    {
+        foreach (var component in
+                 ComponentRepository.GetAllComponents())
+        {
+            if (component is not SceneServiceComponent)
+                return true;
+        }
+
+        return false;
+    }
+
+    internal bool ContainsSceneServiceInHierarchy()
+    {
+        if (ContainsSceneService())
+            return true;
+
+        for (var i = 0;
+             i < _children.Count;
+             i++)
+        {
+            if (_children[i]
+                .ContainsSceneServiceInHierarchy())
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /// <summary>
     ///     Detaches a component from the entity and cleans it up
     ///     only if it exists in the entities internal component list.
@@ -642,7 +689,7 @@ public class Entity : IDisposable
         //Todo: Implement on call back for components
     }
 
-    public void SetParent(Entity parentEntity, bool preserveWorldTransform)
+    public void SetParent(Entity? parentEntity, bool preserveWorldTransform)
     {
         if (ReferenceEquals(parentEntity, this))
             throw new InvalidOperationException("An entity cannot be parented to itself.");
@@ -678,12 +725,12 @@ public class Entity : IDisposable
         }
     }
 
-    private void SetParent(Entity parentEntity)
+    private void SetParent(Entity? parentEntity)
     {
         SetParent(parentEntity, false);
     }
 
-    private void SetParentInternal(Entity parentEntity)
+    private void SetParentInternal(Entity? parentEntity)
     {
         if (_parent != null)
             _parent._children.Remove(this);

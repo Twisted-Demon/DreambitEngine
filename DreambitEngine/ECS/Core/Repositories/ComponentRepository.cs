@@ -62,6 +62,9 @@ public class ComponentRepository
             return;
         }
 
+        if (component is SceneServiceComponent sceneService)
+            _scene?.Services.EnsureCanRemove(sceneService);
+
         if (_componentsToDetach.Contains(component))
         {
             _logger.Trace("ComponentList: {0} is already being removed", component.GetType().Name);
@@ -86,34 +89,35 @@ public class ComponentRepository
     {
         var cleanupErrors = new List<Exception>();
 
-        foreach (var component in _componentsToAttach)
-        {
-            if (_attachedComponents.Contains(component))
-                continue;
+        var components =
+            new List<Component>(
+                _componentsToAttach.Count +
+                _attachedComponents.Count);
 
+        foreach (var component in _componentsToAttach)
+            if (!components.Contains(component))
+                components.Add(component);
+
+        foreach (var component in _attachedComponents)
+            if (!components.Contains(component))
+                components.Add(component);
+
+        components.Sort(
+            CompareForDestruction);
+
+        foreach (var component in components)
+        {
             try
             {
                 DestroyComponentNow(
                     component,
-                    false);
+                    _attachedComponents.Contains(component));
             }
             catch (Exception exception)
             {
                 cleanupErrors.Add(exception);
             }
         }
-
-        foreach (var component in _attachedComponents)
-            try
-            {
-                DestroyComponentNow(
-                    component,
-                    true);
-            }
-            catch (Exception exception)
-            {
-                cleanupErrors.Add(exception);
-            }
 
         // Ownership is gone regardless of individual cleanup failures.
         _componentsToAttach.Clear();
@@ -126,6 +130,31 @@ public class ComponentRepository
             throw new AggregateException(
                 "One or more components failed while being destroyed.",
                 cleanupErrors);
+    }
+
+    private int CompareForDestruction(
+        Component left,
+        Component right)
+    {
+        var leftService =
+            left as SceneServiceComponent;
+
+        var rightService =
+            right as SceneServiceComponent;
+
+        if (leftService is null)
+            return rightService is null
+                ? 0
+                : -1;
+
+        if (rightService is null)
+            return 1;
+
+        return _scene.Services
+            .GetDestructionOrder(rightService)
+            .CompareTo(
+                _scene.Services
+                    .GetDestructionOrder(leftService));
     }
 
     public T GetComponent<T>()

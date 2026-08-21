@@ -80,6 +80,8 @@ public class EntityRepository
             return;
         }
 
+        _scene.Services.EnsureCanRemove(entity);
+
         if (_entitiesToDestroySet.Contains(entity))
         {
             Console.WriteLine(
@@ -128,29 +130,48 @@ public class EntityRepository
     internal void ClearLists()
     {
         var allEntities =
-            new HashSet<Entity>(
-                ReferenceEqualityComparer.Instance);
+            new List<Entity>(
+                _entities.Count +
+                _entitiesToCreate.Count +
+                _entitiesToDestroy.Count);
 
-        allEntities.UnionWith(_entitiesToCreate);
-        allEntities.UnionWith(_entitiesToDestroy);
-        allEntities.UnionWith(_entities);
+        AddUniqueByReference(
+            allEntities,
+            _entities);
+
+        AddUniqueByReference(
+            allEntities,
+            _entitiesToCreate);
+
+        AddUniqueByReference(
+            allEntities,
+            _entitiesToDestroy);
+
+        var ordinaryEntities =
+            new List<Entity>(
+                allEntities.Count);
+
+        var serviceEntities =
+            new List<Entity>();
+
+        foreach (var entity in allEntities)
+            if (entity.ContainsSceneService())
+                serviceEntities.Add(entity);
+            else
+                ordinaryEntities.Add(entity);
 
         var cleanupErrors =
             new List<Exception>();
 
-        foreach (var entity in _entities)
-        {
-            TryCleanup(
-                cleanupErrors,
-                entity.OnRemovedFromScene);
-        }
+        RemoveAndDestroyEntities(
+            ordinaryEntities,
+            cleanupErrors);
 
-        foreach (var entity in allEntities)
-        {
-            DestroyAndDisposeEntity(
-                entity,
-                cleanupErrors);
-        }
+        _scene.Services.StopAll();
+
+        RemoveAndDestroyEntities(
+            serviceEntities,
+            cleanupErrors);
 
         // Repository ownership must always be released, even when user cleanup
         // code throws.
@@ -170,6 +191,62 @@ public class EntityRepository
         ThrowIfCleanupFailed(
             cleanupErrors,
             "One or more entities failed while clearing the scene.");
+    }
+
+    private void RemoveAndDestroyEntities(
+        IReadOnlyList<Entity> entities,
+        List<Exception> cleanupErrors)
+    {
+        for (var i = 0;
+             i < entities.Count;
+             i++)
+        {
+            var entity =
+                entities[i];
+
+            if (_entitiesSet.Contains(entity))
+                TryCleanup(
+                    cleanupErrors,
+                    entity.OnRemovedFromScene);
+
+            DestroyAndDisposeEntity(
+                entity,
+                cleanupErrors);
+        }
+    }
+
+    private static void AddUniqueByReference(
+        List<Entity> destination,
+        IReadOnlyList<Entity> source)
+    {
+        for (var i = 0;
+             i < source.Count;
+             i++)
+        {
+            var candidate =
+                source[i];
+
+            var exists =
+                false;
+
+            for (var destinationIndex = 0;
+                 destinationIndex < destination.Count;
+                 destinationIndex++)
+            {
+                if (!ReferenceEquals(
+                        destination[destinationIndex],
+                        candidate))
+                {
+                    continue;
+                }
+
+                exists = true;
+                break;
+            }
+
+            if (!exists)
+                destination.Add(candidate);
+        }
     }
 
     private void UpdateEntities()

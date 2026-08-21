@@ -1,4 +1,5 @@
 using Dreambit.Editor.Scenes;
+using Dreambit.ECS;
 
 namespace Dreambit.Editor.Tests;
 
@@ -90,6 +91,40 @@ public sealed class SceneRuntimeTests
         runtime.Dispose();
     }
 
+    [Fact]
+    public void EditorPreviewReplacementDoesNotRegisterRuntimeSingletons()
+    {
+        using var runtime = new SceneRuntime();
+        var source = new SceneBlueprint
+        {
+            Name = "Singleton Preview",
+            Entities =
+            [
+                new EntityBlueprint
+                {
+                    Name = "Manager",
+                    Guid = Guid.NewGuid(),
+                    Components =
+                    [
+                        new ComponentBlueprint
+                        {
+                            Type = SceneDocumentSerializer.GetComponentTypeId(
+                                typeof(EditorPreviewSingletonComponent))
+                        }
+                    ]
+                }
+            ]
+        };
+
+        runtime.Replace(
+            runtime.Build(source),
+            "Could not dispose the initial editor scene.");
+        var replacement = runtime.Build(source);
+
+        Assert.NotNull(replacement);
+        Assert.False(EditorPreviewSingletonComponent.HasInstance);
+    }
+
     private static SceneBlueprint CreateSource(string name) => new()
     {
         Name = name,
@@ -102,4 +137,8 @@ public sealed class SceneRuntimeTests
         entity.AttachComponent<ThrowingDisposeComponent>();
         scene.FlushStructuralChanges();
     }
+}
+
+public sealed class EditorPreviewSingletonComponent : SingletonComponent<EditorPreviewSingletonComponent>
+{
 }

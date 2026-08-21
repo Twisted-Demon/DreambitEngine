@@ -4,10 +4,11 @@
         <BaseOutputPath>Build\</BaseOutputPath>
         <AssemblyName>Dreambit</AssemblyName>
         <RootNamespace>Dreambit</RootNamespace>
+        <Nullable>annotations</Nullable>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <IsPackable>true</IsPackable>
         <PackageId>DreambitEngine</PackageId>
-        <PackageVersion Condition="'$(PackageVersion)' == ''">0.4.5</PackageVersion>
+        <PackageVersion Condition="'$(PackageVersion)' == ''">0.4.7</PackageVersion>
         <Authors>Dreambit Engine</Authors>
         <Description>DreambitEngine runtime library for MonoGame games.</Description>
         <PackageReadmeFile>README.md</PackageReadmeFile>

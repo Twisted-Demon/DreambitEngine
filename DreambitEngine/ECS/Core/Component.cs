@@ -65,6 +65,9 @@ public abstract class Component : IDisposable
 
     public void Dispose()
     {
+        if (this is SceneServiceComponent sceneService)
+            Scene?.Services.EnsureCanRemove(sceneService);
+
         try
         {
             Dispose(true);
@@ -92,15 +95,20 @@ public abstract class Component : IDisposable
         return this;
     }
 
-    internal static Component BpFromType(Type type, Entity entity, bool enabled = true)
+    internal static Component BpFromType(
+        Type type,
+        Entity entity,
+        bool enabled = true)
     {
         if (!type.IsSubclassOf(typeof(Component)))
         {
-            Core.Logger.Warn("{0} is not a valid component type on deserialization", type.FullName);
+            Core.Logger.Warn(
+                "{0} is not a valid component type on deserialization",
+                type.FullName);
+
             return null;
         }
 
-        // check if already created, if not create a new one
         var component =
             entity.GetComponent(type) ??
             (Component)Activator.CreateInstance(type);
@@ -108,12 +116,9 @@ public abstract class Component : IDisposable
         if (component is null)
             return null;
 
-        component.Entity = entity;
-        component._enabled = enabled;
-        component._requiredComponentTypes = component.GetRequiredComponents();
-
-
-        return component;
+        return component.SetUpAndCreateChildren(
+            entity,
+            enabled);
     }
 
     private IReadOnlyList<Type> GetRequiredComponents()
@@ -567,6 +572,12 @@ public class SingletonComponent<T> : Component where T : SingletonComponent<T>
 
     internal override Component SetUpAndCreateChildren(Entity entity, bool enabled = true)
     {
+        // Editor previews can coexist briefly while SceneRuntime builds a replacement before
+        // disposing the outgoing scene. They never run gameplay callbacks, so they must not
+        // participate in the process-wide runtime singleton registry.
+        if (entity.Scene?.ExecutionMode == SceneExecutionMode.Editor)
+            return base.SetUpAndCreateChildren(entity, enabled);
+
         if (!IsNull(Instance) && !ReferenceEquals(Instance, this))
             throw new InvalidOperationException(
                 $"A singleton component of type '{typeof(T).FullName}' " +

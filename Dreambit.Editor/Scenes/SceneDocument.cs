@@ -600,11 +600,14 @@ internal sealed class SceneDocument : IDisposable
 
     public void RecordGeneratedComponentMember(Component component, string memberName, object? value)
     {
+        ArgumentNullException.ThrowIfNull(component);
+        ArgumentException.ThrowIfNullOrWhiteSpace(memberName);
+
         _importedSceneSources.RecordComponentMember(
             _source,
             component,
             memberName,
-            DreambitJson.ToToken(value));
+            SceneDocumentSerializer.SerializeValue(value, value?.GetType() ?? typeof(object)));
     }
 
     public void RecordLDtkEntityName(Entity entity) => RecordGeneratedEntityName(entity);

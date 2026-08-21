@@ -803,6 +803,141 @@ public class PhysicsSystem : Singleton<PhysicsSystem>
 
         return result.Collisions.Count > 0;
     }
+    
+    internal bool TryGetBestSolidContact(
+        Collider collider,
+        HashSet<string> interestedTags,
+        out Vector2 normal,
+        out float penetration)
+    {
+        const float penetrationEpsilon =
+            0.000001f;
+
+        normal =
+            Vector2.Zero;
+
+        penetration =
+            0f;
+
+        if (!IsColliderValid(collider) ||
+            collider.IsTrigger)
+        {
+            return false;
+        }
+
+        var geometry =
+            collider.WorldGeometry2D;
+
+        if (!geometry.IsValid)
+            return false;
+
+        _candidateSet.Clear();
+
+        _grid.QueryAABB(
+            collider.AABB,
+            _candidateSet);
+
+        var found =
+            false;
+
+        foreach (var other in _candidateSet)
+        {
+            if (ReferenceEquals(
+                    other,
+                    collider))
+            {
+                continue;
+            }
+
+            if (!IsColliderValid(other))
+                continue;
+
+            /*
+             * A collider should not physically block another collider
+             * belonging to the same entity.
+             */
+            if (ReferenceEquals(
+                    other.Entity,
+                    collider.Entity))
+            {
+                continue;
+            }
+
+            /*
+             * Triggers participate in overlap/cast queries but must not
+             * physically stop a RigidBody2D.
+             */
+            if (other.IsTrigger)
+                continue;
+
+            if (interestedTags is
+                    { Count: > 0 } &&
+                !HasAnyTag(
+                    other.Entity,
+                    interestedTags))
+            {
+                continue;
+            }
+
+            if (!CollisionManifoldSolver2D
+                    .TryGetManifold(
+                        geometry,
+                        other.WorldGeometry2D,
+                        out var manifold))
+            {
+                continue;
+            }
+
+            /*
+             * Touching without penetration is a valid geometric contact,
+             * but there is nothing to depenetrate.
+             */
+            if (!float.IsFinite(
+                    manifold.Penetration) ||
+                manifold.Penetration <=
+                penetrationEpsilon)
+            {
+                continue;
+            }
+
+            var normalLengthSquared =
+                manifold.Normal
+                    .LengthSquared();
+
+            if (!float.IsFinite(
+                    normalLengthSquared) ||
+                normalLengthSquared <=
+                penetrationEpsilon *
+                penetrationEpsilon)
+            {
+                continue;
+            }
+
+            /*
+             * Resolve the deepest contact first.
+             *
+             * RigidBody2D repeats this query after each correction, so
+             * corners and multiple simultaneous contacts settle iteratively.
+             */
+            if (found &&
+                manifold.Penetration <=
+                penetration)
+            {
+                continue;
+            }
+
+            found =
+                true;
+
+            normal =
+                manifold.Normal;
+
+            penetration =
+                manifold.Penetration;
+        }
+
+        return found;
+    }
 
     #endregion
 
