@@ -757,6 +757,12 @@ internal sealed class ProjectPanel : EditorPanel
 
         EditorGui.WrappedText($"Delete '{_pendingDeletePath}' from disk?");
         EditorGui.MutedText("Its stable asset ID will remain as a missing-reference tombstone.");
+        if (_pendingDeletePath is not null &&
+            _assets.TryGetAsset(_pendingDeletePath, out var pendingAsset) &&
+            pendingAsset?.Kind == AssetKind.Blueprint)
+        {
+            EditorGui.MutedText("Linked Blueprint instances will also be removed from scene assets.");
+        }
         DrawPopupError();
         EditorGui.Space();
         if (EditorGui.Button(
@@ -766,9 +772,30 @@ internal sealed class ProjectPanel : EditorPanel
                 primary: true) &&
             _pendingDeletePath is not null)
         {
+            var deletedAsset = _assets.TryGetAsset(_pendingDeletePath, out var asset)
+                ? asset
+                : null;
             if (_assets.TryDelete(_pendingDeletePath, out var error))
             {
                 _assetEditing.RefreshFromDatabase();
+                if (deletedAsset?.Kind == AssetKind.Blueprint)
+                {
+                    try
+                    {
+                        var removed = _scenes.RemoveDeletedBlueprintReferences(deletedAsset);
+                        if (removed > 0)
+                            _logs.Info(
+                                "Assets",
+                                $"Removed {removed} scene Blueprint instance(s) that referenced '{deletedAsset.RelativePath}'.");
+                    }
+                    catch (Exception exception)
+                    {
+                        SetError(
+                            $"The Blueprint was deleted, but some scene references could not be removed. {exception.Message}",
+                            exception);
+                        return;
+                    }
+                }
                 ClearSelection();
                 _pendingDeletePath = null;
                 _error = null;

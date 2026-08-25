@@ -101,6 +101,27 @@ public sealed class InspectorMetadataTests
     }
 
     [Fact]
+    public void VirtualCameraExposesEntityFollowTargetInsteadOfCameraFollowSettings()
+    {
+        var cache = new InspectorMetadataCache();
+
+        var virtualCameraMembers = cache.Get(
+            typeof(VirtualCamera),
+            InspectorTargetKind.Component);
+        var followTarget = Assert.Single(
+            virtualCameraMembers,
+            member => member.SerializedName == nameof(VirtualCamera.EntityToFollow));
+        Assert.Equal(typeof(Entity), followTarget.ValueType);
+
+        var cameraMembers = cache.Get(
+            typeof(Camera2D),
+            InspectorTargetKind.Component);
+        Assert.DoesNotContain(
+            cameraMembers,
+            member => member.SerializedName == nameof(VirtualCamera.LerpSpeed));
+    }
+
+    [Fact]
     public void AssetDocumentCaptureDoesNotWalkRuntimeOnlyObjectGraphs()
     {
         var path = Path.Combine(Path.GetTempPath(), $"circular-runtime-{Guid.NewGuid():N}.json");

@@ -211,6 +211,46 @@ internal sealed class SceneDocumentService : IDisposable
 
     public void ClearBlueprintPreviews() => _blueprintSources.ClearPreviews();
 
+    /// <summary>
+    /// Repairs scene documents after an Entity Blueprint has been removed. The open scene is
+    /// changed through its undo history; unopened scene assets are updated on disk so a later
+    /// load cannot retain a dangling Blueprint instance.
+    /// </summary>
+    public int RemoveDeletedBlueprintReferences(AssetRecord deletedAsset)
+    {
+        ArgumentNullException.ThrowIfNull(deletedAsset);
+        if (deletedAsset.Kind != AssetKind.Blueprint)
+            return 0;
+
+        var removed = Current?.RemoveDeletedBlueprintInstances(
+            deletedAsset.Id,
+            deletedAsset.LogicalAssetName) ?? 0;
+        var currentPath = Current?.Path;
+        foreach (var sceneAsset in _assets.GetSnapshot().Assets.Where(asset =>
+                     asset.Kind == AssetKind.Scene &&
+                     !string.Equals(
+                         ResolveScenePath(asset.RelativePath),
+                         currentPath,
+                         OperatingSystem.IsWindows()
+                             ? StringComparison.OrdinalIgnoreCase
+                             : StringComparison.Ordinal)))
+        {
+            var path = ResolveScenePath(sceneAsset.RelativePath);
+            var source = SceneDocumentSerializer.Deserialize(File.ReadAllText(path));
+            var removedFromScene = SceneDocument.RemoveBlueprintInstanceReferences(
+                source.Entities,
+                deletedAsset.Id,
+                deletedAsset.LogicalAssetName);
+            if (removedFromScene == 0)
+                continue;
+
+            WriteSceneAtomically(path, SceneDocumentSerializer.Serialize(source));
+            removed += removedFromScene;
+        }
+
+        return removed;
+    }
+
     public void Close()
     {
         var current = Current;
@@ -300,6 +340,21 @@ internal sealed class SceneDocumentService : IDisposable
             _project.ContentRootPath,
             asset.RelativePath.Replace('/', System.IO.Path.DirectorySeparatorChar));
         return TmxMap.FromContentFile(path, asset.LogicalAssetName, _project.ContentRootPath);
+    }
+
+    private static void WriteSceneAtomically(string path, string content)
+    {
+        var temporaryPath = path + $".{Guid.NewGuid():N}.tmp";
+        try
+        {
+            File.WriteAllText(temporaryPath, content);
+            File.Move(temporaryPath, path, true);
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+                File.Delete(temporaryPath);
+        }
     }
 
     public void Dispose()

@@ -5,6 +5,7 @@ using Dreambit.Editor.Scenes;
 using Dreambit.EditorApi;
 using Dreambit.LDtk;
 using Dreambit.Tiled;
+using XnaVec3 = Microsoft.Xna.Framework.Vector3;
 
 namespace Dreambit.Editor.Commands;
 
@@ -35,6 +36,7 @@ internal sealed class EditorDocumentCommands
     private readonly AssetEditingService _assetEditing;
     private readonly BlueprintSourceService _blueprintSources;
     private readonly EditorWorkspaceSelectionPersistence _workspaceSelection;
+    private readonly EditorWorkspaceState _workspace;
     private readonly EditorLogService _logs;
 
     public EditorDocumentCommands(
@@ -43,6 +45,7 @@ internal sealed class EditorDocumentCommands
         AssetEditingService assetEditing,
         BlueprintSourceService blueprintSources,
         EditorWorkspaceSelectionPersistence workspaceSelection,
+        EditorWorkspaceState workspace,
         EditorLogService logs)
     {
         _scenes = scenes;
@@ -50,6 +53,7 @@ internal sealed class EditorDocumentCommands
         _assetEditing = assetEditing;
         _blueprintSources = blueprintSources;
         _workspaceSelection = workspaceSelection;
+        _workspace = workspace;
         _logs = logs;
     }
 
@@ -202,7 +206,8 @@ internal sealed class EditorDocumentCommands
         {
             document.CreateEmpty(
                 "Entity",
-                _documents.IsBlueprint ? _documents.Blueprints.Root : null);
+                _documents.IsBlueprint ? _documents.Blueprints.Root : null,
+                GetViewportCenter());
             return EditorCommandResult.Success();
         }
         catch (Exception exception)
@@ -222,6 +227,7 @@ internal sealed class EditorDocumentCommands
             using var source = _blueprintSources.Load(blueprint);
             document.InstantiateBlueprint(
                 source,
+                GetViewportCenter(source.Position.Z),
                 parent: _documents.IsBlueprint ? _documents.Blueprints.Root : null);
             return EditorCommandResult.Success();
         }
@@ -230,6 +236,11 @@ internal sealed class EditorDocumentCommands
             return LogFailure("Scene", "Could not create the entity from the Blueprint.", exception);
         }
     }
+
+    private XnaVec3 GetViewportCenter(float z = 0f) =>
+        _documents.IsBlueprint
+            ? new XnaVec3(_workspace.BlueprintCameraX, _workspace.BlueprintCameraY, z)
+            : new XnaVec3(_workspace.SceneCameraX, _workspace.SceneCameraY, z);
 
     private EditorCommandResult ChangeHistory(bool redo)
     {

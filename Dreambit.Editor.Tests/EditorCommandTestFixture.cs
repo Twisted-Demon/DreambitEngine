@@ -112,6 +112,7 @@ internal sealed class EditorCommandTestFixture : IDisposable
             AssetEditing,
             BlueprintSources,
             SelectionPersistence,
+            WorkspaceState,
             Logs);
     }
 

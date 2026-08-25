@@ -236,6 +236,57 @@ public sealed class SceneDocumentTests : IDisposable
     }
 
     [Fact]
+    public void VirtualCameraEntityTargetRoundTripsThroughEditorSceneData()
+    {
+        var targetId = Guid.NewGuid();
+        var cameraId = Guid.NewGuid();
+        var root = new EntityBlueprint
+        {
+            Name = "Target",
+            Guid = targetId,
+            Children =
+            [
+                new EntityBlueprint
+                {
+                    Name = "Camera",
+                    Guid = cameraId,
+                    Components =
+                    [
+                        new ComponentBlueprint
+                        {
+                            Type = nameof(VirtualCamera),
+                            Properties = new Dictionary<string, JToken>
+                            {
+                                [nameof(VirtualCamera.EntityToFollow)] = targetId.ToString()
+                            }
+                        }
+                    ]
+                }
+            ]
+        };
+
+        using var document = new SceneDocument(
+            new SceneBlueprint { Name = "Virtual Camera", Entities = [root] },
+            null,
+            new SelectionService());
+
+        var target = document.Scene!.FindEntity(targetId)!;
+        var cameraEntity = document.Scene.FindEntity(cameraId)!;
+        var virtualCamera = cameraEntity.GetComponent<VirtualCamera>()!;
+
+        Assert.Same(target, virtualCamera.EntityToFollow);
+        Assert.NotNull(cameraEntity.GetComponent<Camera2D>());
+
+        var capturedCamera = Assert.Single(document.CaptureSingleRoot().Children);
+        var capturedVirtualCamera = Assert.Single(
+            capturedCamera.Components,
+            component => component.Type == nameof(VirtualCamera));
+        Assert.Equal(
+            targetId.ToString(),
+            capturedVirtualCamera.Properties[nameof(VirtualCamera.EntityToFollow)]!.Value<string>());
+    }
+
+    [Fact]
     public void NewSpriteDrawerDefaultsToOpaqueWhiteAndSerializesThoseDefaults()
     {
         var root = new EntityBlueprint

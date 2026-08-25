@@ -133,6 +133,7 @@ internal sealed class EditorApplication : IDisposable
                     session.AssetEditing,
                     session.BlueprintSources,
                     workspaceSelection,
+                    workspaceState,
                     _logs);
 
                 buildCommands = new EditorBuildCommands(

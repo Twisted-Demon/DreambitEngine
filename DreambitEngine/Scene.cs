@@ -279,7 +279,7 @@ public class Scene : IDisposable
     public readonly RenderingOptions RenderingOptions;
 
     /// <summary>Primary world camera.</summary>
-    public Camera2D MainCamera { get; private set; }
+    public Camera2D MainCamera { get; set; }
 
     /// <summary>UI camera for screen-space/UI rendering.</summary>
     public Camera2D UiCamera { get; private set; }

@@ -229,7 +229,10 @@ internal sealed class SceneDocument : IDisposable
             _runtime.Generation);
     }
 
-    public Entity CreateEmpty(string name = "Entity", Entity? parent = null)
+    public Entity CreateEmpty(
+        string name = "Entity",
+        Entity? parent = null,
+        Microsoft.Xna.Framework.Vector3? worldPosition = null)
     {
         if (parent?.IsImportedMapGenerated == true)
             throw new InvalidOperationException("Imported map entities cannot own Dreambit-authored children.");
@@ -241,6 +244,8 @@ internal sealed class SceneDocument : IDisposable
             created = scene.CreateEntity(name);
             if (parent is not null)
                 created.SetParent(parent, false);
+            if (worldPosition.HasValue)
+                created.Transform.WorldPosition = worldPosition.Value;
             scene.FlushStructuralChanges();
             Selection.Set(created);
         });
@@ -608,6 +613,27 @@ internal sealed class SceneDocument : IDisposable
             component,
             memberName,
             SceneDocumentSerializer.SerializeValue(value, value?.GetType() ?? typeof(object)));
+    }
+
+    /// <summary>
+    /// Removes boxed instances that directly reference a Blueprint asset that has been deleted.
+    /// The edit remains undoable and leaves the document dirty until the user saves it.
+    /// </summary>
+    public int RemoveDeletedBlueprintInstances(AssetId assetId, string logicalAssetName)
+    {
+        var scene = Scene;
+        if (scene is null)
+            return 0;
+
+        var roots = scene.GetAllEntities()
+            .Where(entity => FindSourceEntity(entity.Id)?.BlueprintInstance is { } instance &&
+                             ReferencesBlueprint(instance, assetId, logicalAssetName))
+            .ToArray();
+        if (roots.Length == 0)
+            return 0;
+
+        Delete(roots);
+        return roots.Length;
     }
 
     public void RecordLDtkEntityName(Entity entity) => RecordGeneratedEntityName(entity);
@@ -1040,6 +1066,41 @@ internal sealed class SceneDocument : IDisposable
         _source.Entities
             .SelectMany(root => root.FlattenedHierarchy())
             .FirstOrDefault(entity => entity.Guid == entityId);
+
+    internal static bool ReferencesBlueprint(
+        BlueprintInstanceReference instance,
+        AssetId assetId,
+        string logicalAssetName) =>
+        (!assetId.IsEmpty && instance.AssetId == assetId.Value) ||
+        (instance.AssetId == Guid.Empty &&
+         !string.IsNullOrWhiteSpace(logicalAssetName) &&
+         string.Equals(instance.AssetName, logicalAssetName, StringComparison.OrdinalIgnoreCase));
+
+    internal static int RemoveBlueprintInstanceReferences(
+        List<EntityBlueprint> entities,
+        AssetId assetId,
+        string logicalAssetName)
+    {
+        var removed = 0;
+        for (var index = entities.Count - 1; index >= 0; index--)
+        {
+            var entity = entities[index];
+            if (entity.BlueprintInstance is { } instance &&
+                ReferencesBlueprint(instance, assetId, logicalAssetName))
+            {
+                entities.RemoveAt(index);
+                removed++;
+                continue;
+            }
+
+            removed += RemoveBlueprintInstanceReferences(
+                entity.Children,
+                assetId,
+                logicalAssetName);
+        }
+
+        return removed;
+    }
 
     private static IEnumerable<Entity> RemoveDescendantDuplicates(IEnumerable<Entity> entities)
     {

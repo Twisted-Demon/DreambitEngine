@@ -7,7 +7,7 @@ internal readonly record struct AssetTypeInfo(AssetKind Kind, string? TypeId);
 
 internal static class AssetTypeClassifier
 {
-    public const int ClassificationVersion = 4;
+    public const int ClassificationVersion = 5;
 
     private static readonly (AssetKind Kind, Type AssetType)[] SerializedTypes =
     [
@@ -76,7 +76,7 @@ internal static class AssetTypeClassifier
 
         return extension.ToLowerInvariant() switch
         {
-            ".png" or ".jpg" or ".jpeg" or ".bmp" or ".gif" or ".tga" or ".webp" =>
+            ".png" or ".jpg" or ".jpeg" or ".bmp" or ".tga" =>
                 new AssetTypeInfo(AssetKind.Texture, DreambitAssetTypeRegistry.GetTypeId(typeof(TextureAsset))),
             ".wav" or ".ogg" or ".mp3" or ".flac" =>
                 new AssetTypeInfo(AssetKind.Audio, null),

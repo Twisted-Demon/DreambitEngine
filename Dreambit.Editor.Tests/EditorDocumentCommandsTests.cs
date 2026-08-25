@@ -216,6 +216,23 @@ public sealed class EditorDocumentCommandsTests
     }
 
     [Fact]
+    public void CreateEntityPlacesItAtTheActiveViewportCenter()
+    {
+        using var fixture = new EditorCommandTestFixture();
+        fixture.Scenes.New("Centered");
+        fixture.Documents.ActivateScene();
+        fixture.WorkspaceState.SceneCameraX = 18.5f;
+        fixture.WorkspaceState.SceneCameraY = -7.25f;
+
+        var result = fixture.Commands.CreateEmptyEntity();
+
+        Assert.True(result.Succeeded, result.Error);
+        var created = fixture.Scenes.Selection.GetActive(fixture.Scenes.Current!.Scene)!;
+        Assert.Equal(18.5f, created.Transform.WorldPosition.X);
+        Assert.Equal(-7.25f, created.Transform.WorldPosition.Y);
+    }
+
+    [Fact]
     public void SaveWithoutAnActiveDocumentIsAHarmlessNoOp()
     {
         using var fixture = new EditorCommandTestFixture();

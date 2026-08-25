@@ -3,7 +3,7 @@ using Dreambit;
 using DreambitEngine.AssetBaker.Abstractions;
 using ZstdSharp;
 
-namespace DreambitEngine.AssetBaker.Pipeline.Textures;
+namespace DreambitEngine.AssetBaker.Pipeline;
 
 public sealed class PakWriter
 {
