@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using Dreambit.Networking;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -11,6 +12,7 @@ public class Core : Game
     private const float FixedPhysicsStep = 1f / 60f;
     private const int MaxPhysicsStepsPerFrame = 8;
     private float _accumulatedPhysicsTime;
+    private NetworkService? _networking;
     
     public static readonly Logger<Core> Logger = new();
 
@@ -44,6 +46,7 @@ public class Core : Game
     public static SpriteBatch SpriteBatch { get; private set; }
     public Scene CurrentScene { get; private set; }
     public Scene NextScene { get; private set; }
+    public NetworkService Networking => _networking ??= new NetworkService(this);
     private static string GameName { get; set; }
 
 
@@ -81,15 +84,21 @@ public class Core : Game
 
         UpdateDebug();
 
+        _networking?.PollTransport();
+
         InputSystem.Instance.PreUpdate();
         CurrentScene?.RouteUiInput();
         InputSystem.Instance.Update();
         {
+            _networking?.ApplyInbound();
+
             if (NextScene != null)
                 ChangeScenes();
 
             HandlePhysics();
             CurrentScene?.Tick();
+            if (CurrentScene is { } scene)
+                _networking?.AfterSceneTick(scene);
         }
         InputSystem.Instance.PostUpdate();
 
@@ -124,7 +133,9 @@ public class Core : Game
                steps < MaxPhysicsStepsPerFrame)
         {
             Time.UpdatePhysicsTime(FixedPhysicsStep);
+            _networking?.BeforeFixedStep(CurrentScene);
             CurrentScene.PhysicsTick();
+            _networking?.AfterFixedStep(CurrentScene);
             _accumulatedPhysicsTime -= FixedPhysicsStep;
             steps++;
         }
@@ -147,8 +158,16 @@ public class Core : Game
 
         NextScene = null;
 
+        TryCleanup(
+            cleanupErrors,
+            () => _networking?.StopIntake());
+
         if (currentScene is not null)
         {
+            TryCleanup(
+                cleanupErrors,
+                () => _networking?.BeforeSceneUnload(currentScene));
+
             TryCleanup(
                 cleanupErrors,
                 currentScene.Terminate);
@@ -165,6 +184,15 @@ public class Core : Game
         }
 
         CurrentScene = null;
+
+        var networking = _networking;
+        _networking = null;
+        if (networking is not null)
+        {
+            TryCleanup(
+                cleanupErrors,
+                networking.Dispose);
+        }
 
         TryCleanup(
             cleanupErrors,
@@ -221,12 +249,23 @@ public class Core : Game
         {
             TryCleanup(
                 cleanupErrors,
+                () => _networking?.BeforeSceneUnload(outgoingScene));
+
+            TryCleanup(
+                cleanupErrors,
                 outgoingScene.Terminate);
         }
 
         // Drop the old scene reference even if its custom cleanup reported errors.
         CurrentScene =
             incomingScene;
+
+        if (incomingScene is not null)
+        {
+            TryCleanup(
+                cleanupErrors,
+                () => _networking?.AfterSceneAssigned(incomingScene));
+        }
 
         _accumulatedPhysicsTime =
             0f;

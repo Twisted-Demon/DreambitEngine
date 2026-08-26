@@ -26,6 +26,9 @@ internal sealed class BlobContentReader
         if (manifest.SchemaVersion != BlobContentManifest.CurrentSchemaVersion)
             throw new NotSupportedException(
                 $"Dreambit blob manifest schema {manifest.SchemaVersion} is not supported.");
+        Fingerprint = string.IsNullOrWhiteSpace(manifest.Fingerprint)
+            ? null
+            : manifest.Fingerprint;
 
         foreach (var entry in manifest.Assets)
         {
@@ -39,6 +42,8 @@ internal sealed class BlobContentReader
                     $"The Dreambit blob manifest contains duplicate path '{entry.Path}'.");
         }
     }
+
+    public string? Fingerprint { get; }
 
     public Stream Open(string logicalPath)
     {

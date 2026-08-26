@@ -236,6 +236,7 @@ public class Scene : IDisposable
 
     private bool _hasBegun;
     private bool _hasEnded;
+    private Func<Scene, bool>? _startPreparationGate;
 
     private readonly CoroutineScheduler _coroutineScheduler;
 
@@ -586,12 +587,13 @@ public class Scene : IDisposable
                 OnInitialize();
                 Services.ActivateAll();
                 Transition(SceneState.Starting);
-                _hasBegun = true;
-                OnBegin();
-                Transition(SceneState.Running);
+                TryCompleteStart();
                 break;
 
             case SceneState.Starting:
+                TryCompleteStart();
+                break;
+
             case SceneState.Initializing:
                 // Transitional states do not execute per-frame logic.
                 break;
@@ -610,6 +612,24 @@ public class Scene : IDisposable
             default:
                 throw new ArgumentOutOfRangeException();
         }
+    }
+
+    internal void SetStartPreparationGate(Func<Scene, bool>? gate)
+    {
+        _startPreparationGate = gate;
+    }
+
+    private void TryCompleteStart()
+    {
+        if (_hasBegun)
+            return;
+        if (_startPreparationGate is not null && !_startPreparationGate(this))
+            return;
+
+        _startPreparationGate = null;
+        _hasBegun = true;
+        OnBegin();
+        Transition(SceneState.Running);
     }
 
     /// <summary>
@@ -907,6 +927,35 @@ public class Scene : IDisposable
             scale);
     }
 
+    /// <summary>
+    /// Materializes boxed Blueprint instances before using the ordinary runtime spawn path.
+    /// This narrow seam is used by remote network spawns, whose source must behave like a
+    /// Blueprint embedded in a Scene while still receiving fresh runtime Entity IDs.
+    /// </summary>
+    internal Entity CreateNetworkEntity(
+        EntityBlueprint blueprint,
+        bool? enabled = null,
+        Vector3? createAt = null,
+        Vector3? eulerRotation = null,
+        Vector3? scale = null)
+    {
+        ArgumentNullException.ThrowIfNull(blueprint);
+        var materialized = BlueprintInstanceMaterializer.Materialize(
+            [blueprint],
+            ResolveBlueprintInstance);
+        if (materialized.Count != 1)
+            throw new InvalidOperationException("A network Blueprint must materialize exactly one root Entity.");
+
+        ValidateNetworkBlueprintShape(materialized[0]);
+        return SpawnBlueprint(
+            materialized[0],
+            null,
+            enabled,
+            createAt,
+            eulerRotation,
+            scale);
+    }
+
     public Entity CreateChildOfEntity(
         EntityBlueprint blueprint,
         Entity parent,
@@ -961,6 +1010,30 @@ public class Scene : IDisposable
             RollbackBlueprintSpawn(context);
             throw;
         }
+    }
+
+    private static void ValidateNetworkBlueprintShape(EntityBlueprint root)
+    {
+        var rootMarkers = CountNetworkObjectComponents(root);
+        if (rootMarkers != 1)
+            throw new InvalidOperationException(
+                "A network Blueprint root must contain exactly one NetworkObject component.");
+
+        foreach (var child in root.Children.SelectMany(child => child.FlattenedHierarchy()))
+            if (CountNetworkObjectComponents(child) != 0)
+                throw new InvalidOperationException(
+                    "A network Blueprint cannot contain nested NetworkObject components; " +
+                    "spawn each network root independently.");
+    }
+
+    private static int CountNetworkObjectComponents(EntityBlueprint blueprint)
+    {
+        var count = 0;
+        foreach (var component in blueprint.Components)
+            if (BlueprintResolver.ResolveComponentType(component.Type) ==
+                typeof(Networking.NetworkObject))
+                count++;
+        return count;
     }
 
     private Entity CreateBlueprintHierarchy(

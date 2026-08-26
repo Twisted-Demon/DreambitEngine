@@ -54,6 +54,41 @@ public class Resources : Singleton<Resources>
     public static string PakName { get; set; } = "content.pak";
     public static IAssetRegistry AssetRegistry { get; set; }
 
+    /// <summary>
+    /// Fingerprint emitted by the active baked-content source, or null for loose/legacy content.
+    /// </summary>
+    public static string? ContentFingerprint
+    {
+        get
+        {
+            if (_contentMode == AssetContentMode.LooseFiles)
+                return null;
+            var contentDirectory = ContentDirectory;
+            var pakPath = Path.GetFullPath(Path.Combine(contentDirectory, PakName));
+            if (_contentMode is AssetContentMode.Pak ||
+                (_contentMode == AssetContentMode.Auto && File.Exists(pakPath)))
+            {
+                var fingerprintPath = pakPath + ".fingerprint";
+                return File.Exists(fingerprintPath)
+                    ? NormalizeFingerprint(File.ReadAllText(fingerprintPath))
+                    : null;
+            }
+
+            var manifestPath = Path.Combine(contentDirectory, BlobContentManifest.FileName);
+            if (_contentMode == AssetContentMode.Blobs || File.Exists(manifestPath))
+            {
+                var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(contentDirectory));
+                if (!Instance._blobReaders.TryGetValue(root, out var reader))
+                {
+                    reader = new BlobContentReader(root);
+                    Instance._blobReaders.Add(root, reader);
+                }
+                return reader.Fingerprint;
+            }
+            return null;
+        }
+    }
+
     public DreambitContentCollection ContentCollection { get; } = new();
 
     /// <summary>The directory currently used for PAK and loose content loading.</summary>
@@ -426,6 +461,12 @@ public class Resources : Singleton<Resources>
         }
 
         return reader.Open(assetName);
+    }
+
+    private static string? NormalizeFingerprint(string value)
+    {
+        var normalized = value.Trim();
+        return normalized.Length == 0 ? null : normalized;
     }
 
     internal void CleanUp()
