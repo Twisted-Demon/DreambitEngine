@@ -1,6 +1,7 @@
 using Dreambit;
 using Dreambit.Editor.Assets;
 using Dreambit.Editor.Projects;
+using DreambitEngine.AssetBaker.Abstractions;
 using DreambitEngine.AssetBaker.Pipeline;
 using DreambitEngine.AssetBaker.Pipeline.Textures;
 using Newtonsoft.Json.Linq;
@@ -392,6 +393,127 @@ public sealed class AssetBakePipelineTests : IDisposable
         Assert.Equal("pixel.texb", blob.LogicalPath);
         Assert.Equal(3u, BitConverter.ToUInt32(blob.Data, 12));
         Assert.Equal(new byte[] { 147, 72, 34, 128 }, blob.Data[20..24]);
+    }
+
+    [Fact]
+    public void NormalMapBakeIsLinearUnpremultipliedAndRenormalizesEveryMip()
+    {
+        var assets = Path.Combine(_root, "NormalMapAssets");
+        Directory.CreateDirectory(assets);
+        var source = Path.Combine(assets, "surface.png");
+        using (var image = new Image<Rgba32>(2, 1))
+        {
+            image[0, 0] = new Rgba32(255, 128, 128, 64);
+            image[1, 0] = new Rgba32(128, 255, 128, 192);
+            image.SaveAsPng(source);
+        }
+
+        var blob = new TextureBaker().BakeToBytes(new BakeContext
+        {
+            InputPath = source,
+            OutputPath = string.Empty,
+            LogicalRoot = assets,
+            GenerateMips = true,
+            PremultiplyAlpha = true,
+            MarkSRgb = true,
+            ImportSettings = NormalMapImportSettings()
+        });
+
+        Assert.Equal((uint)TexbFlags.NormalMap, BitConverter.ToUInt32(blob.Data, 12));
+        Assert.Equal(2, BitConverter.ToUInt16(blob.Data, 10));
+        Assert.Equal((byte)64, blob.Data[23]);
+        Assert.Equal((byte)192, blob.Data[27]);
+
+        var offset = 16;
+        for (var mip = 0; mip < 2; mip++)
+        {
+            var byteCount = BitConverter.ToInt32(blob.Data, offset);
+            offset += sizeof(uint);
+            for (var pixel = 0; pixel < byteCount; pixel += 4)
+            {
+                var normalX = blob.Data[offset + pixel] / 255f * 2f - 1f;
+                var normalY = blob.Data[offset + pixel + 1] / 255f * 2f - 1f;
+                var normalZ = blob.Data[offset + pixel + 2] / 255f * 2f - 1f;
+                var length = MathF.Sqrt(
+                    normalX * normalX + normalY * normalY + normalZ * normalZ);
+                Assert.InRange(length, 0.99f, 1.01f);
+            }
+            offset += byteCount;
+        }
+    }
+
+    [Fact]
+    public void ChangingOnlyOneTextureSemanticRebakesOnlyThatTexture()
+    {
+        var assets = Path.Combine(_root, "SemanticCacheAssets");
+        var cache = Path.Combine(_root, "SemanticCache");
+        var output = Path.Combine(_root, "SemanticCacheOutput", "content.pak");
+        var registry = Path.Combine(_root, ".dreambit", "semantic-assets.json");
+        Directory.CreateDirectory(assets);
+        Directory.CreateDirectory(Path.GetDirectoryName(registry)!);
+        WritePng(Path.Combine(assets, "first.png"), new Rgba32(255, 128, 128, 128));
+        WritePng(Path.Combine(assets, "second.png"), new Rgba32(200, 100, 50, 128));
+        var firstId = Guid.NewGuid();
+        var secondId = Guid.NewGuid();
+        WriteTextureRegistry(registry, firstId, secondId, normalMapFirst: false);
+
+        var pipeline = new AssetBakePipeline();
+        var request = new AssetBakeRequest(assets, output, registry, cache);
+        var first = pipeline.BakePak(request);
+        var cached = pipeline.BakePak(request);
+        WriteTextureRegistry(registry, firstId, secondId, normalMapFirst: true);
+        var changed = pipeline.BakePak(request);
+
+        Assert.Equal(2, first.BakedCount);
+        Assert.Equal(2, cached.CacheHitCount);
+        Assert.Equal(1, changed.BakedCount);
+        Assert.Equal(1, changed.CacheHitCount);
+        using var pak = new PakReader(output);
+        using var firstTexture = pak.Open("first.texb");
+        using var secondTexture = pak.Open("second.texb");
+        Assert.Equal(TexbFlags.NormalMap, ReadTexbFlags(firstTexture));
+        Assert.Equal(TexbFlags.Premultiplied | TexbFlags.Srgb, ReadTexbFlags(secondTexture));
+    }
+
+    private static AssetImportSettings NormalMapImportSettings() => new()
+    {
+        Texture = new TextureImportSettings { Semantic = TextureSemantic.NormalMap }
+    };
+
+    private static void WritePng(string path, Rgba32 pixel)
+    {
+        using var image = new Image<Rgba32>(1, 1);
+        image[0, 0] = pixel;
+        image.SaveAsPng(path);
+    }
+
+    private static void WriteTextureRegistry(
+        string path,
+        Guid firstId,
+        Guid secondId,
+        bool normalMapFirst)
+    {
+        var importSettings = normalMapFirst
+            ? "\"importSettings\": { \"texture\": { \"semantic\": \"NormalMap\" } },"
+            : string.Empty;
+        File.WriteAllText(
+            path,
+            $$"""
+              {
+                "schemaVersion": 2,
+                "assets": [
+                  { "id": "{{firstId:D}}", "path": "first.png", "kind": "Texture", {{importSettings}} "length": 0 },
+                  { "id": "{{secondId:D}}", "path": "second.png", "kind": "Texture", "length": 0 }
+                ]
+              }
+              """);
+    }
+
+    private static TexbFlags ReadTexbFlags(Stream stream)
+    {
+        Span<byte> header = stackalloc byte[16];
+        stream.ReadExactly(header);
+        return (TexbFlags)BitConverter.ToUInt32(header[12..16]);
     }
 
     [Fact]

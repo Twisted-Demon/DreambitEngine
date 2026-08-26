@@ -1,4 +1,5 @@
 ﻿using DreambitEngine.AssetBaker.Abstractions;
+using Dreambit;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
@@ -17,12 +18,18 @@ public abstract class TextureBakerBase : AssetBakerBase
 {
     protected const ushort TexbVersion = 1;
 
-    protected const uint FlagPremultiplied = 1u << 0;
-    protected const uint FlagSrgb = 1u << 1;
-
     public override string AssetTypeName => "texture";
 
     public override string OutputExtension => ".texb";
+
+    public override string GetCacheSignature(BakeContext ctx)
+    {
+        ArgumentNullException.ThrowIfNull(ctx);
+        var options = TextureBakeProfiles.Resolve(ctx).Resolve(ctx);
+        return $"texture-v3;semantic={options.Semantic};mips={options.GenerateMips};" +
+               $"premul={options.PremultiplyAlpha};max={options.MaxDimension?.ToString() ?? "none"};" +
+               $"srgb={options.MarkSrgb};platform={ctx.TargetPlatform}";
+    }
 
     public override void Bake(BakeContext ctx)
     {
@@ -72,7 +79,6 @@ public abstract class TextureBakerBase : AssetBakerBase
     {
         ValidateInputExtension(ctx);
         ValidateBakeContext(ctx);
-
         using var image = BuildSourceImage(ctx);
 
         ValidateSourceImage(image, ctx);
@@ -122,20 +128,26 @@ public abstract class TextureBakerBase : AssetBakerBase
         Image<Rgba32> image,
         BakeContext ctx)
     {
+        var profile = TextureBakeProfiles.Resolve(ctx);
+        var options = profile.Resolve(ctx);
         ResizeIfNeeded(image, ctx);
 
         ValidateTexbDimensions(
             image,
             ctx.InputPath);
 
-        if (ctx.PremultiplyAlpha)
-            PremultiplyAlpha(image, ctx.MarkSRgb);
+        profile.ProcessPixels(image);
+
+        if (options.PremultiplyAlpha)
+            PremultiplyAlpha(image, options.MarkSrgb);
     }
 
     protected virtual List<(int w, int h, byte[] data)> BuildMipChain(
         Image<Rgba32> image,
         BakeContext ctx)
     {
+        var profile = TextureBakeProfiles.Resolve(ctx);
+        var options = profile.Resolve(ctx);
         var mips = new List<(int w, int h, byte[] data)>
         {
             (
@@ -145,7 +157,7 @@ public abstract class TextureBakerBase : AssetBakerBase
             )
         };
 
-        if (!ctx.GenerateMips)
+        if (!options.GenerateMips)
             return mips;
 
         var width = image.Width;
@@ -165,8 +177,10 @@ public abstract class TextureBakerBase : AssetBakerBase
                     Size = new Size(width, height),
                     Sampler = KnownResamplers.Box,
                     Mode = ResizeMode.Stretch,
-                    Compand = ctx.MarkSRgb
+                    Compand = options.MarkSrgb
                 }));
+
+            profile.ProcessPixels(mip);
 
             mips.Add((
                 width,
@@ -179,15 +193,17 @@ public abstract class TextureBakerBase : AssetBakerBase
 
     protected virtual uint BuildFlags(BakeContext ctx)
     {
-        uint flags = 0;
+        var profile = TextureBakeProfiles.Resolve(ctx);
+        var options = profile.Resolve(ctx);
+        var flags = profile.AdditionalFlags;
 
-        if (ctx.PremultiplyAlpha)
-            flags |= FlagPremultiplied;
+        if (options.PremultiplyAlpha)
+            flags |= TexbFlags.Premultiplied;
 
-        if (ctx.MarkSRgb)
-            flags |= FlagSrgb;
+        if (options.MarkSrgb)
+            flags |= TexbFlags.Srgb;
 
-        return flags;
+        return (uint)flags;
     }
 
     protected void ValidateInputExtension(BakeContext ctx)
@@ -213,7 +229,8 @@ public abstract class TextureBakerBase : AssetBakerBase
         Image<Rgba32> image,
         BakeContext ctx)
     {
-        if (ctx.MaxDimension is not { } limit)
+        var options = TextureBakeProfiles.Resolve(ctx).Resolve(ctx);
+        if (options.MaxDimension is not { } limit)
             return;
 
         if (limit <= 0)
@@ -248,7 +265,7 @@ public abstract class TextureBakerBase : AssetBakerBase
                 Size = new Size(width, height),
                 Sampler = KnownResamplers.Lanczos3,
                 Mode = ResizeMode.Stretch,
-                Compand = ctx.MarkSRgb
+                Compand = options.MarkSrgb
             }));
     }
 

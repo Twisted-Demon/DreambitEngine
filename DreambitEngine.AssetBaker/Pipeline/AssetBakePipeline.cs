@@ -192,10 +192,10 @@ public sealed class AssetBakePipeline
 
         var cache = IncrementalBakeCache.Load(request.CacheDirectory, request.RebuildAll);
         var bakerRegistry = AssetBakerRegistry.CreateDefault();
+        var sourceRegistry = SourceAssetRegistryCatalog.Load(request.AssetRegistryPath);
         var bakedCount = 0;
         var cacheHitCount = 0;
         var unsupportedCount = 0;
-        var optionSignature = CreateOptionSignature(request);
         var liveCacheKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var builtInEffectPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var finalBlobs = new Dictionary<string, PreparedBlob>(StringComparer.OrdinalIgnoreCase);
@@ -250,11 +250,26 @@ public sealed class AssetBakePipeline
                 var sourceHash = ComputeHash(file);
                 var cacheKey = $"{bakeRoot.CachePrefix}/{relativePath}".ToLowerInvariant();
                 liveCacheKeys.Add(cacheKey);
+                var bakeContext = new BakeContext
+                {
+                    InputPath = file,
+                    OutputPath = string.Empty,
+                    GenerateMips = request.GenerateMips,
+                    PremultiplyAlpha = request.PremultiplyAlpha,
+                    MaxDimension = request.MaxDimension,
+                    MarkSRgb = request.MarkSrgb,
+                    TargetPlatform = request.TargetPlatform,
+                    LogicalRoot = bakeRoot.Path,
+                    ImportSettings = bakeRoot.IsBuiltIn
+                        ? null
+                        : sourceRegistry?.GetImportSettings(relativePath)
+                };
+                var cacheSignature = baker.GetCacheSignature(bakeContext);
                 PreparedBlob preparedBlob;
                 if (cache.TryRead(
                         cacheKey,
                         sourceHash,
-                        optionSignature,
+                        cacheSignature,
                         retainBlobData,
                         out preparedBlob))
                 {
@@ -271,18 +286,8 @@ public sealed class AssetBakePipeline
                         "Bake",
                         $"Baking {relativePath}",
                         relativePath));
-                    var blob = baker.BakeToBytes(new BakeContext
-                    {
-                        InputPath = file,
-                        OutputPath = string.Empty,
-                        GenerateMips = request.GenerateMips,
-                        PremultiplyAlpha = request.PremultiplyAlpha,
-                        MaxDimension = request.MaxDimension,
-                        MarkSRgb = request.MarkSrgb,
-                        TargetPlatform = request.TargetPlatform,
-                        LogicalRoot = bakeRoot.Path
-                    });
-                    var blobFile = cache.Write(cacheKey, sourceHash, optionSignature, blob);
+                    var blob = baker.BakeToBytes(bakeContext);
+                    var blobFile = cache.Write(cacheKey, sourceHash, cacheSignature, blob);
                     preparedBlob = PreparedBlob.FromBlob(
                         blob,
                         blobFile,
@@ -306,28 +311,28 @@ public sealed class AssetBakePipeline
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(request.AssetRegistryPath) &&
-            File.Exists(request.AssetRegistryPath))
+        if (sourceRegistry is not null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             const string registryCacheKey = "registry/runtime";
+            const string registryCacheSignature = "runtime-registry-v3";
             liveCacheKeys.Add(registryCacheKey);
-            var registryHash = ComputeHash(request.AssetRegistryPath);
+            var registryHash = sourceRegistry.SourceHash;
             PreparedBlob registryBlob;
             if (!cache.TryRead(
                     registryCacheKey,
                     registryHash,
-                    "runtime-registry-v2",
+                    registryCacheSignature,
                     retainBlobData,
                     out registryBlob))
             {
                 var bakedRegistryBlob = CreateRuntimeRegistryBlob(
-                    request.AssetRegistryPath,
+                    sourceRegistry,
                     bakerRegistry);
                 var registryBlobFile = cache.Write(
                     registryCacheKey,
                     registryHash,
-                    "runtime-registry-v1",
+                    registryCacheSignature,
                     bakedRegistryBlob);
                 registryBlob = PreparedBlob.FromBlob(
                     bakedRegistryBlob,
@@ -352,12 +357,9 @@ public sealed class AssetBakePipeline
     }
 
     private static AssetBlob CreateRuntimeRegistryBlob(
-        string registryPath,
+        SourceAssetRegistryCatalog source,
         AssetBakerRegistry bakerRegistry)
     {
-        using var stream = File.OpenRead(registryPath);
-        var source = JsonSerializer.Deserialize<SourceAssetRegistry>(stream, JsonOptions)
-                     ?? throw new InvalidDataException("The Dreambit asset registry is empty.");
         var seenIds = new HashSet<Guid>();
         var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var runtimeAssets = new List<RuntimeRegistryEntry>(source.Assets.Count);
@@ -396,11 +398,6 @@ public sealed class AssetBakePipeline
             ".jsonb",
             output.ToArray());
     }
-
-    private static string CreateOptionSignature(BakeParameters request) =>
-        $"v2;mips={request.GenerateMips};premul={request.PremultiplyAlpha};" +
-        $"max={request.MaxDimension?.ToString() ?? "none"};srgb={request.MarkSrgb};" +
-        $"platform={request.TargetPlatform}";
 
     private static string ComputeContentFingerprint(
         IReadOnlyDictionary<string, PreparedBlob> blobs,
@@ -608,17 +605,6 @@ public sealed class AssetBakePipeline
         int BakedCount,
         int CacheHitCount,
         int UnsupportedCount);
-
-    private sealed class SourceAssetRegistry
-    {
-        public List<SourceAssetRegistryEntry> Assets { get; set; } = [];
-    }
-
-    private sealed class SourceAssetRegistryEntry
-    {
-        public Guid Id { get; set; }
-        public string Path { get; set; } = string.Empty;
-    }
 
     private sealed record RuntimeAssetRegistryDocument(
         int SchemaVersion,
