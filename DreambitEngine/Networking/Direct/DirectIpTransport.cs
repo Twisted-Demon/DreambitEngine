@@ -192,7 +192,11 @@ public sealed class DirectIpTransport : INetworkTransport
                     throw new ArgumentOutOfRangeException(nameof(payload));
                 try
                 {
-                    directConnection.SendTcpFrame(TcpReliableData, payload, Capabilities.MaxReliablePayload);
+                    directConnection.SendReliableFrame(
+                        TcpReliableData,
+                        channel,
+                        payload,
+                        Capabilities.MaxReliablePayload);
                 }
                 catch (Exception exception) when (IsSocketFailure(exception))
                 {
@@ -348,7 +352,7 @@ public sealed class DirectIpTransport : INetworkTransport
                 if (!ReceiveExact(connection.Tcp, lengthBytes))
                     break;
                 var length = BinaryPrimitives.ReadInt32LittleEndian(lengthBytes);
-                var maximumFrame = Math.Max(Capabilities.MaxReliablePayload + 1, AssociationTokenLength + 1);
+                var maximumFrame = Math.Max(Capabilities.MaxReliablePayload + 2, AssociationTokenLength + 1);
                 if (length < 1 || length > maximumFrame)
                     throw new InvalidDataException($"TCP frame length {length} is outside 1..{maximumFrame}.");
 
@@ -399,14 +403,21 @@ public sealed class DirectIpTransport : INetworkTransport
                     ReadOnlyMemory<byte>.Empty));
                 break;
             case TcpReliableData:
-                if (payload.Length > Capabilities.MaxReliablePayload)
+                if (payload.Length < 1)
+                    throw new InvalidDataException("Reliable frame is missing its channel ID.");
+                var channel = payload[0];
+                var reliablePayload = payload[1..];
+                if (channel >= Capabilities.MaxChannels)
+                    throw new InvalidDataException(
+                        $"Reliable frame channel {channel} is outside 0..{Capabilities.MaxChannels - 1}.");
+                if (reliablePayload.Length > Capabilities.MaxReliablePayload)
                     throw new InvalidDataException("Reliable payload exceeds the configured bound.");
                 if (!TryQueueEvent(new TransportEvent(
                     TransportEventKind.Data,
                     connection.Id,
-                    payload.ToArray(),
+                    reliablePayload.ToArray(),
                     NetworkDelivery.ReliableOrdered,
-                    0)))
+                    channel)))
                     CloseConnection(
                         connection,
                         TransportDisconnectReason.TransportError,
@@ -763,6 +774,24 @@ public sealed class DirectIpTransport : INetworkTransport
             BinaryPrimitives.WriteInt32LittleEndian(frame, frameLength);
             frame[sizeof(int)] = kind;
             payload.CopyTo(frame.AsSpan(sizeof(int) + 1));
+            lock (_tcpSendLock)
+                SendAll(Tcp, frame);
+        }
+
+        public void SendReliableFrame(
+            byte kind,
+            byte channel,
+            ReadOnlySpan<byte> payload,
+            int maximumPayload)
+        {
+            if (payload.Length > maximumPayload)
+                throw new ArgumentOutOfRangeException(nameof(payload));
+            var frameLength = checked(payload.Length + 2);
+            var frame = new byte[sizeof(int) + frameLength];
+            BinaryPrimitives.WriteInt32LittleEndian(frame, frameLength);
+            frame[sizeof(int)] = kind;
+            frame[sizeof(int) + 1] = channel;
+            payload.CopyTo(frame.AsSpan(sizeof(int) + 2));
             lock (_tcpSendLock)
                 SendAll(Tcp, frame);
         }

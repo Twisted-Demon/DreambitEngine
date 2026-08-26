@@ -11,10 +11,12 @@ internal sealed class InMemoryTransport : INetworkTransport
     private TransportConnectionId _connection;
     private bool _disposed;
     private bool _connectionReported;
+    private int _eventsPolledInWindow;
 
     public TransportCapabilities Capabilities { get; } = new(64 * 1024, 1200, 4);
     public TransportState State { get; private set; } = TransportState.Stopped;
     public bool DropNextUnreliableSend { get; set; }
+    public int? MaxEventsPerPollWindow { get; set; }
     internal TransportConnectionId Connection => _connection;
 
     public static (InMemoryTransport Server, InMemoryTransport Client) CreatePair()
@@ -43,8 +45,22 @@ internal sealed class InMemoryTransport : INetworkTransport
         TryReportConnection();
     }
 
-    public bool TryPollEvent(out TransportEvent transportEvent) =>
-        _events.TryDequeue(out transportEvent);
+    public bool TryPollEvent(out TransportEvent transportEvent)
+    {
+        if (MaxEventsPerPollWindow is { } maximum && _eventsPolledInWindow >= maximum)
+        {
+            _eventsPolledInWindow = 0;
+            transportEvent = default;
+            return false;
+        }
+        if (_events.TryDequeue(out transportEvent))
+        {
+            _eventsPolledInWindow++;
+            return true;
+        }
+        _eventsPolledInWindow = 0;
+        return false;
+    }
 
     public void Send(
         TransportConnectionId connection,

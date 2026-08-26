@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using Dreambit.ECS;
 using Dreambit.Networking.Messaging;
 using Dreambit.Networking.Protocol;
@@ -29,6 +30,7 @@ internal sealed class NetworkSession : IDisposable
     private string? _pendingSceneKey;
     private NetworkSceneEpoch _pendingSceneEpoch;
     private readonly Dictionary<ReplicationStateKey, uint> _lastStateSequences = [];
+    private readonly Dictionary<NetworkEntityId, PendingLiveSpawn> _pendingLiveSpawns = [];
     private double _snapshotElapsed;
     private uint _stateSequence;
     private ClientBaselineState? _clientBaseline;
@@ -56,7 +58,9 @@ internal sealed class NetworkSession : IDisposable
             throw new ArgumentException(
                 "Dreambit networking requires at least four transport channels.",
                 nameof(transport));
+        _replication.ValidateForTransport(Transport.Capabilities, _options.MaxProtocolPayload);
         SessionId = IsServer ? Guid.NewGuid() : Guid.Empty;
+        ValidateControlPacketsForTransport();
     }
 
     public event Action<NetworkPeerId>? PeerConnected;
@@ -210,6 +214,7 @@ internal sealed class NetworkSession : IDisposable
             World.Dispose(false);
             World = null;
             _lastStateSequences.Clear();
+            _pendingLiveSpawns.Clear();
             _clientBaseline = null;
             _clientSceneLoadedSent = false;
             _clientSceneReady = false;
@@ -230,7 +235,12 @@ internal sealed class NetworkSession : IDisposable
         _pendingSceneEpoch = NetworkSceneEpoch.None;
         _pendingSceneKey = null;
         StructuralRevision = NetworkStructuralRevision.None;
-        World = new NetworkWorld(scene, SceneEpoch, IsServer, _replication);
+        World = new NetworkWorld(
+            scene,
+            SceneEpoch,
+            IsServer,
+            _replication,
+            _options.MaxNetworkEntities);
         World.EntityRemoved += HandleWorldEntityRemoved;
         scene.SetStartPreparationGate(
             IsServer || synchronizedClientAssignment
@@ -285,25 +295,99 @@ internal sealed class NetworkSession : IDisposable
         if (blueprint.AssetId.IsEmpty)
             throw new InvalidOperationException(
                 "A remotely replicated Blueprint must have a stable AssetId.");
+        if (blueprint.AssetName is not null && Encoding.UTF8.GetByteCount(blueprint.AssetName) > 1024)
+            throw new InvalidOperationException(
+                "A remotely replicated Blueprint fallback name cannot exceed 1024 UTF-8 bytes.");
 
         options ??= new NetworkSpawnOptions();
-        var entity = World.Scene.CreateNetworkEntity(
-            blueprint,
-            options.Enabled,
-            options.Position,
-            options.Rotation,
-            options.Scale);
-        var networkId = AllocateEntityId();
-        World.RegisterDynamicEntity(
-            entity,
-            networkId,
-            options.Owner,
-            blueprint.AssetId,
-            blueprint.AssetName,
-            options.DestroyWithOwner);
-        var revision = AdvanceStructuralRevision();
-        BroadcastSpawn(entity, networkId, blueprint, options, revision);
-        BroadcastEntityStateReliable(networkId);
+        Entity? entity = null;
+        var networkId = NetworkEntityId.None;
+        var registered = false;
+        byte[] spawnPacket;
+        List<byte[]> initialStatePackets;
+        byte[] readyPacket;
+        NetworkStructuralRevision revision;
+        try
+        {
+            entity = World.Scene.CreateNetworkEntity(
+                blueprint,
+                options.Enabled,
+                options.Position,
+                options.Rotation,
+                options.Scale);
+            networkId = AllocateEntityId();
+            World.RegisterDynamicEntity(
+                entity,
+                networkId,
+                options.Owner,
+                blueprint.AssetId,
+                blueprint.AssetName,
+                options.DestroyWithOwner);
+            registered = true;
+
+            var record = World.Records.First(candidate => candidate.Id == networkId);
+            revision = NextStructuralRevision(StructuralRevision);
+            spawnPacket = EncodePacket(
+                NetworkProtocolMessage.Spawn,
+                writer => WriteSpawn(writer, entity, networkId, blueprint, options),
+                SceneEpoch,
+                ServerTick,
+                revision);
+            EnsurePacketFitsReliableTransport(spawnPacket, "Spawn");
+
+            initialStatePackets = new List<byte[]>(record.ReplicationBindings.Count);
+            var sequence = NextStateSequence();
+            foreach (var binding in record.ReplicationBindings)
+                initialStatePackets.Add(EncodeStateRecord(networkId, binding, sequence, revision));
+            readyPacket = EncodePacket(
+                NetworkProtocolMessage.SpawnReady,
+                writer => writer.WriteUInt64(networkId.Value),
+                SceneEpoch,
+                ServerTick,
+                revision);
+            EnsurePacketFitsReliableTransport(readyPacket, "SpawnReady");
+        }
+        catch (Exception exception)
+        {
+            var cleanupErrors = new List<Exception>();
+            if (registered && networkId.IsValid)
+                try
+                {
+                    World.Unregister(networkId, false);
+                }
+                catch (Exception cleanupException)
+                {
+                    cleanupErrors.Add(cleanupException);
+                }
+            if (entity is not null)
+                try
+                {
+                    World.Scene.DestroyEntityHierarchyImmediately(entity);
+                }
+                catch (Exception cleanupException)
+                {
+                    cleanupErrors.Add(cleanupException);
+                }
+            if (cleanupErrors.Count != 0)
+            {
+                cleanupErrors.Insert(0, exception);
+                throw new AggregateException(
+                    "Network spawn failed and one or more rollback operations also failed.",
+                    cleanupErrors);
+            }
+            throw;
+        }
+
+        StructuralRevision = revision;
+        foreach (var peer in _peersById.Values)
+        {
+            if (peer.IsLocal || !ReceivesLiveStructure(peer))
+                continue;
+            Transport.Send(peer.Connection, spawnPacket, NetworkDelivery.ReliableOrdered, 0);
+            foreach (var statePacket in initialStatePackets)
+                Transport.Send(peer.Connection, statePacket, NetworkDelivery.ReliableOrdered, 0);
+            Transport.Send(peer.Connection, readyPacket, NetworkDelivery.ReliableOrdered, 0);
+        }
         return entity;
     }
 
@@ -312,6 +396,10 @@ internal sealed class NetworkSession : IDisposable
         if (!IsServer)
             throw new InvalidOperationException("Only the server controls synchronized Scene changes.");
         ArgumentException.ThrowIfNullOrWhiteSpace(sceneKey);
+        if (Encoding.UTF8.GetByteCount(sceneKey) > 256)
+            throw new ArgumentException(
+                "A synchronized Scene key cannot exceed 256 UTF-8 bytes.",
+                nameof(sceneKey));
         if (_pendingSceneEpoch.IsValid)
             throw new InvalidOperationException("A synchronized Scene change is already pending.");
 
@@ -378,7 +466,9 @@ internal sealed class NetworkSession : IDisposable
             revision);
     }
 
-    internal void SendToServer<T>(T message, NetworkDelivery delivery)
+    internal void SendToServer<T>(
+        T message,
+        NetworkDelivery delivery = NetworkDelivery.ReliableOrdered)
     {
         if (!IsClient || !LocalPeerId.IsValid)
             throw new InvalidOperationException("An active client or host is required to send to the server.");
@@ -413,7 +503,10 @@ internal sealed class NetworkSession : IDisposable
             delivery == NetworkDelivery.ReliableOrdered ? (byte)1 : (byte)3);
     }
 
-    internal void Send<T>(NetworkPeerId peerId, T message, NetworkDelivery delivery)
+    internal void Send<T>(
+        NetworkPeerId peerId,
+        T message,
+        NetworkDelivery delivery = NetworkDelivery.ReliableOrdered)
     {
         if (!IsServer)
             throw new InvalidOperationException("Only the server can send directly to a peer.");
@@ -457,6 +550,7 @@ internal sealed class NetworkSession : IDisposable
         _transportEvents.Clear();
         _peersByConnection.Clear();
         _peersById.Clear();
+        _pendingLiveSpawns.Clear();
         if (World is not null)
         {
             World.Scene.SetStartPreparationGate(null);
@@ -535,6 +629,13 @@ internal sealed class NetworkSession : IDisposable
                 if (IsStaleScenePacket(packet.Header))
                     return;
                 HandleSpawn(packet);
+                break;
+            case NetworkProtocolMessage.SpawnReady:
+                RequireDelivery(transportEvent, NetworkDelivery.ReliableOrdered, 0);
+                ValidateReadyPacket(peer, packet.Header);
+                if (IsStaleScenePacket(packet.Header))
+                    return;
+                HandleSpawnReady(packet);
                 break;
             case NetworkProtocolMessage.Despawn:
                 RequireDelivery(transportEvent, NetworkDelivery.ReliableOrdered, 0);
@@ -776,7 +877,17 @@ internal sealed class NetworkSession : IDisposable
             World.BindServerAuthoredEntities(AllocateEntityId);
 
         peer.Phase = NetworkConnectionPhase.Synchronizing;
-        SendBaseline(peer);
+        try
+        {
+            SendBaseline(peer);
+        }
+        catch (NetworkSynchronizationException exception)
+        {
+            peer.RemoteDiagnostic = exception.Message;
+            peer.Phase = NetworkConnectionPhase.Rejected;
+            SendReject(peer.Connection, exception.Message);
+            Transport.Disconnect(peer.Connection, TransportDisconnectReason.Incompatible);
+        }
     }
 
     private void SendBaseline(NetworkPeer peer)
@@ -793,12 +904,18 @@ internal sealed class NetworkSession : IDisposable
         var players = World.PlayerEntities.ToArray();
         var componentCount = World.Records.Sum(record => record.ReplicationBindings.Count);
         if (authored.Length + dynamic.Length > _options.MaxNetworkEntities ||
+            players.Length > _options.MaxNetworkEntities ||
             componentCount > _options.MaxBaselineComponentRecords)
-            throw new InvalidOperationException(
-                "The current NetworkWorld exceeds configured baseline entity/component limits.");
+            throw new NetworkSynchronizationException(
+                $"Peer {peer.PeerId} cannot be synchronized because the current NetworkWorld baseline " +
+                $"contains {authored.Length + dynamic.Length} Entities, {players.Length} player mappings, " +
+                $"and {componentCount} Component states; configured limits are " +
+                $"{_options.MaxNetworkEntities}, {_options.MaxNetworkEntities}, and " +
+                $"{_options.MaxBaselineComponentRecords} respectively.");
 
-        SendBaselineRecord(
-            peer,
+        var packets = new List<byte[]>(
+            checked(2 + authored.Length + dynamic.Length + players.Length + componentCount));
+        AddBaselinePacket(
             NetworkBaselineRecordKind.Begin,
             writer =>
             {
@@ -807,12 +924,10 @@ internal sealed class NetworkSession : IDisposable
                 writer.WriteInt32(players.Length);
                 writer.WriteInt32(componentCount);
             },
-            revision,
-            tick);
+            "baseline Begin");
 
         foreach (var binding in authored)
-            SendBaselineRecord(
-                peer,
+            AddBaselinePacket(
                 NetworkBaselineRecordKind.AuthoredEntity,
                 writer =>
                 {
@@ -820,40 +935,29 @@ internal sealed class NetworkSession : IDisposable
                     writer.WriteUInt64(binding.NetworkEntityId.Value);
                     writer.WriteUInt32(binding.Owner.Value);
                 },
-                revision,
-                tick);
+                $"authored Entity {binding.NetworkEntityId}");
 
         foreach (var record in dynamic)
-            SendBaselineRecord(
-                peer,
+            AddBaselinePacket(
                 NetworkBaselineRecordKind.DynamicEntity,
                 writer => WriteDynamicBaselineRecord(writer, record),
-                revision,
-                tick);
+                $"dynamic Entity {record.Id}");
 
         foreach (var player in players)
-            SendBaselineRecord(
-                peer,
+            AddBaselinePacket(
                 NetworkBaselineRecordKind.PlayerEntity,
                 writer =>
                 {
                     writer.WriteUInt32(player.Key.Value);
                     writer.WriteUInt64(player.Value.Value);
                 },
-                revision,
-                tick);
+                $"player mapping {player.Key}");
 
         foreach (var record in World.Records)
             foreach (var binding in record.ReplicationBindings)
             {
                 var payload = binding.Capture();
-                if (NetworkProtocol.HeaderLength + 1 + 8 + 2 + 4 + payload.Length >
-                    Transport.Capabilities.MaxReliablePayload)
-                    throw new InvalidOperationException(
-                        $"Baseline Component {binding.Descriptor.Id} on Entity {record.Id} exceeds " +
-                        "the reliable transport packet limit.");
-                SendBaselineRecord(
-                    peer,
+                AddBaselinePacket(
                     NetworkBaselineRecordKind.ComponentState,
                     writer =>
                     {
@@ -861,31 +965,37 @@ internal sealed class NetworkSession : IDisposable
                         writer.WriteUInt16(binding.Descriptor.Id);
                         writer.WriteLengthPrefixedBytes(payload, binding.Descriptor.MaximumPayload);
                     },
-                    revision,
-                    tick);
+                    $"Component {binding.Descriptor.Id} state on Entity {record.Id}");
             }
 
-        SendBaselineRecord(peer, NetworkBaselineRecordKind.End, null, revision, tick);
-    }
+        AddBaselinePacket(NetworkBaselineRecordKind.End, null, "baseline End");
+        foreach (var packet in packets)
+            Transport.Send(peer.Connection, packet, NetworkDelivery.ReliableOrdered, 0);
 
-    private void SendBaselineRecord(
-        NetworkPeer peer,
-        NetworkBaselineRecordKind kind,
-        Action<NetworkWriter>? payload,
-        NetworkStructuralRevision revision,
-        ulong tick)
-    {
-        SendPacket(
-            peer.Connection,
-            NetworkProtocolMessage.Baseline,
-            writer =>
+        void AddBaselinePacket(
+            NetworkBaselineRecordKind kind,
+            Action<NetworkWriter>? writePayload,
+            string label)
+        {
+            var packet = EncodePacket(
+                NetworkProtocolMessage.Baseline,
+                writer =>
+                {
+                    writer.WriteByte((byte)kind);
+                    writePayload?.Invoke(writer);
+                },
+                SceneEpoch,
+                tick,
+                revision);
+            if (packet.Length > Transport.Capabilities.MaxReliablePayload)
             {
-                writer.WriteByte((byte)kind);
-                payload?.Invoke(writer);
-            },
-            SceneEpoch,
-            tick,
-            revision);
+                throw new NetworkSynchronizationException(
+                    $"Peer {peer.PeerId} cannot be synchronized because {label} requires a " +
+                    $"{packet.Length}-byte reliable packet, exceeding the active transport limit " +
+                    $"of {Transport.Capabilities.MaxReliablePayload} bytes.");
+            }
+            packets.Add(packet);
+        }
     }
 
     private static void WriteDynamicBaselineRecord(
@@ -1052,20 +1162,56 @@ internal sealed class NetworkSession : IDisposable
                             typeof(EntityBlueprint)) as EntityBlueprint
                         ?? throw new InvalidOperationException(
                             $"Blueprint '{spawn.BlueprintAssetName}' ({spawn.BlueprintAssetId}) could not be loaded.");
-        var entity = World.Scene.CreateNetworkEntity(
-            blueprint,
-            spawn.Enabled,
-            spawn.Position,
-            null,
-            spawn.Scale);
-        entity.Transform.Rotation = spawn.Rotation;
-        World.RegisterDynamicEntity(
-            entity,
-            spawn.EntityId,
-            spawn.Owner,
-            spawn.BlueprintAssetId,
-            spawn.BlueprintAssetName,
-            spawn.DestroyWithOwner);
+        Entity? entity = null;
+        var registered = false;
+        try
+        {
+            entity = World.Scene.CreateNetworkEntity(
+                blueprint,
+                spawn.Enabled,
+                spawn.Position,
+                null,
+                spawn.Scale);
+            entity.Transform.Rotation = spawn.Rotation;
+            World.RegisterDynamicEntity(
+                entity,
+                spawn.EntityId,
+                spawn.Owner,
+                spawn.BlueprintAssetId,
+                spawn.BlueprintAssetName,
+                spawn.DestroyWithOwner);
+            registered = true;
+        }
+        catch (Exception exception)
+        {
+            var cleanupErrors = new List<Exception>();
+            if (registered)
+                try
+                {
+                    World.Unregister(spawn.EntityId, false);
+                }
+                catch (Exception cleanupException)
+                {
+                    cleanupErrors.Add(cleanupException);
+                }
+            if (entity is not null)
+                try
+                {
+                    World.Scene.DestroyEntityHierarchyImmediately(entity);
+                }
+                catch (Exception cleanupException)
+                {
+                    cleanupErrors.Add(cleanupException);
+                }
+            if (cleanupErrors.Count != 0)
+            {
+                cleanupErrors.Insert(0, exception);
+                throw new AggregateException(
+                    "Dynamic baseline materialization failed and rollback also reported errors.",
+                    cleanupErrors);
+            }
+            throw;
+        }
     }
 
     private static NetworkDynamicSpawnRecord ReadDynamicBaselineRecord(ref NetworkReader reader)
@@ -1189,6 +1335,7 @@ internal sealed class NetworkSession : IDisposable
             _clientBaseline = null;
             _clientSceneReady = false;
             _lastStateSequences.Clear();
+            _pendingLiveSpawns.Clear();
         }
     }
 
@@ -1215,6 +1362,14 @@ internal sealed class NetworkSession : IDisposable
 
     private void SendReject(TransportConnectionId connection, string diagnostic)
     {
+        var maximumDiagnosticBytes = Math.Min(
+            1024,
+            Math.Min(
+                _options.MaxProtocolPayload - sizeof(int),
+                Transport.Capabilities.MaxReliablePayload - NetworkProtocol.HeaderLength - sizeof(int)));
+        if (maximumDiagnosticBytes < 0)
+            throw new InvalidOperationException(
+                "The active transport cannot fit the minimum networking Reject packet.");
         var packet = NetworkProtocol.Encode(
             new NetworkPacketHeader(
                 NetworkProtocolMessage.Reject,
@@ -1222,9 +1377,47 @@ internal sealed class NetworkSession : IDisposable
                 NetworkSceneEpoch.None,
                 0,
                 NetworkStructuralRevision.None),
-            writer => writer.WriteString(diagnostic, 1024),
+            writer => writer.WriteString(
+                TruncateUtf8(diagnostic, maximumDiagnosticBytes),
+                maximumDiagnosticBytes),
             _options.MaxProtocolPayload);
         Transport.Send(connection, packet, NetworkDelivery.ReliableOrdered, 0);
+    }
+
+    private void ValidateControlPacketsForTransport()
+    {
+        if (Transport.Capabilities.MaxReliablePayload < NetworkProtocol.HeaderLength + sizeof(int))
+            throw new InvalidOperationException(
+                $"The active transport's reliable payload limit of " +
+                $"{Transport.Capabilities.MaxReliablePayload} bytes cannot fit the minimum Dreambit " +
+                $"network packet size of {NetworkProtocol.HeaderLength + sizeof(int)} bytes.");
+        if (Transport.Capabilities.MaxUnreliablePayload < NetworkProtocol.HeaderLength)
+            throw new InvalidOperationException(
+                $"The active transport's unreliable payload limit of " +
+                $"{Transport.Capabilities.MaxUnreliablePayload} bytes cannot fit the " +
+                $"{NetworkProtocol.HeaderLength}-byte Dreambit network header.");
+
+        var hello = NetworkProtocol.Encode(
+            new NetworkPacketHeader(
+                NetworkProtocolMessage.Hello,
+                Guid.Empty,
+                NetworkSceneEpoch.None,
+                0,
+                NetworkStructuralRevision.None),
+            writer =>
+            {
+                writer.WriteUInt16(NetworkProtocol.Version);
+                writer.WriteString(_options.GameBuildId, 256);
+                writer.WriteString(_options.ContentFingerprint, 256);
+                writer.WriteString(_messages.SchemaHash.Hex, 64);
+                writer.WriteString(_replication.SchemaHash.Hex, 64);
+            },
+            _options.MaxProtocolPayload);
+        if (hello.Length > Transport.Capabilities.MaxReliablePayload)
+            throw new InvalidOperationException(
+                $"The configured handshake requires a {hello.Length}-byte reliable packet, " +
+                $"exceeding the active transport limit of " +
+                $"{Transport.Capabilities.MaxReliablePayload} bytes.");
     }
 
     private void SendPacket(
@@ -1237,7 +1430,22 @@ internal sealed class NetworkSession : IDisposable
         NetworkDelivery delivery = NetworkDelivery.ReliableOrdered,
         byte channel = 0)
     {
-        var packet = NetworkProtocol.Encode(
+        var packet = EncodePacket(
+            message,
+            payload,
+            sceneEpoch,
+            serverTick,
+            structuralRevision);
+        Transport.Send(connection, packet, delivery, channel);
+    }
+
+    private byte[] EncodePacket(
+        NetworkProtocolMessage message,
+        Action<NetworkWriter>? payload,
+        NetworkSceneEpoch sceneEpoch = default,
+        ulong serverTick = 0,
+        NetworkStructuralRevision structuralRevision = default) =>
+        NetworkProtocol.Encode(
             new NetworkPacketHeader(
                 message,
                 SessionId,
@@ -1246,32 +1454,10 @@ internal sealed class NetworkSession : IDisposable
                 structuralRevision),
             payload,
             _options.MaxProtocolPayload);
-        Transport.Send(connection, packet, delivery, channel);
-    }
-
-    private void BroadcastSpawn(
-        Entity entity,
-        NetworkEntityId id,
-        EntityBlueprint blueprint,
-        NetworkSpawnOptions options,
-        NetworkStructuralRevision revision)
-    {
-        foreach (var peer in _peersById.Values)
-        {
-            if (peer.IsLocal || !ReceivesLiveStructure(peer))
-                continue;
-            SendPacket(
-                peer.Connection,
-                NetworkProtocolMessage.Spawn,
-                writer => WriteSpawn(writer, id, blueprint, options),
-                SceneEpoch,
-                ServerTick,
-                revision);
-        }
-    }
 
     private static void WriteSpawn(
         NetworkWriter writer,
+        Entity entity,
         NetworkEntityId id,
         EntityBlueprint blueprint,
         NetworkSpawnOptions options)
@@ -1281,13 +1467,12 @@ internal sealed class NetworkSession : IDisposable
         writer.WriteString(blueprint.AssetName, 1024);
         writer.WriteUInt32(options.Owner.Value);
         writer.WriteBoolean(options.DestroyWithOwner);
+        writer.WriteBoolean(entity.LocallyEnabled);
         byte flags = 0;
-        if (options.Enabled.HasValue) flags |= 1;
         if (options.Position.HasValue) flags |= 2;
         if (options.Rotation.HasValue) flags |= 4;
         if (options.Scale.HasValue) flags |= 8;
         writer.WriteByte(flags);
-        if (options.Enabled.HasValue) writer.WriteBoolean(options.Enabled.Value);
         if (options.Position is { } position) WriteVector3(writer, position);
         if (options.Rotation is { } rotation) WriteVector3(writer, rotation);
         if (options.Scale is { } scale) WriteVector3(writer, scale);
@@ -1307,10 +1492,10 @@ internal sealed class NetworkSession : IDisposable
         var fallbackName = reader.ReadString(1024);
         var owner = new NetworkPeerId(reader.ReadUInt32());
         var destroyWithOwner = reader.ReadBoolean();
+        var intendedEnabled = reader.ReadBoolean();
         var flags = reader.ReadByte();
-        if ((flags & ~15) != 0)
+        if ((flags & ~14) != 0)
             throw new NetworkProtocolException($"Spawn options contain unknown flags {flags}.");
-        bool? enabled = (flags & 1) != 0 ? reader.ReadBoolean() : null;
         Vector3? position = (flags & 2) != 0 ? ReadVector3(ref reader) : null;
         Vector3? rotation = (flags & 4) != 0 ? ReadVector3(ref reader) : null;
         Vector3? scale = (flags & 8) != 0 ? ReadVector3(ref reader) : null;
@@ -1318,13 +1503,21 @@ internal sealed class NetworkSession : IDisposable
         if (!id.IsValid || assetId.IsEmpty)
             throw new NetworkProtocolException("Spawn contains an empty network or Blueprint identity.");
 
+        Entity? entity = null;
+        var registered = false;
         try
         {
             var blueprint = Resources.LoadDreambitAsset(assetId, fallbackName, typeof(EntityBlueprint))
                             as EntityBlueprint
                             ?? throw new InvalidOperationException(
                                 $"Blueprint '{fallbackName}' ({assetId}) could not be loaded.");
-            var entity = World.Scene.CreateNetworkEntity(blueprint, enabled, position, rotation, scale);
+            entity = World.Scene.CreateNetworkEntity(
+                blueprint,
+                intendedEnabled,
+                position,
+                rotation,
+                scale);
+            SetHierarchyUpdatesSuspended(entity, true);
             World.RegisterDynamicEntity(
                 entity,
                 id,
@@ -1332,13 +1525,73 @@ internal sealed class NetworkSession : IDisposable
                 assetId,
                 fallbackName,
                 destroyWithOwner);
+            registered = true;
+            var record = World.Records.First(candidate => candidate.Id == id);
+            _pendingLiveSpawns.Add(
+                id,
+                new PendingLiveSpawn(
+                    entity,
+                    intendedEnabled,
+                    record.ReplicationBindings));
             StructuralRevision = packet.Header.StructuralRevision;
         }
         catch (Exception exception) when (exception is not NetworkProtocolException)
         {
+            var cleanupErrors = new List<Exception>();
+            _pendingLiveSpawns.Remove(id);
+            if (registered)
+                try
+                {
+                    World.Unregister(id, false);
+                }
+                catch (Exception cleanupException)
+                {
+                    cleanupErrors.Add(cleanupException);
+                }
+            if (entity is not null)
+                try
+                {
+                    World.Scene.DestroyEntityHierarchyImmediately(entity);
+                }
+                catch (Exception cleanupException)
+                {
+                    cleanupErrors.Add(cleanupException);
+                }
+            Exception failure = exception;
+            if (cleanupErrors.Count != 0)
+            {
+                cleanupErrors.Insert(0, exception);
+                failure = new AggregateException(
+                    "Remote network spawn failed and rollback also reported errors.",
+                    cleanupErrors);
+            }
             throw new NetworkProtocolException(
-                $"Could not materialize network Blueprint '{fallbackName}' ({assetId}): {exception.Message}");
+                $"Could not materialize network Blueprint '{fallbackName}' ({assetId}): {failure.Message}",
+                failure);
         }
+    }
+
+    private void HandleSpawnReady(NetworkPacket packet)
+    {
+        if (IsServer)
+            throw new NetworkProtocolException("A server cannot receive SpawnReady.");
+        ValidateCurrentScenePacket(packet.Header, requireNextRevision: false);
+        if (packet.Header.StructuralRevision != StructuralRevision)
+            throw new NetworkProtocolException(
+                $"SpawnReady revision {packet.Header.StructuralRevision} does not match " +
+                $"the active structural revision {StructuralRevision}.");
+        var reader = new NetworkReader(packet.Payload.Span);
+        var id = new NetworkEntityId(reader.ReadUInt64());
+        reader.EnsureComplete();
+        if (!_pendingLiveSpawns.Remove(id, out var pending))
+            throw new NetworkProtocolException($"SpawnReady references non-pending network Entity {id}.");
+        if (pending.RemainingComponentIds.Count != 0)
+            throw new NetworkProtocolException(
+                $"SpawnReady for network Entity {id} arrived before initial state for Component(s) " +
+                $"{string.Join(", ", pending.RemainingComponentIds)}.");
+
+        pending.Entity.Enabled = pending.IntendedEnabled;
+        SetHierarchyUpdatesSuspended(pending.Entity, false);
     }
 
     private void HandleDespawn(NetworkPacket packet)
@@ -1526,27 +1779,31 @@ internal sealed class NetworkSession : IDisposable
         }
     }
 
-    private void BroadcastEntityStateReliable(NetworkEntityId id)
+    private byte[] EncodeStateRecord(
+        NetworkEntityId entityId,
+        NetworkReplicationBinding binding,
+        uint sequence,
+        NetworkStructuralRevision revision)
     {
-        if (World is null)
-            return;
-        var record = World.Records.FirstOrDefault(candidate => candidate.Id == id);
-        if (record is null)
-            return;
-        var sequence = NextStateSequence();
-        foreach (var peer in _peersById.Values)
-        {
-            if (peer.IsLocal || !ReceivesLiveStructure(peer))
-                continue;
-            foreach (var binding in record.ReplicationBindings)
-                SendStateRecord(
-                    peer.Connection,
-                    id,
-                    binding,
-                    sequence,
-                    NetworkDelivery.ReliableOrdered,
-                    0);
-        }
+        var componentPayload = binding.Capture();
+        var packet = EncodePacket(
+            NetworkProtocolMessage.Snapshot,
+            writer =>
+            {
+                writer.WriteUInt32(sequence);
+                writer.WriteUInt64(entityId.Value);
+                writer.WriteUInt16(binding.Descriptor.Id);
+                writer.WriteLengthPrefixedBytes(
+                    componentPayload,
+                    binding.Descriptor.MaximumPayload);
+            },
+            SceneEpoch,
+            ServerTick,
+            revision);
+        EnsurePacketFitsReliableTransport(
+            packet,
+            $"initial Component {binding.Descriptor.Id} state for Entity {entityId}");
+        return packet;
     }
 
     private void SendStateRecord(
@@ -1621,6 +1878,8 @@ internal sealed class NetworkSession : IDisposable
         {
             binding.Apply(componentPayload);
             _lastStateSequences[key] = sequence;
+            if (_pendingLiveSpawns.TryGetValue(entityId, out var pending))
+                pending.RemainingComponentIds.Remove(componentId);
         }
         catch (Exception exception) when (exception is not NetworkProtocolException)
         {
@@ -1727,6 +1986,36 @@ internal sealed class NetworkSession : IDisposable
     private static Vector3 ReadVector3(ref NetworkReader reader) =>
         new(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
 
+    private void EnsurePacketFitsReliableTransport(byte[] packet, string label)
+    {
+        if (packet.Length > Transport.Capabilities.MaxReliablePayload)
+            throw new InvalidOperationException(
+                $"{label} requires a {packet.Length}-byte reliable packet, exceeding the active " +
+                $"transport limit of {Transport.Capabilities.MaxReliablePayload} bytes.");
+    }
+
+    private static void SetHierarchyUpdatesSuspended(Entity root, bool suspended)
+    {
+        root.UpdatesSuspended = suspended;
+        foreach (var child in root.Children)
+            SetHierarchyUpdatesSuspended(child, suspended);
+    }
+
+    private static string TruncateUtf8(string value, int maximumBytes)
+    {
+        if (Encoding.UTF8.GetByteCount(value) <= maximumBytes)
+            return value;
+        Span<byte> buffer = stackalloc byte[maximumBytes];
+        Encoding.UTF8.GetEncoder().Convert(
+            value.AsSpan(),
+            buffer,
+            true,
+            out var charsUsed,
+            out _,
+            out _);
+        return value[..charsUsed];
+    }
+
     private void RejectProtocolError(TransportConnectionId connection, string diagnostic)
     {
         if (!connection.IsValid)
@@ -1805,4 +2094,25 @@ internal sealed class NetworkSession : IDisposable
     private readonly record struct ReplicationStateKey(
         NetworkEntityId EntityId,
         ushort ComponentId);
+
+    private sealed class PendingLiveSpawn
+    {
+        public PendingLiveSpawn(
+            Entity entity,
+            bool intendedEnabled,
+            IReadOnlyList<NetworkReplicationBinding> bindings)
+        {
+            Entity = entity;
+            IntendedEnabled = intendedEnabled;
+            RemainingComponentIds = new HashSet<ushort>();
+            foreach (var binding in bindings)
+                RemainingComponentIds.Add(binding.Descriptor.Id);
+        }
+
+        public Entity Entity { get; }
+        public bool IntendedEnabled { get; }
+        public HashSet<ushort> RemainingComponentIds { get; }
+    }
+
+    private sealed class NetworkSynchronizationException(string message) : Exception(message);
 }

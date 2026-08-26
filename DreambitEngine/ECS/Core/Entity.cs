@@ -95,6 +95,12 @@ public class Entity : IDisposable
 
     public bool IsTiledGenerated => !string.IsNullOrWhiteSpace(TiledSourceKey);
 
+    /// <summary>
+    /// Runtime-only gate used while an owning subsystem completes transactional initialization.
+    /// It is deliberately not serialized and does not change the entity's authored enabled state.
+    /// </summary>
+    internal bool UpdatesSuspended { get; set; }
+
     public bool IsImportedMapGenerated => IsLDtkGenerated || IsTiledGenerated;
 
     public bool AlwaysUpdate
@@ -288,7 +294,7 @@ public class Entity : IDisposable
 
     internal void Update()
     {
-        if (_isDestroyed) return;
+        if (_isDestroyed || UpdatesSuspended) return;
 
         ComponentRepository.UpdateLists();
         ComponentRepository.UpdateComponents();
@@ -308,8 +314,13 @@ public class Entity : IDisposable
 
     internal void PhysicsUpdate()
     {
-        if (_isDestroyed) return;
+        if (_isDestroyed || UpdatesSuspended) return;
         ComponentRepository.PhysicsUpdateComponents();
+    }
+
+    internal void MarkDeadForImmediateDestruction()
+    {
+        _isDead = true;
     }
 
     /// <summary>

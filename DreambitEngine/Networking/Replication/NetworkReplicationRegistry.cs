@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Text;
 using Dreambit.ECS;
 using Dreambit.Networking.Protocol;
+using Dreambit.Networking.Transport;
 
 namespace Dreambit.Networking.Replication;
 
@@ -60,6 +61,8 @@ public sealed class NetworkReplicationRegistry
         if (_byType.Count == 0)
             return [];
 
+        ValidateEntityShape(entity);
+
         var bindings = new List<NetworkReplicationBinding>();
         // This scan happens once when NetworkWorld registers the Entity, not each snapshot.
         foreach (var component in entity.GetAllComponents())
@@ -73,6 +76,44 @@ public sealed class NetworkReplicationRegistry
         return bindings;
     }
 
+    internal void ValidateForTransport(
+        TransportCapabilities capabilities,
+        int maximumProtocolPayload)
+    {
+        const int snapshotPayloadOverhead = 4 + 8 + 2 + 4;
+        const int baselinePayloadOverhead = 1 + 8 + 2 + 4;
+        foreach (var descriptor in _byId.Values)
+        {
+            var snapshotPacketSize = checked(
+                NetworkProtocol.HeaderLength + snapshotPayloadOverhead + descriptor.MaximumPayload);
+            if (snapshotPayloadOverhead + descriptor.MaximumPayload > maximumProtocolPayload)
+                throw new InvalidOperationException(
+                    $"Replicated Component '{descriptor.ComponentType.FullName}' ({descriptor.Id}) can require " +
+                    $"{descriptor.MaximumPayload} bytes and cannot fit the configured protocol payload limit " +
+                    $"of {maximumProtocolPayload} bytes.");
+            if (snapshotPacketSize > capabilities.MaxUnreliablePayload)
+                throw new InvalidOperationException(
+                    $"Replicated Component '{descriptor.ComponentType.FullName}' ({descriptor.Id}) can require " +
+                    $"a {snapshotPacketSize}-byte snapshot packet, exceeding the active transport's " +
+                    $"{capabilities.MaxUnreliablePayload}-byte unreliable payload limit.");
+
+            var baselinePacketSize = checked(
+                NetworkProtocol.HeaderLength + baselinePayloadOverhead + descriptor.MaximumPayload);
+            if (baselinePacketSize > capabilities.MaxReliablePayload)
+                throw new InvalidOperationException(
+                    $"Replicated Component '{descriptor.ComponentType.FullName}' ({descriptor.Id}) can require " +
+                    $"a {baselinePacketSize}-byte baseline packet, exceeding the active transport's " +
+                    $"{capabilities.MaxReliablePayload}-byte reliable payload limit.");
+        }
+    }
+
+    internal void ValidateEntityShape(Entity entity)
+    {
+        ArgumentNullException.ThrowIfNull(entity);
+        if (_byType.Count != 0)
+            ValidateNoReplicatedDescendants(entity, entity);
+    }
+
     internal NetworkComponentDescriptor GetById(ushort id) =>
         _byId.TryGetValue(id, out var descriptor)
             ? descriptor
@@ -82,6 +123,20 @@ public sealed class NetworkReplicationRegistry
     {
         if (_frozen)
             throw new InvalidOperationException("Replication registrations are frozen while a session is active.");
+    }
+
+    private void ValidateNoReplicatedDescendants(Entity root, Entity parent)
+    {
+        foreach (var child in parent.Children)
+        {
+            foreach (var component in child.GetAllComponents())
+                if (_byType.ContainsKey(component.GetType()))
+                    throw new InvalidOperationException(
+                        $"Network root '{root.Name}' contains registered replicated Component " +
+                        $"'{component.GetType().FullName}' on child Entity '{child.Name}'. " +
+                        "Version 1 replication supports Components on the network root only.");
+            ValidateNoReplicatedDescendants(root, child);
+        }
     }
 
     private void RegisterDescriptor(NetworkComponentDescriptor descriptor)

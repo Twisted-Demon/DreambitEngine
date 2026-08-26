@@ -47,9 +47,17 @@ public sealed class NetworkService : IDisposable
     public event Action<NetworkPeerId, TransportDisconnectReason, string?>? PeerDisconnected;
     public event Action<TransportDisconnectReason, string?>? ConnectionFailed;
 
+    /// <summary>
+    /// Starts an authoritative server. Start before assigning a Scene, then use
+    /// <see cref="ChangeScene"/> so every synchronized Scene has a catalog key.
+    /// </summary>
     public void StartServer(INetworkTransport transport) =>
         StartSession(NetworkRole.Server, transport);
 
+    /// <summary>
+    /// Starts an authoritative listen server/host. Start before assigning a Scene, then use
+    /// <see cref="ChangeScene"/> so every synchronized Scene has a catalog key.
+    /// </summary>
     public void StartHost(INetworkTransport transport) =>
         StartSession(NetworkRole.Host, transport);
 
@@ -81,7 +89,7 @@ public sealed class NetworkService : IDisposable
         }
         // SetNextScene takes ownership immediately, including when terminating a displaced
         // pending Scene reports a cleanup failure.
-        _core.SetNextScene(scene);
+        _core.SetNextSceneFromNetworking(scene, this);
     }
 
     public Entity Spawn(EntityBlueprint blueprint, NetworkSpawnOptions? options = null) =>
@@ -204,7 +212,15 @@ public sealed class NetworkService : IDisposable
         var registriesFrozen = false;
         try
         {
-            var sessionOptions = Options.Snapshot(Resources.ContentFingerprint);
+            if (role is NetworkRole.Server or NetworkRole.Host &&
+                (_core.CurrentScene is not null || _core.NextScene is not null))
+                throw new InvalidOperationException(
+                    "A server/host networking session must start before a Scene is active or pending. " +
+                    "Start networking first, register the Scene key, then call Networking.ChangeScene(key).");
+            var defaultContentFingerprint = Options.ContentFingerprint is null
+                ? Resources.ContentFingerprint
+                : null;
+            var sessionOptions = Options.Snapshot(defaultContentFingerprint);
             sessionOptions.Validate();
             Messages.Freeze();
             Replication.Freeze();
@@ -241,6 +257,6 @@ public sealed class NetworkService : IDisposable
     private void HandleSceneChangeRequested(string sceneKey, NetworkSceneEpoch sceneEpoch)
     {
         var scene = Scenes.Create(sceneKey);
-        _core.SetNextScene(scene);
+        _core.SetNextSceneFromNetworking(scene, this);
     }
 }

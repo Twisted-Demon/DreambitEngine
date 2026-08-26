@@ -116,6 +116,7 @@ public class Scene : IDisposable
     /// <summary>Schedules a new scene by type to be swapped in by the Core.</summary>
     public static void SetNextScene<T>() where T : Scene, new()
     {
+        Core.Instance.EnsureLocalSceneTransitionAllowed();
         var scene = new T();
         Core.Instance.SetNextScene(scene);
     }
@@ -123,6 +124,7 @@ public class Scene : IDisposable
     public static void SetNextScene(string sceneAssetName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sceneAssetName);
+        Core.Instance.EnsureLocalSceneTransitionAllowed();
         var blueprint = Resources.LoadAsset<SceneBlueprint>(sceneAssetName)
                         ?? throw new InvalidOperationException(
                             $"Scene asset '{sceneAssetName}' could not be loaded.");
@@ -135,6 +137,7 @@ public class Scene : IDisposable
     public static void SetNextScene<T>(string sceneAssetName) where T : Scene, new()
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sceneAssetName);
+        Core.Instance.EnsureLocalSceneTransitionAllowed();
         var blueprint = Resources.LoadAsset<SceneBlueprint>(sceneAssetName)
                         ?? throw new InvalidOperationException(
                             $"Scene asset '{sceneAssetName}' could not be loaded.");
@@ -1123,6 +1126,46 @@ public class Scene : IDisposable
             entity.Parent = null;
             Entities.DestroyEntityImmediately(entity);
         }
+    }
+
+    /// <summary>
+    /// Immediately releases a newly materialized runtime hierarchy. This is a narrow rollback
+    /// seam for transactions that fail before the hierarchy can become observable on a later tick.
+    /// </summary>
+    internal void DestroyEntityHierarchyImmediately(Entity root)
+    {
+        ArgumentNullException.ThrowIfNull(root);
+        if (!ReferenceEquals(root.OwningScene, this))
+            throw new InvalidOperationException("Cannot roll back an Entity owned by another Scene.");
+
+        var hierarchy = root.GetChildren();
+        hierarchy.Insert(0, root);
+        var cleanupErrors = new List<Exception>();
+        for (var index = hierarchy.Count - 1; index >= 0; index--)
+        {
+            var entity = hierarchy[index];
+            try
+            {
+                entity.Parent = null;
+            }
+            catch (Exception exception)
+            {
+                cleanupErrors.Add(exception);
+            }
+            try
+            {
+                Entities.DestroyEntityImmediately(entity);
+            }
+            catch (Exception exception)
+            {
+                cleanupErrors.Add(exception);
+            }
+        }
+
+        if (cleanupErrors.Count != 0)
+            throw new AggregateException(
+                "One or more Entities failed during immediate hierarchy rollback.",
+                cleanupErrors);
     }
 
     /// <summary>Sets AlwaysUpdate on a specific entity.</summary>

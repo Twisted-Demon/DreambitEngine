@@ -5,8 +5,16 @@ namespace Dreambit.Networking;
 
 public enum NetworkPresence : byte
 {
+    /// <summary>Exists on the authoritative server/host and synchronized remote clients.</summary>
     Replicated = 0,
+
+    /// <summary>Exists only on the authoritative server/host.</summary>
     ServerOnly = 1,
+
+    /// <summary>
+    /// Exists only on non-authoritative remote clients. A listen server/host is authoritative,
+    /// so it removes ClientOnly entities just like a dedicated server.
+    /// </summary>
     ClientOnly = 2
 }
 

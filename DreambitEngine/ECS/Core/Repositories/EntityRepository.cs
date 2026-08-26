@@ -496,6 +496,8 @@ public class EntityRepository
         if (entity == null)
             return;
 
+        entity.MarkDeadForImmediateDestruction();
+
         var wasActive =
             _entitiesSet.Remove(entity);
 

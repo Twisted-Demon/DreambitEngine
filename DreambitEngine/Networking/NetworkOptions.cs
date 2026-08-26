@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 
 namespace Dreambit.Networking;
 
@@ -31,10 +32,10 @@ public sealed class NetworkOptions
     {
         if (string.IsNullOrWhiteSpace(GameBuildId))
             throw new InvalidOperationException("A non-empty networking GameBuildId is required.");
-        if (GameBuildId.Length > 256)
-            throw new InvalidOperationException("Networking GameBuildId must not exceed 256 characters.");
-        if (ContentFingerprint is { Length: > 256 })
-            throw new InvalidOperationException("Content fingerprint must not exceed 256 characters.");
+        if (Encoding.UTF8.GetByteCount(GameBuildId) > 256)
+            throw new InvalidOperationException("Networking GameBuildId must not exceed 256 UTF-8 bytes.");
+        if (ContentFingerprint is not null && Encoding.UTF8.GetByteCount(ContentFingerprint) > 256)
+            throw new InvalidOperationException("Content fingerprint must not exceed 256 UTF-8 bytes.");
         if (MaxProtocolPayload is < 256 or > 16 * 1024 * 1024)
             throw new ArgumentOutOfRangeException(nameof(MaxProtocolPayload));
         if (MaxQueuedTransportEvents is < 1 or > 65_536)

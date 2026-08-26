@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using Dreambit.ECS;
 using Dreambit.Networking.Replication;
 
@@ -16,13 +17,15 @@ internal sealed class NetworkWorld : IDisposable
     private readonly List<NetworkEntityRecord> _records = [];
     private readonly List<NetworkAuthoredBinding> _authoredBindings = [];
     private readonly NetworkReplicationRegistry _replication;
+    private readonly int _maxNetworkEntities;
     private bool _disposed;
 
     public NetworkWorld(
         Scene scene,
         NetworkSceneEpoch sceneEpoch,
         bool server,
-        NetworkReplicationRegistry? replication = null)
+        NetworkReplicationRegistry? replication = null,
+        int maxNetworkEntities = 100_000)
     {
         Scene = scene ?? throw new ArgumentNullException(nameof(scene));
         if (!sceneEpoch.IsValid)
@@ -30,6 +33,9 @@ internal sealed class NetworkWorld : IDisposable
         SceneEpoch = sceneEpoch;
         IsServer = server;
         _replication = replication ?? new NetworkReplicationRegistry();
+        if (maxNetworkEntities < 1)
+            throw new ArgumentOutOfRangeException(nameof(maxNetworkEntities));
+        _maxNetworkEntities = maxNetworkEntities;
     }
 
     public event Action<NetworkEntityId>? EntityRemoved;
@@ -52,8 +58,26 @@ internal sealed class NetworkWorld : IDisposable
             throw new InvalidOperationException("Authored network entities are already bound.");
         ArgumentNullException.ThrowIfNull(allocateNetworkId);
 
-        var bindings = new List<NetworkAuthoredBinding>();
-        foreach (var entity in Scene.GetAllEntities())
+        var sceneEntities = Scene.GetAllEntities();
+        var replicatedEntities = new List<(Entity Entity, NetworkObject Marker)>();
+        foreach (var entity in sceneEntities)
+        {
+            var marker = entity.GetComponent<NetworkObject>();
+            if (marker is null)
+                continue;
+            if (marker.Presence == NetworkPresence.Replicated)
+            {
+                _replication.ValidateEntityShape(entity);
+                replicatedEntities.Add((entity, marker));
+            }
+            else if (!Enum.IsDefined(marker.Presence))
+                throw new InvalidOperationException(
+                    $"Entity '{entity.Name}' has unsupported network presence {marker.Presence}.");
+        }
+        EnsureRegistrationCapacity(replicatedEntities.Count);
+
+        var bindings = new List<NetworkAuthoredBinding>(replicatedEntities.Count);
+        foreach (var entity in sceneEntities)
         {
             var marker = entity.GetComponent<NetworkObject>();
             if (marker is null)
@@ -107,6 +131,17 @@ internal sealed class NetworkWorld : IDisposable
             if (!bySource.TryAdd(binding.SourceGuid, binding))
                 throw new InvalidOperationException(
                     $"Authored source GUID '{binding.SourceGuid}' appears more than once in the binding table.");
+        }
+
+        EnsureRegistrationCapacity(bindings.Count);
+        foreach (var entity in Scene.GetAllEntities())
+        {
+            var marker = entity.GetComponent<NetworkObject>();
+            if (marker?.Presence == NetworkPresence.Replicated)
+                _replication.ValidateEntityShape(entity);
+            else if (marker is not null && !Enum.IsDefined(marker.Presence))
+                throw new InvalidOperationException(
+                    $"Entity '{entity.Name}' has unsupported network presence {marker.Presence}.");
         }
 
         var consumed = new HashSet<Guid>();
@@ -164,6 +199,10 @@ internal sealed class NetworkWorld : IDisposable
         ArgumentNullException.ThrowIfNull(entity);
         if (blueprintAssetId.IsEmpty)
             throw new ArgumentException("A dynamic network entity requires a stable Blueprint AssetId.", nameof(blueprintAssetId));
+        if (blueprintAssetName is not null && Encoding.UTF8.GetByteCount(blueprintAssetName) > 1024)
+            throw new ArgumentException(
+                "A dynamic network Blueprint fallback name cannot exceed 1024 UTF-8 bytes.",
+                nameof(blueprintAssetName));
         var marker = entity.GetComponent<NetworkObject>() ??
                      throw new InvalidOperationException(
                          $"Dynamic network entity '{entity.Name}' has no NetworkObject component.");
@@ -365,6 +404,7 @@ internal sealed class NetworkWorld : IDisposable
             throw new InvalidOperationException($"Network entity ID {id} is already registered.");
         if (_byEntity.ContainsKey(entity))
             throw new InvalidOperationException($"Entity '{entity.Name}' is already registered for networking.");
+        EnsureRegistrationCapacity(1);
 
         var record = new NetworkEntityRecord
         {
@@ -383,6 +423,14 @@ internal sealed class NetworkWorld : IDisposable
         _byEntity.Add(entity, id);
         _records.Add(record);
         marker.BindDestroyed(HandleEntityDestroyed);
+    }
+
+    private void EnsureRegistrationCapacity(int additionalEntities)
+    {
+        if (additionalEntities < 0 || additionalEntities > _maxNetworkEntities - _records.Count)
+            throw new InvalidOperationException(
+                $"Registering {additionalEntities} network Entity/Entities would exceed the configured " +
+                $"MaxNetworkEntities limit of {_maxNetworkEntities} for Scene epoch {SceneEpoch}.");
     }
 
     private void HandleEntityDestroyed(Entity entity)

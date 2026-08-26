@@ -18,6 +18,7 @@ internal enum NetworkProtocolMessage : ushort
     Despawn = 37,
     PlayerEntity = 38,
     Ownership = 39,
+    SpawnReady = 40,
     Snapshot = 48
 }
 
@@ -35,7 +36,7 @@ internal readonly record struct NetworkPacket(
 internal static class NetworkProtocol
 {
     public const uint Magic = 0x54494244; // DBIT, little-endian.
-    public const ushort Version = 1;
+    public const ushort Version = 2;
     public const int HeaderLength = 48;
 
     public static byte[] Encode(

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 
 namespace Dreambit.Networking.Scenes;
 
@@ -17,8 +18,8 @@ public sealed class NetworkSceneCatalog
                 "Network Scene registrations are frozen while a session is active.");
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
         ArgumentNullException.ThrowIfNull(factory);
-        if (key.Length > 256)
-            throw new ArgumentException("A network Scene key cannot exceed 256 characters.", nameof(key));
+        if (Encoding.UTF8.GetByteCount(key) > 256)
+            throw new ArgumentException("A network Scene key cannot exceed 256 UTF-8 bytes.", nameof(key));
         if (!_factories.TryAdd(key, factory))
             throw new InvalidOperationException($"Network Scene key '{key}' is already registered.");
     }

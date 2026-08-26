@@ -27,9 +27,10 @@ public sealed class DirectIpTransportTests
         client.Connect();
         var (serverConnection, clientConnection) = WaitForConnections(server, client);
 
-        client.Send(clientConnection, [1, 2, 3], NetworkDelivery.ReliableOrdered, 0);
+        client.Send(clientConnection, [1, 2, 3], NetworkDelivery.ReliableOrdered, 1);
         var reliable = WaitForData(server);
         Assert.Equal(NetworkDelivery.ReliableOrdered, reliable.Delivery);
+        Assert.Equal((byte)1, reliable.Channel);
         Assert.Equal(new byte[] { 1, 2, 3 }, reliable.Payload.ToArray());
 
         client.Send(clientConnection, [4, 5, 6], NetworkDelivery.UnreliableSequenced, 3);
@@ -98,8 +99,13 @@ public sealed class DirectIpTransportTests
         serverReplication.Register<DirectState>();
         clientReplication.Register<DirectState>();
         DirectInput? receivedInput = null;
-        var serverMessages = CreateInputMessages((_, input) => receivedInput = input);
-        var clientMessages = CreateInputMessages((_, _) => { });
+        DirectEvent? receivedEvent = null;
+        var serverMessages = CreateMessages(
+            (_, input) => receivedInput = input,
+            (_, _) => { });
+        var clientMessages = CreateMessages(
+            (_, _) => { },
+            (_, message) => receivedEvent = message);
         using var server = new NetworkSession(
             NetworkRole.Server,
             serverTransport,
@@ -160,8 +166,10 @@ public sealed class DirectIpTransportTests
                   entity!.GetComponent<DirectState>().Value == 404,
             server,
             client);
-        client.SendToServer(new DirectInput(17), NetworkDelivery.UnreliableSequenced);
+        client.SendToServer(new DirectInput(17));
         PumpUntil(() => receivedInput == new DirectInput(17), server, client);
+        server.Send(client.LocalPeerId, new DirectEvent(23));
+        PumpUntil(() => receivedEvent == new DirectEvent(23), server, client);
 
         server.Despawn(serverEntity);
         PumpUntil(
@@ -184,6 +192,7 @@ public sealed class DirectIpTransportTests
         PumpServerUntil(() => server.ReadyPeerCount == 0, server);
 
         Assert.Equal(new DirectInput(17), receivedInput);
+        Assert.Equal(new DirectEvent(23), receivedEvent);
         Assert.True(Entity.IsDestroyed(serverEntity));
         Assert.True(Entity.IsDestroyed(disconnectOwned));
         clientScene?.Dispose();
@@ -272,8 +281,9 @@ public sealed class DirectIpTransportTests
         throw new TimeoutException("Direct IP server did not observe disconnect in time.");
     }
 
-    private static NetworkMessageRegistry CreateInputMessages(
-        Action<NetworkMessageContext, DirectInput> handler)
+    private static NetworkMessageRegistry CreateMessages(
+        Action<NetworkMessageContext, DirectInput> inputHandler,
+        Action<NetworkMessageContext, DirectEvent> eventHandler)
     {
         var messages = new NetworkMessageRegistry();
         messages.Register(
@@ -281,7 +291,13 @@ public sealed class DirectIpTransportTests
             NetworkMessageDirection.ClientToServer,
             4,
             new DirectInputCodec(),
-            handler);
+            inputHandler);
+        messages.Register(
+            502,
+            NetworkMessageDirection.ServerToClient,
+            4,
+            new DirectEventCodec(),
+            eventHandler);
         return messages;
     }
 
@@ -313,6 +329,7 @@ public sealed class DirectIpTransportTests
     }
 
     private readonly record struct DirectInput(int Value);
+    private readonly record struct DirectEvent(int Value);
 
     private sealed class DirectInputCodec : INetworkMessageCodec<DirectInput>
     {
@@ -320,6 +337,15 @@ public sealed class DirectIpTransportTests
             writer.WriteInt32(message.Value);
 
         public DirectInput Read(ref NetworkReader reader) =>
+            new(reader.ReadInt32());
+    }
+
+    private sealed class DirectEventCodec : INetworkMessageCodec<DirectEvent>
+    {
+        public void Write(NetworkWriter writer, DirectEvent message) =>
+            writer.WriteInt32(message.Value);
+
+        public DirectEvent Read(ref NetworkReader reader) =>
             new(reader.ReadInt32());
     }
 }

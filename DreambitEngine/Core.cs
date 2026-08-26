@@ -307,6 +307,31 @@ public class Core : Game
     internal void SetNextScene(
         Scene scene)
     {
+        EnsureLocalSceneTransitionAllowed();
+        SetNextSceneCore(scene);
+    }
+
+    internal void SetNextSceneFromNetworking(
+        Scene scene,
+        NetworkService authority)
+    {
+        ArgumentNullException.ThrowIfNull(authority);
+        if (!ReferenceEquals(_networking, authority) || authority.ActiveSession is null)
+            throw new InvalidOperationException("Only this Core's active NetworkService can authorize a network Scene transition.");
+        SetNextSceneCore(scene);
+    }
+
+    internal void EnsureLocalSceneTransitionAllowed()
+    {
+        if (_networking?.ActiveSession is not null)
+            throw new InvalidOperationException(
+                "Direct Scene transitions are disabled while a synchronized networking session is active. " +
+                "The server/host must use Core.Networking.ChangeScene; clients follow the server SceneChange.");
+    }
+
+    private void SetNextSceneCore(
+        Scene scene)
+    {
         ArgumentNullException.ThrowIfNull(scene);
 
         if (ReferenceEquals(
