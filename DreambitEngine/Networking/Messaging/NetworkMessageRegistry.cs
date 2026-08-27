@@ -21,6 +21,29 @@ public sealed class NetworkMessageRegistry
     /// rejects peers whose message schemas differ.
     /// </summary>
     public NetworkSchemaHash SchemaHash => BuildSchemaHash();
+    
+    /// <summary>
+    /// Registers a self-describing gameplay message and its receive handler.
+    /// The message type supplies its protocol ID, direction, payload bound,
+    /// and serialization contract.
+    /// </summary>
+    /// <typeparam name="T">The self-describing gameplay message type.</typeparam>
+    /// <param name="handler">
+    /// The callback invoked when a valid message arrives.
+    /// </param>
+    public void Register<T>(
+        Action<NetworkMessageContext, T> handler)
+        where T : INetworkMessage<T>
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+
+        Register(
+            T.Id,
+            T.Direction,
+            T.MaximumPayload,
+            SelfDescribingNetworkMessageCodec<T>.Instance,
+            handler);
+    }
 
     /// <summary>Registers a strongly typed gameplay message, codec, and receive handler.</summary>
     /// <typeparam name="T">The game-defined message type.</typeparam>

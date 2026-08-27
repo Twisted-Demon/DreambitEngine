@@ -21,6 +21,8 @@ public sealed class NetworkService : IDisposable
     internal NetworkService(Core core)
     {
         _core = core ?? throw new ArgumentNullException(nameof(core));
+
+        RegisterInternalReplications();
     }
 
     /// <summary>
@@ -121,11 +123,48 @@ public sealed class NetworkService : IDisposable
     /// <summary>
     /// Registers default dreambit replicated components i.e. NetworkTransform2D
     /// </summary>
-    public void RegisterInternalReplications()
+    private void RegisterInternalReplications()
     {
         Replication.Register<NetworkTransform2D>();
     }
 
+    /// <summary>
+    /// Applies one or more explicit game networking modules.
+    ///
+    /// Configuration must occur before a networking session starts.
+    /// Registrations persist for the lifetime of this NetworkService,
+    /// including across Stop/start cycles.
+    /// </summary>
+    /// <param name="modules">
+    /// The game networking modules to register.
+    /// </param>
+    public void Configure(
+        params INetworkModule[] modules)
+    {
+        ArgumentNullException.ThrowIfNull(modules);
+
+        if (_session is not null)
+        {
+            throw new InvalidOperationException(
+                "Networking modules must be configured before starting a networking session.");
+        }
+
+        for (var i = 0; i < modules.Length; i++)
+        {
+            if (modules[i] is null)
+            {
+                throw new ArgumentException(
+                    "Networking modules cannot contain null entries.",
+                    nameof(modules));
+            }
+        }
+
+        var context = new NetworkRegistrationContext(this);
+
+        for (var i = 0; i < modules.Length; i++)
+            modules[i].Register(context);
+    }
+    
     /// <summary>
     /// Starts an authoritative server. An existing local Scene remains local; use
     /// <see cref="ChangeScene"/> when the server is ready to enter a synchronized Scene.
