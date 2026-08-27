@@ -119,6 +119,14 @@ public sealed class NetworkService : IDisposable
     public event Action<TransportDisconnectReason, string?>? ConnectionFailed;
 
     /// <summary>
+    /// Registers default dreambit replicated components i.e. NetworkTransform2D
+    /// </summary>
+    public void RegisterInternalReplications()
+    {
+        Replication.Register<NetworkTransform2D>();
+    }
+
+    /// <summary>
     /// Starts an authoritative server. An existing local Scene remains local; use
     /// <see cref="ChangeScene"/> when the server is ready to enter a synchronized Scene.
     /// </summary>

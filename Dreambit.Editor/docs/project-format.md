@@ -14,7 +14,7 @@ Dreambit projects declare portable Editor/build information in `.dreambit/projec
   "launcherProject": "src/MyGame.VK/MyGame.VK.csproj",
   "targetRenderer": "DesktopVK",
   "sdk": {
-    "version": "0.6.5"
+    "version": "0.6.6"
   }
 }
 ```
