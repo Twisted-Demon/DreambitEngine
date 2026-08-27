@@ -10,7 +10,7 @@ using Dreambit.Networking.World;
 namespace Dreambit.Networking;
 
 /// <summary>
-/// Core-owned networking façade. The service is created lazily and owns at most one session.
+/// Core-owned networking façade. The service lives for the Core lifetime and owns at most one session.
 /// </summary>
 public sealed class NetworkService : IDisposable
 {
@@ -23,6 +23,10 @@ public sealed class NetworkService : IDisposable
         _core = core ?? throw new ArgumentNullException(nameof(core));
     }
 
+    /// <summary>
+    /// Configuration copied into each session when it starts. Options can be prepared before
+    /// a session and changed again after <see cref="Stop"/> for the next session.
+    /// </summary>
     public NetworkOptions Options { get; } = new();
     public NetworkMessageRegistry Messages { get; } = new();
     public NetworkReplicationRegistry Replication { get; } = new();
@@ -48,19 +52,23 @@ public sealed class NetworkService : IDisposable
     public event Action<TransportDisconnectReason, string?>? ConnectionFailed;
 
     /// <summary>
-    /// Starts an authoritative server. Start before assigning a Scene, then use
-    /// <see cref="ChangeScene"/> so every synchronized Scene has a catalog key.
+    /// Starts an authoritative server. An existing local Scene remains local; use
+    /// <see cref="ChangeScene"/> when the server is ready to enter a synchronized Scene.
     /// </summary>
     public void StartServer(INetworkTransport transport) =>
         StartSession(NetworkRole.Server, transport);
 
     /// <summary>
-    /// Starts an authoritative listen server/host. Start before assigning a Scene, then use
-    /// <see cref="ChangeScene"/> so every synchronized Scene has a catalog key.
+    /// Starts an authoritative listen server/host. An existing local Scene remains local; use
+    /// <see cref="ChangeScene"/> when the host is ready to enter a synchronized Scene.
     /// </summary>
     public void StartHost(INetworkTransport transport) =>
         StartSession(NetworkRole.Host, transport);
 
+    /// <summary>
+    /// Starts a client connection. An existing local Scene remains active until the server
+    /// requests a catalog-driven synchronized Scene transition.
+    /// </summary>
     public void Connect(INetworkTransport transport) =>
         StartSession(NetworkRole.Client, transport);
 
@@ -190,7 +198,15 @@ public sealed class NetworkService : IDisposable
     internal void AfterFixedStep(Scene scene) => _session?.AfterFixedStep(scene);
     internal void AfterSceneTick(Scene scene) => _session?.AfterSceneTick(scene);
     internal void BeforeSceneUnload(Scene scene) => _session?.BeforeSceneUnload(scene);
-    internal void AfterSceneAssigned(Scene scene) => _session?.AfterSceneAssigned(scene);
+    internal void AfterSceneAssigned(Scene scene)
+    {
+        // A session can begin while a local menu/bootstrap Scene is already active, and a
+        // local Scene may already be pending when it begins. Only a catalog-driven network
+        // transition is allowed to create a NetworkWorld and consume a network Scene epoch.
+        if (_session?.HasPendingSynchronizedScene == true)
+            _session.AfterSceneAssigned(scene);
+    }
+
     internal void StopIntake() => _session?.StopIntake();
 
     public void Dispose()
@@ -212,11 +228,6 @@ public sealed class NetworkService : IDisposable
         var registriesFrozen = false;
         try
         {
-            if (role is NetworkRole.Server or NetworkRole.Host &&
-                (_core.CurrentScene is not null || _core.NextScene is not null))
-                throw new InvalidOperationException(
-                    "A server/host networking session must start before a Scene is active or pending. " +
-                    "Start networking first, register the Scene key, then call Networking.ChangeScene(key).");
             var defaultContentFingerprint = Options.ContentFingerprint is null
                 ? Resources.ContentFingerprint
                 : null;
@@ -234,8 +245,6 @@ public sealed class NetworkService : IDisposable
                 ConnectionFailed?.Invoke(reason, diagnostic);
             session.SceneChangeRequested += HandleSceneChangeRequested;
             session.Start();
-            if (_core.CurrentScene is { } scene)
-                session.AfterSceneAssigned(scene);
             _session = session;
         }
         catch

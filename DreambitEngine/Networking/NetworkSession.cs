@@ -82,6 +82,8 @@ internal sealed class NetworkSession : IDisposable
     public ulong ServerTick { get; private set; }
     public string? CurrentSceneKey { get; private set; }
     public NetworkWorld? World { get; private set; }
+    internal bool HasPendingSynchronizedScene =>
+        _pendingSceneEpoch.IsValid && _pendingSceneKey is not null;
 
     public void Start()
     {

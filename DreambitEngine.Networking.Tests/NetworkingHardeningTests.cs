@@ -425,22 +425,43 @@ public sealed class NetworkingHardeningTests
     }
 
     [Fact]
-    public void ServerStartupRejectsExistingUnkeyedScene()
+    public void SessionCanStartAndRestartWhileLocalSceneIsActive()
     {
         var core = CreateUninitializedCore();
-        using var scene = new TestScene();
-        typeof(Core).GetProperty(nameof(Core.CurrentScene), BindingFlags.Instance | BindingFlags.Public)!
-            .SetValue(core, scene);
-        using var transport = new SessionHandshakeTests.StandaloneInMemoryServerTransportForTests();
+        using var localMenu = new TestScene();
+        SetCurrentScene(core, localMenu);
+        var networking = core.Networking;
+        networking.Options.ContentFingerprint = "test-content";
+        networking.Options.GameBuildId = "menu-build-1";
+        networking.Options.ReplicationRate = 30;
+        networking.Scenes.Register("arena", () => new TestScene());
+        using var firstTransport = new SessionHandshakeTests.StandaloneInMemoryServerTransportForTests();
 
-        var exception = Assert.Throws<InvalidOperationException>(
-            () => core.Networking.StartHost(transport));
+        networking.StartHost(firstTransport);
+        networking.AfterSceneAssigned(localMenu);
 
-        Assert.Contains("start before a Scene", exception.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(NetworkRole.Offline, core.Networking.Role);
-        Assert.Equal(TransportState.Disposed, transport.State);
-        typeof(Core).GetProperty(nameof(Core.CurrentScene), BindingFlags.Instance | BindingFlags.Public)!
-            .SetValue(core, null);
+        Assert.Equal(NetworkRole.Host, networking.Role);
+        Assert.Same(localMenu, core.CurrentScene);
+        Assert.Null(networking.CurrentSceneKey);
+        Assert.Equal(NetworkSceneEpoch.None, networking.SceneEpoch);
+        Assert.Null(networking.ActiveSession!.World);
+
+        networking.Stop();
+        networking.Options.GameBuildId = "menu-build-2";
+        networking.Options.ReplicationRate = 20;
+        using var secondTransport = new SessionHandshakeTests.StandaloneInMemoryServerTransportForTests();
+
+        networking.StartHost(secondTransport);
+        networking.ChangeScene("arena");
+
+        Assert.Equal(NetworkRole.Host, networking.Role);
+        Assert.Same(localMenu, core.CurrentScene);
+        Assert.IsType<TestScene>(core.NextScene);
+        Assert.Null(networking.ActiveSession!.World);
+
+        networking.Stop();
+        core.NextScene.Terminate();
+        SetCurrentScene(core, null);
     }
 
     [Fact]
@@ -448,6 +469,10 @@ public sealed class NetworkingHardeningTests
     {
         var serverCore = CreateUninitializedCore();
         var clientCore = CreateUninitializedCore();
+        using var serverMenu = new TestScene();
+        using var clientMenu = new TestScene();
+        SetCurrentScene(serverCore, serverMenu);
+        SetCurrentScene(clientCore, clientMenu);
         var serverNetwork = serverCore.Networking;
         var clientNetwork = clientCore.Networking;
         serverNetwork.Options.ContentFingerprint = "test-content";
@@ -459,13 +484,19 @@ public sealed class NetworkingHardeningTests
         serverNetwork.StartServer(pair.Server);
         clientNetwork.Connect(pair.Client);
         Pump(serverNetwork.ActiveSession!, clientNetwork.ActiveSession!);
+
+        Assert.Null(serverNetwork.ActiveSession!.World);
+        Assert.Null(clientNetwork.ActiveSession!.World);
+        Assert.Same(serverMenu, serverCore.CurrentScene);
+        Assert.Same(clientMenu, clientCore.CurrentScene);
+
         serverNetwork.ChangeScene("arena");
         Pump(serverNetwork.ActiveSession!, clientNetwork.ActiveSession!);
 
         var serverScene = Assert.IsType<TestScene>(serverCore.NextScene);
         var clientScene = Assert.IsType<TestScene>(clientCore.NextScene);
-        serverNetwork.ActiveSession!.AfterSceneAssigned(serverScene);
-        clientNetwork.ActiveSession!.AfterSceneAssigned(clientScene);
+        serverNetwork.AfterSceneAssigned(serverScene);
+        clientNetwork.AfterSceneAssigned(clientScene);
         serverScene.Tick();
         clientScene.Tick();
         Pump(serverNetwork.ActiveSession!, clientNetwork.ActiveSession!);
@@ -482,6 +513,8 @@ public sealed class NetworkingHardeningTests
         serverNetwork.Stop();
         clientScene.Terminate();
         serverScene.Terminate();
+        SetCurrentScene(clientCore, null);
+        SetCurrentScene(serverCore, null);
     }
 
     private static Core CreateUninitializedCore(bool makeCurrent = false)
@@ -496,6 +529,12 @@ public sealed class NetworkingHardeningTests
     {
         typeof(Core).GetProperty(nameof(Core.Instance), BindingFlags.Static | BindingFlags.Public)!
             .SetValue(null, core);
+    }
+
+    private static void SetCurrentScene(Core core, Scene? scene)
+    {
+        typeof(Core).GetProperty(nameof(Core.CurrentScene), BindingFlags.Instance | BindingFlags.Public)!
+            .SetValue(core, scene);
     }
 
     private static NetworkReplicationRegistry CreateInitialStateReplication()

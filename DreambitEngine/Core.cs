@@ -36,6 +36,11 @@ public class Core : Game
 
         Resources.Instance.Init();
 
+        // Core owns networking for the lifetime of the game. Create the service before
+        // the first Scene is assigned so games can configure it during boot or from a
+        // later menu Scene without changing its lifetime.
+        _networking = new NetworkService(this);
+
         TargetElapsedTime = TimeSpan.FromSeconds((double)1 / 120); //set Target fps to 120
     }
 
