@@ -7,7 +7,7 @@ internal readonly record struct AssetTypeInfo(AssetKind Kind, string? TypeId);
 
 internal static class AssetTypeClassifier
 {
-    public const int ClassificationVersion = 5;
+    public const int ClassificationVersion = 6;
 
     private static readonly (AssetKind Kind, Type AssetType)[] SerializedTypes =
     [
@@ -83,6 +83,7 @@ internal static class AssetTypeClassifier
             ".ttf" => new AssetTypeInfo(AssetKind.Font, DreambitAssetTypeRegistry.GetTypeId(typeof(FontAsset))),
             ".fx" => new AssetTypeInfo(AssetKind.Effect, DreambitAssetTypeRegistry.GetTypeId(typeof(DreambitEffect))),
             ".txt" or ".md" => new AssetTypeInfo(AssetKind.Text, null),
+            ".css" => new AssetTypeInfo(AssetKind.Stylesheet, null),
             ".ldtk" or ".ldtkl" => new AssetTypeInfo(AssetKind.Ldtk, null),
             ".tmx" => new AssetTypeInfo(
                 AssetKind.TiledMap,

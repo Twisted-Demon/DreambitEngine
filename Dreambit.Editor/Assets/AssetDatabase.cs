@@ -983,6 +983,9 @@ internal sealed class AssetDatabase : IAssetRegistry, IDisposable
 
     private static string ToLogicalAssetName(string relativePath)
     {
+        if (Path.GetExtension(relativePath).Equals(".css", StringComparison.OrdinalIgnoreCase))
+            return relativePath.Replace('\\', '/');
+
         if (DreambitAssetFileExtensions.IsSerialized(Path.GetExtension(relativePath)))
             return relativePath.Replace('\\', '/');
 

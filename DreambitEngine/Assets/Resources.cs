@@ -451,6 +451,51 @@ public class Resources : Singleton<Resources>
         return reader.Open(assetName);
     }
 
+    internal static bool TryOpenAssetStream(
+        string assetName,
+        string pakName,
+        bool usePak,
+        string contentDirectory,
+        out Stream? stream)
+    {
+        var mode = _contentMode;
+        if (mode == AssetContentMode.Blobs)
+            return TryOpenBlobStream(assetName, contentDirectory, out stream);
+
+        if (!usePak)
+        {
+            var path = Path.Combine(contentDirectory, assetName);
+            if (!File.Exists(path))
+            {
+                stream = null;
+                return false;
+            }
+
+            stream = new FileStream(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
+            return true;
+        }
+
+        var pakPath = Path.GetFullPath(Path.Combine(contentDirectory, pakName));
+        if (mode == AssetContentMode.Auto && !File.Exists(pakPath))
+        {
+            var manifestPath = Path.Combine(contentDirectory, BlobContentManifest.FileName);
+            if (File.Exists(manifestPath))
+                return TryOpenBlobStream(assetName, contentDirectory, out stream);
+        }
+
+        if (!Instance._pakReaders.TryGetValue(pakPath, out var reader))
+        {
+            reader = new PakReader(pakPath);
+            Instance._pakReaders.Add(pakPath, reader);
+        }
+
+        return reader.TryOpen(assetName, out stream, out _);
+    }
+
     private static Stream OpenBlobStream(string assetName, string contentDirectory)
     {
         var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(contentDirectory));
@@ -461,6 +506,21 @@ public class Resources : Singleton<Resources>
         }
 
         return reader.Open(assetName);
+    }
+
+    private static bool TryOpenBlobStream(
+        string assetName,
+        string contentDirectory,
+        out Stream? stream)
+    {
+        var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(contentDirectory));
+        if (!Instance._blobReaders.TryGetValue(root, out var reader))
+        {
+            reader = new BlobContentReader(root);
+            Instance._blobReaders.Add(root, reader);
+        }
+
+        return reader.TryOpen(assetName, out stream);
     }
 
     private static string? NormalizeFingerprint(string value)

@@ -58,6 +58,26 @@ internal sealed class BlobContentReader
             FileShare.ReadWrite | FileShare.Delete);
     }
 
+    public bool TryOpen(string logicalPath, out Stream? stream)
+    {
+        var normalized = NormalizeLogicalPath(logicalPath);
+        if (!_blobPaths.TryGetValue(normalized, out var blobPath))
+        {
+            stream = null;
+            return false;
+        }
+
+        // A manifest entry whose physical blob is unavailable is corrupt content,
+        // not an optional-asset miss. Preserve that distinction by allowing the
+        // FileStream constructor to throw.
+        stream = new FileStream(
+            blobPath,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.ReadWrite | FileShare.Delete);
+        return true;
+    }
+
     private string ResolveBlobPath(string relativePath)
     {
         var normalized = relativePath.Replace('/', Path.DirectorySeparatorChar);

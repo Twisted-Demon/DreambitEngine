@@ -24,6 +24,12 @@ public abstract class UiElement
     /// <summary>Gets or sets the container that owns this element.</summary>
     public UiContainer Parent;
 
+    /// <summary>
+    ///     Gets the immutable CSS class tokens authored for this element.
+    ///     Classes are resolved only while the element is constructed.
+    /// </summary>
+    public IReadOnlyList<string> StyleClasses { get; private set; } = Array.Empty<string>();
+
     private UiAnchor _anchor = UiAnchor.TopLeft;
     private bool _forceArrange;
     private int _gridColumn;
@@ -671,6 +677,7 @@ public abstract class UiElement
     /// <param name="node">The XML element that describes this UI element.</param>
     internal void ParseInternal(XmlNode node)
     {
+        StyleClasses = UiStyleResolver.ParseClasses(node);
         Id = UiXmlParser.ParseString(node, "id", string.Empty);
         X = UiXmlParser.ParseLength(
             UiXmlParser.ParseString(node, "x", "0%"));

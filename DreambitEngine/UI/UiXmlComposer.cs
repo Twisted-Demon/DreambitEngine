@@ -28,8 +28,15 @@ public static class UiXmlComposer
     /// <returns>Ordinary UI XML containing one <c>&lt;Ui&gt;</c> root.</returns>
     public static string ComposeLayout(string layoutPath, string contentRoot)
     {
+        return ComposeLayoutResult(layoutPath, contentRoot).Document.OuterXml;
+    }
+
+    internal static UiCompositionResult ComposeLayoutResult(
+        string layoutPath,
+        string contentRoot)
+    {
         var session = new UiCompositionSession(contentRoot);
-        return ComposeLayout(layoutPath, session);
+        return ComposeLayoutResult(layoutPath, session);
     }
 
     /// <summary>
@@ -46,12 +53,19 @@ public static class UiXmlComposer
         string layoutPath,
         Func<string, Stream> openAsset)
     {
-        ArgumentNullException.ThrowIfNull(openAsset);
-        var session = UiCompositionSession.ForAssets(openAsset);
-        return ComposeLayout(layoutPath, session);
+        return ComposeAssetLayoutResult(layoutPath, openAsset).Document.OuterXml;
     }
 
-    private static string ComposeLayout(
+    internal static UiCompositionResult ComposeAssetLayoutResult(
+        string layoutPath,
+        Func<string, Stream> openAsset)
+    {
+        ArgumentNullException.ThrowIfNull(openAsset);
+        var session = UiCompositionSession.ForAssets(openAsset);
+        return ComposeLayoutResult(layoutPath, session);
+    }
+
+    private static UiCompositionResult ComposeLayoutResult(
         string layoutPath,
         UiCompositionSession session)
     {
@@ -67,7 +81,7 @@ public static class UiXmlComposer
                            $"UI document '{session.GetDisplayPath(fullPath)}' has no root element.");
 
             ExpandDocumentRoot(root, fullPath, session);
-            return document.OuterXml;
+            return session.CreateResult(document, fullPath);
         }
         finally
         {
@@ -91,8 +105,18 @@ public static class UiXmlComposer
         string contentRoot,
         string idPrefix = null)
     {
+        return ComposeComponentResult(componentPath, contentRoot, idPrefix)
+            .Document
+            .OuterXml;
+    }
+
+    internal static UiCompositionResult ComposeComponentResult(
+        string componentPath,
+        string contentRoot,
+        string idPrefix = null)
+    {
         var session = new UiCompositionSession(contentRoot);
-        return ComposeComponentAsLayout(componentPath, idPrefix, session);
+        return ComposeComponentResult(componentPath, idPrefix, session);
     }
 
     /// <summary>
@@ -112,12 +136,22 @@ public static class UiXmlComposer
         Func<string, Stream> openAsset,
         string idPrefix = null)
     {
-        ArgumentNullException.ThrowIfNull(openAsset);
-        var session = UiCompositionSession.ForAssets(openAsset);
-        return ComposeComponentAsLayout(componentPath, idPrefix, session);
+        return ComposeAssetComponentResult(componentPath, openAsset, idPrefix)
+            .Document
+            .OuterXml;
     }
 
-    private static string ComposeComponentAsLayout(
+    internal static UiCompositionResult ComposeAssetComponentResult(
+        string componentPath,
+        Func<string, Stream> openAsset,
+        string idPrefix = null)
+    {
+        ArgumentNullException.ThrowIfNull(openAsset);
+        var session = UiCompositionSession.ForAssets(openAsset);
+        return ComposeComponentResult(componentPath, idPrefix, session);
+    }
+
+    private static UiCompositionResult ComposeComponentResult(
         string componentPath,
         string idPrefix,
         UiCompositionSession session)
@@ -133,8 +167,8 @@ public static class UiXmlComposer
         var result = new XmlDocument();
         var uiRoot = result.CreateElement(LayoutRootName);
         result.AppendChild(uiRoot);
-        uiRoot.AppendChild(result.ImportNode(componentRoot, true));
-        return result.OuterXml;
+        uiRoot.AppendChild(session.ImportWithMetadata(result, componentRoot));
+        return session.CreateResult(result, fullPath);
     }
 
     private static void ExpandDocumentRoot(
@@ -277,7 +311,7 @@ public static class UiXmlComposer
             true,
             session);
 
-        ReplaceElement(parent, includeNode, expandedElement);
+        ReplaceElement(parent, includeNode, expandedElement, session);
     }
 
     private static void ExpandNamedComponent(
@@ -298,7 +332,7 @@ public static class UiXmlComposer
             false,
             session);
 
-        ReplaceElement(parent, instanceNode, expandedElement);
+        ReplaceElement(parent, instanceNode, expandedElement, session);
     }
 
     private static XmlElement ExpandComponentFile(
@@ -331,7 +365,7 @@ public static class UiXmlComposer
                     "contain exactly one visual root element after its component " +
                     "declarations are removed.");
 
-            var expandedRoot = (XmlElement)visualChildren[0].CloneNode(true);
+            var expandedRoot = session.CloneWithMetadata(visualChildren[0]);
             var idPrefix = explicitIdPrefix;
             if (instanceNode?.HasAttribute("id-prefix") == true)
                 idPrefix = instanceNode.GetAttribute("id-prefix");
@@ -342,6 +376,8 @@ public static class UiXmlComposer
 
             if (instanceNode is not null)
                 ApplyInstanceAttributes(instanceNode, expandedRoot, isInclude);
+
+            session.PrependComponentBoundary(expandedRoot, componentPath);
 
             return expandedRoot;
         }
@@ -354,12 +390,13 @@ public static class UiXmlComposer
     private static void ReplaceElement(
         XmlElement parent,
         XmlElement original,
-        XmlElement replacement)
+        XmlElement replacement,
+        UiCompositionSession session)
     {
         var ownerDocument = parent.OwnerDocument ??
                             throw new XmlException(
                                 "UI element has no owning XML document.");
-        var importedReplacement = ownerDocument.ImportNode(replacement, true);
+        var importedReplacement = session.ImportWithMetadata(ownerDocument, replacement);
         parent.ReplaceChild(importedReplacement, original);
     }
 
@@ -386,8 +423,34 @@ public static class UiXmlComposer
                 continue;
             }
 
+            if (string.Equals(attribute.Name, "class", StringComparison.Ordinal))
+            {
+                expandedRoot.SetAttribute(
+                    "class",
+                    MergeClassTokens(
+                        expandedRoot.GetAttribute("class"),
+                        attribute.Value));
+                continue;
+            }
+
             // Instance attributes intentionally override component-root defaults.
             expandedRoot.SetAttribute(attribute.Name, attribute.Value);
+        }
+    }
+
+    private static string MergeClassTokens(string componentClasses, string instanceClasses)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var result = new List<string>();
+        AddTokens(componentClasses);
+        AddTokens(instanceClasses);
+        return string.Join(' ', result);
+
+        void AddTokens(string value)
+        {
+            foreach (var token in value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+                if (seen.Add(token))
+                    result.Add(token);
         }
     }
 
@@ -512,6 +575,8 @@ public static class UiXmlComposer
         private readonly StringComparer _pathComparer;
 
         private readonly Dictionary<string, XmlDocument> _templates;
+        private readonly Dictionary<XmlElement, List<string>> _componentBoundaries =
+            new(ReferenceEqualityComparer.Instance);
 
         public UiCompositionSession(string contentRoot)
         {
@@ -546,6 +611,78 @@ public static class UiXmlComposer
             Func<string, Stream> openAsset)
         {
             return new UiCompositionSession(openAsset);
+        }
+
+        public UiCompositionResult CreateResult(XmlDocument document, string entryPath)
+        {
+            var trackedDocument = new UiTrackedXmlDocument
+            {
+                PreserveWhitespace = document.PreserveWhitespace,
+                XmlResolver = null
+            };
+            var sourceRoot = document.DocumentElement ??
+                             throw new XmlException("UI composition produced no root element.");
+            var trackedRoot = ImportWithMetadata(trackedDocument, sourceRoot);
+            trackedDocument.AppendChild(trackedRoot);
+            var result = new Dictionary<XmlElement, IReadOnlyList<string>>(
+                ReferenceEqualityComparer.Instance);
+            CopyResultMetadata(trackedRoot);
+            return new UiCompositionResult(
+                trackedDocument,
+                entryPath,
+                IsAssetBacked,
+                IsAssetBacked ? null : ContentRoot,
+                result);
+
+            void CopyResultMetadata(XmlElement? element)
+            {
+                if (element is null)
+                    return;
+                if (_componentBoundaries.TryGetValue(element, out var boundaries))
+                    result.Add(element, boundaries.AsReadOnly());
+                foreach (XmlNode child in element.ChildNodes)
+                    if (child is XmlElement childElement)
+                        CopyResultMetadata(childElement);
+            }
+        }
+
+        public XmlElement CloneWithMetadata(XmlElement source)
+        {
+            var clone = (XmlElement)source.CloneNode(true);
+            CopyMetadata(source, clone);
+            return clone;
+        }
+
+        public XmlElement ImportWithMetadata(XmlDocument document, XmlElement source)
+        {
+            var imported = (XmlElement)document.ImportNode(source, true);
+            CopyMetadata(source, imported);
+            return imported;
+        }
+
+        public void PrependComponentBoundary(XmlElement element, string componentPath)
+        {
+            if (!_componentBoundaries.TryGetValue(element, out var boundaries))
+            {
+                boundaries = [];
+                _componentBoundaries.Add(element, boundaries);
+            }
+
+            boundaries.Insert(0, componentPath);
+        }
+
+        private void CopyMetadata(XmlElement source, XmlElement destination)
+        {
+            if (_componentBoundaries.TryGetValue(source, out var boundaries))
+                _componentBoundaries[destination] = [..boundaries];
+
+            var sourceChildren = source.ChildNodes.OfType<XmlElement>().ToArray();
+            var destinationChildren = destination.ChildNodes.OfType<XmlElement>().ToArray();
+            if (sourceChildren.Length != destinationChildren.Length)
+                throw new InvalidOperationException(
+                    "UI composition metadata could not follow an XML clone.");
+            for (var index = 0; index < sourceChildren.Length; index++)
+                CopyMetadata(sourceChildren[index], destinationChildren[index]);
         }
 
         public string ResolveEntryPath(string path)
@@ -644,7 +781,7 @@ public static class UiXmlComposer
             }
             catch (FileNotFoundException exception) when (IsAssetBacked)
             {
-                var bakedPath = GetBakedXmlAssetPath(fullPath);
+                var bakedPath = UiAssetPath.ToBakedXml(fullPath);
                 throw new FileNotFoundException(
                     $"UI XML asset '{GetDisplayPath(fullPath)}' was not found " +
                     $"as baked asset '{bakedPath}'.",
@@ -653,7 +790,7 @@ public static class UiXmlComposer
             }
             catch (DirectoryNotFoundException exception) when (IsAssetBacked)
             {
-                var bakedPath = GetBakedXmlAssetPath(fullPath);
+                var bakedPath = UiAssetPath.ToBakedXml(fullPath);
                 throw new FileNotFoundException(
                     $"UI XML asset '{GetDisplayPath(fullPath)}' was not found " +
                     $"as baked asset '{bakedPath}'.",
@@ -715,7 +852,7 @@ public static class UiXmlComposer
             string sourcePath,
             XmlReaderSettings settings)
         {
-            using var stream = _openAsset(GetBakedXmlAssetPath(sourcePath));
+            using var stream = _openAsset(UiAssetPath.ToBakedXml(sourcePath));
             var xml = XmlbLoader.GetXmlString(stream);
             settings.CloseInput = true;
             return XmlReader.Create(new StringReader(xml), settings);
@@ -803,17 +940,6 @@ public static class UiXmlComposer
                     path[1] == ':' &&
                     char.IsLetter(path[0])) ||
                    Path.IsPathRooted(path);
-        }
-
-        private static string GetBakedXmlAssetPath(string sourcePath)
-        {
-            if (sourcePath.EndsWith(".xmlb", StringComparison.OrdinalIgnoreCase))
-                return sourcePath;
-
-            if (sourcePath.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
-                return sourcePath[..^".xml".Length] + ".xmlb";
-
-            return sourcePath + ".xmlb";
         }
 
         private string NormalizeInsideContentRoot(

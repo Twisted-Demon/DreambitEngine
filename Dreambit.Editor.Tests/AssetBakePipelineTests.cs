@@ -1,8 +1,10 @@
 using Dreambit;
 using Dreambit.Editor.Assets;
 using Dreambit.Editor.Projects;
+using Dreambit.UI;
 using DreambitEngine.AssetBaker.Abstractions;
 using DreambitEngine.AssetBaker.Pipeline;
+using DreambitEngine.AssetBaker.Pipeline.Docs;
 using DreambitEngine.AssetBaker.Pipeline.Textures;
 using Newtonsoft.Json.Linq;
 using SixLabors.ImageSharp;
@@ -20,6 +22,92 @@ public sealed class AssetBakePipelineTests : IDisposable
     public AssetBakePipelineTests()
     {
         Directory.CreateDirectory(_root);
+    }
+
+    [Fact]
+    public void CssBakerProducesVersionedRuntimeLoadableText()
+    {
+        var assets = Path.Combine(_root, "CssAssets");
+        var output = Path.Combine(_root, "CssBlobs");
+        Directory.CreateDirectory(Path.Combine(assets, "Ui"));
+        const string css = "/* Grüße */ Text { text: \"Crème brûlée\"; color: #FFFFFF; width: 100px; }";
+        File.WriteAllText(Path.Combine(assets, "Ui", "master.css"), css);
+
+        var result = new AssetBakePipeline().BakeBlobs(new AssetBlobBakeRequest(
+            assets,
+            output,
+            RebuildAll: true));
+
+        Assert.Equal(1, result.BakedCount);
+        var reader = new BlobContentReader(output);
+        using var stream = reader.Open("ui/master.cssb");
+        Assert.Equal(css, CssbLoader.GetStylesheet(stream));
+
+        var second = new AssetBakePipeline().BakeBlobs(new AssetBlobBakeRequest(
+            assets,
+            output));
+        Assert.Equal(0, second.BakedCount);
+        Assert.Equal(1, second.CacheHitCount);
+    }
+
+    [Fact]
+    public void CssBakerRejectsMalformedStylesheetBeforePublishing()
+    {
+        var assets = Path.Combine(_root, "BadCssAssets");
+        var output = Path.Combine(_root, "BadCssBlobs");
+        Directory.CreateDirectory(assets);
+        File.WriteAllText(Path.Combine(assets, "bad.css"), "Text { width: 100; }");
+
+        var exception = Assert.Throws<UiStylesheetException>(() =>
+            new AssetBakePipeline().BakeBlobs(new AssetBlobBakeRequest(
+                assets,
+                output,
+                RebuildAll: true)));
+
+        Assert.Contains("width", exception.Message);
+        Assert.False(File.Exists(Path.Combine(output, BlobContentManifest.FileName)));
+    }
+
+    [Fact]
+    public void SameStemXmlAndCssDoNotCollideInRuntimeRegistry()
+    {
+        var assets = Path.Combine(_root, "RegistryCssAssets");
+        var output = Path.Combine(_root, "RegistryCssContent", "content.pak");
+        var registry = Path.Combine(_root, "RegistryCss", "assets.json");
+        Directory.CreateDirectory(Path.Combine(assets, "Ui"));
+        Directory.CreateDirectory(Path.GetDirectoryName(registry)!);
+        File.WriteAllText(Path.Combine(assets, "Ui", "main.xml"), "<Ui />");
+        File.WriteAllText(Path.Combine(assets, "Ui", "main.css"), "Text { width: 10px; }");
+        var xmlId = Guid.NewGuid();
+        var cssId = Guid.NewGuid();
+        File.WriteAllText(
+            registry,
+            $$"""
+              {
+                "schemaVersion": 2,
+                "assets": [
+                  { "id": "{{xmlId:D}}", "path": "Ui/main.xml" },
+                  { "id": "{{cssId:D}}", "path": "Ui/main.css" }
+                ]
+              }
+              """);
+
+        new AssetBakePipeline().BakePak(new AssetBakeRequest(
+            assets,
+            output,
+            registry,
+            RebuildAll: true));
+
+        using var pak = new PakReader(output);
+        using (var xml = pak.Open("ui/main.xmlb"))
+            Assert.Contains("<Ui", XmlbLoader.GetXmlString(xml));
+        using (var css = pak.Open("ui/main.cssb"))
+            Assert.Contains("width", CssbLoader.GetStylesheet(css));
+        using var registryStream = pak.Open(RuntimeAssetRegistry.LogicalPath);
+        var runtimeRegistry = RuntimeAssetRegistry.Load(registryStream);
+        Assert.True(runtimeRegistry.TryResolveAssetName(new AssetId(xmlId), out var xmlName));
+        Assert.Equal("Ui/main", xmlName);
+        Assert.False(runtimeRegistry.TryResolveAssetName(new AssetId(cssId), out _));
     }
 
     [Fact]

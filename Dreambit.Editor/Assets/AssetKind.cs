@@ -20,5 +20,6 @@ internal enum AssetKind
     Cutscene,
     Ldtk,
     TiledMap,
-    Data
+    Data,
+    Stylesheet
 }

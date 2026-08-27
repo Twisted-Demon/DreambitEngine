@@ -62,6 +62,7 @@ nav:
           - TileMover: ecs/components/tile-mover.md
   - User interface:
       - Overview: UI/README.md
+      - Stylesheets: UI/Stylesheets.md
       - Elements:
           - UiElement: UI/Elements/UiElement.md
           - UiContainer: UI/Elements/UiContainer.md

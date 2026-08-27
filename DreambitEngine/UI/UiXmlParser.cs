@@ -20,11 +20,25 @@ public static class UiXmlParser
     /// <returns>The attribute value or <paramref name="defaultValue" />.</returns>
     public static string ParseString(XmlNode node, string name, string defaultValue)
     {
+        MarkAttributeHandled(node, name);
         if (node.Attributes == null)
             return defaultValue;
 
         var attribute = node.Attributes[name];
         return attribute?.Value ?? defaultValue;
+    }
+
+    /// <summary>
+    ///     Marks an attribute as handled by a custom parser. Custom UI elements
+    ///     only need this when they inspect <see cref="XmlNode.Attributes" />
+    ///     directly instead of using the standard parsing helpers.
+    /// </summary>
+    public static void MarkAttributeHandled(XmlNode node, string name)
+    {
+        ArgumentNullException.ThrowIfNull(node);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        if (node.OwnerDocument is UiTrackedXmlDocument trackedDocument)
+            trackedDocument.MarkAttributeHandled(node, name);
     }
 
     /// <summary>Reads an invariant-culture floating-point attribute.</summary>

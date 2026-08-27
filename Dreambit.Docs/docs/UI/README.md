@@ -2,6 +2,9 @@
 
 Production-level replacement documentation for every current Dreambit UI element and brush/interface type.
 
+For construction-time CSS styling, selector scope, cascade rules, supported
+values, and runtime component APIs, see [UI stylesheets](Stylesheets.md).
+
 The API and implementation behavior were reviewed against `Twisted-Demon/DreambitEngine` on 2026-08-03. The replacement set preserves the existing folder and file names and targets the UI implementation represented by:
 
 `ef6e5b9c600ad6e215c53ea287a0c7858884ce00`  

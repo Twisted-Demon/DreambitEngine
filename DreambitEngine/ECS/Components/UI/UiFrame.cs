@@ -8,7 +8,35 @@ namespace Dreambit.ECS;
 [BlueprintType(nameof(UiFrame))]
 public class UiFrame : DrawableComponent<UiFrame>
 {
+    private string _cssPath;
     private string _layoutPath;
+
+    /// <summary>
+    ///     Gets or sets the optional global stylesheet source path. Changing it
+    ///     rebuilds an existing layout transactionally; null or whitespace clears it.
+    /// </summary>
+    [DreambitSerialize]
+    public string CssPath
+    {
+        get => _cssPath;
+        set
+        {
+            var normalized = string.IsNullOrWhiteSpace(value) ? null : value;
+            if (string.Equals(_cssPath, normalized, StringComparison.Ordinal))
+                return;
+
+            if (Layout is null || string.IsNullOrWhiteSpace(_layoutPath))
+            {
+                _cssPath = normalized;
+                return;
+            }
+
+            // Rebuild before committing either the path or the retained tree.
+            var newLayout = UiLoader.LoadFromAsset(_layoutPath, normalized);
+            _cssPath = normalized;
+            Layout = newLayout;
+        }
+    }
 
     [DreambitSerialize]
     public string LayoutPath
@@ -44,7 +72,7 @@ public class UiFrame : DrawableComponent<UiFrame>
                 nameof(layoutPath));
 
         // Do not replace a working layout when a reload fails to compose.
-        var newLayout = UiLoader.LoadFromAsset(layoutPath);
+        var newLayout = UiLoader.LoadFromAsset(layoutPath, _cssPath);
 
         _layoutPath = layoutPath;
         Layout = newLayout;
@@ -53,6 +81,20 @@ public class UiFrame : DrawableComponent<UiFrame>
     public UiFrame WithLayout(string layoutPath)
     {
         LoadLayout(layoutPath);
+        return this;
+    }
+
+    /// <summary>Configures the required global stylesheet source path.</summary>
+    /// <param name="cssPath">A content-root-relative <c>.css</c> path.</param>
+    /// <returns>This frame for fluent configuration.</returns>
+    public UiFrame WithCss(string cssPath)
+    {
+        if (string.IsNullOrWhiteSpace(cssPath))
+            throw new ArgumentException(
+                "A UI stylesheet path is required.",
+                nameof(cssPath));
+
+        CssPath = cssPath;
         return this;
     }
 
@@ -74,7 +116,40 @@ public class UiFrame : DrawableComponent<UiFrame>
 
         return UiLoader.LoadComponentFromAsset(
             componentPath,
-            idPrefix);
+            idPrefix,
+            _cssPath,
+            Layout is null ? null : _layoutPath,
+            null);
+    }
+
+    /// <summary>
+    ///     Creates a detached component with an additional required stylesheet
+    ///     applied during construction.
+    /// </summary>
+    /// <param name="componentPath">A path relative to the content root.</param>
+    /// <param name="idPrefix">Optional text prepended to every authored component ID.</param>
+    /// <param name="additionalCssPath">A required additional stylesheet source path.</param>
+    /// <returns>The fully parsed detached component root.</returns>
+    public UiElement CreateComponent(
+        string componentPath,
+        string idPrefix,
+        string additionalCssPath)
+    {
+        if (string.IsNullOrWhiteSpace(componentPath))
+            throw new ArgumentException(
+                "A UI component path is required.",
+                nameof(componentPath));
+        if (string.IsNullOrWhiteSpace(additionalCssPath))
+            throw new ArgumentException(
+                "An additional UI stylesheet path is required.",
+                nameof(additionalCssPath));
+
+        return UiLoader.LoadComponentFromAsset(
+            componentPath,
+            idPrefix,
+            _cssPath,
+            Layout is null ? null : _layoutPath,
+            additionalCssPath);
     }
 
     internal UiInputCapture RouteInput(UiInputCapture availableInput)

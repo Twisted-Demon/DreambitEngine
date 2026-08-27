@@ -376,6 +376,12 @@ public sealed class AssetBakePipeline
             if (bakerRegistry.GetByExt(extension) is null)
                 continue;
 
+            // Stylesheets are addressed by their full logical path so a sibling
+            // foo.css can coexist with foo.xml. They intentionally do not receive
+            // stable IDs in the extension-stripping runtime registry.
+            if (extension.Equals(".css", StringComparison.OrdinalIgnoreCase))
+                continue;
+
             var logicalName = IsSerializedDreambitExtension(extension)
                 ? entry.Path.Replace('\\', '/')
                 : Path.ChangeExtension(entry.Path, null)!.Replace('\\', '/');
