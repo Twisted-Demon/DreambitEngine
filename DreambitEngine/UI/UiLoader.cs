@@ -74,6 +74,24 @@ public static class UiLoader
     }
 
     /// <summary>
+    ///     Loads a UI document through Dreambit's active baked-content source.
+    ///     Source-style <c>.xml</c> paths are resolved to their baked
+    ///     <c>.xmlb</c> assets in the active blob directory or PAK.
+    /// </summary>
+    /// <param name="assetPath">
+    ///     The content-root-relative UI path, such as
+    ///     <c>Ui/main-menu.xml</c>.
+    /// </param>
+    /// <returns>The parsed layout.</returns>
+    public static UiLayout LoadFromAsset(string assetPath)
+    {
+        var composedXml = UiXmlComposer.ComposeAssetLayout(
+            assetPath,
+            OpenAssetStream);
+        return LoadFromXml(composedXml);
+    }
+
+    /// <summary>
     ///     Creates one detached file-backed UI component. The returned element can
     ///     be attached to an existing layout with <see cref="UiContainer.AddChild" />.
     /// </summary>
@@ -103,6 +121,45 @@ public static class UiLoader
         var component = temporaryLayout.Root.Children[0];
         temporaryLayout.Root.RemoveChild(component);
         return component;
+    }
+
+    /// <summary>
+    ///     Creates one detached UI component through Dreambit's active
+    ///     baked-content source.
+    /// </summary>
+    /// <param name="assetPath">
+    ///     The content-root-relative component path, such as
+    ///     <c>Ui/components/button.xml</c>.
+    /// </param>
+    /// <param name="idPrefix">Optional text prepended to every authored component ID.</param>
+    /// <returns>The detached component root.</returns>
+    public static UiElement LoadComponentFromAsset(
+        string assetPath,
+        string idPrefix = null)
+    {
+        var composedXml = UiXmlComposer.ComposeAssetComponentAsLayout(
+            assetPath,
+            OpenAssetStream,
+            idPrefix);
+        var temporaryLayout = LoadFromXml(composedXml);
+
+        if (temporaryLayout.Root.Children.Count != 1)
+            throw new XmlException(
+                $"UI component '{assetPath}' did not produce exactly one " +
+                "visual root element.");
+
+        var component = temporaryLayout.Root.Children[0];
+        temporaryLayout.Root.RemoveChild(component);
+        return component;
+    }
+
+    private static System.IO.Stream OpenAssetStream(string assetPath)
+    {
+        return Resources.OpenAssetStream(
+            assetPath,
+            Resources.PakName,
+            Resources.UsePak,
+            Resources.ActiveContentDirectory);
     }
 
     private static UiElement ParseElement(

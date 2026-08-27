@@ -11,6 +11,18 @@ public sealed class NetworkSceneCatalog
         new(StringComparer.Ordinal);
     private bool _frozen;
 
+    /// <summary>Registers a stable synchronized-scene key and its local Scene factory.</summary>
+    /// <param name="key">
+    /// The case-sensitive key shared by server and clients. Its UTF-8 representation must be no
+    /// more than 256 bytes.
+    /// </param>
+    /// <param name="factory">
+    /// A factory that creates a new local Scene whenever this key is entered. For an editor-authored
+    /// Scene, load its Scene Blueprint from <c>OnInitialize</c>.
+    /// </param>
+    /// <exception cref="InvalidOperationException">
+    /// A session is active or <paramref name="key"/> is already registered.
+    /// </exception>
     public void Register(string key, Func<Scene> factory)
     {
         if (_frozen)
@@ -24,6 +36,9 @@ public sealed class NetworkSceneCatalog
             throw new InvalidOperationException($"Network Scene key '{key}' is already registered.");
     }
 
+    /// <summary>Determines whether a non-empty Scene key is registered.</summary>
+    /// <param name="key">The case-sensitive key to find.</param>
+    /// <returns><see langword="true"/> when the key has a registered factory.</returns>
     public bool Contains(string key) =>
         !string.IsNullOrWhiteSpace(key) && _factories.ContainsKey(key);
 

@@ -110,6 +110,7 @@ nav:
       - Overview: input/index.md
       - Direct input: input/direct-input.md
       - Actions, maps, and bindings: input/actions.md
+  - Networking: networking/index.md
   - Physics:
       - Overview: physics/index.md
       - Colliders and triggers: physics/colliders.md

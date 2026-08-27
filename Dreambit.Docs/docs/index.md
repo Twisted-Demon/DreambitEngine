@@ -1,7 +1,7 @@
 # Dreambit Engine
 
 Dreambit is a .NET 8 game engine built on MonoGame. It combines a scene-based
-game loop, an entity-component system, 2D rendering and lighting, polygon
+game loop, an entity-component system, reusable multiplayer networking, 2D rendering and lighting, polygon
 physics, retained-mode XML UI, input actions, content baking, particles, audio,
 AI helpers, coroutines, and LDtk integration.
 
@@ -29,6 +29,8 @@ and ECS components you can attach today.
   [colliders](physics/colliders.md) → [movement](physics/movement.md)
 - **Create data-driven content:** [Assets](assets/index.md) →
   [content pipeline](assets/content-pipeline.md) → [blueprints](assets/blueprints.md)
+- **Add multiplayer:** [Networking](networking/index.md) → configure the protocol contract →
+  host or join from a local menu → enter a synchronized Scene
 
 !!! note "Documentation scope"
     These pages describe the current repository implementation. A few APIs are

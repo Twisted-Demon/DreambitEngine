@@ -28,33 +28,104 @@ public sealed class NetworkService : IDisposable
     /// a session and changed again after <see cref="Stop"/> for the next session.
     /// </summary>
     public NetworkOptions Options { get; } = new();
+
+    /// <summary>
+    /// Gets the persistent typed-message registry. Configure it while offline; registrations are
+    /// frozen from session start until <see cref="Stop"/>.
+    /// </summary>
     public NetworkMessageRegistry Messages { get; } = new();
+
+    /// <summary>
+    /// Gets the persistent Component replication registry. Configure it while offline;
+    /// registrations are frozen from session start until <see cref="Stop"/>.
+    /// </summary>
     public NetworkReplicationRegistry Replication { get; } = new();
+
+    /// <summary>
+    /// Gets the persistent synchronized-Scene catalog. Configure it while offline; registrations
+    /// are frozen from session start until <see cref="Stop"/>.
+    /// </summary>
     public NetworkSceneCatalog Scenes { get; } = new();
 
+    /// <summary>Gets the local role, or <see cref="NetworkRole.Offline"/> when no session is active.</summary>
     public NetworkRole Role => _session?.Role ?? NetworkRole.Offline;
+
+    /// <summary>Gets whether this process is authoritative: a dedicated server or listen host.</summary>
     public bool IsServer => Role is NetworkRole.Server or NetworkRole.Host;
+
+    /// <summary>Gets whether this process has a client role: a remote client or listen host.</summary>
     public bool IsClient => Role is NetworkRole.Client or NetworkRole.Host;
+
+    /// <summary>Gets whether this process is an authoritative listen host with a local peer.</summary>
     public bool IsHost => Role == NetworkRole.Host;
+
+    /// <summary>
+    /// Gets whether the local client has completed its protocol handshake. A host is connected as
+    /// soon as it starts; a dedicated server listens for clients and reports <see langword="false"/>.
+    /// </summary>
     public bool IsConnected => _session?.IsConnected == true;
+
+    /// <summary>
+    /// Gets the local client's peer ID. A dedicated server and an unconnected client return
+    /// <see cref="NetworkPeerId.None"/>.
+    /// </summary>
     public NetworkPeerId LocalPeerId => _session?.LocalPeerId ?? NetworkPeerId.None;
+
+    /// <summary>
+    /// Gets the active synchronized-scene generation, or <see cref="NetworkSceneEpoch.None"/> while
+    /// the session is in a local menu/bootstrap Scene or offline.
+    /// </summary>
     public NetworkSceneEpoch SceneEpoch => _session?.SceneEpoch ?? NetworkSceneEpoch.None;
+
+    /// <summary>
+    /// Gets the registered key for the current synchronized Scene, or <see langword="null"/> when
+    /// the current Scene is local or no network Scene is active.
+    /// </summary>
     public string? CurrentSceneKey => _session?.CurrentSceneKey;
+
+    /// <summary>
+    /// Gets the authoritative fixed-step tick. On a client this is the most recently accepted
+    /// server tick; it is zero before synchronization begins.
+    /// </summary>
     public ulong ServerTick => _session?.ServerTick ?? 0;
+
+    /// <summary>
+    /// Gets the network Entity assigned to the local peer, or <see langword="null"/> until the
+    /// server publishes a player mapping in the current network world.
+    /// </summary>
     public Entity? LocalPlayerEntity =>
         _session is { World: { } world, LocalPeerId.IsValid: true } session &&
         world.TryGetPlayerEntity(session.LocalPeerId, out var entity)
             ? entity
             : null;
 
+    /// <summary>
+    /// Occurs after a peer passes the protocol compatibility handshake. Scene synchronization may
+    /// still be in progress. A remote client receives its own assigned peer ID through this event.
+    /// </summary>
     public event Action<NetworkPeerId>? PeerConnected;
+
+    /// <summary>Occurs after an identified peer disconnects.</summary>
+    /// <remarks>
+    /// The first argument is the peer ID, the second is the transport-neutral reason, and the third
+    /// is optional diagnostic text intended for logging rather than gameplay decisions.
+    /// </remarks>
     public event Action<NetworkPeerId, TransportDisconnectReason, string?>? PeerDisconnected;
+
+    /// <summary>
+    /// Occurs when a client fails before completing its protocol handshake. The diagnostic text is
+    /// optional and intended for logging or a connection-error screen.
+    /// </summary>
     public event Action<TransportDisconnectReason, string?>? ConnectionFailed;
 
     /// <summary>
     /// Starts an authoritative server. An existing local Scene remains local; use
     /// <see cref="ChangeScene"/> when the server is ready to enter a synchronized Scene.
     /// </summary>
+    /// <param name="transport">
+    /// A stopped server-configured transport. The service takes ownership and disposes it on failure
+    /// or when the session stops.
+    /// </param>
     public void StartServer(INetworkTransport transport) =>
         StartSession(NetworkRole.Server, transport);
 
@@ -62,6 +133,10 @@ public sealed class NetworkService : IDisposable
     /// Starts an authoritative listen server/host. An existing local Scene remains local; use
     /// <see cref="ChangeScene"/> when the host is ready to enter a synchronized Scene.
     /// </summary>
+    /// <param name="transport">
+    /// A stopped server-configured transport. The service takes ownership and disposes it on failure
+    /// or when the session stops.
+    /// </param>
     public void StartHost(INetworkTransport transport) =>
         StartSession(NetworkRole.Host, transport);
 
@@ -69,18 +144,40 @@ public sealed class NetworkService : IDisposable
     /// Starts a client connection. An existing local Scene remains active until the server
     /// requests a catalog-driven synchronized Scene transition.
     /// </summary>
+    /// <param name="transport">
+    /// A stopped client-configured transport. The service takes ownership and disposes it on failure
+    /// or when the session stops.
+    /// </param>
     public void Connect(INetworkTransport transport) =>
         StartSession(NetworkRole.Client, transport);
 
+    /// <summary>Starts an authoritative dedicated server using the Direct IP transport.</summary>
+    /// <param name="port">The local TCP and UDP port to bind.</param>
+    /// <param name="options">Optional Direct IP transport settings.</param>
     public void StartServer(int port, DirectIpOptions? options = null) =>
         StartServer(DirectIpTransport.Listen(port, options));
 
+    /// <summary>Starts an authoritative listen host using the Direct IP transport.</summary>
+    /// <param name="port">The local TCP and UDP port to bind.</param>
+    /// <param name="options">Optional Direct IP transport settings.</param>
     public void StartHost(int port, DirectIpOptions? options = null) =>
         StartHost(DirectIpTransport.Listen(port, options));
 
+    /// <summary>Starts a client session that connects using the Direct IP transport.</summary>
+    /// <param name="host">An IPv4 address or host name that resolves to IPv4.</param>
+    /// <param name="port">The server's TCP and UDP port.</param>
+    /// <param name="options">Optional Direct IP transport settings.</param>
     public void Connect(string host, int port, DirectIpOptions? options = null) =>
         Connect(DirectIpTransport.Connect(host, port, options));
 
+    /// <summary>
+    /// Schedules an authoritative transition to a registered synchronized Scene. Connected clients
+    /// receive the same key and create the Scene through their local <see cref="Scenes"/> catalog.
+    /// </summary>
+    /// <param name="sceneKey">The case-sensitive key previously registered on every peer.</param>
+    /// <exception cref="InvalidOperationException">
+    /// The local process is not an active server/host, or another synchronized Scene change is pending.
+    /// </exception>
     public void ChangeScene(string sceneKey)
     {
         if (!IsServer || _session is null)
@@ -100,10 +197,28 @@ public sealed class NetworkService : IDisposable
         _core.SetNextSceneFromNetworking(scene, this);
     }
 
+    /// <summary>
+    /// Materializes a Blueprint as a server-authoritative runtime entity and reliably reproduces it
+    /// on synchronized clients with its initial replicated Component state.
+    /// </summary>
+    /// <param name="blueprint">
+    /// A Blueprint with a stable, non-empty <see cref="DreambitAsset.AssetId"/> available to every peer.
+    /// </param>
+    /// <param name="options">Optional ownership and authored-value overrides.</param>
+    /// <returns>The authoritative local Entity created in the current Scene.</returns>
+    /// <exception cref="InvalidOperationException">
+    /// The local process is not the server/host, no network Scene is active, or the Blueprint cannot
+    /// be represented by the registered network contract.
+    /// </exception>
     public Entity Spawn(EntityBlueprint blueprint, NetworkSpawnOptions? options = null) =>
         _session?.Spawn(blueprint, options) ??
         throw new InvalidOperationException("A networking session is not active.");
 
+    /// <summary>Authoritatively destroys a registered network entity on the server and clients.</summary>
+    /// <param name="entity">The entity registered in the current network world.</param>
+    /// <exception cref="InvalidOperationException">
+    /// The local process is not the server/host or the Entity is not a current network entity.
+    /// </exception>
     public void Despawn(Entity entity)
     {
         if (_session is null)
@@ -111,6 +226,11 @@ public sealed class NetworkService : IDisposable
         _session.Despawn(entity);
     }
 
+    /// <summary>Sends a registered gameplay message from a client or host-local peer to the server.</summary>
+    /// <typeparam name="T">The registered message type.</typeparam>
+    /// <param name="message">The message value to encode.</param>
+    /// <param name="delivery">The desired delivery mode.</param>
+    /// <remarks>A host-local message is dispatched without transport and may invoke its handler synchronously.</remarks>
     public void SendToServer<T>(
         T message,
         NetworkDelivery delivery = NetworkDelivery.ReliableOrdered)
@@ -120,6 +240,12 @@ public sealed class NetworkService : IDisposable
         _session.SendToServer(message, delivery);
     }
 
+    /// <summary>Sends a registered gameplay message from the server to one ready peer.</summary>
+    /// <typeparam name="T">The registered message type.</typeparam>
+    /// <param name="peer">The destination peer.</param>
+    /// <param name="message">The message value to encode.</param>
+    /// <param name="delivery">The desired delivery mode.</param>
+    /// <remarks>Sending to the host's local peer dispatches without transport and may invoke its handler synchronously.</remarks>
     public void Send<T>(
         NetworkPeerId peer,
         T message,
@@ -130,6 +256,12 @@ public sealed class NetworkService : IDisposable
         _session.Send(peer, message, delivery);
     }
 
+    /// <summary>Looks up the current network identity assigned to a local Entity.</summary>
+    /// <param name="entity">The local Entity to find.</param>
+    /// <param name="id">
+    /// Receives the network identity, or <see cref="NetworkEntityId.None"/> when not found.
+    /// </param>
+    /// <returns><see langword="true"/> when the Entity is registered in the current network world.</returns>
     public bool TryGetNetworkId(Entity entity, out NetworkEntityId id)
     {
         if (_session?.World is { } world)
@@ -138,6 +270,10 @@ public sealed class NetworkService : IDisposable
         return false;
     }
 
+    /// <summary>Looks up the local Entity for an ID in the current network world.</summary>
+    /// <param name="id">The current-scene network entity ID.</param>
+    /// <param name="entity">Receives the local Entity, or <see langword="null"/> when not found.</param>
+    /// <returns><see langword="true"/> when the ID is registered in the current network world.</returns>
     public bool TryGetEntity(NetworkEntityId id, out Entity? entity)
     {
         if (_session?.World is { } world)
@@ -146,6 +282,13 @@ public sealed class NetworkService : IDisposable
         return false;
     }
 
+    /// <summary>Resolves a scene-safe network entity reference in the current network world.</summary>
+    /// <param name="reference">The reference containing both scene epoch and entity ID.</param>
+    /// <param name="entity">Receives the local Entity, or <see langword="null"/> when unresolved.</param>
+    /// <returns>
+    /// <see langword="true"/> only when the reference's epoch matches the current synchronized Scene
+    /// and its entity ID is registered.
+    /// </returns>
     public bool TryResolve(NetworkEntityRef reference, out Entity? entity)
     {
         if (_session?.World is { } world)
@@ -154,10 +297,22 @@ public sealed class NetworkService : IDisposable
         return false;
     }
 
+    /// <summary>Determines whether the current local peer owns a network Entity.</summary>
+    /// <param name="entity">The local Entity to test.</param>
+    /// <returns>
+    /// <see langword="true"/> when the Entity is registered and owned by this host/client's peer ID.
+    /// Dedicated servers and unconnected clients return <see langword="false"/>.
+    /// </returns>
     public bool IsOwnedByLocalPeer(Entity entity) =>
         _session is { World: { } world, LocalPeerId.IsValid: true } session &&
         world.IsOwnedBy(session.LocalPeerId, entity);
 
+    /// <summary>
+    /// Assigns a network Entity as a peer's player Entity and reliably publishes that mapping.
+    /// </summary>
+    /// <param name="peer">The peer receiving the player mapping.</param>
+    /// <param name="entity">An Entity registered in the current network world.</param>
+    /// <exception cref="InvalidOperationException">The local process is not an active server/host.</exception>
     public void SetPlayerEntity(NetworkPeerId peer, Entity entity)
     {
         if (_session is null)
@@ -165,6 +320,12 @@ public sealed class NetworkService : IDisposable
         _session.SetPlayerEntity(peer, entity);
     }
 
+    /// <summary>Changes a network Entity's ownership and reliably publishes the change.</summary>
+    /// <param name="entity">An Entity registered in the current network world.</param>
+    /// <param name="owner">
+    /// The new owning peer, or <see cref="NetworkPeerId.None"/> for server ownership.
+    /// </param>
+    /// <exception cref="InvalidOperationException">The local process is not an active server/host.</exception>
     public void SetOwner(Entity entity, NetworkPeerId owner)
     {
         if (_session is null)
@@ -172,6 +333,11 @@ public sealed class NetworkService : IDisposable
         _session.SetOwner(entity, owner);
     }
 
+    /// <summary>
+    /// Ends the active session, disposes its transport, clears runtime network identity, destroys
+    /// dynamic network spawns, and unfreezes the registries for later configuration and restart.
+    /// Calling this method while offline has no effect.
+    /// </summary>
     public void Stop()
     {
         var session = _session;
@@ -209,6 +375,10 @@ public sealed class NetworkService : IDisposable
 
     internal void StopIntake() => _session?.StopIntake();
 
+    /// <summary>
+    /// Permanently disposes this Core-owned service and its active session. Normal games should use
+    /// <see cref="Stop"/> to return offline and let <see cref="Core"/> dispose the service at shutdown.
+    /// </summary>
     public void Dispose()
     {
         if (_disposed)

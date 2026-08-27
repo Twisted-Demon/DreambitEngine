@@ -7,8 +7,8 @@ using System.Xml;
 namespace Dreambit.UI;
 
 /// <summary>
-///     Expands file-backed UI includes and named components before the retained
-///     element tree is created.
+///     Expands UI includes and named components from direct files or Dreambit
+///     baked assets before the retained element tree is created.
 /// </summary>
 public static class UiXmlComposer
 {
@@ -29,6 +29,32 @@ public static class UiXmlComposer
     public static string ComposeLayout(string layoutPath, string contentRoot)
     {
         var session = new UiCompositionSession(contentRoot);
+        return ComposeLayout(layoutPath, session);
+    }
+
+    /// <summary>
+    ///     Loads a complete UI document from Dreambit's baked asset source and
+    ///     expands all of its component references.
+    /// </summary>
+    /// <param name="layoutPath">
+    ///     A content-root-relative source path such as <c>Ui/main-menu.xml</c>.
+    ///     The corresponding <c>.xmlb</c> asset is opened for composition.
+    /// </param>
+    /// <param name="openAsset">Opens a baked asset by logical path.</param>
+    /// <returns>Ordinary UI XML containing one <c>&lt;Ui&gt;</c> root.</returns>
+    internal static string ComposeAssetLayout(
+        string layoutPath,
+        Func<string, Stream> openAsset)
+    {
+        ArgumentNullException.ThrowIfNull(openAsset);
+        var session = UiCompositionSession.ForAssets(openAsset);
+        return ComposeLayout(layoutPath, session);
+    }
+
+    private static string ComposeLayout(
+        string layoutPath,
+        UiCompositionSession session)
+    {
         var fullPath = session.ResolveEntryPath(layoutPath);
 
         session.Enter(fullPath);
@@ -66,6 +92,36 @@ public static class UiXmlComposer
         string idPrefix = null)
     {
         var session = new UiCompositionSession(contentRoot);
+        return ComposeComponentAsLayout(componentPath, idPrefix, session);
+    }
+
+    /// <summary>
+    ///     Loads one component from Dreambit's baked asset source and wraps its
+    ///     expanded visual root in a temporary <c>&lt;Ui&gt;</c> document.
+    /// </summary>
+    /// <param name="componentPath">
+    ///     A content-root-relative source path such as
+    ///     <c>Ui/components/button.xml</c>. The corresponding <c>.xmlb</c>
+    ///     asset is opened for composition.
+    /// </param>
+    /// <param name="openAsset">Opens a baked asset by logical path.</param>
+    /// <param name="idPrefix">Optional text prepended to every authored component ID.</param>
+    /// <returns>Ordinary UI XML containing the component's single visual root.</returns>
+    internal static string ComposeAssetComponentAsLayout(
+        string componentPath,
+        Func<string, Stream> openAsset,
+        string idPrefix = null)
+    {
+        ArgumentNullException.ThrowIfNull(openAsset);
+        var session = UiCompositionSession.ForAssets(openAsset);
+        return ComposeComponentAsLayout(componentPath, idPrefix, session);
+    }
+
+    private static string ComposeComponentAsLayout(
+        string componentPath,
+        string idPrefix,
+        UiCompositionSession session)
+    {
         var fullPath = session.ResolveEntryPath(componentPath);
         var componentRoot = ExpandComponentFile(
             fullPath,
@@ -445,16 +501,17 @@ public static class UiXmlComposer
 
     private sealed class UiCompositionSession
     {
-        private static readonly StringComparer PathComparer =
+        private static readonly StringComparer FilePathComparer =
             OperatingSystem.IsWindows()
                 ? StringComparer.OrdinalIgnoreCase
                 : StringComparer.Ordinal;
 
-        private readonly HashSet<string> _activeFiles = new(PathComparer);
+        private readonly HashSet<string> _activeFiles;
         private readonly List<string> _activeStack = [];
+        private readonly Func<string, Stream> _openAsset;
+        private readonly StringComparer _pathComparer;
 
-        private readonly Dictionary<string, XmlDocument> _templates =
-            new(PathComparer);
+        private readonly Dictionary<string, XmlDocument> _templates;
 
         public UiCompositionSession(string contentRoot)
         {
@@ -467,9 +524,29 @@ public static class UiXmlComposer
             if (!Directory.Exists(ContentRoot))
                 throw new DirectoryNotFoundException(
                     $"UI content root '{ContentRoot}' does not exist.");
+
+            _pathComparer = FilePathComparer;
+            _activeFiles = new HashSet<string>(_pathComparer);
+            _templates = new Dictionary<string, XmlDocument>(_pathComparer);
+        }
+
+        private UiCompositionSession(Func<string, Stream> openAsset)
+        {
+            _openAsset = openAsset;
+            _pathComparer = StringComparer.OrdinalIgnoreCase;
+            _activeFiles = new HashSet<string>(_pathComparer);
+            _templates = new Dictionary<string, XmlDocument>(_pathComparer);
         }
 
         public string ContentRoot { get; }
+
+        private bool IsAssetBacked => _openAsset is not null;
+
+        public static UiCompositionSession ForAssets(
+            Func<string, Stream> openAsset)
+        {
+            return new UiCompositionSession(openAsset);
+        }
 
         public string ResolveEntryPath(string path)
         {
@@ -477,6 +554,9 @@ public static class UiXmlComposer
                 throw new ArgumentException(
                     "A UI document path is required.",
                     nameof(path));
+
+            if (IsAssetBacked)
+                return NormalizeAssetPath(path, path, true);
 
             var candidate = Path.IsPathRooted(path)
                 ? path
@@ -495,6 +575,9 @@ public static class UiXmlComposer
                 throw new XmlException(
                     $"Cannot resolve UI component source '{source}' because the " +
                     "declaring document has no file path.");
+
+            if (IsAssetBacked)
+                return ResolveAssetReference(declaringDocumentPath, source);
 
             string candidate;
             if (source.StartsWith("~/", StringComparison.Ordinal) ||
@@ -528,14 +611,14 @@ public static class UiXmlComposer
             string fullPath,
             UiDocumentKind expectedKind)
         {
-            fullPath = NormalizeInsideContentRoot(fullPath, fullPath);
+            fullPath = NormalizePath(fullPath, fullPath);
             if (_templates.TryGetValue(fullPath, out var cachedDocument))
             {
                 ValidateDocumentRoot(cachedDocument, fullPath, expectedKind);
                 return cachedDocument;
             }
 
-            if (!File.Exists(fullPath))
+            if (!IsAssetBacked && !File.Exists(fullPath))
                 throw new FileNotFoundException(
                     $"UI XML file '{GetDisplayPath(fullPath)}' was not found.",
                     fullPath);
@@ -553,13 +636,35 @@ public static class UiXmlComposer
                     DtdProcessing = DtdProcessing.Prohibit,
                     XmlResolver = null
                 };
-                using var reader = XmlReader.Create(fullPath, settings);
+
+                using var reader = IsAssetBacked
+                    ? CreateAssetXmlReader(fullPath, settings)
+                    : XmlReader.Create(fullPath, settings);
                 document.Load(reader);
+            }
+            catch (FileNotFoundException exception) when (IsAssetBacked)
+            {
+                var bakedPath = GetBakedXmlAssetPath(fullPath);
+                throw new FileNotFoundException(
+                    $"UI XML asset '{GetDisplayPath(fullPath)}' was not found " +
+                    $"as baked asset '{bakedPath}'.",
+                    bakedPath,
+                    exception);
+            }
+            catch (DirectoryNotFoundException exception) when (IsAssetBacked)
+            {
+                var bakedPath = GetBakedXmlAssetPath(fullPath);
+                throw new FileNotFoundException(
+                    $"UI XML asset '{GetDisplayPath(fullPath)}' was not found " +
+                    $"as baked asset '{bakedPath}'.",
+                    bakedPath,
+                    exception);
             }
             catch (XmlException exception)
             {
                 throw new XmlException(
-                    $"Could not parse UI XML file '{GetDisplayPath(fullPath)}'.",
+                    $"Could not parse UI XML {(IsAssetBacked ? "asset" : "file")} " +
+                    $"'{GetDisplayPath(fullPath)}'.",
                     exception);
             }
 
@@ -570,7 +675,7 @@ public static class UiXmlComposer
 
         public void Enter(string fullPath)
         {
-            fullPath = Path.GetFullPath(fullPath);
+            fullPath = NormalizePath(fullPath, fullPath);
             if (!_activeFiles.Add(fullPath))
             {
                 var chain = string.Join(
@@ -585,9 +690,9 @@ public static class UiXmlComposer
 
         public void Exit(string fullPath)
         {
-            fullPath = Path.GetFullPath(fullPath);
+            fullPath = NormalizePath(fullPath, fullPath);
             if (_activeStack.Count == 0 ||
-                !PathComparer.Equals(_activeStack[^1], fullPath))
+                !_pathComparer.Equals(_activeStack[^1], fullPath))
                 throw new InvalidOperationException(
                     "UI composition stack became unbalanced.");
 
@@ -597,10 +702,118 @@ public static class UiXmlComposer
 
         public string GetDisplayPath(string fullPath)
         {
+            if (IsAssetBacked)
+                return fullPath;
+
             var relative = Path.GetRelativePath(ContentRoot, fullPath);
             return Path.IsPathRooted(relative)
                 ? fullPath
                 : relative;
+        }
+
+        private XmlReader CreateAssetXmlReader(
+            string sourcePath,
+            XmlReaderSettings settings)
+        {
+            using var stream = _openAsset(GetBakedXmlAssetPath(sourcePath));
+            var xml = XmlbLoader.GetXmlString(stream);
+            settings.CloseInput = true;
+            return XmlReader.Create(new StringReader(xml), settings);
+        }
+
+        private string ResolveAssetReference(
+            string declaringDocumentPath,
+            string source)
+        {
+            if (source.StartsWith("~/", StringComparison.Ordinal) ||
+                source.StartsWith("~\\", StringComparison.Ordinal))
+                return NormalizeAssetPath(source[2..], source);
+
+            if (IsAssetPathRooted(source))
+                throw new XmlException(
+                    $"UI component source '{source}' must be relative. " +
+                    "Use '~/' for a content-root-relative path.");
+
+            var declaringPath = NormalizeAssetPath(
+                declaringDocumentPath,
+                declaringDocumentPath);
+            var separatorIndex = declaringPath.LastIndexOf('/');
+            var declaringDirectory = separatorIndex < 0
+                ? string.Empty
+                : declaringPath[..separatorIndex];
+            var candidate = string.IsNullOrEmpty(declaringDirectory)
+                ? source
+                : $"{declaringDirectory}/{source}";
+            return NormalizeAssetPath(candidate, source);
+        }
+
+        private string NormalizePath(
+            string path,
+            string originalPath)
+        {
+            return IsAssetBacked
+                ? NormalizeAssetPath(path, originalPath)
+                : NormalizeInsideContentRoot(path, originalPath);
+        }
+
+        private static string NormalizeAssetPath(
+            string path,
+            string originalPath,
+            bool allowRootAlias = false)
+        {
+            var normalized = path.Replace('\\', '/').Trim();
+            if (allowRootAlias && normalized.StartsWith("~/", StringComparison.Ordinal))
+                normalized = normalized[2..];
+
+            if (IsAssetPathRooted(normalized))
+                throw new XmlException(
+                    $"UI asset path '{originalPath}' must be relative to the content root.");
+
+            var segments = new List<string>();
+            foreach (var segment in normalized.Split('/', StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (string.Equals(segment, ".", StringComparison.Ordinal))
+                    continue;
+
+                if (string.Equals(segment, "..", StringComparison.Ordinal))
+                {
+                    if (segments.Count == 0)
+                        throw new XmlException(
+                            $"UI path '{originalPath}' resolves outside the content root.");
+
+                    segments.RemoveAt(segments.Count - 1);
+                    continue;
+                }
+
+                segments.Add(segment);
+            }
+
+            if (segments.Count == 0)
+                throw new XmlException(
+                    $"UI asset path '{originalPath}' does not name a document.");
+
+            return string.Join('/', segments);
+        }
+
+        private static bool IsAssetPathRooted(string path)
+        {
+            return path.StartsWith("/", StringComparison.Ordinal) ||
+                   path.StartsWith('\\') ||
+                   (path.Length >= 2 &&
+                    path[1] == ':' &&
+                    char.IsLetter(path[0])) ||
+                   Path.IsPathRooted(path);
+        }
+
+        private static string GetBakedXmlAssetPath(string sourcePath)
+        {
+            if (sourcePath.EndsWith(".xmlb", StringComparison.OrdinalIgnoreCase))
+                return sourcePath;
+
+            if (sourcePath.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
+                return sourcePath[..^".xml".Length] + ".xmlb";
+
+            return sourcePath + ".xmlb";
         }
 
         private string NormalizeInsideContentRoot(

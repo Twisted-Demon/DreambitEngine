@@ -57,9 +57,20 @@ public sealed class DirectIpTransport : INetworkTransport
             options.MaxChannels).Validate();
     }
 
+    /// <inheritdoc />
     public TransportCapabilities Capabilities { get; }
+
+    /// <inheritdoc />
     public TransportState State => (TransportState)Volatile.Read(ref _state);
 
+    /// <summary>Creates a stopped Direct IP transport configured to listen on an IPv4 endpoint.</summary>
+    /// <param name="port">The local TCP and UDP port, from 0 through 65,535.</param>
+    /// <param name="options">Optional transport limits; defaults are used when omitted.</param>
+    /// <param name="address">
+    /// The local IPv4 address to bind, or <see langword="null"/> to bind <see cref="IPAddress.Any"/>.
+    /// </param>
+    /// <returns>A transport that can be passed to <see cref="NetworkService.StartServer(INetworkTransport)"/>
+    /// or <see cref="NetworkService.StartHost(INetworkTransport)"/>.</returns>
     public static DirectIpTransport Listen(
         int port,
         DirectIpOptions? options = null,
@@ -72,6 +83,11 @@ public sealed class DirectIpTransport : INetworkTransport
             options ?? new DirectIpOptions());
     }
 
+    /// <summary>Creates a stopped Direct IP transport configured to connect to an IPv4 endpoint.</summary>
+    /// <param name="host">An IPv4 address or host name that resolves to an IPv4 address.</param>
+    /// <param name="port">The remote TCP and UDP port, from 0 through 65,535.</param>
+    /// <param name="options">Optional transport limits; defaults are used when omitted.</param>
+    /// <returns>A transport that can be passed to <see cref="NetworkService.Connect(INetworkTransport)"/>.</returns>
     public static DirectIpTransport Connect(
         string host,
         int port,
@@ -87,6 +103,7 @@ public sealed class DirectIpTransport : INetworkTransport
             options ?? new DirectIpOptions());
     }
 
+    /// <inheritdoc />
     public void StartServer()
     {
         ThrowIfDisposed();
@@ -115,6 +132,7 @@ public sealed class DirectIpTransport : INetworkTransport
         }
     }
 
+    /// <inheritdoc />
     public void Connect()
     {
         ThrowIfDisposed();
@@ -164,6 +182,7 @@ public sealed class DirectIpTransport : INetworkTransport
         }
     }
 
+    /// <inheritdoc />
     public bool TryPollEvent(out TransportEvent transportEvent)
     {
         ThrowIfDisposed();
@@ -173,6 +192,7 @@ public sealed class DirectIpTransport : INetworkTransport
         return true;
     }
 
+    /// <inheritdoc />
     public void Send(
         TransportConnectionId connection,
         ReadOnlySpan<byte> payload,
@@ -230,6 +250,7 @@ public sealed class DirectIpTransport : INetworkTransport
         }
     }
 
+    /// <inheritdoc />
     public void Disconnect(
         TransportConnectionId connection,
         TransportDisconnectReason reason = TransportDisconnectReason.LocalShutdown)
@@ -239,6 +260,7 @@ public sealed class DirectIpTransport : INetworkTransport
         CloseConnection(directConnection, reason, "Local disconnect.", true, true);
     }
 
+    /// <inheritdoc />
     public void Stop()
     {
         if (Volatile.Read(ref _disposed) != 0)
@@ -271,6 +293,7 @@ public sealed class DirectIpTransport : INetworkTransport
         Volatile.Write(ref _state, (int)TransportState.Stopped);
     }
 
+    /// <summary>Stops the transport and permanently releases its sockets and worker resources.</summary>
     public void Dispose()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0)

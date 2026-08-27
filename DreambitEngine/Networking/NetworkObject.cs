@@ -3,6 +3,10 @@ using Dreambit.ECS;
 
 namespace Dreambit.Networking;
 
+/// <summary>
+/// Determines on which network roles an authored entity containing a <see cref="NetworkObject"/>
+/// is materialized.
+/// </summary>
 public enum NetworkPresence : byte
 {
     /// <summary>Exists on the authoritative server/host and synchronized remote clients.</summary>
@@ -26,6 +30,10 @@ public sealed class NetworkObject : Component
 {
     private Action<Entity>? _destroyed;
 
+    /// <summary>
+    /// Gets or sets where this authored entity exists during a synchronized scene. This is
+    /// serialized source metadata; runtime network identity and ownership are not serialized.
+    /// </summary>
     [DreambitSerialize]
     public NetworkPresence Presence { get; set; } = NetworkPresence.Replicated;
 
@@ -39,6 +47,7 @@ public sealed class NetworkObject : Component
         _destroyed = null;
     }
 
+    /// <inheritdoc />
     public override void OnDestroyed()
     {
         var entity = Entity;

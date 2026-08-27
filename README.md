@@ -201,7 +201,7 @@ DreambitEngine/              Engine runtime and public API
 DreambitEngine.AssetBaker/   Texture, audio, JSON, YAML, and pak builder
 Dreambit.Content/            Shared engine effects and fonts
 Dreambit.Examples/           Runnable UI, Pong, space game, and particle examples
-Dreambit.Examples.Content/   Example source assets and loose UI layouts
+Dreambit.Examples.Content/   Example source assets, including UI layouts
 Dreambit.Docs/               MkDocs documentation project
 DreambitEngine/LDtk/         Native LDtk schema, loading, and reference resolution
 DreambitEngine/Tiled/        Native TMX/TSX loading, import, and scene integration

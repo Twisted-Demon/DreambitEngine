@@ -6,14 +6,43 @@ using Dreambit.Networking.Protocol;
 
 namespace Dreambit.Networking.Messaging;
 
+/// <summary>
+/// Stores the game's typed message contract. Register the same stable IDs, directions, payload
+/// limits, and message types on every peer before starting a network session.
+/// </summary>
 public sealed class NetworkMessageRegistry
 {
     private readonly Dictionary<ushort, INetworkMessageRegistration> _byId = [];
     private readonly Dictionary<Type, INetworkMessageRegistration> _byType = [];
     private bool _frozen;
 
+    /// <summary>
+    /// Gets the deterministic hash of the current message registrations. The connection handshake
+    /// rejects peers whose message schemas differ.
+    /// </summary>
     public NetworkSchemaHash SchemaHash => BuildSchemaHash();
 
+    /// <summary>Registers a strongly typed gameplay message, codec, and receive handler.</summary>
+    /// <typeparam name="T">The game-defined message type.</typeparam>
+    /// <param name="messageId">
+    /// A stable nonzero protocol ID unique to this message type. Changing it breaks compatibility.
+    /// </param>
+    /// <param name="direction">The side or sides allowed to send this message.</param>
+    /// <param name="maximumPayload">
+    /// The maximum encoded payload in bytes, from 1 through
+    /// <see cref="NetworkOptions.DefaultMaxProtocolPayload"/>.
+    /// </param>
+    /// <param name="codec">The serializer used for this message type.</param>
+    /// <param name="handler">
+    /// The callback invoked when a valid message arrives. Network input is applied from Dreambit's
+    /// main update thread; a host loopback message may invoke the callback synchronously while sending.
+    /// </param>
+    /// <exception cref="InvalidOperationException">
+    /// A session is active, or the message ID or type has already been registered.
+    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="messageId"/> is zero or <paramref name="maximumPayload"/> is out of range.
+    /// </exception>
     public void Register<T>(
         ushort messageId,
         NetworkMessageDirection direction,

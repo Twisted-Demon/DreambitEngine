@@ -347,6 +347,7 @@ public class Scene : IDisposable
 
         UiCamera = Entity.Create("ui-camera").AttachComponent<Camera2D>();
         UiCamera.Entity.AlwaysUpdate = true;
+        UiCamera.SetTargetVerticalResolution(Math.Max(1, Window.Height));
 
         Entity.Create("event-bus").AttachComponent<EventBus>();
 

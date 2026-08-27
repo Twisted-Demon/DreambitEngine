@@ -23,8 +23,28 @@ public sealed class NetworkReplicationRegistry
     private readonly Dictionary<Type, NetworkComponentDescriptor> _byType = [];
     private bool _frozen;
 
+    /// <summary>
+    /// Gets the deterministic hash of the registered Component schemas. The connection handshake
+    /// rejects peers whose replication schemas differ.
+    /// </summary>
     public NetworkSchemaHash SchemaHash => BuildSchemaHash();
 
+    /// <summary>
+    /// Registers a Component for automatic replication using its
+    /// <see cref="NetworkReplicatedAttribute"/> and <see cref="ReplicatedAttribute"/> members.
+    /// Reflection is used during this registration only; runtime capture uses cached delegates.
+    /// </summary>
+    /// <typeparam name="T">The Component type to replicate.</typeparam>
+    /// <remarks>
+    /// Supported automatic values include numeric primitives, Boolean, GUID, string,
+    /// <see cref="AssetId"/>, <see cref="NetworkEntityRef"/>, MonoGame vectors, quaternion, color,
+    /// and enums. Use <see cref="NetworkEntityRef"/> instead of raw Entity or Component references,
+    /// and replicate an asset's <see cref="AssetId"/> instead of the asset object.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// A session is active, metadata is missing or invalid, the type is already registered, or a
+    /// registered replicated Component appears on a network root's descendant.
+    /// </exception>
     public void Register<T>() where T : Component
     {
         EnsureMutable();
@@ -35,6 +55,20 @@ public sealed class NetworkReplicationRegistry
         RegisterDescriptor(CreateAutomaticDescriptor<T>(attribute.ComponentId));
     }
 
+    /// <summary>Registers a Component using an explicit bounded codec.</summary>
+    /// <typeparam name="T">The Component type to replicate.</typeparam>
+    /// <param name="componentId">A stable nonzero protocol ID unique to this Component type.</param>
+    /// <param name="maximumPayload">
+    /// The maximum encoded state size in bytes, from 1 through
+    /// <see cref="NetworkOptions.DefaultMaxProtocolPayload"/>.
+    /// </param>
+    /// <param name="codec">The serializer that captures and applies the Component's state.</param>
+    /// <exception cref="InvalidOperationException">
+    /// A session is active, or the component ID or type has already been registered.
+    /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="componentId"/> is zero or <paramref name="maximumPayload"/> is out of range.
+    /// </exception>
     public void Register<T>(
         ushort componentId,
         int maximumPayload,

@@ -51,6 +51,11 @@ public class Core : Game
     public static SpriteBatch SpriteBatch { get; private set; }
     public Scene CurrentScene { get; private set; }
     public Scene NextScene { get; private set; }
+
+    /// <summary>
+    /// Gets the Core-owned networking service. The service exists before the first Scene, survives
+    /// Scene transitions, and remains available while networking is offline for configuration.
+    /// </summary>
     public NetworkService Networking => _networking ??= new NetworkService(this);
     private static string GameName { get; set; }
 

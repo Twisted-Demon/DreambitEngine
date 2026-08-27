@@ -15,6 +15,7 @@ It recursively mirrors logical paths inside the pak and supports:
 | `.json`, `.ldtk`, `.ldtkl` | `.jsonb` |
 | `.asset`, `.blueprint`, `.particlefx`, `.scene`, `.soundcue`, `.sprite`, `.spriteanimation`, `.spritesheet`, `.tileset` | source extension + `.jsonb` |
 | `.yaml`, `.cutscene` | `.yamlb` (`.cutscene` keeps its source extension) |
+| `.xml`, `.tmx`, `.tx`, `.tsx` | `.xmlb` |
 
 Serialized Dreambit assets use their semantic source extension as part of their logical runtime
 name. For example, `Sprites/hero.sprite` bakes to `sprites/hero.sprite.jsonb` and is loaded as
@@ -25,10 +26,12 @@ Texture options include `--mips`, `--premul`, `--max-size N`, and `--srgb`.
 The runtime defaults to `Resources.UsePak = true` and
 `Resources.PakName = "content.pak"`.
 
-UI XML is loaded directly from disk by `UiFrame`, so copy `*.xml` into the host
-output's `Content` tree. The example content project demonstrates a MonoGame
-content builder with `IncludeCopy<WildcardRule>("*.xml")` and imports its
-`BuildContent.targets` from the host project.
+UI XML is loaded through Dreambit's active content source. During development,
+`UiFrame` reads the baked `*.xmlb` payloads named by `content.blobs.json`; a
+shipping build reads the same logical assets from `content.pak`. Layout and
+component references remain source-style paths such as `Ui/hud.xml`, and the UI
+loader maps them to `Ui/hud.xmlb` internally. Do not add raw `*.xml` copy rules
+to the MonoGame content builder.
 
 !!! note
     `BakeDirectoryCommand` exists in source but is not registered in the current
