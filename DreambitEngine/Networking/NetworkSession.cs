@@ -292,8 +292,18 @@ internal sealed class NetworkSession : IDisposable
         _acceptTransportEvents = false;
     }
 
-    internal Entity Spawn(EntityBlueprint blueprint, NetworkSpawnOptions? options = null)
+    internal Entity Spawn(
+        EntityBlueprint blueprint,
+        NetworkSpawnOptions? options = null) =>
+        Spawn(blueprint, static _ => { }, options);
+
+    internal Entity Spawn(
+        EntityBlueprint blueprint,
+        Action<Entity> initialize,
+        NetworkSpawnOptions? options = null)
     {
+        ArgumentNullException.ThrowIfNull(initialize);
+
         if (!IsServer)
             throw new InvalidOperationException("Only the server can spawn network entities.");
         if (World is null)
@@ -322,6 +332,7 @@ internal sealed class NetworkSession : IDisposable
                 options.Position,
                 options.Rotation,
                 options.Scale);
+            initialize(entity);
             networkId = AllocateEntityId();
             World.RegisterDynamicEntity(
                 entity,

@@ -39,7 +39,7 @@ The networking stack is divided into layers:
 ├──────────────────────┬───────────────────────┤
 │     NetworkWorld     │ Registries / Protocol │
 │                      │                       │
-│ Network Entity IDs   │ Message codecs        │
+│ Network Entity IDs   │ Typed message schemas │
 │ ownership            │ replication schemas   │
 │ player mappings      │ packet encoding       │
 ├──────────────────────┴───────────────────────┤
@@ -196,10 +196,16 @@ dedicated server.
 Scene, message, and replication registrations are frozen while a session is active. Register the
 game's networking contract first, then start the server/host/client.
 
+Game registrations are grouped into feature-level `INetworkModule` implementations. A module uses
+`NetworkRegistrationContext.Handle<T>` for self-describing messages and
+`NetworkRegistrationContext.Replicate<T>` for replicated Components. Apply the modules once through
+`NetworkService.Configure(...)` before starting a session.
+
 `Core` creates its `NetworkService` before the first Scene is assigned. The service then survives
-Scene transitions for the lifetime of the game. A project can therefore register its networking
-contract during application boot, or idempotently from an initial menu Scene, without starting a
-connection yet.
+Scene transitions for the lifetime of the game. A project should therefore register its networking
+contract once during application boot. If configuration is triggered from a menu Scene, guard it so
+the same module is not applied twice: duplicate message IDs, message types, replicated Component IDs,
+and replicated Component types are rejected.
 
 `NetworkOptions` are copied when a session starts. Edit them while offline; after `Stop()`, edit them
 again before starting another session. An edit made during an active session does not reconfigure
@@ -210,7 +216,6 @@ A game-level bootstrap can keep this configuration in one place:
 ```csharp
 using Dreambit;
 using Dreambit.Networking;
-using Dreambit.Networking.Messaging;
 using Dreambit.Networking.Transport;
 
 public sealed class GameNetworking
@@ -232,25 +237,13 @@ public sealed class GameNetworking
             "world",
             static () => new GameWorldScene());
 
-        _network.Replication.Register<PlayerNetworkState>();
-
-        _network.Messages.Register(
-            messageId: 200,
-            direction: NetworkMessageDirection.ClientToServer,
-            maximumPayload: sizeof(float) * 2,
-            codec: new PlayerInputMessageCodec(),
-            handler: HandlePlayerInput);
+        _network.Configure(
+            new PlayerNetworkingModule(),
+            new WorldInteractionNetworkingModule());
 
         _network.PeerConnected += OnPeerConnected;
         _network.PeerDisconnected += OnPeerDisconnected;
         _network.ConnectionFailed += OnConnectionFailed;
-    }
-
-    private void HandlePlayerInput(
-        NetworkMessageContext context,
-        PlayerInputMessage message)
-    {
-        // Game-specific server handling.
     }
 
     private void OnPeerConnected(NetworkPeerId peer)
@@ -272,9 +265,15 @@ public sealed class GameNetworking
 }
 ```
 
+Modules should normally follow gameplay boundaries such as player movement, inventory, farming,
+combat, or world interaction. Their registrations persist across `Stop()` and later session starts;
+do not apply the same module again when restarting a session. The [typed gameplay messages](#typed-gameplay-messages)
+section defines the complete `PlayerNetworkingModule` used above.
+
 !!! warning
-    Do not register new network Scenes, replicated Components, or typed messages after a session
-    starts. The registries are intentionally frozen so every peer has one stable protocol contract.
+    Do not configure modules or register new network Scenes, replicated Components, or typed messages
+    after a session starts. The registries are intentionally frozen so every peer has one stable
+    protocol contract.
 
 ### Menus and other local Scenes
 
@@ -922,6 +921,33 @@ var player = network.Spawn(
     });
 ```
 
+When runtime values must be part of the spawn transaction, initialize them with the callback
+overload:
+
+```csharp
+var crop = network.Spawn(
+    cropBlueprint,
+    entity =>
+    {
+        var state = entity.GetComponent<CropNetworkState>()
+                    ?? throw new InvalidOperationException(
+                        "The crop Blueprint requires CropNetworkState.");
+
+        state.CropDefinitionId = cropDefinitionId;
+        state.PlantedAtTick = network.ServerTick;
+        state.TileX = tile.X;
+        state.TileY = tile.Y;
+    },
+    new NetworkSpawnOptions
+    {
+        Position = worldPosition
+    });
+```
+
+The callback runs on the authoritative server after Blueprint materialization, but before network
+registration and initial-state capture. If it throws, Dreambit rolls back the spawn and destroys the
+partially created Entity.
+
 The Blueprint must have a stable `AssetId`. The root must contain exactly one `NetworkObject` with
 `NetworkPresence.Replicated`.
 
@@ -978,6 +1004,14 @@ FRAME 102
 This prevents a newly spawned projectile/player/enemy from running one frame with stale Blueprint
 defaults before its server state arrives.
 
+!!! note "When initial state is captured"
+    `NetworkService.Spawn` captures the initial replicated Component state during the spawn call,
+    after the Blueprint has been materialized and the optional initialization callback has completed,
+    but before `Spawn` returns. Values authored in the Blueprint, established by Component creation
+    callbacks, or assigned by the initialization callback are included. A value assigned by game code
+    after `Spawn` returns is ordinary live state and reaches clients in a later snapshot, not in the
+    `Spawn`/initial-state/`SpawnReady` transaction.
+
 ## Component replication
 
 Replication is intended for persistent authoritative state.
@@ -1014,13 +1048,17 @@ public enum PlayerFacing : byte
 }
 ```
 
-Register it before starting networking:
+Register it from the feature's network module before starting networking:
 
 ```csharp
-network.Replication.Register<PlayerNetworkState>();
+public void Register(NetworkRegistrationContext network)
+{
+    network.Replicate<PlayerNetworkState>();
+}
 ```
 
-The numeric IDs are part of the network schema. Treat them as stable protocol identifiers.
+Apply the containing module once with `network.Configure(...)`. The numeric replicated Component and
+field IDs are part of the network schema. Treat them as stable protocol identifiers.
 
 ### Supported automatic member types
 
@@ -1258,24 +1296,28 @@ server notification
 one-shot gameplay event
 ```
 
-### Define a message
+### Define a self-describing message
 
-```csharp
-public readonly record struct PlayerInputMessage(
-    float X,
-    float Y);
-```
-
-### Define its codec
+A gameplay message implements `INetworkMessage<TSelf>` and owns its stable protocol ID, allowed
+direction, maximum payload size, and binary serialization contract:
 
 ```csharp
 using Dreambit.Networking.Messaging;
 using Dreambit.Networking.Protocol;
 
-public sealed class PlayerInputMessageCodec
-    : INetworkMessageCodec<PlayerInputMessage>
+public readonly record struct PlayerInputMessage(
+    float X,
+    float Y) : INetworkMessage<PlayerInputMessage>
 {
-    public void Write(
+    public static ushort Id => 200;
+
+    public static NetworkMessageDirection Direction =>
+        NetworkMessageDirection.ClientToServer;
+
+    public static int MaximumPayload =>
+        sizeof(float) * 2;
+
+    public static void Write(
         NetworkWriter writer,
         PlayerInputMessage message)
     {
@@ -1283,7 +1325,7 @@ public sealed class PlayerInputMessageCodec
         writer.WriteSingle(message.Y);
     }
 
-    public PlayerInputMessage Read(
+    public static PlayerInputMessage Read(
         ref NetworkReader reader)
     {
         return new PlayerInputMessage(
@@ -1293,16 +1335,48 @@ public sealed class PlayerInputMessageCodec
 }
 ```
 
-### Register it
+The message ID must be nonzero and unique. `MaximumPayload` is the largest encoded message body in
+bytes, not the size of the enclosing Dreambit packet. Keep IDs and field order stable once builds are
+expected to communicate with each other.
+
+### Register its handler through a module
+
+The feature module associates the message contract with its receive handler:
 
 ```csharp
-network.Messages.Register(
-    messageId: 200,
-    direction: NetworkMessageDirection.ClientToServer,
-    maximumPayload: sizeof(float) * 2,
-    codec: new PlayerInputMessageCodec(),
-    handler: HandlePlayerInput);
+using Dreambit.Networking;
+using Dreambit.Networking.Messaging;
+
+public sealed class PlayerNetworkingModule : INetworkModule
+{
+    public void Register(NetworkRegistrationContext network)
+    {
+        network.Replicate<PlayerNetworkState>();
+        network.Handle<PlayerInputMessage>(HandlePlayerInput);
+    }
+
+    private static void HandlePlayerInput(
+        NetworkMessageContext context,
+        PlayerInputMessage message)
+    {
+        // Validate the request, then update server-authoritative game state.
+    }
+}
 ```
+
+Apply the module before starting a session:
+
+```csharp
+network.Configure(new PlayerNetworkingModule());
+```
+
+`Handle<T>` derives the ID, direction, payload bound, and serializer from `T`; those values are no
+longer repeated at the handler registration site. Both peers must configure the same message and
+replication contracts so their handshake schema hashes match.
+
+The message schema hash includes the registered ID, direction, maximum payload, and message type.
+Treat a change to `Write`/`Read` field order or meaning as a protocol change and update the game's
+`NetworkOptions.GameBuildId` so incompatible builds cannot connect.
 
 The handler receives a `NetworkMessageContext` containing:
 
@@ -1314,6 +1388,14 @@ context.ServerTick
 
 `context.Sender` is particularly important on the authoritative server because it tells game code
 which peer actually sent the request.
+
+Message handlers run while Dreambit applies inbound network work on the main thread. A host-local
+`SendToServer` or `Send` call uses the same serialization and direction checks, but may invoke its
+handler synchronously during the send call.
+
+Expected gameplay rejection—invalid range, missing inventory, stale target, cooldown, or lack of
+permission—should return normally from the handler. Do not use exceptions for ordinary invalid client
+requests.
 
 ### Send continuous input
 
@@ -1544,6 +1626,12 @@ accepts a client pose only when the sending peer matches the Entity's runtime ow
 `NetworkSpawnOptions.Owner` or `NetworkService.SetOwner`. It then applies that pose locally and
 includes it in normal snapshots sent to the other clients.
 
+!!! warning "Client authority is not movement validation"
+    The built-in client-authority path checks the Entity identity, ownership, transform authority,
+    packet ordering, and finite numeric values. It does not enforce game-specific speed, acceleration,
+    collision, teleport, scale, or world-bound rules. Use `Server` authority for hostile clients, or
+    add server-side validation before treating a client-authored pose as trusted gameplay state.
+
 ```csharp
 var player = Network.Spawn(
     playerBlueprint,
@@ -1592,24 +1680,26 @@ public sealed class DoorNetworkState : Component
 }
 ```
 
-The client does not directly decide that the authoritative door is open. It sends intent.
-
-```csharp
-public readonly record struct InteractRequest(
-    NetworkEntityRef Target);
-```
-
-A codec can serialize the safe reference:
+The client does not directly decide that the authoritative door is open. It sends intent through a
+self-describing message:
 
 ```csharp
 using Dreambit.Networking;
 using Dreambit.Networking.Messaging;
 using Dreambit.Networking.Protocol;
 
-public sealed class InteractRequestCodec
-    : INetworkMessageCodec<InteractRequest>
+public readonly record struct InteractRequest(
+    NetworkEntityRef Target) : INetworkMessage<InteractRequest>
 {
-    public void Write(
+    public static ushort Id => 210;
+
+    public static NetworkMessageDirection Direction =>
+        NetworkMessageDirection.ClientToServer;
+
+    public static int MaximumPayload =>
+        sizeof(uint) + sizeof(ulong);
+
+    public static void Write(
         NetworkWriter writer,
         InteractRequest message)
     {
@@ -1619,7 +1709,7 @@ public sealed class InteractRequestCodec
             message.Target.EntityId.Value);
     }
 
-    public InteractRequest Read(
+    public static InteractRequest Read(
         ref NetworkReader reader)
     {
         return new InteractRequest(
@@ -1632,16 +1722,31 @@ public sealed class InteractRequestCodec
 }
 ```
 
-Register it:
+Register its handler in the world-interaction module:
 
 ```csharp
-network.Messages.Register(
-    messageId: 210,
-    direction: NetworkMessageDirection.ClientToServer,
-    maximumPayload: sizeof(uint) + sizeof(ulong),
-    codec: new InteractRequestCodec(),
-    handler: HandleInteractRequest);
+using Dreambit.Networking;
+using Dreambit.Networking.Messaging;
+
+public sealed class WorldInteractionNetworkingModule : INetworkModule
+{
+    public void Register(NetworkRegistrationContext network)
+    {
+        network.Replicate<DoorNetworkState>();
+        network.Handle<InteractRequest>(HandleInteractRequest);
+    }
+
+    private static void HandleInteractRequest(
+        NetworkMessageContext context,
+        InteractRequest request)
+    {
+        // Resolve request.Target and validate context.Sender before opening the door.
+    }
+}
 ```
+
+Apply `WorldInteractionNetworkingModule` through the same startup `network.Configure(...)` call used
+for the rest of the game's modules.
 
 Create a reference when the local interaction system chooses a target:
 
@@ -1750,7 +1855,9 @@ endpoint with the same logical transport connection.
 The current Direct IP implementation is IPv4-only.
 
 It is a useful development/direct-connect transport, but it should not be treated as a complete
-internet matchmaking, NAT traversal, account authentication, or anti-cheat solution.
+internet matchmaking, NAT traversal, account authentication, or anti-cheat solution. It does not
+provide transport encryption or cryptographic peer authentication; the UDP association token is an
+endpoint-association mechanism, not an account identity or security boundary.
 
 ## Main-thread integration
 
@@ -1852,7 +1959,8 @@ A useful game-level division is:
 
 | Game layer | Responsibility |
 | --- | --- |
-| `GameNetworking` | Registers Scene keys, replication, messages, and networking options. |
+| `GameNetworking` | Sets networking options, registers Scene keys, and applies feature network modules. |
+| `INetworkModule` implementations | Register replicated Components and self-describing message handlers by gameplay feature. |
 | game network coordinator | Handles peer lifecycle and game-specific player/session policy. |
 | `Scene` subclasses | Load editor-authored `.scene` assets with `LoadIntoSelf`. |
 | replicated Components | Persistent server-authoritative state. |
@@ -1890,8 +1998,9 @@ A small multiplayer game can use this sequence:
 GAME STARTUP
     configure Networking.Options
     register network Scenes
-    register replicated Components
-    register typed messages
+    configure feature network modules
+        register replicated Components
+        register self-describing message handlers
 
 HOST
     StartHost(port)
@@ -1973,6 +2082,10 @@ DISCONNECT
 !!! important
     **Use messages for intent and replication for state.** Continuous input is often
     `UnreliableSequenced`; discrete actions are normally `ReliableOrdered`.
+
+!!! important
+    **Configure each `INetworkModule` exactly once before the session starts.** Registrations remain
+    installed across `Stop()` and restart; applying a module again attempts duplicate registrations.
 
 !!! important
     **Do not call `Scene.SetNextScene` during an active session.** The server/host calls

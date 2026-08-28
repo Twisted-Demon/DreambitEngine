@@ -257,9 +257,40 @@ public sealed class NetworkService : IDisposable
     /// The local process is not the server/host, no network Scene is active, or the Blueprint cannot
     /// be represented by the registered network contract.
     /// </exception>
-    public Entity Spawn(EntityBlueprint blueprint, NetworkSpawnOptions? options = null) =>
-        _session?.Spawn(blueprint, options) ??
-        throw new InvalidOperationException("A networking session is not active.");
+    public Entity Spawn(
+        EntityBlueprint blueprint,
+        NetworkSpawnOptions? options = null) =>
+        Spawn(blueprint, static _ => { }, options);
+
+    /// <summary>
+    /// Materializes a Blueprint as a server-authoritative runtime entity, initializes its gameplay
+    /// state, and reliably reproduces it on synchronized clients with that initial replicated state.
+    /// </summary>
+    /// <param name="blueprint">
+    /// A Blueprint with a stable, non-empty <see cref="DreambitAsset.AssetId"/> available to every peer.
+    /// </param>
+    /// <param name="initialize">
+    /// Configures the authoritative Entity after Blueprint materialization and before its network
+    /// identity is registered or initial replicated state is captured.
+    /// </param>
+    /// <param name="options">Optional ownership and authored-value overrides.</param>
+    /// <returns>The initialized authoritative local Entity created in the current Scene.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="initialize"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// The local process is not the server/host, no network Scene is active, or the Blueprint cannot
+    /// be represented by the registered network contract.
+    /// </exception>
+    public Entity Spawn(
+        EntityBlueprint blueprint,
+        Action<Entity> initialize,
+        NetworkSpawnOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(initialize);
+
+        return _session?.Spawn(blueprint, initialize, options)
+               ?? throw new InvalidOperationException(
+                   "A networking session is not active.");
+    }
 
     /// <summary>Authoritatively destroys a registered network entity on the server and clients.</summary>
     /// <param name="entity">The entity registered in the current network world.</param>

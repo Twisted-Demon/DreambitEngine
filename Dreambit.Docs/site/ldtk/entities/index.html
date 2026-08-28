@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>Mapping LDtk entities - Dreambit Engine Documentation</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Mapping LDtk entities";
+        var mkdocs_page_input_path = "ldtk\\entities.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> Dreambit Engine Documentation
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Home</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/installation/">Install and reference Dreambit</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/first-game/">Your first game</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../getting-started/project-structure/">Project and content layout</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Core</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../core/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../core/core/">Core and the game loop</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../core/scenes/">Scenes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../core/window/">Window</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../core/time/">Time</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../core/coroutines/">Coroutines</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../core/logging/">Logging and debugging</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">ECS</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../ecs/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../ecs/entities/">Entities</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../ecs/writing-components/">Writing components</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../ecs/component-lifecycle/">Component lifecycle</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../ecs/transform/">Transform</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../ecs/requirements/">Requirements and injection</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../ecs/blueprints/">Entity blueprints</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Components</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../ecs/components/camera2d/">Camera2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../ecs/components/ui-frame/">UiFrame</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../ecs/components/collider/">Collider</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../ecs/components/box-collider/">BoxCollider</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../ecs/components/poly-shape-collider/">PolyShapeCollider</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../ecs/components/rigid-body-2d/">RigidBody2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../ecs/components/mover/">Mover</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../ecs/components/sprite-drawer/">SpriteDrawer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../ecs/components/sprite-animator/">SpriteAnimator</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../ecs/components/rect-drawer/">RectDrawer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../ecs/components/circle-drawer/">CircleDrawer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../ecs/components/particle-system-drawer/">ParticleSystemDrawer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../ecs/components/light2d/">Light2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../ecs/components/ambient-light-2d/">AmbientLight2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../ecs/components/point-light-2d/">PointLight2D</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../ecs/components/sound-effect-emitter/">SoundEffectEmitter</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../ecs/components/sound-emitter-2d/">SoundEmitter2d (obsolete)</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../ecs/components/sound-listener-2d/">SoundListener2d (obsolete)</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../ecs/components/astar-grid/">AStarGrid</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../ecs/components/astar-pathfinder/">AStarPathfinder</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../ecs/components/astar-path-follower/">AStarPathFollower</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../ecs/components/fsm/">FSM</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../ecs/components/tile-mover/">TileMover</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">User interface</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../UI/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../UI/Stylesheets/">Stylesheets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Elements</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiElement/">UiElement</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiContainer/">UiContainer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiContentControl/">UiContentControl</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiControl/">UiControl</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiPanel/">UiPanel</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiBorder/">UiBorder</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiButton/">UiButton</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiCanvas/">UiCanvas</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiCheckBox/">UiCheckBox</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiComboBox/">UiComboBox</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiGrid/">UiGrid</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiHorizontalStackPanel/">UiHorizontalStackPanel</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiItemsControl/">UiItemsControl</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiListBox/">UiListBox</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiOverlay/">UiOverlay</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiPopup/">UiPopup</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiProgressBar/">UiProgressBar</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiRadioButton/">UiRadioButton</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiRangeBase/">UiRangeBase</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiScrollBar/">UiScrollBar</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiSelector/">UiSelector</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiSlider/">UiSlider</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiSpacer/">UiSpacer</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiStackPanel/">UiStackPanel</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiStackPanelBase/">UiStackPanelBase</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiText/">UiText</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiTextBox/">UiTextBox</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiTexture/">UiTexture</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiToggleButton/">UiToggleButton</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiTooltip/">UiTooltip</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiUniformGrid/">UiUniformGrid</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiVerticalStackPanel/">UiVerticalStackPanel</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiViewbox/">UiViewbox</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Elements/UiWrapPanel/">UiWrapPanel</a>
+                </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Brushes</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Brushes/IUiBrush/">IUiBrush</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Brushes/UiBrush/">UiBrush</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Brushes/SolidColorBrush/">SolidColorBrush</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Brushes/OutlineBrush/">OutlineBrush</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Brushes/SpriteBrush/">SpriteBrush</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Brushes/NineSliceBrush/">NineSliceBrush</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Brushes/TiledSpriteBrush/">TiledSpriteBrush</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../UI/Brushes/LayeredBrush/">LayeredBrush</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Input</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../input/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../input/direct-input/">Direct input</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../input/actions/">Actions, maps, and bindings</a>
+                  </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../networking/">Networking</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Physics</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../physics/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../physics/colliders/">Colliders and triggers</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../physics/queries/">Queries</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../physics/shapes/">Shapes</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../physics/movement/">Movement and collision response</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Rendering</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../rendering/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../rendering/cameras/">Cameras and coordinates</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../rendering/drawing/">Drawing sprites and primitives</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../rendering/lighting/">Lighting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../rendering/pipeline/">Render pipeline and post-processing</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Assets and content</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../assets/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../assets/content-pipeline/">Content projects and Asset Baker</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../assets/resources/">Loading resources</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../assets/sprites/">Sprites and sprite sheets</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../assets/animations/">Sprite animation</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../assets/blueprints/">Entity blueprints</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../assets/sound-cues/">Sound cues</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../assets/particles/">Particles</a>
+                  </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../audio/">Audio</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">AI</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../ai/">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../ai/pathfinding/">A* pathfinding</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../ai/fsm/">State machines and blackboards</a>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">LDtk</span></p>
+              <ul class="current">
+                  <li class="toctree-l1"><a class="reference internal" href="../">Overview</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../quick-start/">Quick start</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../loading-levels/">Loading worlds and levels</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../monogame-conversions/">MonoGame conversions</a>
+                  </li>
+                  <li class="toctree-l1 current"><a class="reference internal current" href="#">Mapping LDtk entities</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#correctly-positioning-entities">Correctly positioning entities</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#mapping-identifiers-to-blueprints">Mapping identifiers to blueprints</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#reading-fields">Reading fields</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#ownership-during-streaming">Ownership during streaming</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#converting-to-ldtkentity">Converting to LDtkEntity</a>
+    </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Tiled</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../tiled/">Overview and quick start</a>
+                  </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../scripting/">Scripting and cutscenes</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Utilities</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../utilities/math/">Math and ranges</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../utilities/collections/">Collections and spatial helpers</a>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">Dreambit Engine Documentation</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">LDtk</li>
+      <li class="breadcrumb-item active">Mapping LDtk entities</li>
+    <li class="wy-breadcrumbs-aside">
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="reading-ldtk-entities">Reading LDtk entities<a class="headerlink" href="#reading-ldtk-entities" title="Permanent link">&para;</a></h1>
+<p>Dreambit exposes raw LDtk entity instances and provides import context for
+positioning and render ordering. The default scene hook creates a generic ECS
+entity, or loads an entity blueprint from a non-empty <code>Blueprint</code> string field.</p>
+<p><code>LDtkScene</code> invokes <code>OnLDtkEntityInstances</code> whenever a level is materialized:</p>
+<pre><code class="language-csharp">protected override void OnLDtkEntityInstances(
+    LDtkLevelInstance level,
+    IReadOnlyList&lt;EntityInstance&gt; entityInstances)
+{
+    foreach (var instance in entityInstances)
+        Console.WriteLine($&quot;Importing {instance._Identifier} from {level.Identifier}&quot;);
+}
+</code></pre>
+<p>Override the hook when the game needs an identifier-based mapping, wants to
+ignore marker entities, or needs to initialize custom components.</p>
+<h2 id="correctly-positioning-entities">Correctly positioning entities<a class="headerlink" href="#correctly-positioning-entities" title="Permanent link">&para;</a></h2>
+<p>The callback's <code>entityInstances</code> argument is a flat list of the included
+layers. <code>LDtkLevelInstance</code> retains each entity's owning layer, the import
+options, and the converted placement. Parent game entities to
+<code>level.RootEntity</code>; the root already contains the level's world position.</p>
+<pre><code class="language-csharp">using System.Collections.Generic;
+using Dreambit;
+using Dreambit.LDtk;
+using Microsoft.Xna.Framework;
+
+protected override LDtkImportOptions CreateLDtkImportOptions() =&gt; new()
+{
+    PixelsPerUnit = 16f,
+};
+
+protected override void OnLDtkEntityInstances(
+    LDtkLevelInstance level,
+    IReadOnlyList&lt;EntityInstance&gt; entityInstances)
+{
+    foreach (var instance in entityInstances)
+    {
+        var entity = CreateEntity(instance._Identifier);
+        entity.Parent = level.RootEntity;
+        entity.Transform.Position2D = level.GetLocalPosition(instance);
+
+        // Apply the LDtk layer to current drawable components.
+        level.ApplyDrawLayer(entity, instance);
+
+        // The entity is disabled and destroyed when this level streams out.
+        level.TrackEntity(entity);
+    }
+}
+</code></pre>
+<p><code>instance.Px</code> identifies the entity pivot, not necessarily its top-left corner.
+If the Dreambit component or blueprint uses a top-left origin, subtract
+<code>instance.Width * instance._Pivot.X</code> and
+<code>instance.Height * instance._Pivot.Y</code> before converting to world units. If its
+sprite uses the same pivot as LDtk, use the pivot position directly.</p>
+<p>Use <code>instance.Layer</code> to inspect the owning raw <code>LayerInstance</code>,
+<code>level.GetDrawLayer(instance)</code> for its computed Dreambit draw layer, and
+<code>level.GetWorldPosition(instance)</code> when the entity should not be parented to the
+level root. <code>ApplyDrawLayer</code> also updates drawable components in an existing
+blueprint child hierarchy by default. Components attached later can set
+<code>DrawLayer = level.GetDrawLayer(instance)</code> directly.</p>
+<h2 id="mapping-identifiers-to-blueprints">Mapping identifiers to blueprints<a class="headerlink" href="#mapping-identifiers-to-blueprints" title="Permanent link">&para;</a></h2>
+<p>A typical game maps stable LDtk entity identifiers onto Dreambit blueprints:</p>
+<pre><code class="language-csharp">private EntityBlueprint? GetBlueprint(EntityInstance instance)
+{
+    var assetName = instance._Identifier switch
+    {
+        &quot;PlayerStart&quot; =&gt; &quot;blueprints/player&quot;,
+        &quot;Enemy&quot; =&gt; &quot;blueprints/enemy&quot;,
+        &quot;Treasure&quot; =&gt; &quot;blueprints/treasure&quot;,
+        _ =&gt; null,
+    };
+
+    return assetName is null
+        ? null
+        : Resources.LoadAsset&lt;EntityBlueprint&gt;(assetName);
+}
+</code></pre>
+<p>Use that result in the positioning loop:</p>
+<pre><code class="language-csharp">var blueprint = GetBlueprint(instance);
+if (blueprint is null)
+    continue;
+
+var entity = CreateChildOfEntity(
+    blueprint,
+    level.RootEntity,
+    createAt: level.GetLocalPosition(instance).ToVector3());
+level.ApplyDrawLayer(entity, instance);
+level.TrackEntity(entity);
+</code></pre>
+<p>Returning <code>null</code> for an unknown identifier makes it possible to add LDtk-only
+markers without creating runtime objects. During development, a warning or
+exception may be preferable so misspelled identifiers are noticed immediately.</p>
+<h2 id="reading-fields">Reading fields<a class="headerlink" href="#reading-fields" title="Permanent link">&para;</a></h2>
+<pre><code class="language-csharp">foreach (var layer in level.LayerInstances ?? [])
+{
+    foreach (var instance in layer.EntityInstances ?? [])
+    {
+        Console.WriteLine($&quot;{instance._Identifier}: {instance.Iid}&quot;);
+
+        foreach (var field in instance.FieldInstances ?? [])
+            Console.WriteLine($&quot;  {field._Identifier}: {field._Value}&quot;);
+    }
+}
+</code></pre>
+<p><code>FieldInstance.GetValue&lt;T&gt;()</code> deserializes a raw field value on demand.
+<code>ResolveFilePath()</code> resolves FilePath fields relative to the LDtk project.
+EntityRef fields can be followed with <code>ResolveEntityReference()</code> or parsed with
+<code>TryGetEntityReference</code> and resolved later through <code>LDtkFile.ResolveEntity</code>.</p>
+<p>For example:</p>
+<pre><code class="language-csharp">var healthField = instance.FieldInstances.FirstOrDefault(field =&gt;
+    field._Identifier == &quot;Health&quot;);
+var health = healthField?.GetValue&lt;int&gt;() ?? 1;
+
+var configField = instance.FieldInstances.FirstOrDefault(field =&gt;
+    field._Identifier == &quot;ConfigFile&quot;);
+string? configPath = configField?.ResolveFilePath();
+
+var targetField = instance.FieldInstances.FirstOrDefault(field =&gt;
+    field._Identifier == &quot;Target&quot;);
+EntityInstance? target = null;
+if (targetField is not null &amp;&amp;
+    targetField.TryGetEntityReference(out var targetReference))
+    target = instance.Project.ResolveEntity(targetReference);
+</code></pre>
+<p>Check for a missing or null field before calling a resolver. An EntityRef may
+cause its external target level to be deserialized, but it does not materialize
+that level into the current scene.</p>
+<h2 id="ownership-during-streaming">Ownership during streaming<a class="headerlink" href="#ownership-during-streaming" title="Permanent link">&para;</a></h2>
+<p>Always call <code>level.TrackEntity</code> for an object whose lifetime belongs to the
+loaded level. This includes entities created from child blueprints. The root
+blueprint entity is enough when its descendants are owned and destroyed through
+that hierarchy.</p>
+<p>Do not track persistent objects such as the player, global managers, or UI. If
+an LDtk marker moves the persistent player, update the existing player and leave
+it owned by the scene or game session.</p>
+<p>Entity definitions remain available through <code>instance.Definition</code>; tileset
+references on definitions and layers are connected to their corresponding
+<code>TilesetDefinition</code> objects.</p>
+<h2 id="converting-to-ldtkentity">Converting to <code>LDtkEntity</code><a class="headerlink" href="#converting-to-ldtkentity" title="Permanent link">&para;</a></h2>
+<p><code>LDtkEntity</code> is a MonoGame-friendly snapshot that retains every custom field as
+raw JSON keyed by its LDtk identifier:</p>
+<pre><code class="language-csharp">LDtkEntity entityData = level.CreateEntityData(instance);
+
+int health = entityData.GetField&lt;int&gt;(&quot;Health&quot;);
+string? dialogue = entityData.GetField&lt;string&gt;(&quot;Dialogue&quot;);
+LdtkColor? rawTint = entityData.GetField&lt;LdtkColor&gt;(&quot;Tint&quot;);
+Color? tint = rawTint?.ToColor();
+GridPoint? waypoint = entityData.GetField&lt;GridPoint&gt;(&quot;Waypoint&quot;);
+
+int damage = entityData.GetField(&quot;Damage&quot;, defaultValue: 1);
+
+if (entityData.TryGetField&lt;string&gt;(&quot;DisplayName&quot;, out var displayName))
+    Console.WriteLine(displayName ?? &quot;Unnamed&quot;);
+</code></pre>
+<p><code>GetField&lt;T&gt;</code> uses the same JSON configuration as the project loader, including
+LDtk point, vector, and color converters. The single-argument overload logs and
+returns <code>default(T)</code> when the field is missing, null, or incompatible. The
+fallback overload returns the supplied value instead.</p>
+<p><code>TryGetField&lt;T&gt;</code> does not log. It returns <code>false</code> when the identifier is missing
+or the JSON cannot be converted to <code>T</code>. An existing field whose JSON value is
+explicitly <code>null</code> returns <code>true</code> with <code>default(T)</code> in the output.</p>
+<p><code>CreateEntityData</code> converts <code>Position</code> and <code>Size</code> with the level's
+<code>PixelsPerUnit</code>, includes total layer offsets in <code>Position</code>, and fills <code>Layer</code>
+and <code>DrawLayer</code>. <code>PixelPosition</code> and <code>PixelSize</code> retain the source-pixel values.
+Calling <code>LDtkEntity.FromInstance(instance)</code> directly remains a raw, one-pixel-
+per-unit conversion for tooling that does not have a loaded level instance.</p>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../monogame-conversions/" class="btn btn-neutral float-left" title="MonoGame conversions"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../../tiled/" class="btn btn-neutral float-right" title="Overview and quick start">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+    
+      <span><a href="../monogame-conversions/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../../tiled/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
