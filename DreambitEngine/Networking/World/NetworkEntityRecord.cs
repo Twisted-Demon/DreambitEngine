@@ -23,4 +23,5 @@ internal sealed class NetworkEntityRecord
     public string? BlueprintAssetName { get; init; }
     public bool DestroyWithOwner { get; init; } = true;
     public IReadOnlyList<NetworkReplicationBinding> ReplicationBindings { get; init; } = [];
+    public bool SpawnReadyNotified { get; set; }
 }

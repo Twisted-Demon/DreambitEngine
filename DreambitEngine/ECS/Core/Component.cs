@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
+using Dreambit.Networking;
 
 namespace Dreambit.ECS;
 
@@ -203,6 +204,39 @@ public abstract class Component : IDisposable
     {
     }
 
+    /// <summary>
+    /// Called once after this Component's network Entity has received all initial authoritative
+    /// state and has a registered network identity and owner.
+    /// </summary>
+    /// <param name="context">Identity, ownership, role, Scene, and server-tick information.</param>
+    /// <remarks>
+    /// On a server or host, this runs after authoritative spawn initialization and initial state
+    /// capture. On a remote client, it runs after every initial replicated Component payload has
+    /// been applied and before gameplay updates resume. Unlike <see cref="OnCreated"/>, this callback
+    /// may safely read runtime values established by <see cref="NetworkService.Spawn(
+    /// EntityBlueprint, Action{Entity}, NetworkSpawnOptions?)"/>. It is also called for replicated
+    /// Components and presentation Components on descendants of the network Entity root.
+    /// </remarks>
+    public virtual void OnNetworkSpawnReady(NetworkSpawnReadyContext context)
+    {
+    }
+
+    /// <summary>
+    /// Called on a replicated Component after one complete authoritative payload has been applied
+    /// to it on a remote client.
+    /// </summary>
+    /// <param name="context">The applied Component identity, synchronization kind, Scene, and tick.</param>
+    /// <remarks>
+    /// All <see cref="Networking.Replication.ReplicatedAttribute"/> members on this Component have
+    /// been decoded before the callback runs. During initial synchronization, other replicated
+    /// Components on the Entity may still be pending; use <see cref="OnNetworkSpawnReady"/> for work
+    /// that requires the entire Entity to be initialized. Direct authoritative assignments on a
+    /// server or host do not invoke this callback.
+    /// </remarks>
+    public virtual void OnNetworkStateApplied(NetworkStateAppliedContext context)
+    {
+    }
+
     /// <summary>Called once when this component is created in an editor-hosted scene.</summary>
     public virtual void OnEditorCreated()
     {
@@ -330,6 +364,34 @@ public abstract class Component : IDisposable
         catch (Exception exception)
         {
             HandleCallbackException(nameof(OnCreated), exception);
+        }
+    }
+
+    internal void NetworkSpawnReady(NetworkSpawnReadyContext context)
+    {
+        if (IsDestroyed || IsFaulted() || Scene?.ExecutionMode == SceneExecutionMode.Editor) return;
+
+        try
+        {
+            OnNetworkSpawnReady(context);
+        }
+        catch (Exception exception)
+        {
+            HandleCallbackException(nameof(OnNetworkSpawnReady), exception);
+        }
+    }
+
+    internal void NetworkStateApplied(NetworkStateAppliedContext context)
+    {
+        if (IsDestroyed || IsFaulted() || Scene?.ExecutionMode == SceneExecutionMode.Editor) return;
+
+        try
+        {
+            OnNetworkStateApplied(context);
+        }
+        catch (Exception exception)
+        {
+            HandleCallbackException(nameof(OnNetworkStateApplied), exception);
         }
     }
 

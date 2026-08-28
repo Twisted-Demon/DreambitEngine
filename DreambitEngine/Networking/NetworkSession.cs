@@ -257,7 +257,7 @@ internal sealed class NetworkSession : IDisposable
         _clientSceneLoadedSent = false;
         _clientSceneReady = IsServer || !synchronizedClientAssignment;
         if (IsServer && scene.State == SceneState.Running && !World.AuthoredEntitiesBound)
-            World.BindServerAuthoredEntities(AllocateEntityId);
+            BindServerAuthoredEntities();
     }
 
     public bool PrepareSceneStart(Scene scene)
@@ -266,7 +266,7 @@ internal sealed class NetworkSession : IDisposable
         if (!ReferenceEquals(World?.Scene, scene))
             throw new InvalidOperationException("Scene startup was requested for an unbound NetworkWorld.");
         if (IsServer && !World.AuthoredEntitiesBound)
-            World.BindServerAuthoredEntities(AllocateEntityId);
+            BindServerAuthoredEntities();
         if (IsServer)
             return true;
         if (_clientSceneReady)
@@ -364,6 +364,7 @@ internal sealed class NetworkSession : IDisposable
                 ServerTick,
                 revision);
             EnsurePacketFitsReliableTransport(readyPacket, "SpawnReady");
+            NotifyNetworkSpawnReady(record, SceneEpoch, ServerTick);
         }
         catch (Exception exception)
         {
@@ -898,7 +899,7 @@ internal sealed class NetworkSession : IDisposable
         if (World is null)
             throw new NetworkProtocolException("The server has no NetworkWorld for the loaded Scene.");
         if (!World.AuthoredEntitiesBound)
-            World.BindServerAuthoredEntities(AllocateEntityId);
+            BindServerAuthoredEntities();
 
         peer.Phase = NetworkConnectionPhase.Synchronizing;
         try
@@ -1155,6 +1156,12 @@ internal sealed class NetworkSession : IDisposable
                     throw new InvalidOperationException(
                         $"Baseline references missing Component {state.ComponentId} on Entity {state.EntityId}.");
                 binding.Apply(state.Payload);
+                binding.Component.NetworkStateApplied(new NetworkStateAppliedContext(
+                    state.EntityId,
+                    state.ComponentId,
+                    NetworkStateApplyKind.InitialBaseline,
+                    baseline.SceneEpoch,
+                    baseline.ServerTick));
             }
         }
         catch (Exception exception) when (exception is not NetworkProtocolException)
@@ -1164,6 +1171,8 @@ internal sealed class NetworkSession : IDisposable
 
         StructuralRevision = baseline.StructuralRevision;
         ServerTick = baseline.ServerTick;
+        foreach (var record in World.Records.ToArray())
+            NotifyNetworkSpawnReady(record, baseline.SceneEpoch, baseline.ServerTick);
         _clientBaseline = null;
         _clientSceneReady = true;
         peer.Phase = NetworkConnectionPhase.Ready;
@@ -1615,6 +1624,13 @@ internal sealed class NetworkSession : IDisposable
                 $"SpawnReady for network Entity {id} arrived before initial state for Component(s) " +
                 $"{string.Join(", ", pending.RemainingComponentIds)}.");
 
+        var record = World?.Records.FirstOrDefault(candidate => candidate.Id == id) ??
+                     throw new NetworkProtocolException(
+                         $"SpawnReady references missing network Entity {id}.");
+        NotifyNetworkSpawnReady(
+            record,
+            packet.Header.SceneEpoch,
+            packet.Header.ServerTick);
         pending.Entity.Enabled = pending.IntendedEnabled;
         SetHierarchyUpdatesSuspended(pending.Entity, false);
     }
@@ -1946,6 +1962,15 @@ internal sealed class NetworkSession : IDisposable
         try
         {
             binding.Apply(componentPayload);
+            var applyKind = _pendingLiveSpawns.ContainsKey(entityId)
+                ? NetworkStateApplyKind.InitialSpawn
+                : NetworkStateApplyKind.Snapshot;
+            binding.Component.NetworkStateApplied(new NetworkStateAppliedContext(
+                entityId,
+                componentId,
+                applyKind,
+                packet.Header.SceneEpoch,
+                packet.Header.ServerTick));
             _lastStateSequences[key] = sequence;
             if (_pendingLiveSpawns.TryGetValue(entityId, out var pending))
                 pending.RemainingComponentIds.Remove(componentId);
@@ -2149,6 +2174,55 @@ internal sealed class NetworkSession : IDisposable
         root.UpdatesSuspended = suspended;
         foreach (var child in root.Children)
             SetHierarchyUpdatesSuspended(child, suspended);
+    }
+
+    private void BindServerAuthoredEntities()
+    {
+        if (World is null)
+            throw new InvalidOperationException(
+                "A NetworkWorld is required before binding authored network entities.");
+
+        World.BindServerAuthoredEntities(AllocateEntityId);
+        foreach (var record in World.Records.ToArray())
+            if (record.Origin == NetworkSpawnOrigin.AuthoredScene)
+                NotifyNetworkSpawnReady(record, SceneEpoch, ServerTick);
+    }
+
+    private void NotifyNetworkSpawnReady(
+        NetworkEntityRecord record,
+        NetworkSceneEpoch sceneEpoch,
+        ulong serverTick)
+    {
+        if (record.SpawnReadyNotified)
+            return;
+
+        record.SpawnReadyNotified = true;
+        var context = new NetworkSpawnReadyContext(
+            record.Id,
+            record.Owner,
+            Role,
+            sceneEpoch,
+            serverTick);
+        NotifyNetworkSpawnReadyHierarchy(record.Entity, context);
+    }
+
+    private static void NotifyNetworkSpawnReadyHierarchy(
+        Entity entity,
+        NetworkSpawnReadyContext context)
+    {
+        var components = entity.GetAllComponents().ToArray();
+        var children = entity.Children.ToArray();
+        foreach (var component in components)
+            component.NetworkSpawnReady(context);
+
+        foreach (var child in children)
+        {
+            // An authored hierarchy may contain another independent NetworkObject. Its own record
+            // delivers a separate callback with the correct identity and owner.
+            if (child.GetComponent<NetworkObject>() is not null)
+                continue;
+            NotifyNetworkSpawnReadyHierarchy(child, context);
+        }
     }
 
     private static string TruncateUtf8(string value, int maximumBytes)

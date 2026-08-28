@@ -1012,6 +1012,113 @@ defaults before its server state arrives.
     after `Spawn` returns is ordinary live state and reaches clients in a later snapshot, not in the
     `Spawn`/initial-state/`SpawnReady` transaction.
 
+### Network lifecycle callbacks
+
+Ordinary Component creation and authoritative network readiness are separate lifecycle phases.
+`OnCreated` runs after Blueprint values have been deserialized, but before a server's `Spawn`
+initializer and before a client receives runtime replicated state.
+
+Dreambit provides two explicit callbacks for work that depends on authoritative network state:
+
+| Callback | Guarantee | When it runs |
+| --- | --- | --- |
+| `OnNetworkStateApplied` | One complete replicated Component payload has been decoded and assigned. | On remote clients during initial synchronization and after later snapshots. |
+| `OnNetworkSpawnReady` | The entire network Entity has its identity, owner, and complete initial replicated state. | Once on the server/host and once on each client, before client gameplay updates resume. |
+
+The live-spawn order is:
+
+```text
+SERVER / HOST
+    Blueprint materialized
+    OnCreated
+    Spawn initializer
+    network identity registered
+    initial state captured
+    OnNetworkSpawnReady
+    Spawn transaction sent
+
+REMOTE CLIENT
+    Spawn received
+    Blueprint materialized
+    OnCreated (Blueprint defaults)
+    hierarchy updates suspended
+    complete Component payload applied
+    OnNetworkStateApplied(InitialSpawn)
+    ...remaining initial Components applied...
+    SpawnReady received
+    OnNetworkSpawnReady
+    hierarchy updates resumed
+```
+
+`OnNetworkSpawnReady` is delivered to Components on the network root and its descendants. This lets
+a presentation Component on a child safely construct sprites, animation, colliders, or other local
+state from authoritative values on the root:
+
+```csharp
+public sealed class NetworkCropState : Component
+{
+    private string? _displayedCropId;
+    private int _displayedGrowthStage = -1;
+
+    [Replicated(1, MaxLength = 64)]
+    public string CropId { get; set; } = string.Empty;
+
+    [Replicated(2)]
+    public int GrowthStage { get; set; }
+
+    public override void OnNetworkSpawnReady(
+        NetworkSpawnReadyContext context)
+    {
+        // Every initial replicated Component on this Entity is now ready.
+        RefreshPresentationIfChanged();
+    }
+
+    public override void OnNetworkStateApplied(
+        NetworkStateAppliedContext context)
+    {
+        // Initial state is presented by OnNetworkSpawnReady after the entire Entity is ready.
+        if (!context.IsInitial)
+            RefreshPresentationIfChanged();
+    }
+
+    private void RefreshPresentationIfChanged()
+    {
+        if (_displayedCropId == CropId &&
+            _displayedGrowthStage == GrowthStage)
+        {
+            return;
+        }
+
+        // Resolve the CropDefinition and update the local SpriteDrawer here.
+        _displayedCropId = CropId;
+        _displayedGrowthStage = GrowthStage;
+    }
+}
+```
+
+`NetworkStateAppliedContext.Kind` identifies the source:
+
+```csharp
+NetworkStateApplyKind.InitialSpawn
+NetworkStateApplyKind.InitialBaseline
+NetworkStateApplyKind.Snapshot
+```
+
+`context.IsInitial` is a convenience for the first two cases. Initial Component callbacks occur as
+each Component payload is applied, so another replicated Component on the Entity may still be
+pending. Use `OnNetworkSpawnReady` whenever work needs the complete Entity.
+
+!!! warning "Keep authoritative initialization in Spawn"
+    `OnNetworkSpawnReady` runs after the server has captured the initial state. Do not assign initial
+    replicated gameplay values there. Assign them in the `NetworkService.Spawn` initialization
+    callback so they are included in the reliable spawn transaction.
+
+!!! note "Snapshots report application, not necessarily a change"
+    Dreambit sends full Component snapshots. `OnNetworkStateApplied` can therefore run even when the
+    decoded values equal the previous values. Cache the last presentation-relevant values before
+    rebuilding expensive local state. Direct property assignments on a server or host do not invoke
+    `OnNetworkStateApplied`; it specifically reports inbound authoritative state on a client.
+
 ## Component replication
 
 Replication is intended for persistent authoritative state.
