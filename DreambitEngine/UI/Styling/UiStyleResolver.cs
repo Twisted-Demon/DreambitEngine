@@ -28,6 +28,20 @@ internal sealed class UiStyleAttributeTracker
             .Where(pair => !_handled.Contains(pair.Key))
             .Select(pair => pair.Value);
 
+    public bool TryGetDeclaration(
+        string attributeName,
+        out UiStyleDeclaration declaration)
+    {
+        if (_declarations.TryGetValue(attributeName, out var applied))
+        {
+            declaration = applied.Declaration;
+            return true;
+        }
+
+        declaration = null!;
+        return false;
+    }
+
     public void MarkHandled(string attributeName)
     {
         if (_declarations.TryGetValue(attributeName, out var declaration))
@@ -102,7 +116,7 @@ internal static class UiStyleResolver
                     tracker.LastHandledDeclaration,
                     node,
                     element,
-                    "could not be converted",
+                    $"could not be converted ({exception.Message.TrimEnd('.')})",
                     exception);
             }
 

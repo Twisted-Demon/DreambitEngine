@@ -8,7 +8,7 @@ namespace Dreambit.ECS;
 [BlueprintType(nameof(UiFrame))]
 public class UiFrame : DrawableComponent<UiFrame>
 {
-    private string _cssPath;
+    private string? _cssPath;
     private string _layoutPath;
 
     /// <summary>
@@ -16,7 +16,7 @@ public class UiFrame : DrawableComponent<UiFrame>
     ///     rebuilds an existing layout transactionally; null or whitespace clears it.
     /// </summary>
     [DreambitSerialize]
-    public string CssPath
+    public string? CssPath
     {
         get => _cssPath;
         set
@@ -85,7 +85,7 @@ public class UiFrame : DrawableComponent<UiFrame>
     }
 
     /// <summary>Configures the required global stylesheet source path.</summary>
-    /// <param name="cssPath">A content-root-relative <c>.css</c> path.</param>
+    /// <param name="cssPath">A content-root-relative <c>.ucss</c> path.</param>
     /// <returns>This frame for fluent configuration.</returns>
     public UiFrame WithCss(string cssPath)
     {

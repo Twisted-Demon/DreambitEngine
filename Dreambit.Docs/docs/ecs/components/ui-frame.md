@@ -1,13 +1,13 @@
 # UiFrame
 
-`UiFrame` loads an XML UI document, routes pointer/keyboard/gamepad input, and
-draws it with the scene's UI camera.
+`UiFrame` loads a Dreambit `*.uxml` UI document, routes
+pointer/keyboard/gamepad input, and draws it with the scene's UI camera.
 
 ```csharp
 var frame = CreateEntity("hud")
     .AttachComponent<UiFrame>()
-    .WithCss("Ui/Stylesheets/master.css")
-    .WithLayout("Ui/hud.xml");
+    .WithCss("Ui/Stylesheets/master.ucss")
+    .WithLayout("Ui/hud.uxml");
 
 frame.Layout.GetRequired<UiText>("score").Text = "0";
 ```
@@ -20,11 +20,11 @@ not matter, and old Blueprints without `CssPath` retain their previous behavior.
 
 Paths must be relative to the
 Dreambit content root and cannot escape it. Author the source path as
-`Ui/hud.xml`; the Asset Baker emits `Ui/hud.xmlb`, and `UiFrame` opens it from
+`Ui/hud.uxml`; the Asset Baker emits `Ui/hud.xmlb`, and `UiFrame` opens it from
 the active blob manifest or `content.pak`.
 
 `CreateComponent(path, idPrefix)` uses the same baked asset source, including
-relative and `~/` references inside component XML, and returns one detached UI
+relative and `~/` references inside component UXML, and returns one detached UI
 subtree that you can add to a `UiContainer` in the current layout. See
 [`UiContainer`](../../UI/Elements/UiContainer.md).
 

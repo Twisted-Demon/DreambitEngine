@@ -58,4 +58,16 @@ internal sealed class UiTrackedXmlDocument : XmlDocument
         if (_styleTrackers.TryGetValue(node, out var tracker))
             tracker.MarkHandled(attributeName);
     }
+
+    public bool TryGetStyleDeclaration(
+        XmlNode node,
+        string attributeName,
+        out UiStyleDeclaration declaration)
+    {
+        if (_styleTrackers.TryGetValue(node, out var tracker))
+            return tracker.TryGetDeclaration(attributeName, out declaration);
+
+        declaration = null!;
+        return false;
+    }
 }

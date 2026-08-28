@@ -12,7 +12,7 @@ Related documentation: [Scenes](../core/scenes.md), [Entity blueprints](../ecs/b
 [Scene/asset loading](../assets/resources.md), and [Entity Blueprint assets](../assets/blueprints.md).
 
 !!! note "Implementation status"
-    This page describes the current public networking APIs and protocol version 2. Direct IP is the
+    This page describes the current public networking APIs and protocol version 3. Direct IP is the
     available transport today; Steam P2P and other transports remain future integrations behind the
     same transport boundary.
 
@@ -1528,65 +1528,42 @@ Examples:
 | placed building | keep |
 | world chest | usually authored/not peer-owned |
 
-## Example: server-authoritative movement
+## NetworkTransform2D authority
 
-There is not yet a general-purpose Dreambit `NetworkTransform`.
+`NetworkTransform2D` is registered by Dreambit automatically. Add it beside `NetworkObject` and
+choose its serialized `Authority` value in the blueprint inspector:
 
-A small game can initially replicate a target position and smooth toward it on clients.
+| Authority | Pose source | Typical use |
+| --- | --- | --- |
+| `Server` | dedicated server or host | monsters, NPCs, world objects, strict authoritative movement |
+| `Client` | the Entity's assigned owning peer | responsive player movement in cooperative/casual games |
+| `Both` | server/host and assigned owning peer | deliberately shared control; latest server-processed pose wins |
+
+`Server` is the safe default. `Client` does not allow every client to move the Entity. The server
+accepts a client pose only when the sending peer matches the Entity's runtime owner from
+`NetworkSpawnOptions.Owner` or `NetworkService.SetOwner`. It then applies that pose locally and
+includes it in normal snapshots sent to the other clients.
 
 ```csharp
-using Dreambit;
-using Dreambit.ECS;
-using Dreambit.Networking.Replication;
-using Microsoft.Xna.Framework;
-
-[NetworkReplicated(101)]
-public sealed class NetworkPosition2D : Component
-{
-    [Replicated(1)]
-    public Vector2 Position { get; set; }
-
-    public override void OnUpdate()
+var player = Network.Spawn(
+    playerBlueprint,
+    new NetworkSpawnOptions
     {
-        var network = Core.Instance.Networking;
+        Owner = peerId
+    });
 
-        if (network.IsServer)
-        {
-            Position = Transform.WorldPosition2D;
-            return;
-        }
-
-        Transform.WorldPosition2D = Vector2.Lerp(
-            Transform.WorldPosition2D,
-            Position,
-            0.2f);
-    }
-}
+player.GetComponent<NetworkTransform2D>().Authority =
+    TransformAuthority.Client;
 ```
 
-Register it before the session:
+A listen host's locally owned Entity also works with `Client` authority without a transport
+round-trip. An Entity using `Client` authority but having no assigned peer owner has no client pose
+source, so assign ownership when spawning it.
 
-```csharp
-network.Replication.Register<NetworkPosition2D>();
-```
-
-This is intentionally simple. A production `NetworkTransform2D` should eventually keep snapshot
-history and interpolate against a delayed render time rather than simply lerping toward the newest
-sample.
-
-The important architectural flow is already correct:
-
-```text
-client input
-    ↓
-server movement/physics
-    ↓
-server Transform
-    ↓
-replicated target state
-    ↓
-client presentation/interpolation
-```
+The current component smooths remote position, rotation, and scale toward the newest server-relayed
+pose and snaps errors larger than `SnapDistance`. `ApplyToLocalOwner = false` remains available for a
+future predicted local controller using strict `Server` authority. Input history, prediction,
+reconciliation, and buffered snapshot interpolation are not implemented yet.
 
 ## Example: interacting with an authored door
 
@@ -1989,8 +1966,9 @@ DISCONNECT
     **Use `NetworkEntityRef` instead of raw `Entity`/`Component` references in network state.**
 
 !!! important
-    **Treat the server/host as authoritative.** Ownership identifies the responsible peer but does
-    not transfer snapshot authority.
+    **Treat the server/host as the replication authority.** Ordinary replicated Component state is
+    server-authored. `NetworkTransform2D` is the explicit exception: `Client`/`Both` can accept an
+    owning peer's pose, which the server validates and relays.
 
 !!! important
     **Use messages for intent and replication for state.** Continuous input is often
@@ -2006,7 +1984,6 @@ The current foundation intentionally does not yet provide every higher-level mul
 
 Useful next layers include:
 
-- a reusable `NetworkTransform2D`;
 - interpolation using buffered snapshots;
 - optional client prediction/reconciliation for responsive movement;
 - relevancy/interest management for large worlds;
@@ -2059,5 +2036,6 @@ structural revisions
 disconnect cleanup
 ```
 
-Once that works comfortably, the next high-value engine feature is a proper `NetworkTransform2D`
-with snapshot buffering and interpolation.
+Once that works comfortably, the next high-value movement feature is snapshot buffering and
+interpolation for `NetworkTransform2D`, followed by optional prediction and reconciliation for
+strict `Server` authority.

@@ -169,11 +169,11 @@ public class UiContentControl : UiContainer
         Padding = UiXmlParser.ParseThickness(
             UiXmlParser.ParseString(node, "padding", "0"),
             "Padding");
-        ContentAlignment = UiXmlParser.ParseAnchor(
-            UiXmlParser.ParseString(
-                node,
-                "content-alignment",
-                "Center"));
+        ContentAlignment = UiXmlParser.ParseEnum(
+            node,
+            "content-alignment",
+            UiAnchor.Center,
+            UiAnchor.TopLeft);
 
         if (node.Attributes?["background-tint"] is not null)
             BackgroundTint = UiXmlParser.ParseColor(

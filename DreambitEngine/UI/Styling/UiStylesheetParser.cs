@@ -112,6 +112,7 @@ internal static class UiStylesheetParser
                     propertyName,
                     normalized.PropertyName,
                     normalized.Value,
+                    normalized.Kind,
                     declarationOrder++,
                     Span(propertyToken)));
 
@@ -535,14 +536,19 @@ internal static class UiStylesheetParser
 
 internal readonly record struct UiNormalizedCssValue(
     string PropertyName,
-    string Value);
+    string Value,
+    UiCssValueKind Kind);
 
 internal static class UiCssValueNormalizer
 {
-    private static readonly HashSet<string> LengthProperties = new(StringComparer.Ordinal)
+    private static readonly HashSet<string> SignedLengthProperties = new(StringComparer.Ordinal)
     {
         "x",
-        "y",
+        "y"
+    };
+
+    private static readonly HashSet<string> NonNegativeLengthProperties = new(StringComparer.Ordinal)
+    {
         "width",
         "height"
     };
@@ -580,20 +586,60 @@ internal static class UiCssValueNormalizer
             normalizedPropertyName,
             normalizedPropertyName);
         string value;
-        if (LengthProperties.Contains(authoredName))
-            value = NormalizeLength(tokens, propertyName, sourcePath, line, column);
+        UiCssValueKind kind;
+        if (SignedLengthProperties.Contains(authoredName))
+        {
+            value = NormalizeLength(
+                tokens,
+                propertyName,
+                sourcePath,
+                line,
+                column,
+                allowNegative: true,
+                allowAuto: false);
+            kind = UiCssValueKind.Length;
+        }
+        else if (NonNegativeLengthProperties.Contains(authoredName))
+        {
+            value = NormalizeLength(
+                tokens,
+                propertyName,
+                sourcePath,
+                line,
+                column,
+                allowNegative: false,
+                allowAuto: true);
+            kind = UiCssValueKind.Length;
+        }
         else if (authoredName == "font-size")
+        {
             value = NormalizePixelNumber(tokens, propertyName, sourcePath, line, column);
+            kind = UiCssValueKind.Number;
+        }
         else if (authoredName == "padding")
+        {
             value = NormalizePadding(tokens, propertyName, sourcePath, line, column);
+            kind = UiCssValueKind.Thickness;
+        }
         else if (authoredName is "text-color" or "background-color")
+        {
             value = NormalizeColor(tokens, propertyName, sourcePath, line, column);
+            kind = UiCssValueKind.Hash;
+        }
         else if (authoredName == "font")
+        {
             value = NormalizeFontFamily(tokens, propertyName, sourcePath, line, column);
+            kind = tokens.Count == 1 && tokens[0].Kind == UiCssValueTokenKind.String
+                ? UiCssValueKind.String
+                : UiCssValueKind.Identifier;
+        }
         else
+        {
             value = NormalizeGeneric(tokens, propertyName, sourcePath, line, column);
+            kind = GetGenericValueKind(tokens);
+        }
 
-        return new UiNormalizedCssValue(authoredName, value);
+        return new UiNormalizedCssValue(authoredName, value, kind);
     }
 
     private static string NormalizeLength(
@@ -601,29 +647,37 @@ internal static class UiCssValueNormalizer
         string property,
         string sourcePath,
         int line,
-        int column)
+        int column,
+        bool allowNegative,
+        bool allowAuto)
     {
         RequireCount(tokens, 1, property, sourcePath, line, column);
         var token = tokens[0];
         if (token.Kind == UiCssValueTokenKind.Identifier &&
-            string.Equals(token.Value, "auto", StringComparison.OrdinalIgnoreCase))
+            string.Equals(token.Value, "auto", StringComparison.OrdinalIgnoreCase) &&
+            allowAuto)
             return "*";
         if (token.Kind == UiCssValueTokenKind.Percentage)
         {
-            RequireFiniteNumber(token.Value, property, sourcePath, line, column);
+            var number = RequireFiniteNumber(token.Value, property, sourcePath, line, column);
+            RequireAllowedSign(number, allowNegative, property, sourcePath, line, column);
             return token.Value + "%";
         }
         if (token.Kind == UiCssValueTokenKind.Dimension &&
             string.Equals(token.Unit, "px", StringComparison.OrdinalIgnoreCase))
         {
-            RequireFiniteNumber(token.Value, property, sourcePath, line, column);
+            var number = RequireFiniteNumber(token.Value, property, sourcePath, line, column);
+            RequireAllowedSign(number, allowNegative, property, sourcePath, line, column);
             return token.Value;
         }
         if (token.Kind == UiCssValueTokenKind.Number && IsZero(token.Value))
             return "0";
 
+        var allowedValues = allowAuto
+            ? "a px dimension, percentage, zero, or 'auto'"
+            : "a px dimension, percentage, or zero";
         throw Error(
-            $"Property '{property}' requires a px dimension, percentage, zero, or 'auto'.",
+            $"Property '{property}' requires {allowedValues}.",
             sourcePath,
             line,
             column);
@@ -641,7 +695,8 @@ internal static class UiCssValueNormalizer
         if (token.Kind == UiCssValueTokenKind.Dimension &&
             string.Equals(token.Unit, "px", StringComparison.OrdinalIgnoreCase))
         {
-            RequireFiniteNumber(token.Value, property, sourcePath, line, column);
+            var number = RequireFiniteNumber(token.Value, property, sourcePath, line, column);
+            RequireAllowedSign(number, false, property, sourcePath, line, column);
             return token.Value;
         }
         if (token.Kind == UiCssValueTokenKind.Number && IsZero(token.Value))
@@ -803,6 +858,24 @@ internal static class UiCssValueNormalizer
         return result.ToString();
     }
 
+    private static UiCssValueKind GetGenericValueKind(
+        IReadOnlyList<UiCssValueToken> tokens)
+    {
+        if (tokens.Count != 1)
+            return UiCssValueKind.Sequence;
+
+        return tokens[0].Kind switch
+        {
+            UiCssValueTokenKind.Identifier => UiCssValueKind.Identifier,
+            UiCssValueTokenKind.String => UiCssValueKind.String,
+            UiCssValueTokenKind.Number => UiCssValueKind.Number,
+            UiCssValueTokenKind.Dimension => UiCssValueKind.Dimension,
+            UiCssValueTokenKind.Percentage => UiCssValueKind.Percentage,
+            UiCssValueTokenKind.Hash => UiCssValueKind.Hash,
+            _ => UiCssValueKind.Sequence
+        };
+    }
+
     private static void RequireCount(
         IReadOnlyCollection<UiCssValueToken> tokens,
         int count,
@@ -819,17 +892,34 @@ internal static class UiCssValueNormalizer
                 column);
     }
 
-    private static void RequireFiniteNumber(
+    private static float RequireFiniteNumber(
         string value,
         string property,
         string sourcePath,
         int line,
         int column)
     {
-        if (!double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var number) ||
-            !double.IsFinite(number))
+        if (!float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var number) ||
+            !float.IsFinite(number))
             throw Error(
                 $"Property '{property}' contains an invalid number.",
+                sourcePath,
+                line,
+                column);
+        return number;
+    }
+
+    private static void RequireAllowedSign(
+        double value,
+        bool allowNegative,
+        string property,
+        string sourcePath,
+        int line,
+        int column)
+    {
+        if (!allowNegative && value < 0d)
+            throw Error(
+                $"Property '{property}' requires a non-negative value.",
                 sourcePath,
                 line,
                 column);

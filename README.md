@@ -143,7 +143,7 @@ the engine:
 ```csharp
 var menu = CreateEntity("menu")
     .AttachComponent<UiFrame>()
-    .WithLayout("Ui/main-menu.xml");
+    .WithLayout("Ui/main-menu.uxml");
 
 menu.Layout.GetRequired<UiButton>("play-button").Clicked +=
     _ => Scene.SetNextScene<GameScene>();

@@ -44,7 +44,7 @@ public static class UiXmlComposer
     ///     expands all of its component references.
     /// </summary>
     /// <param name="layoutPath">
-    ///     A content-root-relative source path such as <c>Ui/main-menu.xml</c>.
+    ///     A content-root-relative source path such as <c>Ui/main-menu.uxml</c>.
     ///     The corresponding <c>.xmlb</c> asset is opened for composition.
     /// </param>
     /// <param name="openAsset">Opens a baked asset by logical path.</param>
@@ -125,7 +125,7 @@ public static class UiXmlComposer
     /// </summary>
     /// <param name="componentPath">
     ///     A content-root-relative source path such as
-    ///     <c>Ui/components/button.xml</c>. The corresponding <c>.xmlb</c>
+    ///     <c>Ui/components/button.uxml</c>. The corresponding <c>.xmlb</c>
     ///     asset is opened for composition.
     /// </param>
     /// <param name="openAsset">Opens a baked asset by logical path.</param>

@@ -197,6 +197,7 @@ public sealed class AssetBakePipeline
         var cacheHitCount = 0;
         var unsupportedCount = 0;
         var liveCacheKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var liveProjectSourcePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var builtInEffectPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var finalBlobs = new Dictionary<string, PreparedBlob>(StringComparer.OrdinalIgnoreCase);
 
@@ -308,6 +309,9 @@ public sealed class AssetBakePipeline
                 }
                 else
                     finalBlobs[preparedBlob.LogicalPath] = preparedBlob;
+
+                if (!bakeRoot.IsBuiltIn)
+                    liveProjectSourcePaths.Add(relativePath);
             }
         }
 
@@ -315,9 +319,11 @@ public sealed class AssetBakePipeline
         {
             cancellationToken.ThrowIfCancellationRequested();
             const string registryCacheKey = "registry/runtime";
-            const string registryCacheSignature = "runtime-registry-v3";
+            const string registryCacheSignature = "runtime-registry-v4";
             liveCacheKeys.Add(registryCacheKey);
-            var registryHash = sourceRegistry.SourceHash;
+            var registryHash = ComputeRuntimeRegistryHash(
+                sourceRegistry.SourceHash,
+                liveProjectSourcePaths);
             PreparedBlob registryBlob;
             if (!cache.TryRead(
                     registryCacheKey,
@@ -328,7 +334,8 @@ public sealed class AssetBakePipeline
             {
                 var bakedRegistryBlob = CreateRuntimeRegistryBlob(
                     sourceRegistry,
-                    bakerRegistry);
+                    bakerRegistry,
+                    liveProjectSourcePaths);
                 var registryBlobFile = cache.Write(
                     registryCacheKey,
                     registryHash,
@@ -358,7 +365,8 @@ public sealed class AssetBakePipeline
 
     private static AssetBlob CreateRuntimeRegistryBlob(
         SourceAssetRegistryCatalog source,
-        AssetBakerRegistry bakerRegistry)
+        AssetBakerRegistry bakerRegistry,
+        ISet<string> liveSourcePaths)
     {
         var seenIds = new HashSet<Guid>();
         var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -367,6 +375,12 @@ public sealed class AssetBakePipeline
         {
             if (entry.Id == Guid.Empty || string.IsNullOrWhiteSpace(entry.Path))
                 throw new InvalidDataException("The Dreambit asset registry contains an invalid entry.");
+            var normalizedPath = NormalizeRelativePath(entry.Path);
+            // The Editor deliberately preserves deleted assets as tombstones so
+            // restoring a path can recover its stable ID. Tombstones have no
+            // runtime content, so they must not enter the emitted registry.
+            if (!liveSourcePaths.Contains(normalizedPath))
+                continue;
             var extension = Path.GetExtension(entry.Path);
             // The editor tracks source-only files so they remain visible in the
             // Project panel. They must not enter the runtime registry unless a
@@ -377,14 +391,15 @@ public sealed class AssetBakePipeline
                 continue;
 
             // Stylesheets are addressed by their full logical path so a sibling
-            // foo.css can coexist with foo.xml. They intentionally do not receive
-            // stable IDs in the extension-stripping runtime registry.
-            if (extension.Equals(".css", StringComparison.OrdinalIgnoreCase))
+            // foo.ucss can coexist with foo.uxml. Stylesheets intentionally do
+            // not receive stable IDs in the extension-stripping runtime registry.
+            if (extension.Equals(".ucss", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".css", StringComparison.OrdinalIgnoreCase))
                 continue;
 
             var logicalName = IsSerializedDreambitExtension(extension)
-                ? entry.Path.Replace('\\', '/')
-                : Path.ChangeExtension(entry.Path, null)!.Replace('\\', '/');
+                ? normalizedPath
+                : Path.ChangeExtension(normalizedPath, null)!.Replace('\\', '/');
             if (!seenIds.Add(entry.Id))
                 throw new InvalidDataException($"Duplicate asset ID '{entry.Id:D}'.");
             if (!seenNames.Add(logicalName))
@@ -403,6 +418,21 @@ public sealed class AssetBakePipeline
             AssetType.Json,
             ".jsonb",
             output.ToArray());
+    }
+
+    private static string ComputeRuntimeRegistryHash(
+        string sourceRegistryHash,
+        IEnumerable<string> liveSourcePaths)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        hash.AppendData(Encoding.UTF8.GetBytes(sourceRegistryHash));
+        hash.AppendData([0]);
+        foreach (var path in liveSourcePaths.OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
+        {
+            hash.AppendData(Encoding.UTF8.GetBytes(path.ToLowerInvariant()));
+            hash.AppendData([0]);
+        }
+        return Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
     }
 
     private static string ComputeContentFingerprint(

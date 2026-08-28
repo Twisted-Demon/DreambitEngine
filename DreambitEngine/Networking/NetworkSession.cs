@@ -30,6 +30,7 @@ internal sealed class NetworkSession : IDisposable
     private string? _pendingSceneKey;
     private NetworkSceneEpoch _pendingSceneEpoch;
     private readonly Dictionary<ReplicationStateKey, uint> _lastStateSequences = [];
+    private readonly Dictionary<ClientTransformStateKey, uint> _lastClientTransformSequences = [];
     private readonly Dictionary<NetworkEntityId, PendingLiveSpawn> _pendingLiveSpawns = [];
     private double _snapshotElapsed;
     private uint _stateSequence;
@@ -186,10 +187,10 @@ internal sealed class NetworkSession : IDisposable
     {
         ArgumentNullException.ThrowIfNull(scene);
         if (IsServer)
-        {
             ServerTick++;
+
+        if (IsServer || Role == NetworkRole.Client)
             _snapshotElapsed += 1d / 60d;
-        }
     }
 
     public void AfterSceneTick(Scene scene)
@@ -198,10 +199,13 @@ internal sealed class NetworkSession : IDisposable
         if (ReferenceEquals(World?.Scene, scene))
         {
             World.ReconcileDestroyedEntities();
-            if (IsServer && _snapshotElapsed >= 1d / _options.ReplicationRate)
+            if (_snapshotElapsed >= 1d / _options.ReplicationRate)
             {
                 _snapshotElapsed %= 1d / _options.ReplicationRate;
-                SendSnapshotNow();
+                if (IsServer)
+                    SendSnapshotNow();
+                else if (Role == NetworkRole.Client)
+                    SendClientTransformsNow();
             }
         }
     }
@@ -216,6 +220,7 @@ internal sealed class NetworkSession : IDisposable
             World.Dispose(false);
             World = null;
             _lastStateSequences.Clear();
+            _lastClientTransformSequences.Clear();
             _pendingLiveSpawns.Clear();
             _clientBaseline = null;
             _clientSceneLoadedSent = false;
@@ -553,6 +558,7 @@ internal sealed class NetworkSession : IDisposable
         _peersByConnection.Clear();
         _peersById.Clear();
         _pendingLiveSpawns.Clear();
+        _lastClientTransformSequences.Clear();
         if (World is not null)
         {
             World.Scene.SetStartPreparationGate(null);
@@ -701,6 +707,11 @@ internal sealed class NetworkSession : IDisposable
                 ValidateReadyPacket(peer, packet.Header);
                 RequireSnapshotDelivery(transportEvent);
                 HandleSnapshot(packet);
+                break;
+            case NetworkProtocolMessage.ClientTransform:
+                ValidateReadyPacket(peer, packet.Header);
+                RequireClientTransformDelivery(transportEvent);
+                HandleClientTransform(peer, packet);
                 break;
             default:
                 ValidateReadyPacket(peer, packet.Header);
@@ -1337,6 +1348,7 @@ internal sealed class NetworkSession : IDisposable
             _clientBaseline = null;
             _clientSceneReady = false;
             _lastStateSequences.Clear();
+            _lastClientTransformSequences.Clear();
             _pendingLiveSpawns.Clear();
         }
     }
@@ -1781,6 +1793,50 @@ internal sealed class NetworkSession : IDisposable
         }
     }
 
+    internal void SendClientTransformsNow()
+    {
+        if (Role != NetworkRole.Client)
+            throw new InvalidOperationException(
+                "Only a remote client can publish client-authoritative transforms.");
+        if (World is null || !LocalPeerId.IsValid || !_serverConnection.IsValid)
+            return;
+
+        var sequence = NextStateSequence();
+        foreach (var record in World.Records)
+        {
+            if (record.Owner != LocalPeerId)
+                continue;
+
+            var transform = record.Entity.GetComponent<NetworkTransform2D>();
+            if (transform is null || !transform.AllowsClientAuthority)
+                continue;
+
+            transform.CaptureAuthoritativeTransform();
+            var position = transform.AuthoritativePosition;
+            var rotation = transform.AuthoritativeRotation;
+            var scale = transform.AuthoritativeScale;
+            if (!IsFinite(position) || !float.IsFinite(rotation) || !IsFinite(scale))
+                continue;
+
+            SendPacket(
+                _serverConnection,
+                NetworkProtocolMessage.ClientTransform,
+                writer =>
+                {
+                    writer.WriteUInt32(sequence);
+                    writer.WriteUInt64(record.Id.Value);
+                    WriteVector2(writer, position);
+                    writer.WriteSingle(rotation);
+                    WriteVector2(writer, scale);
+                },
+                SceneEpoch,
+                ServerTick,
+                StructuralRevision,
+                NetworkDelivery.UnreliableSequenced,
+                3);
+        }
+    }
+
     private byte[] EncodeStateRecord(
         NetworkEntityId entityId,
         NetworkReplicationBinding binding,
@@ -1890,6 +1946,64 @@ internal sealed class NetworkSession : IDisposable
         }
     }
 
+    private void HandleClientTransform(NetworkPeer peer, NetworkPacket packet)
+    {
+        if (!IsServer)
+            throw new NetworkProtocolException(
+                "A client cannot receive a client-authoritative transform update.");
+        if (IsStaleScenePacket(packet.Header))
+            return;
+        ValidateCurrentScenePacket(packet.Header, requireNextRevision: false);
+        if (packet.Header.StructuralRevision != StructuralRevision || World is null)
+            return;
+
+        var reader = new NetworkReader(packet.Payload.Span);
+        var sequence = reader.ReadUInt32();
+        var entityId = new NetworkEntityId(reader.ReadUInt64());
+        var position = ReadVector2(ref reader);
+        var rotation = reader.ReadSingle();
+        var scale = ReadVector2(ref reader);
+        reader.EnsureComplete();
+
+        if (!entityId.IsValid)
+            throw new NetworkProtocolException(
+                "A client transform update contains network Entity ID zero.");
+        if (!IsFinite(position) || !float.IsFinite(rotation) || !IsFinite(scale))
+            throw new NetworkProtocolException(
+                $"Client transform update for Entity {entityId} contains a non-finite value.");
+
+        // Ownership and authority may legitimately change while an unreliable packet is in flight.
+        // Drop stale/unauthorized poses instead of disconnecting an otherwise valid peer.
+        if (!World.TryGetEntity(entityId, out var entity) || entity is null ||
+            World.GetOwner(entityId) != peer.PeerId)
+        {
+            return;
+        }
+
+        var transform = entity.GetComponent<NetworkTransform2D>();
+        if (transform is null || !transform.AllowsClientAuthority)
+            return;
+
+        var key = new ClientTransformStateKey(peer.PeerId, entityId);
+        if (_lastClientTransformSequences.TryGetValue(key, out var previous) &&
+            !IsNewerSequence(sequence, previous))
+        {
+            return;
+        }
+
+        // A dedicated server needs the submitted pose immediately for simulation. A listen host
+        // keeps the pose as a presentation target for remote Client-authority entities, avoiding
+        // visible network-rate stepping in the host's local view.
+        var interpolateOnHost =
+            IsHost && transform.Authority == TransformAuthority.Client;
+        transform.AcceptClientTransform(
+            position,
+            rotation,
+            scale,
+            applyImmediately: !interpolateOnHost);
+        _lastClientTransformSequences[key] = sequence;
+    }
+
     private byte[] EncodeUserMessage(INetworkMessageRegistration registration, object message)
     {
         using var body = new NetworkWriter(
@@ -1977,6 +2091,29 @@ internal sealed class NetworkSession : IDisposable
                 $"Component state used invalid {transportEvent.Delivery} channel " +
                 $"{transportEvent.Channel}.");
     }
+
+    private static void RequireClientTransformDelivery(QueuedTransportEvent transportEvent)
+    {
+        if (transportEvent.Delivery != NetworkDelivery.UnreliableSequenced ||
+            transportEvent.Channel != 3)
+        {
+            throw new NetworkProtocolException(
+                $"Client transform used invalid {transportEvent.Delivery} channel " +
+                $"{transportEvent.Channel}.");
+        }
+    }
+
+    private static void WriteVector2(NetworkWriter writer, Vector2 value)
+    {
+        writer.WriteSingle(value.X);
+        writer.WriteSingle(value.Y);
+    }
+
+    private static Vector2 ReadVector2(ref NetworkReader reader) =>
+        new(reader.ReadSingle(), reader.ReadSingle());
+
+    private static bool IsFinite(Vector2 value) =>
+        float.IsFinite(value.X) && float.IsFinite(value.Y);
 
     private static void WriteVector3(NetworkWriter writer, Vector3 value)
     {
@@ -2096,6 +2233,10 @@ internal sealed class NetworkSession : IDisposable
     private readonly record struct ReplicationStateKey(
         NetworkEntityId EntityId,
         ushort ComponentId);
+
+    private readonly record struct ClientTransformStateKey(
+        NetworkPeerId PeerId,
+        NetworkEntityId EntityId);
 
     private sealed class PendingLiveSpawn
     {

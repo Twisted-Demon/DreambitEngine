@@ -687,10 +687,8 @@ public abstract class UiElement
             UiXmlParser.ParseString(node, "width", "100%"));
         Height = UiXmlParser.ParseLength(
             UiXmlParser.ParseString(node, "height", "100%"));
-        Anchor = UiXmlParser.ParseAnchor(
-            UiXmlParser.ParseString(node, "anchor", "TopLeft"));
-        Origin = UiXmlParser.ParseAnchor(
-            UiXmlParser.ParseString(node, "origin", "TopLeft"));
+        Anchor = UiXmlParser.ParseEnum(node, "anchor", UiAnchor.TopLeft);
+        Origin = UiXmlParser.ParseEnum(node, "origin", UiAnchor.TopLeft);
         ZIndex = UiXmlParser.ParseInt(node, "z");
         GridRow = UiXmlParser.ParseInt(node, "grid-row");
         GridColumn = UiXmlParser.ParseInt(node, "grid-column");

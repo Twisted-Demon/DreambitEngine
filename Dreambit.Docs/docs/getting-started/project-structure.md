@@ -29,9 +29,10 @@ Resources.LoadAsset<Sprite>("Sprites/player");
 Resources.LoadAsset<Texture2D>("Textures/background");
 ```
 
-UI XML is part of the same asset build: source `*.xml` files become `*.xmlb`
-assets in the development blob cache and in `content.pak` for shipping builds.
-`UiFrame.WithLayout("Ui/hud.xml")` keeps using the readable source-style path;
+Dreambit UI XML is part of the same asset build: source `*.uxml` files become
+`*.xmlb` assets in the development blob cache and in `content.pak` for shipping
+builds.
+`UiFrame.WithLayout("Ui/hud.uxml")` keeps using the readable source-style path;
 the runtime resolves it through the active Dreambit content source. See
 [Content projects and Asset Baker](../assets/content-pipeline.md).
 

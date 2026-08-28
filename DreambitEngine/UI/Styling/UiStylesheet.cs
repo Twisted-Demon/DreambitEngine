@@ -14,6 +14,19 @@ internal readonly record struct UiStyleSourceSpan(
     int Line,
     int Column);
 
+internal enum UiCssValueKind
+{
+    Identifier,
+    String,
+    Number,
+    Dimension,
+    Percentage,
+    Hash,
+    Sequence,
+    Length,
+    Thickness
+}
+
 internal sealed record UiStyleSelector(
     UiStyleSelectorKind Kind,
     string? ElementName,
@@ -42,6 +55,7 @@ internal sealed record UiStyleDeclaration(
     string CssPropertyName,
     string AuthoredPropertyName,
     string AuthoredValue,
+    UiCssValueKind ValueKind,
     int DeclarationOrder,
     UiStyleSourceSpan SourceSpan);
 

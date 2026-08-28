@@ -7,10 +7,10 @@ namespace DreambitEngine.AssetBaker.Pipeline.Docs;
 public sealed class CssbBaker : AssetBakerBase
 {
     public override string AssetTypeName => "UI stylesheet";
-    public override string[] SupportedInputs => [".css"];
+    public override string[] SupportedInputs => [".ucss", ".css"];
     public override string OutputExtension => ".cssb";
 
-    public override string GetCacheSignature(BakeContext ctx) => "cssb-v1;parser-v1";
+    public override string GetCacheSignature(BakeContext ctx) => "cssb-v1;parser-v2";
 
     public override void Bake(BakeContext ctx)
     {

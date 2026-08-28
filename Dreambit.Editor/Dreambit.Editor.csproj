@@ -18,7 +18,7 @@
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
     <ApplicationManifest>app.manifest</ApplicationManifest>
 
-    <DreambitSdkVersion>0.7.0</DreambitSdkVersion>
+    <DreambitSdkVersion>0.7.4</DreambitSdkVersion>
     <BundleDreambitSdkOnPublish Condition="'$(BundleDreambitSdkOnPublish)' == ''">true</BundleDreambitSdkOnPublish>
   </PropertyGroup>
 

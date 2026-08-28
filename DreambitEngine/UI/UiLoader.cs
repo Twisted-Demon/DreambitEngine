@@ -88,12 +88,12 @@ public static class UiLoader
 
     /// <summary>
     ///     Loads a UI document through Dreambit's active baked-content source.
-    ///     Source-style <c>.xml</c> paths are resolved to their baked
+    ///     Source-style <c>.uxml</c> paths are resolved to their baked
     ///     <c>.xmlb</c> assets in the active blob directory or PAK.
     /// </summary>
     /// <param name="assetPath">
     ///     The content-root-relative UI path, such as
-    ///     <c>Ui/main-menu.xml</c>.
+    ///     <c>Ui/main-menu.uxml</c>.
     /// </param>
     /// <returns>The parsed layout.</returns>
     public static UiLayout LoadFromAsset(string assetPath)
@@ -160,7 +160,7 @@ public static class UiLoader
     /// </summary>
     /// <param name="assetPath">
     ///     The content-root-relative component path, such as
-    ///     <c>Ui/components/button.xml</c>.
+    ///     <c>Ui/components/button.uxml</c>.
     /// </param>
     /// <param name="idPrefix">Optional text prepended to every authored component ID.</param>
     /// <returns>The detached component root.</returns>

@@ -31,7 +31,7 @@ public sealed class AssetBakePipelineTests : IDisposable
         var output = Path.Combine(_root, "CssBlobs");
         Directory.CreateDirectory(Path.Combine(assets, "Ui"));
         const string css = "/* Grüße */ Text { text: \"Crème brûlée\"; color: #FFFFFF; width: 100px; }";
-        File.WriteAllText(Path.Combine(assets, "Ui", "master.css"), css);
+        File.WriteAllText(Path.Combine(assets, "Ui", "master.ucss"), css);
 
         var result = new AssetBakePipeline().BakeBlobs(new AssetBlobBakeRequest(
             assets,
@@ -56,7 +56,7 @@ public sealed class AssetBakePipelineTests : IDisposable
         var assets = Path.Combine(_root, "BadCssAssets");
         var output = Path.Combine(_root, "BadCssBlobs");
         Directory.CreateDirectory(assets);
-        File.WriteAllText(Path.Combine(assets, "bad.css"), "Text { width: 100; }");
+        File.WriteAllText(Path.Combine(assets, "bad.ucss"), "Text { width: 100; }");
 
         var exception = Assert.Throws<UiStylesheetException>(() =>
             new AssetBakePipeline().BakeBlobs(new AssetBlobBakeRequest(
@@ -68,6 +68,31 @@ public sealed class AssetBakePipelineTests : IDisposable
         Assert.False(File.Exists(Path.Combine(output, BlobContentManifest.FileName)));
     }
 
+    [Theory]
+    [InlineData("width", "-100px")]
+    [InlineData("height", "-50%")]
+    [InlineData("font-size", "-24px")]
+    public void CssBakerRejectsNegativeSizesBeforePublishing(
+        string property,
+        string value)
+    {
+        var assets = Path.Combine(_root, "NegativeCssAssets", property);
+        var output = Path.Combine(_root, "NegativeCssBlobs", property);
+        Directory.CreateDirectory(assets);
+        File.WriteAllText(
+            Path.Combine(assets, "bad.ucss"),
+            $"Text {{ {property}: {value}; }}");
+
+        var exception = Assert.Throws<UiStylesheetException>(() =>
+            new AssetBakePipeline().BakeBlobs(new AssetBlobBakeRequest(
+                assets,
+                output,
+                RebuildAll: true)));
+
+        Assert.Contains(property, exception.Message);
+        Assert.False(File.Exists(Path.Combine(output, BlobContentManifest.FileName)));
+    }
+
     [Fact]
     public void SameStemXmlAndCssDoNotCollideInRuntimeRegistry()
     {
@@ -76,8 +101,8 @@ public sealed class AssetBakePipelineTests : IDisposable
         var registry = Path.Combine(_root, "RegistryCss", "assets.json");
         Directory.CreateDirectory(Path.Combine(assets, "Ui"));
         Directory.CreateDirectory(Path.GetDirectoryName(registry)!);
-        File.WriteAllText(Path.Combine(assets, "Ui", "main.xml"), "<Ui />");
-        File.WriteAllText(Path.Combine(assets, "Ui", "main.css"), "Text { width: 10px; }");
+        File.WriteAllText(Path.Combine(assets, "Ui", "main.uxml"), "<Ui />");
+        File.WriteAllText(Path.Combine(assets, "Ui", "main.ucss"), "Text { width: 10px; }");
         var xmlId = Guid.NewGuid();
         var cssId = Guid.NewGuid();
         File.WriteAllText(
@@ -86,8 +111,8 @@ public sealed class AssetBakePipelineTests : IDisposable
               {
                 "schemaVersion": 2,
                 "assets": [
-                  { "id": "{{xmlId:D}}", "path": "Ui/main.xml" },
-                  { "id": "{{cssId:D}}", "path": "Ui/main.css" }
+                  { "id": "{{xmlId:D}}", "path": "Ui/main.uxml" },
+                  { "id": "{{cssId:D}}", "path": "Ui/main.ucss" }
                 ]
               }
               """);
@@ -108,6 +133,46 @@ public sealed class AssetBakePipelineTests : IDisposable
         Assert.True(runtimeRegistry.TryResolveAssetName(new AssetId(xmlId), out var xmlName));
         Assert.Equal("Ui/main", xmlName);
         Assert.False(runtimeRegistry.TryResolveAssetName(new AssetId(cssId), out _));
+    }
+
+    [Fact]
+    public void RuntimeRegistryIgnoresDeletedSourceTombstones()
+    {
+        var assets = Path.Combine(_root, "RegistryTombstoneAssets");
+        var output = Path.Combine(_root, "RegistryTombstoneContent", "content.pak");
+        var registry = Path.Combine(_root, "RegistryTombstone", "assets.json");
+        Directory.CreateDirectory(Path.Combine(assets, "Ui"));
+        Directory.CreateDirectory(Path.GetDirectoryName(registry)!);
+        File.WriteAllText(Path.Combine(assets, "Ui", "main-title.uxml"), "<Ui />");
+        var deletedXmlId = Guid.NewGuid();
+        var deletedUxmlId = Guid.NewGuid();
+        var currentId = Guid.NewGuid();
+        File.WriteAllText(
+            registry,
+            $$"""
+              {
+                "schemaVersion": 2,
+                "assets": [
+                  { "id": "{{deletedXmlId:D}}", "path": "Ui/main-menu.xml" },
+                  { "id": "{{deletedUxmlId:D}}", "path": "Ui/main-menu.uxml" },
+                  { "id": "{{currentId:D}}", "path": "Ui/main-title.uxml" }
+                ]
+              }
+              """);
+
+        new AssetBakePipeline().BakePak(new AssetBakeRequest(
+            assets,
+            output,
+            registry,
+            RebuildAll: true));
+
+        using var pak = new PakReader(output);
+        using var registryStream = pak.Open(RuntimeAssetRegistry.LogicalPath);
+        var runtimeRegistry = RuntimeAssetRegistry.Load(registryStream);
+        Assert.True(runtimeRegistry.TryResolveAssetName(new AssetId(currentId), out var logicalName));
+        Assert.Equal("Ui/main-title", logicalName);
+        Assert.False(runtimeRegistry.TryResolveAssetName(new AssetId(deletedXmlId), out _));
+        Assert.False(runtimeRegistry.TryResolveAssetName(new AssetId(deletedUxmlId), out _));
     }
 
     [Fact]

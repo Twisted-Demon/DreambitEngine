@@ -15,8 +15,8 @@ It recursively mirrors logical paths inside the pak and supports:
 | `.json`, `.ldtk`, `.ldtkl` | `.jsonb` |
 | `.asset`, `.blueprint`, `.particlefx`, `.scene`, `.soundcue`, `.sprite`, `.spriteanimation`, `.spritesheet`, `.tileset` | source extension + `.jsonb` |
 | `.yaml`, `.cutscene` | `.yamlb` (`.cutscene` keeps its source extension) |
-| `.xml`, `.tmx`, `.tx`, `.tsx` | `.xmlb` |
-| `.css` | `.cssb` |
+| `.uxml`, `.xml`, `.tmx`, `.tx`, `.tsx` | `.xmlb` |
+| `.ucss`, `.css` | `.cssb` |
 
 Serialized Dreambit assets use their semantic source extension as part of their logical runtime
 name. For example, `Sprites/hero.sprite` bakes to `sprites/hero.sprite.jsonb` and is loaded as
@@ -27,19 +27,23 @@ Texture options include `--mips`, `--premul`, `--max-size N`, and `--srgb`.
 The runtime defaults to `Resources.UsePak = true` and
 `Resources.PakName = "content.pak"`.
 
-UI XML is loaded through Dreambit's active content source. During development,
+Dreambit UI XML is authored as `*.uxml` and loaded through the active content
+source. During development,
 `UiFrame` reads the baked `*.xmlb` payloads named by `content.blobs.json`; a
 shipping build reads the same logical assets from `content.pak`. Layout and
-component references remain source-style paths such as `Ui/hud.xml`, and the UI
-loader maps them to `Ui/hud.xmlb` internally. Do not add raw `*.xml` copy rules
+component references remain source-style paths such as `Ui/hud.uxml`, and the UI
+loader maps them to `Ui/hud.xmlb` internally. Do not add raw `*.uxml` copy rules
 to the MonoGame content builder.
 
-UI stylesheets follow the same rule: source `Ui/hud.css` becomes
+UI stylesheets use `*.ucss`: source `Ui/hud.ucss` becomes
 `ui/hud.cssb`. Automatic layout/component sibling lookup and explicit
 `UiFrame.CssPath` open only the baked asset. CSS remains path-loaded in this
-version and is excluded from the stable-ID runtime registry so `Ui/hud.xml` and
-`Ui/hud.css` can coexist without producing the same extensionless registry
+version and is excluded from the stable-ID runtime registry so `Ui/hud.uxml` and
+`Ui/hud.ucss` can coexist without producing the same extensionless registry
 name. See [UI stylesheets](../UI/Stylesheets.md).
+
+Legacy UI `*.xml` and `*.css` sources are still accepted for compatibility, but
+new UI assets should use `*.uxml` and `*.ucss`.
 
 !!! note
     `BakeDirectoryCommand` exists in source but is not registered in the current

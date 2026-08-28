@@ -19,12 +19,12 @@ public sealed class UiStylesheetTests : IDisposable
     [Fact]
     public void ElementClassAndCombinedSelectorsUseApprovedSpecificity()
     {
-        Write("Ui/main.xml", """
+        Write("Ui/main.uxml", """
             <Ui>
               <Text id="title" class="h1 centered" />
             </Ui>
             """);
-        Write("Ui/main.css", """
+        Write("Ui/main.ucss", """
             /* The combined selector is strongest, regardless of source position. */
             Text.h1 { width: 30px; color: #FF0000; }
             Text { width: 10px; color: #FFFFFF; }
@@ -43,8 +43,8 @@ public sealed class UiStylesheetTests : IDisposable
     [Fact]
     public void EqualSpecificityUsesLaterRuleAndDeclaration()
     {
-        Write("Ui/main.xml", "<Ui><Text id=\"title\" class=\"h1\" /></Ui>");
-        Write("Ui/main.css", """
+        Write("Ui/main.uxml", "<Ui><Text id=\"title\" class=\"h1\" /></Ui>");
+        Write("Ui/main.ucss", """
             .h1 { width: 10px; width: 20px; }
             .h1 { width: 40px; }
             """);
@@ -57,14 +57,14 @@ public sealed class UiStylesheetTests : IDisposable
     [Fact]
     public void CssValuesNormalizeThroughExistingElementParsers()
     {
-        Write("Ui/main.xml", """
+        Write("Ui/main.uxml", """
             <Ui>
               <Button id="button" class="primary">
                 <Text id="label" />
               </Button>
             </Ui>
             """);
-        Write("Ui/main.css", """
+        Write("Ui/main.ucss", """
             Button.primary {
               width: 50%;
               height: auto;
@@ -105,8 +105,8 @@ public sealed class UiStylesheetTests : IDisposable
         int right,
         int bottom)
     {
-        Write("Ui/main.xml", "<Ui><Button id=\"button\" /></Ui>");
-        Write("Ui/main.css", $"Button {{ padding: {value}; }}");
+        Write("Ui/main.uxml", "<Ui><Button id=\"button\" /></Ui>");
+        Write("Ui/main.ucss", $"Button {{ padding: {value}; }}");
 
         var button = Assert.IsType<UiButton>(Load().Find("button"));
 
@@ -116,8 +116,8 @@ public sealed class UiStylesheetTests : IDisposable
     [Fact]
     public void DreambitSpecificPropertiesUseExistingXmlSemantics()
     {
-        Write("Ui/main.xml", "<Ui><Panel id=\"panel\" /></Ui>");
-        Write("Ui/main.css", """
+        Write("Ui/main.uxml", "<Ui><Panel id=\"panel\" /></Ui>");
+        Write("Ui/main.ucss", """
             Panel {
               anchor: center;
               origin: bottomright;
@@ -141,12 +141,12 @@ public sealed class UiStylesheetTests : IDisposable
     [Fact]
     public void ExplicitXmlWinsIncludingDefaultLookingValues()
     {
-        Write("Ui/main.xml", """
+        Write("Ui/main.uxml", """
             <Ui>
               <Text id="title" width="0" is-visible="false" text-color="#FF0000" />
             </Ui>
             """);
-        Write("Ui/main.css", """
+        Write("Ui/main.ucss", """
             Text { width: 200px; is-visible: true; color: #FFFFFF; }
             """);
 
@@ -160,7 +160,7 @@ public sealed class UiStylesheetTests : IDisposable
     [Fact]
     public void ExplicitBackgroundPropertyElementWinsOverCssShorthand()
     {
-        Write("Ui/main.xml", """
+        Write("Ui/main.uxml", """
             <Ui>
               <Button id="button">
                 <Button.Background>
@@ -169,7 +169,7 @@ public sealed class UiStylesheetTests : IDisposable
               </Button>
             </Ui>
             """);
-        Write("Ui/main.css", "Button { background-color: #355E3B; }");
+        Write("Ui/main.ucss", "Button { background-color: #355E3B; }");
 
         var button = Assert.IsType<UiButton>(Load().Find("button"));
 
@@ -180,10 +180,10 @@ public sealed class UiStylesheetTests : IDisposable
     [Fact]
     public void NestedComponentStylesAreScopedAndOrderedByBoundary()
     {
-        Write("Ui/main.xml", """
+        Write("Ui/main.uxml", """
             <Ui>
               <Ui.Components>
-                <Component name="PanelComponent" source="components/panel.xml" />
+                <Component name="PanelComponent" source="components/panel.uxml" />
               </Ui.Components>
               <Panel>
                 <PanelComponent id-prefix="nested" />
@@ -191,11 +191,11 @@ public sealed class UiStylesheetTests : IDisposable
               </Panel>
             </Ui>
             """);
-        Write("Ui/main.css", "Text.target { width: 10px; }");
-        Write("Ui/components/panel.xml", """
+        Write("Ui/main.ucss", "Text.target { width: 10px; }");
+        Write("Ui/components/panel.uxml", """
             <UiComponent>
               <UiComponent.Components>
-                <Component name="ButtonComponent" source="button.xml" />
+                <Component name="ButtonComponent" source="button.uxml" />
               </UiComponent.Components>
               <Panel id="panel">
                 <ButtonComponent id-prefix="button" />
@@ -203,15 +203,15 @@ public sealed class UiStylesheetTests : IDisposable
               </Panel>
             </UiComponent>
             """);
-        Write("Ui/components/panel.css", "Text.target { width: 20px; }");
-        Write("Ui/components/button.xml", """
+        Write("Ui/components/panel.ucss", "Text.target { width: 20px; }");
+        Write("Ui/components/button.uxml", """
             <UiComponent>
               <Button id="root">
                 <Text id="label" class="target" />
               </Button>
             </UiComponent>
             """);
-        Write("Ui/components/button.css", "Text.target { width: 30px; }");
+        Write("Ui/components/button.ucss", "Text.target { width: 30px; }");
 
         var layout = Load();
 
@@ -223,20 +223,20 @@ public sealed class UiStylesheetTests : IDisposable
     [Fact]
     public void ComponentInstanceAttributesAndClassesRemainFinalOverrides()
     {
-        Write("Ui/main.xml", """
+        Write("Ui/main.uxml", """
             <Ui>
               <Ui.Components>
-                <Component name="PrimaryButton" source="components/button.xml" />
+                <Component name="PrimaryButton" source="components/button.uxml" />
               </Ui.Components>
               <PrimaryButton id-prefix="primary" width="400" class="instance duplicate" />
             </Ui>
             """);
-        Write("Ui/components/button.xml", """
+        Write("Ui/components/button.uxml", """
             <UiComponent>
               <Button id="button" class="component duplicate" />
             </UiComponent>
             """);
-        Write("Ui/components/button.css", "Button { width: 200px; }");
+        Write("Ui/components/button.ucss", "Button { width: 200px; }");
 
         var button = Assert.IsType<UiButton>(Load().Find("primary.button"));
 
@@ -247,29 +247,29 @@ public sealed class UiStylesheetTests : IDisposable
     [Fact]
     public void WrapperComponentsPreserveMultipleBoundariesOnOneFinalNode()
     {
-        Write("Ui/main.xml", """
+        Write("Ui/main.uxml", """
             <Ui>
               <Ui.Components>
-                <Component name="Outer" source="components/outer.xml" />
+                <Component name="Outer" source="components/outer.uxml" />
               </Ui.Components>
               <Outer id-prefix="wrapped" />
             </Ui>
             """);
-        Write("Ui/components/outer.xml", """
+        Write("Ui/components/outer.uxml", """
             <UiComponent>
               <UiComponent.Components>
-                <Component name="Inner" source="inner.xml" />
+                <Component name="Inner" source="inner.uxml" />
               </UiComponent.Components>
               <Inner />
             </UiComponent>
             """);
-        Write("Ui/components/outer.css", "Text { x: 20px; width: 20px; }");
-        Write("Ui/components/inner.xml", """
+        Write("Ui/components/outer.ucss", "Text { x: 20px; width: 20px; }");
+        Write("Ui/components/inner.uxml", """
             <UiComponent>
               <Text id="label" />
             </UiComponent>
             """);
-        Write("Ui/components/inner.css", "Text { width: 30px; }");
+        Write("Ui/components/inner.ucss", "Text { width: 30px; }");
 
         var text = Assert.IsType<UiText>(Load().Find("wrapped.label"));
 
@@ -280,7 +280,7 @@ public sealed class UiStylesheetTests : IDisposable
     [Fact]
     public void MissingSiblingStylesheetIsNormal()
     {
-        Write("Ui/main.xml", "<Ui><Text id=\"title\" /></Ui>");
+        Write("Ui/main.uxml", "<Ui><Text id=\"title\" /></Ui>");
 
         var text = Assert.IsType<UiText>(Load().Find("title"));
 
@@ -291,14 +291,14 @@ public sealed class UiStylesheetTests : IDisposable
     [Fact]
     public void UnknownPropertyFailsOnlyWhenItMatchesATarget()
     {
-        Write("Ui/main.xml", "<Ui><Text id=\"title\" /></Ui>");
-        Write("Ui/main.css", "Button { unknown-property: 123; }");
+        Write("Ui/main.uxml", "<Ui><Text id=\"title\" /></Ui>");
+        Write("Ui/main.ucss", "Button { unknown-property: 123; }");
         _ = Load();
 
-        Write("Ui/main.css", "Text { unknown-property: 123; }");
+        Write("Ui/main.ucss", "Text { unknown-property: 123; }");
         var exception = Assert.Throws<UiStylesheetException>(() => Load());
 
-        Assert.Contains("Ui/main.css", exception.SourcePath.Replace('\\', '/'));
+        Assert.Contains("Ui/main.ucss", exception.SourcePath.Replace('\\', '/'));
         Assert.Contains("unknown-property", exception.Message);
         Assert.Contains("Text", exception.Message);
         Assert.True(exception.LineNumber > 0);
@@ -308,16 +308,149 @@ public sealed class UiStylesheetTests : IDisposable
     [Fact]
     public void CustomElementUsesExistingParsingHelpersForCssProperties()
     {
-        Write("Ui/main.xml", "<Ui><StylesheetProbe id=\"probe\" class=\"custom\" /></Ui>");
-        Write("Ui/main.css", """
-            StylesheetProbe { test-size: 123; }
+        Write("Ui/main.uxml", "<Ui><StylesheetProbe id=\"probe\" class=\"custom\" /></Ui>");
+        Write("Ui/main.ucss", """
+            StylesheetProbe { test-size: 123; test-ratio: 1.25; }
             .custom { test-flag: false; }
             """);
 
         var probe = Assert.IsType<UiStylesheetProbe>(Load().Find("probe"));
 
         Assert.Equal(123, probe.TestSize);
+        Assert.Equal(1.25f, probe.TestRatio);
         Assert.False(probe.TestFlag);
+    }
+
+    [Theory]
+    [InlineData("Panel", "is-enabled", "\"false\"")]
+    [InlineData("Panel", "grid-row", "\"2\"")]
+    [InlineData("Button", "hover-tint", "\"#FF0000\"")]
+    [InlineData("StylesheetProbe", "test-size", "\"123\"")]
+    [InlineData("StylesheetProbe", "test-ratio", "\"1.25\"")]
+    [InlineData("StylesheetProbe", "test-flag", "\"false\"")]
+    public void TypedParsersRejectQuotedCssValues(
+        string element,
+        string property,
+        string value)
+    {
+        Write("Ui/main.uxml", $"<Ui><{element} /></Ui>");
+        Write("Ui/main.ucss", $"{element} {{ {property}: {value}; }}");
+
+        var exception = Assert.Throws<UiStylesheetException>(() => Load());
+
+        Assert.Contains(property, exception.Message);
+        Assert.Contains("quoted string", exception.Message);
+        Assert.True(exception.LineNumber > 0);
+        Assert.True(exception.LinePosition > 0);
+    }
+
+    [Fact]
+    public void FloatingPointCssValuesMustFitDreambitsFiniteFloatRange()
+    {
+        Write("Ui/main.uxml", "<Ui><StylesheetProbe /></Ui>");
+        Write("Ui/main.ucss", "StylesheetProbe { test-ratio: 1e100; }");
+
+        var exception = Assert.Throws<UiStylesheetException>(() => Load());
+
+        Assert.Contains("test-ratio", exception.Message);
+        Assert.Contains("finite number", exception.Message);
+    }
+
+    [Fact]
+    public void TypedParsersAcceptMatchingCssTokenKinds()
+    {
+        Write("Ui/main.uxml", "<Ui><Button id=\"button\" /></Ui>");
+        Write("Ui/main.ucss", """
+            Button {
+              is-enabled: false;
+              grid-row: 2;
+              hover-tint: #FF0000;
+              anchor: center;
+            }
+            """);
+
+        var button = Assert.IsType<UiButton>(Load().Find("button"));
+
+        Assert.False(button.IsEnabled);
+        Assert.Equal(2, button.GridRow);
+        Assert.Equal(Microsoft.Xna.Framework.Color.Red, button.Style.HoveredTint);
+        Assert.Equal(UiAnchor.Center, button.Anchor);
+    }
+
+    [Theory]
+    [InlineData("anchor", "definitely-not-an-anchor")]
+    [InlineData("anchor", "\"center\"")]
+    public void EnumPropertiesRejectInvalidOrMistypedCssValues(
+        string property,
+        string value)
+    {
+        Write("Ui/main.uxml", "<Ui><Panel /></Ui>");
+        Write("Ui/main.ucss", $"Panel {{ {property}: {value}; }}");
+
+        var exception = Assert.Throws<UiStylesheetException>(() => Load());
+
+        Assert.Contains(property, exception.Message);
+        Assert.Contains("Panel", exception.Message);
+    }
+
+    [Theory]
+    [InlineData("width", "-100px")]
+    [InlineData("height", "-50%")]
+    [InlineData("font-size", "-24px")]
+    public void NegativeSizesAreRejected(string property, string value)
+    {
+        Write("Ui/main.uxml", "<Ui><Text /></Ui>");
+        Write("Ui/main.ucss", $"Text {{ {property}: {value}; }}");
+
+        var exception = Assert.Throws<UiStylesheetException>(() => Load());
+
+        Assert.Contains(property, exception.Message);
+        Assert.Contains("non-negative", exception.Message);
+    }
+
+    [Theory]
+    [InlineData("x")]
+    [InlineData("y")]
+    public void OffsetsRejectAuto(string property)
+    {
+        Write("Ui/main.uxml", "<Ui><Text /></Ui>");
+        Write("Ui/main.ucss", $"Text {{ {property}: auto; }}");
+
+        var exception = Assert.Throws<UiStylesheetException>(() => Load());
+
+        Assert.Contains(property, exception.Message);
+        Assert.DoesNotContain("'auto'", exception.Message);
+    }
+
+    [Fact]
+    public void NegativeOffsetsRemainSupported()
+    {
+        Write("Ui/main.uxml", "<Ui><Text id=\"title\" /></Ui>");
+        Write("Ui/main.ucss", "Text { x: -20px; y: -5%; }");
+
+        var text = Assert.IsType<UiText>(Load().Find("title"));
+
+        Assert.Equal(-20f, text.X.Value);
+        Assert.True(text.Y.IsPercent);
+        Assert.Equal(-0.05f, text.Y.Value);
+    }
+
+    [Fact]
+    public void LegacyXmlParsingKeepsItsExistingFallbackBehavior()
+    {
+        Write(
+            "Ui/main.uxml",
+            "<Ui><Panel id=\"panel\" is-enabled=\"false\" grid-row=\"2\" " +
+            "anchor=\"not-an-anchor\" /><Button id=\"button\" " +
+            "content-alignment=\"not-an-anchor\" /></Ui>");
+
+        var panel = Assert.IsType<UiPanel>(Load().Find("panel"));
+        var button = Assert.IsType<UiButton>(Load().Find("button"));
+
+        Assert.False(panel.IsEnabled);
+        Assert.Equal(2, panel.GridRow);
+        Assert.Equal(UiAnchor.TopLeft, panel.Anchor);
+        Assert.Equal(UiAnchor.TopLeft, button.ContentAlignment);
     }
 
     [Theory]
@@ -331,8 +464,8 @@ public sealed class UiStylesheetTests : IDisposable
     [InlineData("Text { font: monogram; }")]
     public void UnsupportedOrNonCssSyntaxReportsAStylesheetError(string css)
     {
-        Write("Ui/main.xml", "<Ui><Text /></Ui>");
-        Write("Ui/main.css", css);
+        Write("Ui/main.uxml", "<Ui><Text /></Ui>");
+        Write("Ui/main.ucss", css);
 
         var exception = Assert.Throws<UiStylesheetException>(() => Load());
 
@@ -343,8 +476,8 @@ public sealed class UiStylesheetTests : IDisposable
     [Fact]
     public void CommentsQuotedStringsAndOptionalTrailingSemicolonAreSupported()
     {
-        Write("Ui/main.xml", "<Ui><Text id=\"title\" /></Ui>");
-        Write("Ui/main.css", """
+        Write("Ui/main.uxml", "<Ui><Text id=\"title\" /></Ui>");
+        Write("Ui/main.ucss", """
             /* before */
             Text {
               ;
@@ -365,7 +498,7 @@ public sealed class UiStylesheetTests : IDisposable
             Directory.Delete(_root, true);
     }
 
-    private UiLayout Load() => UiLoader.LoadFromFile("Ui/main.xml", _root);
+    private UiLayout Load() => UiLoader.LoadFromFile("Ui/main.uxml", _root);
 
     private void Write(string relativePath, string contents)
     {
@@ -380,11 +513,14 @@ public sealed class UiStylesheetProbe : UiElement
 {
     public int TestSize { get; private set; }
 
+    public float TestRatio { get; private set; }
+
     public bool TestFlag { get; private set; } = true;
 
     public override void Parse(XmlNode node)
     {
         TestSize = UiXmlParser.ParseInt(node, "test-size");
+        TestRatio = UiXmlParser.ParseFloat(node, "test-ratio");
         TestFlag = UiXmlParser.ParseBool(node, "test-flag", true);
     }
 }

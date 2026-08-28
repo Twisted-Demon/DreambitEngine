@@ -1,24 +1,55 @@
 ﻿using Dreambit.Networking;
 using Dreambit.Networking.Replication;
+using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 
 namespace Dreambit.ECS;
 
+/// <summary>Determines which peer may author a networked 2D transform.</summary>
+public enum TransformAuthority : byte
+{
+    /// <summary>
+    /// Only the authoritative server or host may move the entity. This is the safe default and
+    /// leaves room for client prediction and reconciliation without trusting the client's pose.
+    /// </summary>
+    Server = 0,
+
+    /// <summary>
+    /// The client peer assigned as the entity's network owner authors the pose. The server validates
+    /// ownership, applies the pose, and relays it to the other clients.
+    /// </summary>
+    Client = 1,
+
+    /// <summary>
+    /// Both the server and the owning client may author the pose. The latest pose processed by the
+    /// server becomes the state relayed to clients.
+    /// </summary>
+    Both = 2
+}
+
 [BlueprintType(nameof(NetworkTransform2D))]
-[NetworkReplicated((ushort)ReplicationId.NetworkTransform2D)]
+[NetworkReplicated((ushort)DreambitReplicationId.NetworkTransform2D)]
 public class NetworkTransform2D : Component
 {
-    private Collider? _collider;
+    private readonly List<Collider> _colliders = [];
+    private bool _collidersInitialized;
     private bool _clientPoseInitialized;
     
-    [Replicated(1)]
+    [Replicated((ushort)FieldId.AuthoritativePosition)]
     public Vector2 AuthoritativePosition { get; set; }
 
-    [Replicated(2)]
+    [Replicated((ushort)FieldId.AuthoritativeRotation)]
     public float AuthoritativeRotation { get; set; }
 
-    [Replicated(3)]
+    [Replicated((ushort)FieldId.AuthoritativeScale)]
     public Vector2 AuthoritativeScale { get; set; } = Vector2.One;
+
+    /// <summary>Gets or sets which network participant may author this transform.</summary>
+    [DreambitSerialize]
+    [Replicated((ushort)FieldId.Authority)]
+    [Tooltip("Server accepts movement only from the server/host. Client accepts movement from the " +
+             "entity's assigned owning client. Both allows either source")]
+    public TransformAuthority Authority { get; set; } = TransformAuthority.Server;
     
     /// <summary>
     /// When false, the ordinary remote-transform presentation is skipped
@@ -47,29 +78,59 @@ public class NetworkTransform2D : Component
     [Tooltip("Errors larger than this are treated as teleports instead of interpolated motion")]
     public float SnapDistance { get; set; } = 3f;
 
+    internal bool AllowsClientAuthority =>
+        Authority is TransformAuthority.Client or TransformAuthority.Both;
+
+    internal bool AllowsServerAuthority =>
+        Authority is TransformAuthority.Server or TransformAuthority.Both;
+
+    public override void OnCreated()
+    {
+        // Dynamic spawn state is captured before the deferred OnAddedToEntity callback runs.
+        // Seed the replicated pose now so a non-origin spawn does not publish zeroes.
+        CaptureAuthoritativeTransform();
+    }
+
     public override void OnAddedToEntity()
     {
-        _collider = Entity.GetComponent<Collider>();
-
-        if (Core.Instance.Networking.IsServer)
-            CaptureAuthoritativeTransform();
+        CacheColliders();
     }
     
     public override void OnUpdate()
     {
         var network = Core.Instance.Networking;
+        var isLocalOwner = network.IsOwnedByLocalPeer(Entity);
 
         if (network.IsServer)
         {
-            CaptureAuthoritativeTransform();
+            // A listen host also presents remote client-owned entities. Keep their network pose as
+            // a target and use the same frame-rate smoothing path as an ordinary remote client.
+            if (network.IsHost &&
+                Authority == TransformAuthority.Client &&
+                !isLocalOwner)
+            {
+                ApplyRemoteTransform();
+                return;
+            }
+
+            // A listen host's local peer is also a valid client authority. A dedicated server
+            // applies remote client poses immediately in NetworkSession for simulation.
+            if (AllowsServerAuthority ||
+                (AllowsClientAuthority && isLocalOwner))
+            {
+                CaptureAuthoritativeTransform();
+            }
+
             return;
         }
 
         if (network.Role != NetworkRole.Client)
             return;
 
-        if (!ApplyToLocalOwner &&
-            network.IsOwnedByLocalPeer(Entity))
+        // The owning peer is the source in Client/Both modes, so it never consumes its echoed pose.
+        // ApplyToLocalOwner remains useful for future prediction in strict Server mode.
+        if ((AllowsClientAuthority && isLocalOwner) ||
+            (!ApplyToLocalOwner && isLocalOwner))
         {
             return;
         }
@@ -77,11 +138,24 @@ public class NetworkTransform2D : Component
         ApplyRemoteTransform();
     }
     
-    private void CaptureAuthoritativeTransform()
+    internal void CaptureAuthoritativeTransform()
     {
         AuthoritativePosition = Transform.WorldPosition2D;
         AuthoritativeRotation = Transform.WorldRotation2D;
         AuthoritativeScale = Transform.WorldScale2D;
+    }
+
+    internal void AcceptClientTransform(
+        Vector2 position,
+        float rotation,
+        Vector2 scale,
+        bool applyImmediately)
+    {
+        AuthoritativePosition = position;
+        AuthoritativeRotation = rotation;
+        AuthoritativeScale = scale;
+        if (applyImmediately)
+            SetWorldPose(position, rotation, scale);
     }
     
     private void ApplyRemoteTransform()
@@ -163,10 +237,24 @@ public class NetworkTransform2D : Component
         Transform.WorldRotation2D = rotation;
         Transform.WorldScale2D = scale;
 
-        // NetworkTransform lives inside DreambitEngine, so it can keep the
-        // collider's spatial-hash representation consistent with the new pose.
-        _collider ??= Entity.GetComponent<Collider>();
-        _collider?.RefreshSpatialHash();
+        // A network root may keep its Collider on a child Entity (for example Rootbound's player),
+        // so every Collider in the moved hierarchy must refresh its world-space hash entry.
+        if (!_collidersInitialized)
+            CacheColliders();
+        foreach (var collider in _colliders)
+            if (!Component.IsNull(collider))
+                collider.RefreshSpatialHash();
+    }
+
+    private void CacheColliders()
+    {
+        _colliders.Clear();
+        if (Entity.GetComponent<Collider>() is { } rootCollider)
+            _colliders.Add(rootCollider);
+        foreach (var child in Entity.GetChildren())
+            if (child.GetComponent<Collider>() is { } collider)
+                _colliders.Add(collider);
+        _collidersInitialized = true;
     }
     
     private static float CalculateSharpnessFactor(
@@ -182,5 +270,13 @@ public class NetworkTransform2D : Component
                Mathf.Exp(
                    -sharpness *
                    Time.DeltaTime);
+    }
+
+    private enum FieldId : ushort
+    {
+        AuthoritativePosition = 1,
+        AuthoritativeRotation,
+        AuthoritativeScale,
+        Authority
     }
 }

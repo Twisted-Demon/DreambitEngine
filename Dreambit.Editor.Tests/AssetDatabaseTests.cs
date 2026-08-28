@@ -54,13 +54,13 @@ public sealed class AssetDatabaseTests : IDisposable
     [Fact]
     public void StylesheetKeepsExtensionInEditorLogicalName()
     {
-        WriteAsset("Ui/main.css", "Text { width: 10px; }");
+        WriteAsset("Ui/main.ucss", "Text { width: 10px; }");
 
         using var database = CreateDatabase();
         var stylesheet = Assert.Single(database.GetSnapshot().Assets);
 
         Assert.Equal(AssetKind.Stylesheet, stylesheet.Kind);
-        Assert.Equal("Ui/main.css", stylesheet.LogicalAssetName);
+        Assert.Equal("Ui/main.ucss", stylesheet.LogicalAssetName);
     }
 
     [Fact]
