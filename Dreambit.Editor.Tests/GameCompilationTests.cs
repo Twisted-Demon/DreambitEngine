@@ -1,4 +1,5 @@
 using System.Numerics;
+using Dreambit;
 using Dreambit.ECS;
 using Dreambit.Editor.Compilation;
 using Dreambit.Editor.Inspection;
@@ -116,6 +117,34 @@ public sealed class GameCompilationTests : IDisposable
         Assert.DoesNotContain(messages, message =>
             message.Severity == GameCodeMessageSeverity.Warning &&
             message.Message.Contains("still referenced after unload", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void BlueprintRegistryUsesOnlyTheActiveCollectibleGameGeneration()
+    {
+        var messages = new List<GameCodeMessage>();
+        using var loader = new GameAssemblyLoadService(_root, messages.Add);
+        var assemblyPath = typeof(GameCompilationTests).Assembly.Location;
+
+        Assert.True(loader.TryLoad(assemblyPath, out var firstError), firstError);
+        var retainedType = Assert.Single(loader.Current!.Types.ComponentTypes, type =>
+            type.FullName == typeof(ReloadTestComponent).FullName);
+        Assert.Same(
+            retainedType,
+            BlueprintResolver.ResolveComponentType("tests.reload-component"));
+
+        Assert.True(loader.TryLoad(assemblyPath, out var secondError), secondError);
+        var activeType = Assert.Single(loader.Current!.Types.ComponentTypes, type =>
+            type.FullName == typeof(ReloadTestComponent).FullName);
+
+        Assert.NotSame(retainedType, activeType);
+        Assert.Same(
+            activeType,
+            BlueprintResolver.ResolveComponentType("tests.reload-component"));
+        Assert.Contains(messages, message =>
+            message.Severity == GameCodeMessageSeverity.Warning &&
+            message.Message.Contains("still referenced after unload", StringComparison.Ordinal));
+        GC.KeepAlive(retainedType);
     }
 
     [Fact]
@@ -261,6 +290,7 @@ public sealed class GameCompilationTests : IDisposable
     }
 }
 
+[BlueprintType("tests.reload-component")]
 public sealed class ReloadTestComponent : Component;
 
 [DreambitCustomEditor(typeof(ReloadTestComponent))]
