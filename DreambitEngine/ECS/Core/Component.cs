@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using Dreambit.Networking;
@@ -14,6 +15,8 @@ public abstract class Component : IDisposable
     private bool _isDisposed;
     private readonly HashSet<string> _editorSerializationFailures =
         new(StringComparer.OrdinalIgnoreCase);
+
+    private readonly List<CoroutineHandle> _coroutineHandles = [];
 
     protected Component()
     {
@@ -322,6 +325,27 @@ public abstract class Component : IDisposable
     {
     }
 
+    public CoroutineHandle StartCoroutine(IEnumerator routine)
+    {
+        var handle = CoroutineService.StartCoroutine(routine);
+        _coroutineHandles.Add(handle);
+
+        return handle;
+    }
+
+    public void StopCoroutine(CoroutineHandle handle)
+    {
+        CoroutineService.StopCoroutine(handle);
+    }
+
+    public void StopAllCoroutines()
+    {
+        foreach(var handle in _coroutineHandles)
+        {
+            CoroutineService.StopCoroutine(handle);
+        }
+    }
+
     internal void BeforeDeserialize()
     {
         if (IsFaulted() || Scene?.ExecutionMode == SceneExecutionMode.Editor) return;
@@ -514,6 +538,8 @@ public abstract class Component : IDisposable
     internal void Destroy()
     {
         if (IsDestroyed) return;
+        
+        StopAllCoroutines();
 
         try
         {

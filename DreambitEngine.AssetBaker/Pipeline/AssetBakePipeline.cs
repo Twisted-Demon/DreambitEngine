@@ -35,7 +35,10 @@ public sealed record AssetBlobBakeRequest(
     int? MaxDimension = null,
     bool MarkSrgb = true,
     string TargetPlatform = "DesktopVK",
-    bool IncludeBuiltInContent = false);
+    bool IncludeBuiltInContent = false)
+{
+    public string? RuntimeOutputDirectory { get; init; }
+}
 
 public sealed record AssetBakeProgress(
     string Stage,
@@ -65,6 +68,8 @@ public sealed record AssetBlobBakeResult(
 public sealed class AssetBakePipeline
 {
     public const string RuntimeRegistryLogicalPath = "__dreambit/asset-registry.jsonb";
+    private const string RuntimeSyncFileName = ".dreambit-blobs.sync";
+    private const string RuntimeSyncVersion = "1";
 
     public static bool HasCurrentBuiltInContent(string cacheDirectory) =>
         BuiltInContentSource.IsCurrent(cacheDirectory);
@@ -97,21 +102,37 @@ public sealed class AssetBakePipeline
         ArgumentNullException.ThrowIfNull(request);
         ArgumentException.ThrowIfNullOrWhiteSpace(request.BlobDirectory);
         var stopwatch = Stopwatch.StartNew();
-        var prepared = PrepareAssets(
-            new BakeParameters(
-                request.InputRoot,
-                request.AssetRegistryPath,
-                request.BlobDirectory,
-                request.RebuildAll,
-                request.GenerateMips,
-                request.PremultiplyAlpha,
-                request.MaxDimension,
-                request.MarkSrgb,
-                request.TargetPlatform,
-                request.IncludeBuiltInContent),
-            retainBlobData: false,
-            progress,
-            cancellationToken);
+        PreparedBake prepared;
+        using (BakeCacheWriterLease.Acquire(
+                   request.BlobDirectory,
+                   progress,
+                   cancellationToken))
+        {
+            prepared = PrepareAssets(
+                new BakeParameters(
+                    request.InputRoot,
+                    request.AssetRegistryPath,
+                    request.BlobDirectory,
+                    request.RebuildAll,
+                    request.GenerateMips,
+                    request.PremultiplyAlpha,
+                    request.MaxDimension,
+                    request.MarkSrgb,
+                    request.TargetPlatform,
+                    request.IncludeBuiltInContent),
+                retainBlobData: false,
+                progress,
+                cancellationToken);
+            if (!string.IsNullOrWhiteSpace(request.RuntimeOutputDirectory))
+            {
+                PublishBlobSnapshot(
+                    request.BlobDirectory,
+                    request.RuntimeOutputDirectory,
+                    prepared,
+                    progress,
+                    cancellationToken);
+            }
+        }
         stopwatch.Stop();
 
         var manifestPath = Path.Combine(
@@ -139,21 +160,28 @@ public sealed class AssetBakePipeline
         ArgumentNullException.ThrowIfNull(request);
         var stopwatch = Stopwatch.StartNew();
         var outputPak = Path.GetFullPath(request.OutputPak);
-        var prepared = PrepareAssets(
-            new BakeParameters(
-                request.InputRoot,
-                request.AssetRegistryPath,
-                request.CacheDirectory,
-                request.RebuildAll,
-                request.GenerateMips,
-                request.PremultiplyAlpha,
-                request.MaxDimension,
-                request.MarkSrgb,
-                request.TargetPlatform,
-                request.IncludeBuiltInContent),
-            retainBlobData: true,
-            progress,
-            cancellationToken);
+        PreparedBake prepared;
+        using (BakeCacheWriterLease.Acquire(
+                   request.CacheDirectory,
+                   progress,
+                   cancellationToken))
+        {
+            prepared = PrepareAssets(
+                new BakeParameters(
+                    request.InputRoot,
+                    request.AssetRegistryPath,
+                    request.CacheDirectory,
+                    request.RebuildAll,
+                    request.GenerateMips,
+                    request.PremultiplyAlpha,
+                    request.MaxDimension,
+                    request.MarkSrgb,
+                    request.TargetPlatform,
+                    request.IncludeBuiltInContent),
+                retainBlobData: true,
+                progress,
+                cancellationToken);
+        }
 
         var pak = new PakWriter();
         foreach (var preparedBlob in prepared.Blobs.Values)
@@ -491,6 +519,106 @@ public sealed class AssetBakePipeline
         }
     }
 
+    private static void PublishBlobSnapshot(
+        string cacheDirectory,
+        string runtimeOutputDirectory,
+        PreparedBake prepared,
+        IProgress<AssetBakeProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        var cacheRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(cacheDirectory));
+        var outputRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(runtimeOutputDirectory));
+        var comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        if (string.Equals(cacheRoot, outputRoot, comparison))
+            return;
+
+        Directory.CreateDirectory(outputRoot);
+        var expectedSync = $"{RuntimeSyncVersion}:{prepared.Fingerprint}";
+        var syncPath = Path.Combine(outputRoot, RuntimeSyncFileName);
+        string? currentSync = null;
+        try
+        {
+            if (File.Exists(syncPath))
+                currentSync = File.ReadAllText(syncPath).Trim();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // A missing or unreadable commit marker means the output cannot be trusted. Recopy
+            // the complete snapshot and let a real write error surface below if it persists.
+        }
+
+        var contentChanged = !string.Equals(expectedSync, currentSync, StringComparison.Ordinal);
+        progress?.Report(new AssetBakeProgress(
+            "Publish",
+            contentChanged
+                ? $"Publishing fresh Debug blobs to {outputRoot}"
+                : $"Verifying Debug blobs in {outputRoot}"));
+
+        foreach (var blob in prepared.Blobs.Values)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var relativePath = blob.BlobFile
+                               ?? throw new InvalidOperationException(
+                                   $"Asset '{blob.LogicalPath}' has no cached blob path.");
+            var normalized = relativePath.Replace('/', Path.DirectorySeparatorChar);
+            var source = Path.Combine(cacheRoot, normalized);
+            var destination = Path.Combine(outputRoot, normalized);
+            if (contentChanged || !File.Exists(destination))
+                CopyFileAtomically(source, destination, cancellationToken);
+        }
+
+        // Blobs are immutable for the duration of the cache writer lease. Commit the manifest
+        // only after every file it references is available, then write the sync token last.
+        CopyFileAtomically(
+            Path.Combine(cacheRoot, BlobContentManifest.FileName),
+            Path.Combine(outputRoot, BlobContentManifest.FileName),
+            cancellationToken);
+        WriteTextAtomically(
+            Path.Combine(outputRoot, BlobContentManifest.FingerprintFileName),
+            prepared.Fingerprint + Environment.NewLine);
+
+        // Auto mode prefers a PAK when present. A Debug snapshot must never silently select a
+        // shipping PAK left behind by an earlier Release build.
+        File.Delete(Path.Combine(outputRoot, "content.pak"));
+        File.Delete(Path.Combine(outputRoot, "content.pak.fingerprint"));
+        WriteTextAtomically(syncPath, expectedSync + Environment.NewLine);
+    }
+
+    private static void CopyFileAtomically(
+        string sourcePath,
+        string destinationPath,
+        CancellationToken cancellationToken)
+    {
+        var fullDestination = Path.GetFullPath(destinationPath);
+        Directory.CreateDirectory(Path.GetDirectoryName(fullDestination)!);
+        var temporaryPath = fullDestination + $".{Guid.NewGuid():N}.tmp";
+        try
+        {
+            using (var source = new FileStream(
+                       sourcePath,
+                       FileMode.Open,
+                       FileAccess.Read,
+                       FileShare.ReadWrite | FileShare.Delete))
+            using (var destination = new FileStream(
+                       temporaryPath,
+                       FileMode.CreateNew,
+                       FileAccess.Write,
+                       FileShare.None))
+            {
+                source.CopyTo(destination);
+                cancellationToken.ThrowIfCancellationRequested();
+                destination.Flush(true);
+            }
+            File.Move(temporaryPath, fullDestination, true);
+        }
+        finally
+        {
+            TryDeleteTemporaryFile(temporaryPath);
+        }
+    }
+
     private static void WriteTextAtomically(string path, string content)
     {
         var fullPath = Path.GetFullPath(path);
@@ -647,6 +775,56 @@ public sealed class AssetBakePipeline
         IReadOnlyList<RuntimeRegistryEntry> Assets);
 
     private sealed record RuntimeRegistryEntry(Guid Id, string Name);
+
+    private sealed class BakeCacheWriterLease : IDisposable
+    {
+        internal const string FileName = "bake.lock";
+        private static readonly TimeSpan RetryDelay = TimeSpan.FromMilliseconds(50);
+        private readonly FileStream? _stream;
+
+        private BakeCacheWriterLease(FileStream? stream) => _stream = stream;
+
+        public static BakeCacheWriterLease Acquire(
+            string? cacheDirectory,
+            IProgress<AssetBakeProgress>? progress,
+            CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(cacheDirectory))
+                return new BakeCacheWriterLease(null);
+
+            var directory = Path.GetFullPath(cacheDirectory);
+            Directory.CreateDirectory(directory);
+            var path = Path.Combine(directory, FileName);
+            var reportedWait = false;
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    return new BakeCacheWriterLease(new FileStream(
+                        path,
+                        FileMode.OpenOrCreate,
+                        FileAccess.ReadWrite,
+                        FileShare.None));
+                }
+                catch (IOException)
+                {
+                    if (!reportedWait)
+                    {
+                        progress?.Report(new AssetBakeProgress(
+                            "Wait",
+                            "Waiting for another asset bake to finish."));
+                        reportedWait = true;
+                    }
+
+                    if (cancellationToken.WaitHandle.WaitOne(RetryDelay))
+                        cancellationToken.ThrowIfCancellationRequested();
+                }
+            }
+        }
+
+        public void Dispose() => _stream?.Dispose();
+    }
 
     private sealed class IncrementalBakeCache
     {

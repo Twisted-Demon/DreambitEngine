@@ -24,6 +24,9 @@ public sealed class BakeBlobsSettings : CommandSettings
     [CommandOption("--no-builtins")] public bool NoBuiltIns { get; set; }
     [CommandOption("--registry <PATH>")] public string? AssetRegistryPath { get; set; }
     [CommandOption("--rebuild")] public bool RebuildAll { get; set; }
+    [CommandOption("--runtime-output <DIRECTORY>")]
+    [Description("Publish the coherent blob snapshot used by a Debug game build")]
+    public string? RuntimeOutputDirectory { get; set; }
 
     public override ValidationResult Validate()
     {
@@ -55,7 +58,10 @@ public sealed class BakeBlobsCommand : Command<BakeBlobsSettings>
                     settings.MaxSize,
                     settings.SRgb,
                     settings.Platform,
-                    !settings.NoBuiltIns),
+                    !settings.NoBuiltIns)
+                {
+                    RuntimeOutputDirectory = settings.RuntimeOutputDirectory
+                },
                 new ConsoleProgress(),
                 cancellationToken);
             AnsiConsole.MarkupLine(

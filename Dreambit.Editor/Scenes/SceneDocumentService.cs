@@ -50,7 +50,8 @@ internal sealed class SceneDocumentService : IDisposable
             _reportError,
             ResolveBlueprintInstance,
             ResolveLDtkProject,
-            tiledMapResolver: ResolveTiledMap);
+            tiledMapResolver: ResolveTiledMap,
+            activeGameAssemblyNameProvider: GetActiveGameAssemblyName);
         ReplaceCurrent(replacement);
         return replacement;
     }
@@ -83,7 +84,8 @@ internal sealed class SceneDocumentService : IDisposable
                 WorldIid = worldIid,
                 ImportOptions = (importOptions ?? new LDtkImportOptions()).Clone()
             },
-            tiledMapResolver: ResolveTiledMap);
+            tiledMapResolver: ResolveTiledMap,
+            activeGameAssemblyNameProvider: GetActiveGameAssemblyName);
         ReplaceCurrent(replacement);
         return replacement;
     }
@@ -110,7 +112,8 @@ internal sealed class SceneDocumentService : IDisposable
                 AssetId = asset.Id.Value,
                 AssetName = asset.LogicalAssetName,
                 ImportOptions = (importOptions ?? new TiledImportOptions()).Clone()
-            });
+            },
+            activeGameAssemblyNameProvider: GetActiveGameAssemblyName);
         ReplaceCurrent(replacement);
         return replacement;
     }
@@ -136,7 +139,8 @@ internal sealed class SceneDocumentService : IDisposable
             _reportError,
             ResolveBlueprintInstance,
             ResolveLDtkProject,
-            tiledMapResolver: ResolveTiledMap);
+            tiledMapResolver: ResolveTiledMap,
+            activeGameAssemblyNameProvider: GetActiveGameAssemblyName);
         ReplaceCurrent(replacement);
         return replacement;
     }
@@ -146,6 +150,9 @@ internal sealed class SceneDocumentService : IDisposable
         var document = Current ?? throw new InvalidOperationException("No scene is open.");
         document.Save(path is null ? null : ResolveScenePath(path));
     }
+
+    private string? GetActiveGameAssemblyName() =>
+        _assemblies.Current?.Assembly.GetName().Name;
 
     public string ResolveScenePath(string path)
     {

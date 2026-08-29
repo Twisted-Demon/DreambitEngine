@@ -15,6 +15,7 @@ internal sealed class SceneDocument : IDisposable
 {
     private readonly Action<string, Exception?>? _reportError;
     private readonly Func<BlueprintInstanceReference, EntityBlueprint>? _blueprintInstanceResolver;
+    private readonly Func<string?>? _activeGameAssemblyNameProvider;
     private readonly SceneRuntime _runtime;
     private readonly ImportedSceneSources _importedSceneSources = new();
     private readonly SceneEditHistory _history;
@@ -33,13 +34,15 @@ internal sealed class SceneDocument : IDisposable
         Func<LDtkSceneReference, LDtkFile>? ldtkProjectResolver = null,
         SceneDocumentHistoryOwnership historyOwnership = SceneDocumentHistoryOwnership.Document,
         Func<TiledSceneReference, TmxMap>? tiledMapResolver = null,
-        Func<EditorScene>? sceneFactory = null)
+        Func<EditorScene>? sceneFactory = null,
+        Func<string?>? activeGameAssemblyNameProvider = null)
     {
         _source = source;
         Path = path;
         Selection = selection;
         _reportError = reportError;
         _blueprintInstanceResolver = blueprintInstanceResolver;
+        _activeGameAssemblyNameProvider = activeGameAssemblyNameProvider;
         _runtime = new SceneRuntime(
             reportError,
             blueprintInstanceResolver,
@@ -79,7 +82,8 @@ internal sealed class SceneDocument : IDisposable
         LDtkSceneReference? ldtk = null,
         SceneDocumentHistoryOwnership historyOwnership = SceneDocumentHistoryOwnership.Document,
         Func<TiledSceneReference, TmxMap>? tiledMapResolver = null,
-        TiledSceneReference? tiled = null)
+        TiledSceneReference? tiled = null,
+        Func<string?>? activeGameAssemblyNameProvider = null)
     {
         var document = new SceneDocument(
             new SceneBlueprint { Name = name, Entities = [], LDtk = ldtk, Tiled = tiled },
@@ -89,7 +93,8 @@ internal sealed class SceneDocument : IDisposable
             blueprintInstanceResolver,
             ldtkProjectResolver,
             historyOwnership,
-            tiledMapResolver);
+            tiledMapResolver,
+            activeGameAssemblyNameProvider: activeGameAssemblyNameProvider);
         // A new scene has no successful on-disk save to compare against.
         document._history.MarkNewDocumentUnsaved();
         return document;
@@ -102,7 +107,8 @@ internal sealed class SceneDocument : IDisposable
         Func<BlueprintInstanceReference, EntityBlueprint>? blueprintInstanceResolver = null,
         Func<LDtkSceneReference, LDtkFile>? ldtkProjectResolver = null,
         SceneDocumentHistoryOwnership historyOwnership = SceneDocumentHistoryOwnership.Document,
-        Func<TiledSceneReference, TmxMap>? tiledMapResolver = null)
+        Func<TiledSceneReference, TmxMap>? tiledMapResolver = null,
+        Func<string?>? activeGameAssemblyNameProvider = null)
     {
         var fullPath = System.IO.Path.GetFullPath(path);
         var source = SceneDocumentSerializer.Deserialize(File.ReadAllText(fullPath));
@@ -114,7 +120,8 @@ internal sealed class SceneDocument : IDisposable
             blueprintInstanceResolver,
             ldtkProjectResolver,
             historyOwnership,
-            tiledMapResolver);
+            tiledMapResolver,
+            activeGameAssemblyNameProvider: activeGameAssemblyNameProvider);
     }
 
     public void Update(bool autoSave, TimeSpan autoSaveDelay)
@@ -146,7 +153,17 @@ internal sealed class SceneDocument : IDisposable
         if (targetPath is null)
             throw new InvalidOperationException("Choose a path before saving this scene.");
         RollBackActiveTransactionBeforeSourceCapture();
-        var snapshot = CaptureJson();
+        var saveSource = Scene is null
+            ? _source
+            : SceneDocumentSerializer.CaptureForSave(
+                Scene,
+                _source,
+                Name,
+                _activeGameAssemblyNameProvider?.Invoke(),
+                _explicitlyClearedReferences,
+                _explicitlyRemovedComponents);
+        ValidateForSave(saveSource);
+        var snapshot = SceneDocumentSerializer.Serialize(saveSource);
 
         var directory = System.IO.Path.GetDirectoryName(targetPath)!;
         Directory.CreateDirectory(directory);
@@ -163,7 +180,30 @@ internal sealed class SceneDocument : IDisposable
         }
 
         Path = targetPath;
+        _source = saveSource;
+        _explicitlyClearedReferences.Clear();
+        _explicitlyRemovedComponents.Clear();
         _history.MarkSaveSucceeded(snapshot);
+    }
+
+    private static void ValidateForSave(SceneBlueprint source)
+    {
+        var entityIds = source.Entities
+            .SelectMany(entity => entity.FlattenedHierarchy())
+            .Select(entity => entity.Guid)
+            .ToHashSet();
+        Guid validationRootId;
+        do
+        {
+            validationRootId = Guid.NewGuid();
+        } while (entityIds.Contains(validationRootId));
+
+        BlueprintValidator.ValidateOrThrow(new EntityBlueprint
+        {
+            Name = string.IsNullOrWhiteSpace(source.Name) ? "scene" : source.Name,
+            Guid = validationRootId,
+            Children = source.Entities
+        });
     }
 
     public void Apply(

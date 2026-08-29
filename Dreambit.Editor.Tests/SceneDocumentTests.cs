@@ -679,7 +679,7 @@ public sealed class SceneDocumentTests : IDisposable
     }
 
     [Fact]
-    public void SceneDocumentUndoAndSavePreserveMissingComponentPayload()
+    public void SaveValidationRejectsUnknownComponentAndPreservesExistingFile()
     {
         var scenePath = Path.Combine(_root, "level.scene.json");
         var entityId = Guid.NewGuid();
@@ -717,15 +717,19 @@ public sealed class SceneDocumentTests : IDisposable
         Assert.Equal("Original", document.Scene.FindEntity(entityId)!.Name);
         Assert.True(document.Undo.Redo());
 
-        document.Save();
+        var exception = Assert.Throws<InvalidOperationException>(() => document.Save());
+        Assert.Contains("Removed.GameComponent", exception.Message, StringComparison.Ordinal);
+
         var saved = SceneDocumentSerializer.Deserialize(File.ReadAllText(scenePath));
-        var missing = Assert.Single(Assert.Single(saved.Entities).Components);
+        var savedEntity = Assert.Single(saved.Entities);
+        Assert.Equal("Original", savedEntity.Name);
+        var missing = Assert.Single(savedEntity.Components);
         Assert.Equal("Removed.GameComponent", missing.Type);
         Assert.Equal(42, missing.Properties["UnrecoverableData"]!["answer"]!.Value<int>());
     }
 
     [Fact]
-    public void EditorPreservesInvalidKnownComponentMembersUntilDeliberatelyChanged()
+    public void SaveRepairsInvalidKnownComponentMembers()
     {
         var scenePath = Path.Combine(_root, "reload-safe.scene.json");
         var entityId = Guid.NewGuid();
@@ -766,8 +770,18 @@ public sealed class SceneDocumentTests : IDisposable
         Assert.Contains(nameof(EditorReloadSafetyComponent.Target), component.EditorSerializationFailures);
         Assert.Contains("RetiredMember", component.EditorSerializationFailures);
 
+        document.Save();
+
+        var saved = SceneDocumentSerializer.Deserialize(File.ReadAllText(scenePath));
+        var properties = Assert.Single(Assert.Single(saved.Entities).Components).Properties;
+        Assert.Equal(0, properties[nameof(EditorReloadSafetyComponent.Count)]!.Value<int>());
+        Assert.Equal(
+            JTokenType.Null,
+            properties[nameof(EditorReloadSafetyComponent.Target)]!.Type);
+        Assert.DoesNotContain("RetiredMember", properties.Keys);
+
         document.SetComponentMember(
-            "Replace invalid count",
+            "Set repaired count",
             [component],
             nameof(EditorReloadSafetyComponent.Count),
             typeof(int),
@@ -775,27 +789,49 @@ public sealed class SceneDocumentTests : IDisposable
             (target, value) => ((EditorReloadSafetyComponent)target).Count = (int)value!);
         document.Save();
 
-        var saved = SceneDocumentSerializer.Deserialize(File.ReadAllText(scenePath));
-        var properties = Assert.Single(Assert.Single(saved.Entities).Components).Properties;
-        Assert.Equal(7, properties[nameof(EditorReloadSafetyComponent.Count)]!.Value<int>());
-        Assert.Equal(missingTarget.ToString(), properties[nameof(EditorReloadSafetyComponent.Target)]!.Value<string>());
-        Assert.True(properties["RetiredMember"]!["stillHere"]!.Value<bool>());
-
-        document.SetComponentMember(
-            "Clear invalid target",
-            [component],
-            nameof(EditorReloadSafetyComponent.Target),
-            typeof(Entity),
-            null,
-            (target, value) => ((EditorReloadSafetyComponent)target).Target = (Entity?)value);
-        document.Save();
-
         saved = SceneDocumentSerializer.Deserialize(File.ReadAllText(scenePath));
         properties = Assert.Single(Assert.Single(saved.Entities).Components).Properties;
-        Assert.Equal(
-            JTokenType.Null,
-            properties[nameof(EditorReloadSafetyComponent.Target)]!.Type);
-        Assert.True(properties["RetiredMember"]!["stillHere"]!.Value<bool>());
+        Assert.Equal(7, properties[nameof(EditorReloadSafetyComponent.Count)]!.Value<int>());
+        Assert.DoesNotContain("RetiredMember", properties.Keys);
+    }
+
+    [Fact]
+    public void SaveDropsRetiredComponentsOwnedByTheActiveGameAssembly()
+    {
+        var scenePath = Path.Combine(_root, "retired-component.scene.json");
+        File.WriteAllText(scenePath, DreambitJson.Serialize(new SceneBlueprint
+        {
+            Name = "Retired Component",
+            Entities =
+            [
+                new EntityBlueprint
+                {
+                    Name = "Services",
+                    Guid = Guid.NewGuid(),
+                    Components =
+                    [
+                        new ComponentBlueprint
+                        {
+                            Type = "Game.RetiredService",
+                            Properties = new Dictionary<string, JToken>
+                            {
+                                ["OldSetting"] = new JValue(42)
+                            }
+                        }
+                    ]
+                }
+            ]
+        }));
+
+        using var document = SceneDocument.Open(
+            scenePath,
+            new SelectionService(),
+            activeGameAssemblyNameProvider: static () => "Game");
+
+        document.Save();
+
+        var saved = SceneDocumentSerializer.Deserialize(File.ReadAllText(scenePath));
+        Assert.Empty(Assert.Single(saved.Entities).Components);
     }
 
     [Fact]

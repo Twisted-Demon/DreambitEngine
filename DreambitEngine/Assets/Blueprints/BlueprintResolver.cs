@@ -255,14 +255,18 @@ public class BlueprintResolver : Singleton<BlueprintResolver>
                 var blueprintType = type.GetCustomAttribute<BlueprintTypeAttribute>();
 
                 if (blueprintType is not null)
+                {
                     RegisterComponentTypeKey(replacement, blueprintType.Id, type, true);
+                    foreach (var formerId in blueprintType.FormerIds)
+                        RegisterComponentTypeKey(replacement, formerId, type, true);
+                }
 
                 if (!string.IsNullOrWhiteSpace(componentName))
                     RegisterComponentTypeKey(
                         replacement,
                         $"{assemblyName}.{componentName}",
                         type,
-                        false);
+                        true);
 
                 var registeredName = blueprintType?.Id ?? $"{assemblyName}.{componentName}";
                 logger.Trace($"registered: {registeredName}");

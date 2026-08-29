@@ -25,6 +25,85 @@ public sealed class AssetBakePipelineTests : IDisposable
     }
 
     [Fact]
+    public async Task BlobBakesWaitForTheCurrentCacheWriterBeforeReadingSources()
+    {
+        var assets = Path.Combine(_root, "LeaseAssets");
+        var cache = Path.Combine(_root, "LeaseCache");
+        Directory.CreateDirectory(assets);
+        Directory.CreateDirectory(cache);
+        File.WriteAllText(Path.Combine(assets, "settings.json"), "{\"version\":1}");
+
+        var waiting = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var progress = new InlineProgress<AssetBakeProgress>(value =>
+        {
+            if (value.Stage == "Wait")
+                waiting.TrySetResult();
+        });
+        var leasePath = Path.Combine(cache, "bake.lock");
+        var lease = new FileStream(
+            leasePath,
+            FileMode.OpenOrCreate,
+            FileAccess.ReadWrite,
+            FileShare.None);
+        Task<AssetBlobBakeResult>? bake = null;
+        try
+        {
+            bake = new AssetBakePipeline().BakeBlobsAsync(
+                new AssetBlobBakeRequest(assets, cache),
+                progress);
+            await waiting.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.False(bake.IsCompleted);
+        }
+        finally
+        {
+            lease.Dispose();
+        }
+
+        var result = await bake!.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(1, result.BakedCount);
+        Assert.True(File.Exists(result.ManifestPath));
+    }
+
+    [Fact]
+    public void DebugRuntimeSnapshotPublishesRapidSameSizeBlobChanges()
+    {
+        var assets = Path.Combine(_root, "RuntimeSnapshotAssets");
+        var cache = Path.Combine(_root, "RuntimeSnapshotCache");
+        var output = Path.Combine(_root, "RuntimeSnapshotOutput");
+        Directory.CreateDirectory(assets);
+        var source = Path.Combine(assets, "settings.json");
+        var request = new AssetBlobBakeRequest(
+            assets,
+            cache)
+        {
+            RuntimeOutputDirectory = output
+        };
+        var pipeline = new AssetBakePipeline();
+
+        File.WriteAllText(source, "{\"version\":1}");
+        pipeline.BakeBlobs(request);
+        Assert.Equal(1, ReadBakedJsonVersion(output));
+
+        // Both sources serialize to the same length. The old MSBuild copy could treat the blob
+        // as unchanged when this happened inside the filesystem's timestamp resolution window.
+        File.WriteAllText(source, "{\"version\":2}");
+        pipeline.BakeBlobs(request);
+
+        Assert.Equal(2, ReadBakedJsonVersion(output));
+        Assert.Equal(
+            File.ReadAllText(Path.Combine(cache, BlobContentManifest.FingerprintFileName)),
+            File.ReadAllText(Path.Combine(output, BlobContentManifest.FingerprintFileName)));
+    }
+
+    private static int ReadBakedJsonVersion(string contentDirectory)
+    {
+        var reader = new BlobContentReader(contentDirectory);
+        using var stream = reader.Open("settings.jsonb");
+        return JObject.Parse(JsnbLoader.GetJsonString(stream)).Value<int>("version");
+    }
+
+    [Fact]
     public void CssBakerProducesVersionedRuntimeLoadableText()
     {
         var assets = Path.Combine(_root, "CssAssets");
@@ -717,5 +796,10 @@ public sealed class AssetBakePipelineTests : IDisposable
     {
         if (Directory.Exists(_root))
             Directory.Delete(_root, true);
+    }
+
+    private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>
+    {
+        public void Report(T value) => report(value);
     }
 }

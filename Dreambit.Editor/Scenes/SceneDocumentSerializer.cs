@@ -10,6 +10,12 @@ internal static class SceneDocumentSerializer
 {
     private const BindingFlags SerializableMemberFlags = BindingFlags.Instance | BindingFlags.Public;
 
+    private enum CapturePolicy
+    {
+        PreserveSourcePayload,
+        RuntimeSafeSave
+    }
+
     public static SceneBlueprint Deserialize(string json)
     {
         return DreambitJson.Deserialize<SceneBlueprint>(json)
@@ -27,6 +33,39 @@ internal static class SceneDocumentSerializer
         string sceneName,
         IReadOnlySet<string>? explicitlyClearedReferences = null,
         IReadOnlySet<string>? explicitlyRemovedComponents = null)
+        => Capture(
+            scene,
+            source,
+            sceneName,
+            explicitlyClearedReferences,
+            explicitlyRemovedComponents,
+            CapturePolicy.PreserveSourcePayload,
+            null);
+
+    public static SceneBlueprint CaptureForSave(
+        Scene scene,
+        SceneBlueprint source,
+        string sceneName,
+        string? activeGameAssemblyName,
+        IReadOnlySet<string>? explicitlyClearedReferences = null,
+        IReadOnlySet<string>? explicitlyRemovedComponents = null)
+        => Capture(
+            scene,
+            source,
+            sceneName,
+            explicitlyClearedReferences,
+            explicitlyRemovedComponents,
+            CapturePolicy.RuntimeSafeSave,
+            activeGameAssemblyName);
+
+    private static SceneBlueprint Capture(
+        Scene scene,
+        SceneBlueprint source,
+        string sceneName,
+        IReadOnlySet<string>? explicitlyClearedReferences,
+        IReadOnlySet<string>? explicitlyRemovedComponents,
+        CapturePolicy policy,
+        string? activeGameAssemblyName)
     {
         scene.FlushStructuralChanges();
         var sourceEntities = source.Entities
@@ -38,7 +77,9 @@ internal static class SceneDocumentSerializer
                 entity,
                 sourceEntities,
                 explicitlyClearedReferences,
-                explicitlyRemovedComponents))
+                explicitlyRemovedComponents,
+                policy,
+                activeGameAssemblyName))
             .ToList();
 
         return new SceneBlueprint
@@ -57,7 +98,13 @@ internal static class SceneDocumentSerializer
         var sourceEntities = source.Entities
             .SelectMany(root => root.FlattenedHierarchy())
             .ToDictionary(item => item.Guid);
-        return CaptureEntity(entity, sourceEntities, null, null);
+        return CaptureEntity(
+            entity,
+            sourceEntities,
+            null,
+            null,
+            CapturePolicy.PreserveSourcePayload,
+            null);
     }
 
     public static EntityBlueprint CloneAndRemap(EntityBlueprint source)
@@ -155,7 +202,9 @@ internal static class SceneDocumentSerializer
         Entity entity,
         IReadOnlyDictionary<Guid, EntityBlueprint> sourceEntities,
         IReadOnlySet<string>? explicitlyClearedReferences,
-        IReadOnlySet<string>? explicitlyRemovedComponents)
+        IReadOnlySet<string>? explicitlyRemovedComponents,
+        CapturePolicy policy,
+        string? activeGameAssemblyName)
     {
         sourceEntities.TryGetValue(entity.Id, out var source);
 
@@ -212,7 +261,7 @@ internal static class SceneDocumentSerializer
             if (original is not null)
                 matchedSourceComponents.Add(original);
 
-            var properties = original is null
+            var properties = original is null || policy == CapturePolicy.RuntimeSafeSave
                 ? new Dictionary<string, JToken>(
                     StringComparer.OrdinalIgnoreCase)
                 : original.Properties.ToDictionary(
@@ -241,7 +290,8 @@ internal static class SceneDocumentSerializer
                     componentType,
                     member.Name);
 
-                if (component.EditorSerializationFailures.Contains(member.Name) &&
+                if (policy == CapturePolicy.PreserveSourcePayload &&
+                    component.EditorSerializationFailures.Contains(member.Name) &&
                     (properties.ContainsKey(member.Name) ||
                      HasFormerSerializedName(properties, member)))
                     continue;
@@ -254,7 +304,8 @@ internal static class SceneDocumentSerializer
                 // If a reference temporarily failed to resolve in the editor,
                 // preserve its existing serialized value unless the user
                 // explicitly cleared it.
-                if (value is null &&
+                if (policy == CapturePolicy.PreserveSourcePayload &&
+                    value is null &&
                     isReference &&
                     properties.ContainsKey(member.Name) &&
                     explicitlyClearedReferences?.Contains(referenceKey) != true)
@@ -268,7 +319,9 @@ internal static class SceneDocumentSerializer
 
             capturedComponents.Add(new ComponentBlueprint
             {
-                Type = original?.Type ?? componentTypeId,
+                Type = policy == CapturePolicy.RuntimeSafeSave
+                    ? componentTypeId
+                    : original?.Type ?? componentTypeId,
                 Enabled = component.Enabled,
                 Properties = properties
             });
@@ -287,8 +340,21 @@ internal static class SceneDocumentSerializer
 
             if (resolvedType is null)
             {
-                // Its assembly is unavailable, so keep the JSON untouched until it returns.
-                capturedComponents.Add(CloneComponent(missing));
+                if (policy == CapturePolicy.PreserveSourcePayload ||
+                    !IsOwnedByAssembly(missing.Type, activeGameAssemblyName))
+                {
+                    // Preserve payload outside an authoritative save. During a save, an
+                    // unresolved ID owned by the active game assembly is a retired component;
+                    // unknown external IDs remain so strict validation can block data loss.
+                    capturedComponents.Add(CloneComponent(missing));
+                }
+                continue;
+            }
+
+            if (policy == CapturePolicy.RuntimeSafeSave)
+            {
+                // A known component that has no live instance could not be constructed.
+                // Persisting it would reproduce the same failure at runtime.
                 continue;
             }
 
@@ -330,7 +396,9 @@ internal static class SceneDocumentSerializer
                     child,
                     sourceEntities,
                     explicitlyClearedReferences,
-                    explicitlyRemovedComponents))
+                    explicitlyRemovedComponents,
+                    policy,
+                    activeGameAssemblyName))
                 .ToList()
         };
     }
@@ -350,6 +418,15 @@ internal static class SceneDocumentSerializer
 
         // Retain compatibility with older/full-name component identifiers.
         return BlueprintResolver.ResolveComponentType(source.Type) == liveType;
+    }
+
+    private static bool IsOwnedByAssembly(string typeId, string? assemblyName)
+    {
+        return !string.IsNullOrWhiteSpace(typeId) &&
+               !string.IsNullOrWhiteSpace(assemblyName) &&
+               typeId.StartsWith(
+                   assemblyName + ".",
+                   StringComparison.OrdinalIgnoreCase);
     }
 
     private static IEnumerable<MemberInfo> GetBlueprintMembers(Type type)
