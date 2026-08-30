@@ -1,5 +1,6 @@
 using System.Reflection;
 using Dreambit.ECS;
+using Dreambit.Networking;
 
 namespace Dreambit.Editor.Tests;
 
@@ -134,6 +135,53 @@ public sealed class SceneServiceTests
 
         serviceEntity.AttachComponent<IndependentService>();
         serviceEntity.AttachComponent<OrdinaryComponent>();
+
+        var exception =
+            Assert.Throws<TargetInvocationException>(
+                () => ActivateServices(scene));
+
+        Assert.IsType<InvalidOperationException>(
+            exception.InnerException);
+    }
+
+    [Fact]
+    public void ServiceHostCanContainReplicatedNetworkObject()
+    {
+        using var scene = new ServiceTestScene();
+        var serviceEntity =
+            scene.CreateEntity("services");
+
+        var service =
+            serviceEntity.AttachComponent<IndependentService>();
+
+        var networkObject =
+            serviceEntity.AttachComponent<NetworkObject>();
+
+        ActivateServices(scene);
+
+        Assert.Same(
+            service,
+            scene.Services.Get<IndependentService>());
+
+        Assert.Same(
+            networkObject,
+            serviceEntity.GetComponent<NetworkObject>());
+    }
+
+    [Theory]
+    [InlineData(NetworkPresence.ServerOnly)]
+    [InlineData(NetworkPresence.ClientOnly)]
+    public void ServiceHostRejectsRoleSpecificNetworkObject(
+        NetworkPresence presence)
+    {
+        using var scene = new ServiceTestScene();
+        var serviceEntity =
+            scene.CreateEntity("services");
+
+        serviceEntity.AttachComponent<IndependentService>();
+
+        serviceEntity.AttachComponent<NetworkObject>()
+            .Presence = presence;
 
         var exception =
             Assert.Throws<TargetInvocationException>(

@@ -572,18 +572,6 @@ public class Entity : IDisposable
         return false;
     }
 
-    internal bool ContainsNonSceneService()
-    {
-        foreach (var component in
-                 ComponentRepository.GetAllComponents())
-        {
-            if (component is not SceneServiceComponent)
-                return true;
-        }
-
-        return false;
-    }
-
     internal bool ContainsSceneServiceInHierarchy()
     {
         if (ContainsSceneService())

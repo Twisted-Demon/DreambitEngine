@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using Dreambit.Networking;
 
 namespace Dreambit.ECS;
 
@@ -180,12 +181,23 @@ public sealed class SceneServiceCollection
             var service =
                 _registrationOrder[i];
 
-            if (!service.Entity.ContainsNonSceneService())
-                continue;
+            foreach (var component in
+                     service.Entity.GetAllComponents())
+            {
+                if (component is SceneServiceComponent or
+                    NetworkObject
+                    {
+                        Presence: NetworkPresence.Replicated
+                    })
+                {
+                    continue;
+                }
 
-            throw new InvalidOperationException(
-                $"Scene service '{service.GetType().FullName}' must be placed " +
-                "on an entity containing only scene service components.");
+                throw new InvalidOperationException(
+                    $"Scene service '{service.GetType().FullName}' must be placed " +
+                    "on an entity containing only scene service components and, " +
+                    "optionally, one replicated NetworkObject component.");
+            }
         }
     }
 

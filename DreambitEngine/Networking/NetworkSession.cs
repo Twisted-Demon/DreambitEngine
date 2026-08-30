@@ -446,6 +446,7 @@ internal sealed class NetworkSession : IDisposable
         ArgumentNullException.ThrowIfNull(entity);
         if (World is null || !World.TryGetNetworkId(entity, out var id))
             throw new InvalidOperationException("The Entity is not registered in the current NetworkWorld.");
+        entity.Scene.Services.EnsureCanRemove(entity);
         DespawnAuthoritative(id);
     }
 
@@ -473,6 +474,9 @@ internal sealed class NetworkSession : IDisposable
             throw new InvalidOperationException("Only an active server can change network ownership.");
         if (!World.TryGetNetworkId(entity, out var entityId))
             throw new InvalidOperationException("The Entity is not registered in the current NetworkWorld.");
+        if (owner.IsValid && entity.ContainsSceneServiceInHierarchy())
+            throw new InvalidOperationException(
+                "Scene service hosts are scene-owned and cannot be assigned to a network peer.");
         World.SetOwner(entityId, owner);
         var revision = AdvanceStructuralRevision();
         BroadcastStructural(
