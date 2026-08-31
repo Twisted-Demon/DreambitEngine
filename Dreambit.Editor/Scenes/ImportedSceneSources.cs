@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using Dreambit;
 using Dreambit.ECS;
-using Dreambit.LDtk;
 using Dreambit.Tiled;
 using Newtonsoft.Json.Linq;
 
@@ -10,13 +9,11 @@ namespace Dreambit.Editor.Scenes;
 /// <summary>The imported-map format that owns a generated scene entity.</summary>
 internal enum ImportedSceneSourceKind
 {
-    LDtk,
     Tiled
 }
 
 /// <summary>
-/// Stable identity for an entity regenerated from an imported map. The source key alone is
-/// not enough because LDtk and Tiled use independent key spaces.
+/// Stable identity for an entity regenerated from an imported map.
 /// </summary>
 internal readonly record struct ImportedSceneSourceIdentity(
     ImportedSceneSourceKind SourceKind,
@@ -26,15 +23,13 @@ internal readonly record struct ImportedSceneSourceIdentity(
 }
 
 /// <summary>
-/// Bridges the editor's format-neutral generated-entity operations to the persisted LDtk and
-/// Tiled override schemas. Keeping the format adapters here prevents callers from needing to
-/// know which imported-map reference owns an entity.
+/// Bridges the editor's format-neutral generated-entity operations to persisted imported-map
+/// overrides. Keeping the adapter here prevents callers from depending on the source schema.
 /// </summary>
 internal sealed class ImportedSceneSources
 {
     private static readonly IImportedSceneSourceAdapter[] SourceAdapters =
     [
-        new LDtkImportedSceneSourceAdapter(),
         new TiledImportedSceneSourceAdapter()
     ];
 
@@ -185,86 +180,6 @@ internal sealed class ImportedSceneSources
             Type componentType,
             string memberName,
             JToken value);
-    }
-
-    private sealed class LDtkImportedSceneSourceAdapter : IImportedSceneSourceAdapter
-    {
-        public ImportedSceneSourceKind SourceKind => ImportedSceneSourceKind.LDtk;
-
-        public bool TryGetSourceKey(Entity entity, out string sourceKey)
-        {
-            sourceKey = entity.LDtkSourceKey;
-            return !string.IsNullOrWhiteSpace(sourceKey);
-        }
-
-        public void RecordName(SceneBlueprint source, string sourceKey, Entity entity)
-        {
-            if (GetOrCreateOverride(source, sourceKey) is { } entityOverride)
-                entityOverride.Name = entity.Name;
-        }
-
-        public void RecordEnabled(SceneBlueprint source, string sourceKey, Entity entity)
-        {
-            if (GetOrCreateOverride(source, sourceKey) is { } entityOverride)
-                entityOverride.Enabled = entity.LocallyEnabled;
-        }
-
-        public void RecordTags(SceneBlueprint source, string sourceKey, Entity entity)
-        {
-            if (GetOrCreateOverride(source, sourceKey) is { } entityOverride)
-                entityOverride.Tags = new HashSet<string>(entity.Tags, StringComparer.OrdinalIgnoreCase);
-        }
-
-        public void RecordPosition(SceneBlueprint source, string sourceKey, Entity entity)
-        {
-            if (GetOrCreateOverride(source, sourceKey) is { } entityOverride)
-                entityOverride.Position = entity.Transform.Position;
-        }
-
-        public void RecordRotation(SceneBlueprint source, string sourceKey, Entity entity)
-        {
-            if (GetOrCreateOverride(source, sourceKey) is { } entityOverride)
-                entityOverride.Rotation2D = entity.Transform.Rotation2D;
-        }
-
-        public void RecordScale(SceneBlueprint source, string sourceKey, Entity entity)
-        {
-            if (GetOrCreateOverride(source, sourceKey) is { } entityOverride)
-                entityOverride.Scale = entity.Transform.Scale;
-        }
-
-        public void RecordComponentMember(
-            SceneBlueprint source,
-            string sourceKey,
-            Type componentType,
-            string memberName,
-            JToken value)
-        {
-            if (GetOrCreateOverride(source, sourceKey) is { } entityOverride)
-                ImportedSceneSources.RecordComponentMember(
-                    entityOverride.Components,
-                    componentType,
-                    memberName,
-                    value);
-        }
-
-        private static LDtkGeneratedEntityOverride? GetOrCreateOverride(
-            SceneBlueprint source,
-            string sourceKey)
-        {
-            if (source.LDtk is not { } reference)
-                return null;
-
-            reference.EntityOverrides ??= new Dictionary<string, LDtkGeneratedEntityOverride>(
-                StringComparer.Ordinal);
-            if (!reference.EntityOverrides.TryGetValue(sourceKey, out var entityOverride))
-            {
-                entityOverride = new LDtkGeneratedEntityOverride();
-                reference.EntityOverrides[sourceKey] = entityOverride;
-            }
-
-            return entityOverride;
-        }
     }
 
     private sealed class TiledImportedSceneSourceAdapter : IImportedSceneSourceAdapter

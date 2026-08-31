@@ -40,7 +40,6 @@ internal sealed class EditorProjectWorkspace : IDisposable
         // This must run before registration because registration creates missing visibility keys.
         var dockLayoutMissingNewTabs =
             !workspaceState.PanelVisibility.ContainsKey(EditorPanelIds.Blueprint) ||
-            !workspaceState.PanelVisibility.ContainsKey(EditorPanelIds.LDtkImportOptions) ||
             !workspaceState.PanelVisibility.ContainsKey(EditorPanelIds.TiledImportOptions) ||
             !workspaceState.PanelVisibility.ContainsKey(EditorPanelIds.SceneSettings);
 
@@ -85,7 +84,6 @@ internal sealed class EditorProjectWorkspace : IDisposable
                 new AssetPreviewService(graphicsDevice, imGuiRenderer, session.Assets.ContentRoot),
                 session.CustomEditors,
                 logs));
-            panels.Register(new LDtkImportOptionsPanel(documentContext));
             panels.Register(new TiledImportOptionsPanel(documentContext));
             panels.Register(new SceneSettingsPanel(documentContext));
             var projectPanel = new ProjectPanel(

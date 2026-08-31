@@ -1,6 +1,5 @@
 using Dreambit.ECS;
 using Dreambit.Editor.Scenes;
-using Dreambit.LDtk;
 using Dreambit.Tiled;
 
 namespace Dreambit.Editor.Tests;
@@ -258,59 +257,6 @@ public sealed class SceneDocumentCharacterizationTests : IDisposable
         Assert.Equal(0, changed);
     }
 
-    [Fact]
-    public void FailedLDtkImportOptionUpdateLeavesTheWorkingDocumentUntouched()
-    {
-        var contentRoot = Path.Combine(_root, "Assets");
-        var mapsDirectory = Path.Combine(contentRoot, "maps");
-        Directory.CreateDirectory(mapsDirectory);
-        var projectPath = Path.Combine(mapsDirectory, "world.ldtk");
-        WriteLDtkProject(projectPath, Guid.NewGuid());
-
-        LDtkFile ResolveProject(LDtkSceneReference reference)
-        {
-            if (reference.ImportOptions.PixelsPerUnit == 2f)
-                throw new InvalidOperationException("The updated LDtk options cannot be materialized.");
-            return LDtkFile.FromContentFile(projectPath, "maps/world", contentRoot);
-        }
-
-        var selection = new SelectionService();
-        using var document = new SceneDocument(
-            new SceneBlueprint
-            {
-                Name = "LDtk Option Failure",
-                LDtk = new LDtkSceneReference
-                {
-                    AssetName = "maps/world",
-                    ImportOptions = new LDtkImportOptions { PixelsPerUnit = 1f }
-                }
-            },
-            null,
-            selection,
-            ldtkProjectResolver: ResolveProject);
-        var selected = Assert.Single(
-            document.Scene!.GetAllEntities(),
-            entity => entity.Name == "LDtk Level: Level");
-        selection.Set(selected);
-        var workingScene = document.Scene;
-        var generation = document.SceneGeneration;
-        var changed = 0;
-        document.Changed += _ => changed++;
-
-        Assert.Throws<InvalidOperationException>(() => document.UpdateLDtkImportOptions(
-            "Change LDtk Pixels Per Unit",
-            options => options.PixelsPerUnit = 2f));
-
-        Assert.Same(workingScene, document.Scene);
-        Assert.Equal(generation, document.SceneGeneration);
-        Assert.Equal(1f, document.LDtkReference!.ImportOptions.PixelsPerUnit);
-        Assert.Equal(selected.Id, Assert.Single(selection.EntityIds));
-        Assert.Same(selected, selection.GetActive(document.Scene));
-        Assert.False(document.Undo.CanUndo);
-        Assert.False(document.IsDirty);
-        Assert.Equal(0, changed);
-    }
-
     private static SceneDocument CreateDocument(EntityBlueprint entity) =>
         new(
             new SceneBlueprint { Name = "Characterization", Entities = [entity] },
@@ -326,29 +272,6 @@ public sealed class SceneDocumentCharacterizationTests : IDisposable
             <data encoding="csv">0</data>
           </layer>
         </map>
-        """);
-    }
-
-    private static void WriteLDtkProject(string path, Guid levelId)
-    {
-        File.WriteAllText(path, $$"""
-        {
-          "jsonVersion": "1.5.3",
-          "levels": [{
-            "__bgColor": "#123456",
-            "identifier": "Level",
-            "iid": "{{levelId}}",
-            "uid": 1,
-            "pxWid": 16,
-            "pxHei": 16,
-            "worldX": 0,
-            "worldY": 0,
-            "worldDepth": 0,
-            "fieldInstances": [],
-            "__neighbours": [],
-            "layerInstances": []
-          }]
-        }
         """);
     }
 

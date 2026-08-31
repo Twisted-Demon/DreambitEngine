@@ -64,6 +64,8 @@
     <ul class="current">
     <li class="toctree-l2"><a class="reference internal" href="#switching-scenes">Switching scenes</a>
     </li>
+    <li class="toctree-l2"><a class="reference internal" href="#creating-an-editor-authored-scene">Creating an editor-authored scene</a>
+    </li>
     <li class="toctree-l2"><a class="reference internal" href="#finding-entities">Finding entities</a>
     </li>
     </ul>
@@ -131,15 +133,7 @@
                 </li>
                 <li class="toctree-l2"><a class="reference internal" href="../../ecs/components/sound-listener-2d/">SoundListener2d (obsolete)</a>
                 </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../ecs/components/astar-grid/">AStarGrid</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../ecs/components/astar-pathfinder/">AStarPathfinder</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../ecs/components/astar-path-follower/">AStarPathFollower</a>
-                </li>
                 <li class="toctree-l2"><a class="reference internal" href="../../ecs/components/fsm/">FSM</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../../ecs/components/tile-mover/">TileMover</a>
                 </li>
     </ul>
                   </li>
@@ -309,22 +303,7 @@
               <ul>
                   <li class="toctree-l1"><a class="reference internal" href="../../ai/">Overview</a>
                   </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../ai/pathfinding/">A* pathfinding</a>
-                  </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../ai/fsm/">State machines and blackboards</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">LDtk</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../ldtk/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../ldtk/quick-start/">Quick start</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../ldtk/loading-levels/">Loading worlds and levels</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../ldtk/monogame-conversions/">MonoGame conversions</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../ldtk/entities/">Mapping LDtk entities</a>
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">Tiled</span></p>
@@ -393,9 +372,20 @@ the scripting manager.</p>
 <h2 id="switching-scenes">Switching scenes<a class="headerlink" href="#switching-scenes" title="Permanent link">&para;</a></h2>
 <pre><code class="language-csharp">Scene.SetNextScene&lt;GameScene&gt;();
 Scene.SetNextScene(new ResultsScene(score));
+Scene.SetNextScene&lt;GameplayScene&gt;(&quot;Scenes/world&quot;);
 </code></pre>
-<p>The switch occurs on the next engine update. For LDtk levels, use the GUID-based
-helpers described in <a href="../../ldtk/loading-levels/">Loading LDtk levels</a>.</p>
+<p>The switch occurs on the next engine update.</p>
+<h2 id="creating-an-editor-authored-scene">Creating an editor-authored scene<a class="headerlink" href="#creating-an-editor-authored-scene" title="Permanent link">&para;</a></h2>
+<p>Use <code>CreateFromBlueprint&lt;TScene&gt;</code> when another system needs a fully authored Scene instance without
+scheduling a local transition:</p>
+<pre><code class="language-csharp">var scene = Scene.CreateFromBlueprint&lt;GameplayScene&gt;(&quot;Scenes/world&quot;);
+</code></pre>
+<p>The factory constructs <code>GameplayScene</code>, loads the <code>.scene</code> asset immediately while the Scene is still
+in <code>Created</code>, and returns it without running initialization. If materialization fails, it disposes the
+partially constructed Scene before rethrowing the error.</p>
+<p>For a Scene Blueprint linked to Tiled, <code>GameplayScene</code> must derive from <code>TiledScene</code>. Networking uses
+this same factory through <code>NetworkSceneCatalog.RegisterBlueprint&lt;TScene&gt;</code> so every peer constructs the
+same typed host before synchronization starts.</p>
 <h2 id="finding-entities">Finding entities<a class="headerlink" href="#finding-entities" title="Permanent link">&para;</a></h2>
 <pre><code class="language-csharp">var player = FindEntity(&quot;player&quot;);
 var enemies = GetActiveEntitiesByTag(&quot;enemy&quot;);

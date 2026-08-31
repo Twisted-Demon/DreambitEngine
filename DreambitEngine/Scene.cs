@@ -3,9 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Dreambit.ECS;
 using Dreambit.Events;
-using Dreambit.LDtk;
 using Dreambit.Scripting;
-using Dreambit.Tiled;
 using Dreambit.UI;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -121,30 +119,76 @@ public class Scene : IDisposable
         Core.Instance.SetNextScene(scene);
     }
 
+    /// <summary>
+    /// Creates an ordinary runtime Scene and eagerly materializes a baked Scene Blueprint into it.
+    /// The returned Scene remains in the Created state and has not been scheduled or initialized.
+    /// </summary>
+    public static Scene CreateFromBlueprint(string sceneAssetName)
+    {
+        return CreateFromBlueprint(sceneAssetName, static () => new Scene());
+    }
+
+    /// <summary>
+    /// Creates a runtime Scene of the requested type and eagerly materializes a baked Scene Blueprint
+    /// into it. Use a TiledScene-derived type for a blueprint linked to a Tiled map.
+    /// The returned Scene remains in the Created state and has not been scheduled or initialized.
+    /// </summary>
+    public static TScene CreateFromBlueprint<TScene>(string sceneAssetName)
+        where TScene : Scene, new()
+    {
+        return CreateFromBlueprint(sceneAssetName, static () => new TScene());
+    }
+
     public static void SetNextScene(string sceneAssetName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sceneAssetName);
         Core.Instance.EnsureLocalSceneTransitionAllowed();
-        var blueprint = Resources.LoadAsset<SceneBlueprint>(sceneAssetName)
-                        ?? throw new InvalidOperationException(
-                            $"Scene asset '{sceneAssetName}' could not be loaded.");
-
-        var scene = new Scene();
-        scene.LoadIntoSelf(blueprint);
+        var scene = CreateFromBlueprint(sceneAssetName);
         SetNextScene(scene);
     }
 
-    public static void SetNextScene<T>(string sceneAssetName) where T : Scene, new()
+    public static void SetNextScene<TScene>(string sceneAssetName) where TScene : Scene, new()
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sceneAssetName);
         Core.Instance.EnsureLocalSceneTransitionAllowed();
+        var scene = CreateFromBlueprint<TScene>(sceneAssetName);
+        SetNextScene(scene);
+    }
+
+    private static TScene CreateFromBlueprint<TScene>(
+        string sceneAssetName,
+        Func<TScene> sceneFactory)
+        where TScene : Scene
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sceneAssetName);
+        ArgumentNullException.ThrowIfNull(sceneFactory);
         var blueprint = Resources.LoadAsset<SceneBlueprint>(sceneAssetName)
                         ?? throw new InvalidOperationException(
                             $"Scene asset '{sceneAssetName}' could not be loaded.");
 
-        var scene = new T();
-        scene.LoadIntoSelf(blueprint);
-        SetNextScene(scene);
+        var scene = sceneFactory()
+                    ?? throw new InvalidOperationException(
+                        $"The Scene factory for asset '{sceneAssetName}' returned null.");
+        try
+        {
+            scene.LoadIntoSelf(blueprint);
+            return scene;
+        }
+        catch (Exception materializationException)
+        {
+            try
+            {
+                scene.Dispose();
+            }
+            catch (Exception cleanupException)
+            {
+                throw new AggregateException(
+                    $"Scene asset '{sceneAssetName}' failed to materialize and its Scene failed to dispose.",
+                    materializationException,
+                    cleanupException);
+            }
+            throw;
+        }
     }
 
     public void LoadIntoSelf(SceneBlueprint blueprint)
@@ -167,11 +211,7 @@ public class Scene : IDisposable
         ArgumentNullException.ThrowIfNull(blueprint);
         ArgumentNullException.ThrowIfNull(options);
 
-        if (blueprint.LDtk is { } ldtk)
-            MaterializeLDtkScene(ldtk, options);
-
-        if (blueprint.Tiled is { } tiled)
-            MaterializeTiledScene(tiled, options);
+        blueprint.MaterializeLinkedSources(this, options);
 
         if (options.ApplySceneSettings)
             ApplySettings(blueprint.Settings);
@@ -730,88 +770,6 @@ public class Scene : IDisposable
         return resolved as EntityBlueprint
                ?? throw new InvalidOperationException(
                    $"Blueprint asset '{instance.AssetName}' could not be loaded.");
-    }
-
-    private void MaterializeLDtkScene(
-        LDtkSceneReference reference,
-        SceneBlueprintLoadOptions options)
-    {
-        var project = (options.LDtkProjectResolver ?? ResolveLDtkProject)(reference)
-                      ?? throw new InvalidOperationException(
-                          $"LDtk project asset '{reference.AssetName}' could not be loaded.");
-        var world = reference.WorldIid == Guid.Empty
-            ? project.LoadWorld()
-            : project.LoadWorld(reference.WorldIid);
-        var importer = new LDtkLevelImporter();
-        var importOptions = (reference.ImportOptions ?? new LDtkImportOptions()).Clone();
-        importOptions.Validate();
-
-        foreach (var levelStub in world.Levels)
-        {
-            var level = world.LoadLevel(levelStub.Iid);
-            var instance = importer.Import(this, world, level, importOptions);
-            if (options.MaterializeLDtkEntities)
-                LDtkSceneEntityMaterializer.Materialize(this, instance, instance.EntityInstances);
-            LDtkGeneratedEntityOverrides.Apply(
-                instance.OwnedEntities,
-                reference.EntityOverrides ?? new Dictionary<string, LDtkGeneratedEntityOverride>());
-            if (!options.MarkImportedLDtkEntitiesEditorOnly)
-                continue;
-            foreach (var entity in instance.OwnedEntities)
-                entity.IsEditorOnly = true;
-        }
-    }
-
-    private static LDtkFile ResolveLDtkProject(LDtkSceneReference reference)
-    {
-        var assetName = reference.AssetName;
-        if (reference.AssetId != Guid.Empty &&
-            Resources.AssetRegistry?.TryResolveAssetName(
-                new AssetId(reference.AssetId),
-                out var resolvedName) == true)
-        {
-            assetName = resolvedName;
-        }
-
-        return string.IsNullOrWhiteSpace(assetName)
-            ? null
-            : Resources.LoadAsset<LDtkFile>(assetName);
-    }
-
-    private void MaterializeTiledScene(
-        TiledSceneReference reference,
-        SceneBlueprintLoadOptions options)
-    {
-        var map = (options.TiledMapResolver ?? ResolveTiledMap)(reference)
-                  ?? throw new InvalidOperationException(
-                      $"Tiled map asset '{reference.AssetName}' could not be loaded.");
-        var importer = new TiledMapImporter();
-        var importOptions = (reference.ImportOptions ?? new TiledImportOptions()).Clone();
-        importOptions.Validate();
-        var instance = importer.Import(this, map, importOptions);
-        TiledGeneratedEntityOverrides.Apply(
-            instance.OwnedEntities,
-            reference.EntityOverrides ?? new Dictionary<string, TiledGeneratedEntityOverride>());
-        if (!options.MarkImportedTiledEntitiesEditorOnly)
-            return;
-        foreach (var entity in instance.OwnedEntities)
-            entity.IsEditorOnly = true;
-    }
-
-    private static TmxMap ResolveTiledMap(TiledSceneReference reference)
-    {
-        var assetName = reference.AssetName;
-        if (reference.AssetId != Guid.Empty &&
-            Resources.AssetRegistry?.TryResolveAssetName(
-                new AssetId(reference.AssetId),
-                out var resolvedName) == true)
-        {
-            assetName = resolvedName;
-        }
-
-        return string.IsNullOrWhiteSpace(assetName)
-            ? null
-            : Resources.LoadAsset<TmxMap>(assetName);
     }
 
     /// <summary>

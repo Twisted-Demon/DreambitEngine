@@ -26,7 +26,7 @@ public class VirtualCamera : Component
     [DreambitSerialize]
     public bool SetAsMainCamera { get; set; } = true;
 
-    public override void OnCreated()
+    public override void OnAddedToEntity()
     {
         if (SetAsMainCamera)
             Scene.MainCamera = _camera!;

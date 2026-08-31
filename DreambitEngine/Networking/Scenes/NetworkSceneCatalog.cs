@@ -17,8 +17,8 @@ public sealed class NetworkSceneCatalog
     /// more than 256 bytes.
     /// </param>
     /// <param name="factory">
-    /// A factory that creates a new local Scene whenever this key is entered. For an editor-authored
-    /// Scene, load its Scene Blueprint from <c>OnInitialize</c>.
+    /// A factory that creates a new local Scene whenever this key is entered. Use
+    /// <see cref="RegisterBlueprint{TScene}(string,string)"/> for an editor-authored Scene.
     /// </param>
     /// <exception cref="InvalidOperationException">
     /// A session is active or <paramref name="key"/> is already registered.
@@ -34,6 +34,34 @@ public sealed class NetworkSceneCatalog
             throw new ArgumentException("A network Scene key cannot exceed 256 UTF-8 bytes.", nameof(key));
         if (!_factories.TryAdd(key, factory))
             throw new InvalidOperationException($"Network Scene key '{key}' is already registered.");
+    }
+
+    /// <summary>
+    /// Registers an editor-authored Scene Blueprint using an ordinary runtime Scene host.
+    /// The asset is loaded eagerly whenever the synchronized Scene is entered.
+    /// </summary>
+    /// <remarks>
+    /// Tiled-linked Scene Blueprints require the generic overload with a TiledScene-derived host.
+    /// </remarks>
+    public void RegisterBlueprint(string key, string sceneAssetName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sceneAssetName);
+        Register(key, () => Scene.CreateFromBlueprint(sceneAssetName));
+    }
+
+    /// <summary>
+    /// Registers an editor-authored Scene Blueprint using the requested runtime Scene type.
+    /// The asset is eagerly materialized before the Scene is assigned to a NetworkWorld.
+    /// </summary>
+    /// <typeparam name="TScene">
+    /// Runtime behavior and source-integration host for the Scene. Use a TiledScene-derived type
+    /// when the Scene Blueprint is linked to a Tiled map.
+    /// </typeparam>
+    public void RegisterBlueprint<TScene>(string key, string sceneAssetName)
+        where TScene : Scene, new()
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sceneAssetName);
+        Register(key, () => Scene.CreateFromBlueprint<TScene>(sceneAssetName));
     }
 
     /// <summary>Determines whether a non-empty Scene key is registered.</summary>

@@ -32,10 +32,27 @@ the scripting manager.
 ```csharp
 Scene.SetNextScene<GameScene>();
 Scene.SetNextScene(new ResultsScene(score));
+Scene.SetNextScene<GameplayScene>("Scenes/world");
 ```
 
-The switch occurs on the next engine update. For LDtk levels, use the GUID-based
-helpers described in [Loading LDtk levels](../ldtk/loading-levels.md).
+The switch occurs on the next engine update.
+
+## Creating an editor-authored scene
+
+Use `CreateFromBlueprint<TScene>` when another system needs a fully authored Scene instance without
+scheduling a local transition:
+
+```csharp
+var scene = Scene.CreateFromBlueprint<GameplayScene>("Scenes/world");
+```
+
+The factory constructs `GameplayScene`, loads the `.scene` asset immediately while the Scene is still
+in `Created`, and returns it without running initialization. If materialization fails, it disposes the
+partially constructed Scene before rethrowing the error.
+
+For a Scene Blueprint linked to Tiled, `GameplayScene` must derive from `TiledScene`. Networking uses
+this same factory through `NetworkSceneCatalog.RegisterBlueprint<TScene>` so every peer constructs the
+same typed host before synchronization starts.
 
 ## Finding entities
 

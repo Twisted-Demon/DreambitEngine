@@ -121,9 +121,7 @@ internal sealed class HierarchyPanel : EditorPanel
 
         var displayName = entity.IsTiledGenerated
             ? $"[Tiled] {entity.Name}"
-            : entity.IsLDtkGenerated
-                ? $"[LDtk] {entity.Name}"
-                : entity.Name;
+            : entity.Name;
 
         bool open;
         using (EditorGui.Muted(!entity.LocallyEnabled))
@@ -259,9 +257,7 @@ internal sealed class HierarchyPanel : EditorPanel
                               ReferenceEquals(entity, _documentContext.Blueprints.Root);
         if (entity.IsImportedMapGenerated)
         {
-            EditorGui.MutedText(entity.IsTiledGenerated
-                ? "Generated from the linked Tiled map"
-                : "Generated from the linked LDtk project");
+            EditorGui.MutedText("Generated from the linked Tiled map");
             EditorGui.Separator();
         }
 

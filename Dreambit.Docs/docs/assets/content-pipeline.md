@@ -12,7 +12,7 @@ It recursively mirrors logical paths inside the pak and supports:
 | --- | --- |
 | `.png`, `.jpg`, `.jpeg`, `.bmp`, `.tga` | `.texb` |
 | `.wav`, `.ogg`, `.mp3` | `.audb` |
-| `.json`, `.ldtk`, `.ldtkl` | `.jsonb` |
+| `.json` | `.jsonb` |
 | `.asset`, `.blueprint`, `.particlefx`, `.scene`, `.soundcue`, `.sprite`, `.spriteanimation`, `.spritesheet`, `.tileset` | source extension + `.jsonb` |
 | `.yaml`, `.cutscene` | `.yamlb` (`.cutscene` keeps its source extension) |
 | `.uxml`, `.xml`, `.tmx`, `.tx`, `.tsx` | `.xmlb` |

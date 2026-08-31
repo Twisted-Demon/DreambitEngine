@@ -125,15 +125,7 @@
                 </li>
                 <li class="toctree-l2"><a class="reference internal" href="../ecs/components/sound-listener-2d/">SoundListener2d (obsolete)</a>
                 </li>
-                <li class="toctree-l2"><a class="reference internal" href="../ecs/components/astar-grid/">AStarGrid</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../ecs/components/astar-pathfinder/">AStarPathfinder</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../ecs/components/astar-path-follower/">AStarPathFollower</a>
-                </li>
                 <li class="toctree-l2"><a class="reference internal" href="../ecs/components/fsm/">FSM</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../ecs/components/tile-mover/">TileMover</a>
                 </li>
     </ul>
                   </li>
@@ -303,22 +295,7 @@
               <ul>
                   <li class="toctree-l1"><a class="reference internal" href="../ai/">Overview</a>
                   </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../ai/pathfinding/">A* pathfinding</a>
-                  </li>
                   <li class="toctree-l1"><a class="reference internal" href="../ai/fsm/">State machines and blackboards</a>
-                  </li>
-              </ul>
-              <p class="caption"><span class="caption-text">LDtk</span></p>
-              <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../ldtk/">Overview</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../ldtk/quick-start/">Quick start</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../ldtk/loading-levels/">Loading worlds and levels</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../ldtk/monogame-conversions/">MonoGame conversions</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../ldtk/entities/">Mapping LDtk entities</a>
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">Tiled</span></p>
@@ -332,6 +309,14 @@
     <li class="toctree-l2"><a class="reference internal" href="#dreambit-editor-workflow">Dreambit Editor workflow</a>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#runtime-scene">Runtime scene</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#loading-a-scene-authored-from-tiled-in-dreambit-editor">Loading a scene authored from Tiled in Dreambit Editor</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#mutable-runtime-tile-layers">Mutable runtime tile layers</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#runtime-automapping">Runtime Automapping</a>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#rendering-and-large-maps">Rendering and large maps</a>
     </li>
@@ -459,9 +444,113 @@ public sealed class OverworldScene : TiledScene
 only that imported hierarchy. <code>TrackEntity</code> can attach a runtime-created
 entity to the same lifetime, and <code>ApplyDrawLayer</code> copies a Tiled layer's
 resolved Dreambit draw layer to an entity hierarchy.</p>
+<h3 id="loading-a-scene-authored-from-tiled-in-dreambit-editor">Loading a scene authored from Tiled in Dreambit Editor<a class="headerlink" href="#loading-a-scene-authored-from-tiled-in-dreambit-editor" title="Permanent link">&para;</a></h3>
+<p>A saved editor scene linked to a Tiled map must be loaded into a <code>TiledScene</code>
+subclass. Use the parameterless base constructor because the scene blueprint
+already contains the map asset and import options:</p>
+<pre><code class="language-csharp">using Dreambit.Tiled;
+
+public sealed class OverworldScene : TiledScene
+{
+    public OverworldScene() : base()
+    {
+    }
+
+    protected override void OnTiledMapLoaded(TiledMapInstance map)
+    {
+        var ground = map.GetRuntimeTileLayer(&quot;Ground&quot;);
+        var terrain = map.GetTileset(&quot;tiles/terrain&quot;);
+        ground.SetTile(12, 8, terrain.GetTile(4));
+    }
+}
+
+Scene.SetNextScene&lt;OverworldScene&gt;(&quot;scenes/overworld.scene&quot;);
+</code></pre>
+<p>For a synchronized network Scene, register the same typed host and Scene asset on every peer:</p>
+<pre><code class="language-csharp">network.Scenes.RegisterBlueprint&lt;OverworldScene&gt;(
+    &quot;overworld&quot;,
+    &quot;scenes/overworld.scene&quot;);
+</code></pre>
+<p>The network catalog eagerly creates the authored <code>OverworldScene</code> while it is still in <code>Created</code>;
+the linked map is then imported during Scene initialization before authored network objects bind.</p>
+<p>The generic scene type is required. Loading a Tiled-linked scene asset through
+<code>Scene.SetNextScene("scenes/overworld.scene")</code>, or into an ordinary <code>Scene</code>,
+throws an actionable error before the map is resolved or authored entities are
+materialized. Plain scene blueprints remain loadable into either <code>Scene</code> or
+<code>TiledScene</code>.</p>
+<p>Use either a map supplied to <code>TiledScene(string mapAssetName)</code> or a map linked
+by the scene blueprint. Combining both sources, loading a second linked Tiled
+scene, or adding the link after the scene starts is rejected. The Tiled-owned
+scene lifetime invalidates <code>MapInstance</code> and runtime layer handles when the
+scene is disposed. Dreambit Editor uses an internal Tiled-capable preview host,
+so creation, live reimport, generated-entity overrides, and selection recovery
+continue without requiring game code to run in the editor.</p>
+<h2 id="mutable-runtime-tile-layers">Mutable runtime tile layers<a class="headerlink" href="#mutable-runtime-tile-layers" title="Permanent link">&para;</a></h2>
+<p>Every imported tile layer has sparse mutable runtime state, including layers
+that were empty in the source map. A tile is identified by its normalized
+tileset asset name, tileset-local ID, and Tiled flip flags instead of a
+map-specific GID.</p>
+<pre><code class="language-csharp">protected override void OnTiledMapLoaded(TiledMapInstance map)
+{
+    var ground = map.GetRuntimeTileLayer(&quot;Ground&quot;);
+    var terrain = map.GetTileset(&quot;tiles/terrain&quot;);
+
+    using (map.BeginTileEdit())
+    {
+        ground.SetTile(-12, 8, terrain.GetTile(4));
+        ground.SetTile(-11, 8, terrain.GetTile(
+            5,
+            TmxTileFlipFlags.Horizontal));
+        ground.ClearTile(-10, 8);
+    }
+
+    TiledTileReference? current = ground.GetTile(-12, 8);
+}
+</code></pre>
+<p><code>BeginTileEdit</code> is nestable. The outer scope runs Automapping once for the
+logical changes and replaces each affected 32-by-32 render chunk once.
+Untouched chunk objects and their static renderer caches remain valid. Direct
+single-cell calls implicitly create their own edit scope.</p>
+<p>Coordinates are logical Tiled cell coordinates and can be negative. Runtime
+overrides, generated Automapping output, and source cells remain separate, so
+retracting a generated tile reveals the authored or gameplay value beneath it.
+These changes live only on <code>TiledMapInstance</code>; Dreambit never writes them back
+to the <code>.tmx</code> or <code>.tsx</code> source.</p>
+<h2 id="runtime-automapping">Runtime Automapping<a class="headerlink" href="#runtime-automapping" title="Permanent link">&para;</a></h2>
+<p>The Asset Baker discovers <code>.tiled-project</code> files from the Dreambit project root
+and reads each project's <code>folders</code> and <code>automappingRulesFile</code>. Rules can point
+directly to a rule-map <code>.tmx</code> or to Tiled <code>rules.txt</code> files. Nested rule lists,
+comments, and filename filter sections are resolved at bake time. A
+same-directory <code>rules.txt</code> beside a map takes precedence over project rules.</p>
+<p>The baker compiles applicable rules into one internal runtime catalog. Rule
+maps and project metadata are not parsed during gameplay, and a missing or
+invalid referenced rule file fails the bake with its path. Once loaded,
+changing an input tile evaluates only rule origins whose input footprint can
+touch the changed cell; it does not scan the whole map.</p>
+<p>Dreambit supports modern Tiled tile-layer Automapping, including:</p>
+<ul>
+<li><code>input</code>, <code>inputnot</code>, indexed input alternatives, and multiple target layers;</li>
+<li><code>output</code> and indexed weighted output alternatives;</li>
+<li><code>Empty</code>, <code>NonEmpty</code>, <code>Other</code>, negation, and ignored flip flags;</li>
+<li><code>AutomappingRadius</code>, <code>MatchInOrder</code>, border matching/wrapping/overflow;</li>
+<li>rule probability, modulo/offset, disabled rules, lock handling,
+  non-overlapping output, and <code>DeleteTiles</code>;</li>
+<li>fixed and infinite maps, negative coordinates, groups, and deterministic
+  output controlled by <code>TiledImportOptions.AutomappingSeed</code>.</li>
+</ul>
+<p>The embedded <code>qrc:/automap-tiles.tsx</code> match tiles used by current Tiled
+versions are recognized without requiring a file on disk. <code>Other</code> follows
+Tiled 1.10+ behavior: it also matches an empty cell unless the same rule has
+an explicit <code>Empty</code> predicate for that target layer.</p>
+<p>Output target layers must already exist in the gameplay map so their draw order
+and renderer ownership are defined. Legacy region-based rules and object-layer
+outputs are rejected with an actionable bake error. Rule maps use Dreambit's
+orthogonal TMX pipeline; TMJ rule maps are not compiled. This keeps the
+compiled runtime representation small and tile-focused.</p>
 <p>Editor-authored scenes store a <code>TiledSceneReference</code> in the scene blueprint.
-Runtime <code>SceneBlueprint</code> loading resolves that reference, imports fresh tile
-data, and applies the saved Dreambit overrides before the scene starts.</p>
+When loaded into a <code>TiledScene</code> host, runtime blueprint loading resolves that
+reference, imports fresh tile data, and applies the saved Dreambit overrides
+before the scene starts.</p>
 <h2 id="rendering-and-large-maps">Rendering and large maps<a class="headerlink" href="#rendering-and-large-maps" title="Permanent link">&para;</a></h2>
 <p>Infinite-map tile layers retain Tiled's source chunks. Fixed-size layers are
 partitioned into sparse 32-by-32-cell chunks. <code>TilemapRenderer</code> culls occupied
@@ -486,7 +575,7 @@ costs one sprite submission in each render pass instead of one per tile.</p>
             </div>
           </div><footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
-        <a href="../ldtk/entities/" class="btn btn-neutral float-left" title="Mapping LDtk entities"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../ai/fsm/" class="btn btn-neutral float-left" title="State machines and blackboards"><span class="icon icon-circle-arrow-left"></span> Previous</a>
         <a href="../scripting/" class="btn btn-neutral float-right" title="Scripting and cutscenes">Next <span class="icon icon-circle-arrow-right"></span></a>
     </div>
 
@@ -510,7 +599,7 @@ costs one sprite submission in each render pass instead of one per tile.</p>
   <span class="rst-current-version" data-toggle="rst-current-version">
     
     
-      <span><a href="../ldtk/entities/" style="color: #fcfcfc">&laquo; Previous</a></span>
+      <span><a href="../ai/fsm/" style="color: #fcfcfc">&laquo; Previous</a></span>
     
     
       <span><a href="../scripting/" style="color: #fcfcfc">Next &raquo;</a></span>

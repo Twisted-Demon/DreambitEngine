@@ -450,7 +450,6 @@ A `SceneBlueprint` is a `.scene` Dreambit asset containing:
 
 - Scene name.
 - serialized Entity Blueprints.
-- optional LDtk reference.
 - optional Tiled reference.
 - Scene settings.
 
@@ -461,15 +460,15 @@ Dreambit.Editor
      ↓
 Scenes/village.scene
      ↓
-VillageScene.OnInitialize()
+NetworkSceneCatalog.RegisterBlueprint<VillageScene>()
      ↓
-LoadIntoSelf("Scenes/village")
+Scene.CreateFromBlueprint<VillageScene>()
      ↓
-live Dreambit entities are materialized
+live Dreambit entities are materialized while Scene.Created
      ↓
-network authored-entity binding
+NetworkWorld assignment and Scene initialization
      ↓
-client baseline
+network authored-entity binding and client baseline
      ↓
 OnBegin()
 ```
@@ -486,11 +485,10 @@ using Dreambit;
 
 public sealed class VillageScene : Scene
 {
-    private const string SceneAsset = "Scenes/village";
-
     protected override void OnInitialize()
     {
-        LoadIntoSelf(SceneAsset);
+        // The Scene Blueprint has already been materialized. Initialize only
+        // runtime behavior that is not represented by authored Components.
     }
 
     protected override void OnBegin()
@@ -516,9 +514,9 @@ public sealed class VillageScene : Scene
 Register that runtime Scene class with the network catalog:
 
 ```csharp
-network.Scenes.Register(
+network.Scenes.RegisterBlueprint<VillageScene>(
     "village",
-    static () => new VillageScene());
+    "Scenes/village");
 ```
 
 Then the host starts with:
@@ -534,21 +532,27 @@ A client only connects:
 network.Connect("127.0.0.1", 7777);
 ```
 
-The server tells the client to construct `"village"`.
+The server tells the client to construct `"village"`. Each peer invokes the same local catalog
+registration and loads its own copy of `Scenes/village`.
 
-### Why LoadIntoSelf belongs in OnInitialize
+### Why Scene Blueprints are loaded eagerly
 
-This placement is important.
+`RegisterBlueprint<TScene>` creates the requested runtime Scene type and materializes the Scene
+Blueprint before returning it to networking. This is important for source-specific hosts such as
+`TiledScene`, which must receive their linked-source configuration while still in `Scene.Created`.
 
-A newly assigned network Scene first has a `NetworkWorld` attached to it. On its first `Tick`,
-Dreambit executes:
+The synchronized load order is:
 
 ```text
-Scene.Created
+catalog factory
     ↓
-InitializeInternals()
+new TScene()
     ↓
-OnInitialize()
+LoadIntoSelf(scene asset) while Scene.Created
+    ↓
+Core assigns the Scene and networking attaches NetworkWorld
+    ↓
+first Tick: InitializeInternals() and OnInitialize()
     ↓
 Services.ActivateAll()
     ↓
@@ -561,17 +565,20 @@ OnBegin() only when the gate succeeds
 Scene.Running
 ```
 
-Calling `LoadIntoSelf` in `OnInitialize` means the editor-authored entities exist **before** the
-network startup gate tries to bind or synchronize them.
+Ordinary authored entities therefore exist before the Scene is assigned. A `TiledScene` imports its
+configured map during `OnInitialize`. Both paths complete before the network startup gate scans for
+authored `NetworkObject` Components.
 
 On the server:
 
 ```text
-OnInitialize
+RegisterBlueprint<TScene> factory
     ↓
-LoadIntoSelf("Scenes/village")
+all authored NetworkObjects materialize
     ↓
-all authored NetworkObjects now exist
+OnInitialize (including Tiled import when applicable)
+    ↓
+Services activate
     ↓
 network startup gate
     ↓
@@ -583,11 +590,11 @@ OnBegin
 On a remote client:
 
 ```text
-OnInitialize
+RegisterBlueprint<TScene> factory
     ↓
-LoadIntoSelf("Scenes/village")
+all local authored NetworkObjects materialize
     ↓
-all local authored NetworkObjects now exist
+OnInitialize (including Tiled import when applicable)
     ↓
 network startup gate
     ↓
@@ -607,8 +614,9 @@ OnBegin
 ```
 
 !!! warning
-    Do not defer `LoadIntoSelf` until `OnBegin` for a synchronized Scene. The networking startup gate
-    needs the editor-authored entities to exist before `OnBegin` can be reached.
+    Do not call `LoadIntoSelf` again from `OnInitialize` or defer it until `OnBegin` when using
+    `RegisterBlueprint`. The catalog factory has already loaded the asset, and the networking startup
+    gate needs that authored identity to remain stable.
 
 ### What LoadIntoSelf actually does
 
@@ -633,8 +641,6 @@ SceneBlueprintLoadOptions.Runtime
 The runtime load path performs this order:
 
 ```text
-optional LDtk materialization
-        ↓
 optional Tiled materialization
         ↓
 Scene settings
@@ -668,16 +674,13 @@ That behavior is essential for **authored network entities**.
 The same editor-created Scene asset loaded by the server and client produces the same authored root
 Entity IDs. Networking uses those stable IDs as the source locator during the baseline.
 
-You normally do not need to provide custom load options:
+You normally do not need to call this method yourself. The catalog registration:
 
 ```csharp
-protected override void OnInitialize()
-{
-    LoadIntoSelf("Scenes/village");
-}
+network.Scenes.RegisterBlueprint<VillageScene>("village", "Scenes/village");
 ```
 
-is already the correct strict runtime path.
+uses the correct strict runtime options through `Scene.CreateFromBlueprint<VillageScene>`.
 
 ### How an editor-authored replicated Entity binds
 
@@ -771,51 +774,29 @@ door.blueprint source
 This is useful for authored doors, chests, NPCs, harvest nodes, world objects, and other reusable
 Blueprint-based content.
 
-### A reusable Blueprint-backed Scene class
+### Reusing a runtime Scene type
 
-If most game logic lives in Components and Scene services, a game can use one small runtime Scene
-class for many editor-authored Scene assets:
-
-```csharp
-using Dreambit;
-
-public sealed class BlueprintBackedScene : Scene
-{
-    private readonly string _sceneAssetName;
-
-    public BlueprintBackedScene(string sceneAssetName)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(sceneAssetName);
-        _sceneAssetName = sceneAssetName;
-    }
-
-    protected override void OnInitialize()
-    {
-        LoadIntoSelf(_sceneAssetName);
-    }
-}
-```
-
-Register different synchronized Scene keys:
+If most game logic lives in Components and Scene services, one runtime Scene type can host many
+ordinary editor-authored Scene assets. Register each network key and asset explicitly:
 
 ```csharp
-network.Scenes.Register(
+network.Scenes.RegisterBlueprint<GameplayScene>(
     "village",
-    static () => new BlueprintBackedScene("Scenes/village"));
+    "Scenes/village");
 
-network.Scenes.Register(
+network.Scenes.RegisterBlueprint<GameplayScene>(
     "forest",
-    static () => new BlueprintBackedScene("Scenes/forest"));
+    "Scenes/forest");
 
-network.Scenes.Register(
+network.Scenes.RegisterBlueprint<GameplayScene>(
     "mine",
-    static () => new BlueprintBackedScene("Scenes/mine"));
+    "Scenes/mine");
 ```
 
 The editor controls the Scene contents. The network key is the stable protocol-facing name.
 
-If a particular Scene needs custom runtime lifecycle behavior, use a dedicated `Scene` subclass and
-still call `LoadIntoSelf` from `OnInitialize`.
+If a particular Scene needs custom runtime lifecycle behavior, register a dedicated `Scene` subclass.
+There is no Blueprint-backed wrapper class and no inheritance collision with specialized hosts.
 
 ### Changing between editor-authored Scenes
 
@@ -831,19 +812,19 @@ The flow is:
 SERVER
     ChangeScene("forest")
         ↓
-    catalog creates BlueprintBackedScene("Scenes/forest")
+    catalog eagerly creates GameplayScene from "Scenes/forest"
         ↓
     clients receive SceneChange("forest", new epoch)
         ↓
     Core swaps the server Scene
         ↓
-    server Scene OnInitialize -> LoadIntoSelf
+    server Scene initializes
         ↓
     authored network objects bind
         ↓
-    each client creates the same catalog Scene
+    each client eagerly creates the same catalog Scene + Blueprint
         ↓
-    client OnInitialize -> LoadIntoSelf
+    client Scene initializes
         ↓
     client sends SceneLoaded
         ↓
@@ -859,15 +840,32 @@ SERVER
 Every synchronized transition receives a new `NetworkSceneEpoch`, so delayed traffic from the old
 Scene cannot be mistaken for state in the new Scene.
 
-### LDtk and Tiled references inside a Scene Blueprint
+### Tiled references inside a Scene Blueprint
 
-`LoadIntoSelf` also supports `SceneBlueprint.LDtk` and `SceneBlueprint.Tiled`.
+Register a Tiled-linked Scene Blueprint with a `TiledScene` subclass:
 
-Their materialization happens before the ordinary `SceneBlueprint.Entities` collection is created.
-After `OnInitialize` completes, networking sees the resulting live Scene and scans it for
-`NetworkObject` Components.
+```csharp
+public sealed class VillageScene : TiledScene
+{
+    public VillageScene() : base()
+    {
+    }
 
-Networking does not have a separate LDtk/Tiled network protocol. The synchronized unit remains the
+    protected override void OnTiledMapLoaded(TiledMapInstance map)
+    {
+    }
+}
+
+network.Scenes.RegisterBlueprint<VillageScene>(
+    "village",
+    "Scenes/village");
+```
+
+The blueprint link is configured eagerly while the Scene is in `Created`; the map is imported during
+`TiledScene.OnInitialize`. After initialization completes, networking scans the resulting live Scene
+for `NetworkObject` Components.
+
+Networking does not have a separate Tiled network protocol. The synchronized unit remains the
 resulting Dreambit `Scene`.
 
 For ordinary editor-authored network gameplay entities, prefer Dreambit Scene entities or linked
@@ -2069,7 +2067,7 @@ A useful game-level division is:
 | `GameNetworking` | Sets networking options, registers Scene keys, and applies feature network modules. |
 | `INetworkModule` implementations | Register replicated Components and self-describing message handlers by gameplay feature. |
 | game network coordinator | Handles peer lifecycle and game-specific player/session policy. |
-| `Scene` subclasses | Load editor-authored `.scene` assets with `LoadIntoSelf`. |
+| `Scene` subclasses | Supply runtime behavior and specialized source hosting for editor-authored `.scene` assets. |
 | replicated Components | Persistent server-authoritative state. |
 | typed messages | Commands, requests, and one-shot notifications. |
 | normal gameplay Components | Movement, combat, interaction, inventory, AI, etc. |
@@ -2122,8 +2120,8 @@ HANDSHAKE
 
 SCENE
     server sends "village" + SceneEpoch
-    both sides create VillageScene
-    OnInitialize -> LoadIntoSelf("Scenes/village")
+    both sides eagerly create VillageScene from "Scenes/village"
+    both sides initialize the already-authored Scene
 
 INITIAL SYNC
     server binds editor-authored NetworkObjects
@@ -2148,7 +2146,7 @@ GAMEPLAY
 SCENE CHANGE
     server Networking.ChangeScene("forest")
     new SceneEpoch
-    both sides OnInitialize -> LoadIntoSelf("Scenes/forest")
+    both sides eagerly create the registered Scene from "Scenes/forest"
     new baseline
 
 DISCONNECT
@@ -2163,8 +2161,9 @@ DISCONNECT
     instruction.
 
 !!! important
-    **Load editor-authored Scene Blueprints from `OnInitialize`.** Networking needs authored
-    `NetworkObject` entities before the startup gate performs binding/synchronization.
+    **Register editor-authored Scenes with `Scenes.RegisterBlueprint<TScene>`.** It eagerly creates
+    the typed Scene Blueprint host before assignment, so authored `NetworkObject` entities exist
+    before the startup gate performs binding and synchronization.
 
 !!! important
     **Use stable Scene keys.** Both peers must register the same key to a factory that constructs the

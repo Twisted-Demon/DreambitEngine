@@ -84,7 +84,6 @@ internal static class AssetTypeClassifier
             ".fx" => new AssetTypeInfo(AssetKind.Effect, DreambitAssetTypeRegistry.GetTypeId(typeof(DreambitEffect))),
             ".txt" or ".md" => new AssetTypeInfo(AssetKind.Text, null),
             ".ucss" or ".css" => new AssetTypeInfo(AssetKind.Stylesheet, null),
-            ".ldtk" or ".ldtkl" => new AssetTypeInfo(AssetKind.Ldtk, null),
             ".tmx" => new AssetTypeInfo(
                 AssetKind.TiledMap,
                 DreambitAssetTypeRegistry.GetTypeId(typeof(Dreambit.Tiled.TmxMap))),

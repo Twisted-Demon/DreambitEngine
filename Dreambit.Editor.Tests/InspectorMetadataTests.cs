@@ -417,21 +417,18 @@ public sealed class InspectorMetadataTests
     }
 
     [Theory]
-    [InlineData(false, true, true, false, "LDtk")]
-    [InlineData(false, true, false, true, "Tiled")]
-    [InlineData(false, true, false, false, "Imported")]
-    [InlineData(true, true, false, true, "Boxed")]
+    [InlineData(false, true, true, "Tiled")]
+    [InlineData(false, true, false, "Imported")]
+    [InlineData(true, true, true, "Boxed")]
     public void ComponentStatusDescribesTheActualSource(
         bool readOnly,
         bool hasGeneratedEntity,
-        bool allLDtkGenerated,
         bool allTiledGenerated,
         string expected)
     {
         Assert.Equal(expected, SceneEntityInspector.GetComponentStatus(
             readOnly,
             hasGeneratedEntity,
-            allLDtkGenerated,
             allTiledGenerated));
     }
 

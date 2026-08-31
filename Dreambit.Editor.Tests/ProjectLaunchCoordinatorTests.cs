@@ -130,7 +130,7 @@ public sealed class ProjectLaunchCoordinatorTests
         coordinator.BeginPendingUpgrade();
         await UpdateUntilAsync(
             coordinator,
-            () => processRunner.Commands.Count == 1 &&
+            () => processRunner.Commands.Count == 2 &&
                   coordinator.PendingUpgrade is { RequiresUpgrade: true, IsRunning: false });
 
         var retry = Assert.IsType<ProjectUpgradePresentation>(coordinator.PendingUpgrade);
@@ -141,10 +141,10 @@ public sealed class ProjectLaunchCoordinatorTests
         coordinator.BeginPendingUpgrade();
         await UpdateUntilAsync(
             coordinator,
-            () => processRunner.Commands.Count == 2 &&
+            () => processRunner.Commands.Count == 4 &&
                   coordinator.PendingUpgrade is { RequiresUpgrade: true, IsRunning: false });
 
-        Assert.Equal(2, processRunner.Commands.Count);
+        Assert.Equal(4, processRunner.Commands.Count);
     }
 
     private static ProjectLaunchCoordinator CreateCoordinator(

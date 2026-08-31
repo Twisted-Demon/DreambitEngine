@@ -18,7 +18,8 @@ internal enum AssetKind
     SoundCue,
     ParticleEffect,
     Cutscene,
-    Ldtk,
+    // Keeps later persisted numeric values stable after removing a legacy map integration.
+    ReservedLegacyTilemap,
     TiledMap,
     Data,
     Stylesheet

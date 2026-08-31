@@ -1,6 +1,5 @@
 using Dreambit.ECS;
 using Dreambit.Editor.Undo;
-using Dreambit.LDtk;
 using Dreambit.Tiled;
 
 namespace Dreambit.Editor.Scenes;
@@ -31,7 +30,6 @@ internal sealed class SceneDocument : IDisposable
         SelectionService selection,
         Action<string, Exception?>? reportError = null,
         Func<BlueprintInstanceReference, EntityBlueprint>? blueprintInstanceResolver = null,
-        Func<LDtkSceneReference, LDtkFile>? ldtkProjectResolver = null,
         SceneDocumentHistoryOwnership historyOwnership = SceneDocumentHistoryOwnership.Document,
         Func<TiledSceneReference, TmxMap>? tiledMapResolver = null,
         Func<EditorScene>? sceneFactory = null,
@@ -46,7 +44,6 @@ internal sealed class SceneDocument : IDisposable
         _runtime = new SceneRuntime(
             reportError,
             blueprintInstanceResolver,
-            ldtkProjectResolver,
             tiledMapResolver,
             sceneFactory);
         _history = new SceneEditHistory(historyOwnership);
@@ -68,7 +65,6 @@ internal sealed class SceneDocument : IDisposable
     internal int SceneGeneration => _runtime.Generation;
     internal string? ActiveChangeMergeKey => _history.ActiveChangeMergeKey;
     public bool HasLiveScene => _runtime.HasLiveScene;
-    public LDtkSceneReference? LDtkReference => _source.LDtk;
     public TiledSceneReference? TiledReference => _source.Tiled;
     public SceneSettings Settings => _source.Settings ??= new SceneSettings();
     public event Action<SceneDocument>? Changed;
@@ -78,20 +74,17 @@ internal sealed class SceneDocument : IDisposable
         SelectionService selection,
         Action<string, Exception?>? reportError = null,
         Func<BlueprintInstanceReference, EntityBlueprint>? blueprintInstanceResolver = null,
-        Func<LDtkSceneReference, LDtkFile>? ldtkProjectResolver = null,
-        LDtkSceneReference? ldtk = null,
         SceneDocumentHistoryOwnership historyOwnership = SceneDocumentHistoryOwnership.Document,
         Func<TiledSceneReference, TmxMap>? tiledMapResolver = null,
         TiledSceneReference? tiled = null,
         Func<string?>? activeGameAssemblyNameProvider = null)
     {
         var document = new SceneDocument(
-            new SceneBlueprint { Name = name, Entities = [], LDtk = ldtk, Tiled = tiled },
+            new SceneBlueprint { Name = name, Entities = [], Tiled = tiled },
             null,
             selection,
             reportError,
             blueprintInstanceResolver,
-            ldtkProjectResolver,
             historyOwnership,
             tiledMapResolver,
             activeGameAssemblyNameProvider: activeGameAssemblyNameProvider);
@@ -105,7 +98,6 @@ internal sealed class SceneDocument : IDisposable
         SelectionService selection,
         Action<string, Exception?>? reportError = null,
         Func<BlueprintInstanceReference, EntityBlueprint>? blueprintInstanceResolver = null,
-        Func<LDtkSceneReference, LDtkFile>? ldtkProjectResolver = null,
         SceneDocumentHistoryOwnership historyOwnership = SceneDocumentHistoryOwnership.Document,
         Func<TiledSceneReference, TmxMap>? tiledMapResolver = null,
         Func<string?>? activeGameAssemblyNameProvider = null)
@@ -118,7 +110,6 @@ internal sealed class SceneDocument : IDisposable
             selection,
             reportError,
             blueprintInstanceResolver,
-            ldtkProjectResolver,
             historyOwnership,
             tiledMapResolver,
             activeGameAssemblyNameProvider: activeGameAssemblyNameProvider);
@@ -676,34 +667,6 @@ internal sealed class SceneDocument : IDisposable
         return roots.Length;
     }
 
-    public void RecordLDtkEntityName(Entity entity) => RecordGeneratedEntityName(entity);
-    public void RecordLDtkEntityEnabled(Entity entity) => RecordGeneratedEntityEnabled(entity);
-    public void RecordLDtkEntityTags(Entity entity) => RecordGeneratedEntityTags(entity);
-    public void RecordLDtkPosition(Entity entity) => RecordGeneratedPosition(entity);
-    public void RecordLDtkRotation(Entity entity) => RecordGeneratedRotation(entity);
-    public void RecordLDtkScale(Entity entity) => RecordGeneratedScale(entity);
-    public void RecordLDtkComponentMember(Component component, string memberName, object? value)
-        => RecordGeneratedComponentMember(component, memberName, value);
-
-    public void UpdateLDtkImportOptions(
-        string name,
-        Action<LDtkImportOptions> mutation,
-        string? mergeKey = null)
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentNullException.ThrowIfNull(mutation);
-        ApplySourceChange(name, () =>
-        {
-            var reference = _source.LDtk
-                            ?? throw new InvalidOperationException("This scene is not linked to an LDtk project.");
-            var updated = (reference.ImportOptions ?? new LDtkImportOptions()).Clone();
-            mutation(updated);
-            updated.Validate();
-            reference.ImportOptions = updated;
-        }, mergeKey);
-    }
-
     public void UpdateTiledImportOptions(
         string name,
         Action<TiledImportOptions> mutation,
@@ -809,15 +772,6 @@ internal sealed class SceneDocument : IDisposable
             beforeSelection,
             CaptureSelectionMarkers(),
             mergeKey);
-    }
-
-    /// <summary>Reloads the linked LDtk source while preserving Dreambit-authored scene entities.</summary>
-    public void ReimportLDtk()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        if (_source.LDtk is null || Scene is null)
-            return;
-        RebuildPreservingSelection();
     }
 
     /// <summary>Reloads the linked TMX source while preserving Dreambit-authored scene entities.</summary>

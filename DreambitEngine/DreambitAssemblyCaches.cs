@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using Dreambit.ECS;
-using Dreambit.LDtk;
 
 namespace Dreambit;
 
@@ -19,7 +18,6 @@ public static class DreambitAssemblyCaches
         PropertyConverterRegistry.ReleaseAssembly(assembly);
         BlueprintResolver.ReleaseAssembly(assembly);
         ComponentRepository.ReleaseAssembly(assembly);
-        LDtkEntityBuilderRepository.ReleaseAssembly(assembly);
         Resources.ReleaseAssembly(assembly);
     }
 
@@ -28,7 +26,6 @@ public static class DreambitAssemblyCaches
         DreambitAssetTypeRegistry.Refresh();
         DreambitJson.RefreshConverters();
         BlueprintResolver.RebuildComponentTypeRegistry();
-        LDtkEntityBuilderRepository.Refresh();
         Resources.RefreshLoaders();
     }
 
@@ -48,7 +45,6 @@ public static class DreambitAssemblyCaches
             BlueprintResolver.RebuildComponentTypeRegistry();
         else
             BlueprintResolver.RebuildComponentTypeRegistry(componentTypes);
-        LDtkEntityBuilderRepository.Refresh();
         Resources.RefreshLoaders(assetLoaderTypes);
     }
 }

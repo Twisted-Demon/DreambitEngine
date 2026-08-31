@@ -129,11 +129,9 @@ public abstract class Component : IDisposable
     {
         var list = new List<Type>();
 
-        var attributes = Attribute.GetCustomAttributes(GetType());
-        foreach (var attribute in attributes)
+        var attributes = GetType().GetCustomAttributes<RequireAttribute>(inherit: true);
+        foreach (var requireAttribute in attributes)
         {
-            if (attribute is not RequireAttribute requireAttribute) continue;
-
             foreach (var requiredType in requireAttribute.RequiredTypes)
             {
                 var hasRequired = Entity.HasComponentOfType(requiredType);

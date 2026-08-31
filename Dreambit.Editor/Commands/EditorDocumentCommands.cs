@@ -3,7 +3,6 @@ using Dreambit.Editor.Logging;
 using Dreambit.Editor.Persistence;
 using Dreambit.Editor.Scenes;
 using Dreambit.EditorApi;
-using Dreambit.LDtk;
 using Dreambit.Tiled;
 using XnaVec3 = Microsoft.Xna.Framework.Vector3;
 
@@ -74,29 +73,6 @@ internal sealed class EditorDocumentCommands
         catch (Exception exception)
         {
             return LogFailure("Scene", "Could not create the scene.", exception);
-        }
-    }
-
-    public EditorCommandResult CreateSceneFromLDtk(
-        AssetRecord asset,
-        SceneDocumentService.LDtkWorldChoice world,
-        LDtkImportOptions importOptions)
-    {
-        try
-        {
-            if (!_assetEditing.Clear())
-            {
-                return EditorCommandResult.Failure(
-                    "Could not create the LDtk scene because the current asset could not be saved.");
-            }
-
-            _scenes.NewFromLDtk(asset, world.WorldIid, world.DisplayName, importOptions);
-            _documents.ActivateScene();
-            return EditorCommandResult.Success();
-        }
-        catch (Exception exception)
-        {
-            return LogFailure("LDtk", "Could not create the LDtk scene.", exception);
         }
     }
 

@@ -398,7 +398,6 @@ internal sealed class ProjectPanel : EditorPanel
         AssetKind.Animation => "animation",
         AssetKind.Audio => "audiotrack",
         AssetKind.SoundCue => "audiotrack",
-        AssetKind.Ldtk => "data_object",
         AssetKind.TiledMap => "data_object",
         _ => "extension"
     };

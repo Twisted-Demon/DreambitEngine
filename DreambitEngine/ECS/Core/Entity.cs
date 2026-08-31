@@ -81,14 +81,6 @@ public class Entity : IDisposable
     public bool IsEditorOnly { get; internal set; }
 
     /// <summary>
-    /// Stable source identity for entities regenerated from an LDtk project. Editor hosts use it
-    /// to show and override imported visualization nodes without serializing duplicate entities.
-    /// </summary>
-    public string LDtkSourceKey { get; internal set; }
-
-    public bool IsLDtkGenerated => !string.IsNullOrWhiteSpace(LDtkSourceKey);
-
-    /// <summary>
     /// Stable source identity for entities regenerated from a Tiled TMX map.
     /// </summary>
     public string TiledSourceKey { get; internal set; }
@@ -101,7 +93,7 @@ public class Entity : IDisposable
     /// </summary>
     internal bool UpdatesSuspended { get; set; }
 
-    public bool IsImportedMapGenerated => IsLDtkGenerated || IsTiledGenerated;
+    public bool IsImportedMapGenerated => IsTiledGenerated;
 
     public bool AlwaysUpdate
     {

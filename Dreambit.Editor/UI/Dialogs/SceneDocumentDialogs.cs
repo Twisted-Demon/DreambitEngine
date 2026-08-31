@@ -4,7 +4,6 @@ using Dreambit.Editor.Commands;
 using Dreambit.Editor.Inspection;
 using Dreambit.Editor.Scenes;
 using Dreambit.EditorApi;
-using Dreambit.LDtk;
 using Dreambit.Tiled;
 using ImGuiNET;
 
@@ -18,7 +17,6 @@ namespace Dreambit.Editor.UI.Dialogs;
 internal sealed class SceneDocumentDialogs
 {
     private const string NewScenePopup = "New Scene##Dreambit.Editor";
-    private const string NewLDtkScenePopup = "New LDtk Scene##Dreambit.Editor";
     private const string NewTiledScenePopup = "New Tiled Scene##Dreambit.Editor";
     private const string OpenScenePopup = "Open Scene##Dreambit.Editor";
     private const string SaveSceneAsPopup = "Save Scene As##Dreambit.Editor";
@@ -31,11 +29,6 @@ internal sealed class SceneDocumentDialogs
     private bool _newSceneRequested;
     private string _newSceneName = "Untitled";
     private string? _newSceneError;
-
-    private bool _newLdtkSceneRequested;
-    private string _ldtkSearch = string.Empty;
-    private LDtkImportOptions _ldtkImportOptions = new();
-    private string? _ldtkSceneError;
 
     private bool _newTiledSceneRequested;
     private string _tiledSearch = string.Empty;
@@ -65,14 +58,6 @@ internal sealed class SceneDocumentDialogs
     }
 
     public void RequestNewScene() => _newSceneRequested = true;
-
-    public void RequestNewLDtkScene()
-    {
-        _ldtkSearch = string.Empty;
-        _ldtkImportOptions = new LDtkImportOptions();
-        _ldtkSceneError = null;
-        _newLdtkSceneRequested = true;
-    }
 
     public void RequestNewTiledScene()
     {
@@ -106,7 +91,6 @@ internal sealed class SceneDocumentDialogs
     {
         OpenRequestedPopups();
         DrawNewScenePopup();
-        DrawNewLDtkScenePopup();
         DrawNewTiledScenePopup();
         DrawCreateFromBlueprintPopup();
         DrawScenePathPopup(
@@ -129,11 +113,6 @@ internal sealed class SceneDocumentDialogs
         {
             EditorGui.OpenPopup(NewScenePopup);
             _newSceneRequested = false;
-        }
-        if (_newLdtkSceneRequested)
-        {
-            EditorGui.OpenPopup(NewLDtkScenePopup);
-            _newLdtkSceneRequested = false;
         }
         if (_newTiledSceneRequested)
         {
@@ -186,76 +165,6 @@ internal sealed class SceneDocumentDialogs
         DrawError(_newSceneError);
         EditorGui.Inline();
         if (EditorGui.Button("NewScene.Cancel", "Cancel", new Vector2(90f, 0f)))
-            EditorGui.ClosePopup();
-    }
-
-    private void DrawNewLDtkScenePopup()
-    {
-        using var popup = EditorGui.Modal(NewLDtkScenePopup);
-        if (!popup.IsOpen)
-            return;
-
-        EditorGui.WrappedText(
-            "Choose an LDtk project/world. Its tilemap stays linked and entities placed " +
-            "in Dreambit are preserved when LDtk is reimported.");
-        ImportOptionsEditorGui.Draw(_ldtkImportOptions, "NewLDtk");
-        EditorGui.Separator();
-        EditorGui.SearchInput("NewLDtk.Search", "Search LDtk projects", ref _ldtkSearch);
-        using (var results = EditorGui.Child(
-                   "##LDtkResults",
-                   new Vector2(520f, 300f),
-                   ImGuiChildFlags.Borders))
-        {
-            if (results.IsVisible)
-            {
-                var projects = _assets.GetSnapshot().Assets
-                    .Where(asset => asset.Kind == AssetKind.Ldtk &&
-                                    asset.RelativePath.EndsWith(".ldtk", StringComparison.OrdinalIgnoreCase) &&
-                                    (string.IsNullOrWhiteSpace(_ldtkSearch) ||
-                                     asset.RelativePath.Contains(
-                                         _ldtkSearch,
-                                         StringComparison.OrdinalIgnoreCase)))
-                    .ToArray();
-                if (projects.Length == 0)
-                    EditorGui.MutedText("No matching .ldtk projects were found under Assets.");
-                foreach (var asset in projects)
-                {
-                    try
-                    {
-                        foreach (var world in _scenes.GetLDtkWorldChoices(asset))
-                        {
-                            var choiceId = $"{asset.Id.Value:N}-{world.WorldIid:N}";
-                            if (!EditorGui.Selectable(
-                                    choiceId,
-                                    $"{asset.RelativePath}  /  {world.DisplayName}"))
-                            {
-                                continue;
-                            }
-
-                            var result = _commands.CreateSceneFromLDtk(
-                                asset,
-                                world,
-                                _ldtkImportOptions);
-                            if (result.Succeeded)
-                            {
-                                _ldtkSceneError = null;
-                                EditorGui.ClosePopup();
-                                return;
-                            }
-
-                            _ldtkSceneError = result.Error;
-                        }
-                    }
-                    catch (Exception exception)
-                    {
-                        EditorGui.Error($"{asset.RelativePath}: {exception.Message}");
-                    }
-                }
-            }
-        }
-
-        DrawError(_ldtkSceneError);
-        if (EditorGui.Button("NewLDtk.Cancel", "Cancel", new Vector2(90f, 0f)))
             EditorGui.ClosePopup();
     }
 
