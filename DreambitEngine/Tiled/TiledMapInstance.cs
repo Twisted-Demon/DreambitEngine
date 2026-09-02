@@ -16,6 +16,7 @@ public sealed class TiledMapInstance : IDisposable
 {
     private readonly Scene _scene;
     private readonly List<Entity> _ownedEntities;
+    private readonly HashSet<Entity> _ownedEntitySet;
     private readonly List<TilemapRenderer> _tilemapRenderers;
     private readonly List<TiledRuntimeTileLayer> _runtimeTileLayers;
     private readonly IReadOnlyDictionary<int, int> _layerDrawLayers;
@@ -23,6 +24,7 @@ public sealed class TiledMapInstance : IDisposable
     private readonly HashSet<CellChange> _pendingCellChanges = [];
     private readonly HashSet<RenderChunkChange> _dirtyRenderChunks = [];
     private readonly TiledRuntimeAutomapper? _automapper;
+    private SceneContentInstance? _contentOwner;
     private int _editDepth;
     private bool _flushing;
 
@@ -42,6 +44,7 @@ public sealed class TiledMapInstance : IDisposable
         ImportOptions = importOptions;
         RootEntity = rootEntity;
         _ownedEntities = ownedEntities;
+        _ownedEntitySet = new HashSet<Entity>(ownedEntities, ReferenceEqualityComparer.Instance);
         _tilemapRenderers = tilemapRenderers;
         _runtimeTileLayers = runtimeTileLayers;
         _layerDrawLayers = layerDrawLayers;
@@ -158,6 +161,8 @@ public sealed class TiledMapInstance : IDisposable
         EnsureAvailable();
         if (!ReferenceEquals(entity.Scene, _scene))
             throw new InvalidOperationException("Only entities belonging to this map's scene can be tracked.");
+
+        _contentOwner?.TrackEntity(entity, true);
         TrackSingleEntity(entity);
         foreach (var child in entity.GetChildren())
             TrackSingleEntity(child);
@@ -168,28 +173,47 @@ public sealed class TiledMapInstance : IDisposable
         if (IsUnloaded)
             return;
 
-        for (var index = 0; index < _ownedEntities.Count; index++)
+        // Legacy primary maps own later hierarchy descendants implicitly. Additive maps use
+        // the outer SceneContentInstance's exact ownership set and never adopt foreign children.
+        if (_contentOwner is null)
         {
-            var ownedEntity = _ownedEntities[index];
-            if (Entity.IsNull(ownedEntity))
-                continue;
-            foreach (var child in ownedEntity.GetChildren())
-                if (!Entity.IsNull(child) && ReferenceEquals(child.Scene, _scene))
-                    TrackSingleEntity(child);
+            for (var index = 0; index < _ownedEntities.Count; index++)
+            {
+                var ownedEntity = _ownedEntities[index];
+                if (Entity.IsNull(ownedEntity))
+                    continue;
+                foreach (var child in ownedEntity.GetChildren())
+                    if (!Entity.IsNull(child) && ReferenceEquals(child.Scene, _scene))
+                        TrackSingleEntity(child);
+            }
         }
 
         IsUnloaded = true;
         _automapper?.Clear();
         _pendingCellChanges.Clear();
         _dirtyRenderChunks.Clear();
+        var cleanupErrors = new List<Exception>();
         for (var index = _ownedEntities.Count - 1; index >= 0; index--)
         {
             var entity = _ownedEntities[index];
             if (Entity.IsNull(entity))
                 continue;
-            entity.Enabled = false;
-            _scene.DestroyEntity(entity);
+            try
+            {
+                entity.UpdatesSuspended = true;
+                entity.Enabled = false;
+                _scene.DestroyEntity(entity);
+            }
+            catch (Exception exception)
+            {
+                cleanupErrors.Add(exception);
+            }
         }
+
+        if (cleanupErrors.Count > 0)
+            throw new AggregateException(
+                $"One or more Entities failed while unloading Tiled map '{Identifier}'.",
+                cleanupErrors);
     }
 
     public void Dispose()
@@ -312,8 +336,29 @@ public sealed class TiledMapInstance : IDisposable
     {
         if (!ReferenceEquals(entity.Scene, _scene))
             throw new InvalidOperationException("Only entities belonging to this map's scene can be tracked.");
-        if (!_ownedEntities.Contains(entity))
+        if (_ownedEntitySet.Add(entity))
             _ownedEntities.Add(entity);
+    }
+
+    internal void BindContentOwner(SceneContentInstance owner)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+        EnsureAvailable();
+        if (!ReferenceEquals(owner.Scene, _scene))
+            throw new InvalidOperationException("The content owner belongs to another Scene.");
+        if (_contentOwner is { } existing && !ReferenceEquals(existing, owner))
+            throw new InvalidOperationException("The Tiled map already belongs to another content instance.");
+
+        foreach (var entity in _ownedEntities)
+        {
+            if (entity.ContentOwner is { } entityOwner && !ReferenceEquals(entityOwner, owner))
+                throw new InvalidOperationException(
+                    $"Tiled Entity '{entity.Name}' already belongs to another content instance.");
+        }
+
+        foreach (var entity in _ownedEntities)
+            owner.TrackCreatedEntity(entity);
+        _contentOwner = owner;
     }
 
     internal readonly record struct CellChange(TiledRuntimeTileLayer Layer, Point Cell);

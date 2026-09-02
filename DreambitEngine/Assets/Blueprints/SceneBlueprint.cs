@@ -35,4 +35,23 @@ public class SceneBlueprint : DreambitAsset
         if (Tiled is not null)
             TiledSceneBlueprintMaterializer.Materialize(scene, Tiled, options);
     }
+
+    /// <summary>
+    /// Materializes linked runtime content directly under an additive content owner. This path
+    /// deliberately bypasses the singular Tiled Scene service used by primary maps.
+    /// </summary>
+    internal TiledMapInstance? MaterializeAdditiveLinkedSources(
+        Scene scene,
+        SceneContentLoadOptions options,
+        SceneContentInstance owner)
+    {
+        return Tiled is null
+            ? null
+            : TiledSceneBlueprintMaterializer.MaterializeAdditive(
+                scene,
+                Tiled,
+                owner,
+                options.TiledMapResolver,
+                options.TiledMapImporter);
+    }
 }

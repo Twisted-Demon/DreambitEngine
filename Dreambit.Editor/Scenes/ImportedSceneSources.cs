@@ -38,6 +38,14 @@ internal sealed class ImportedSceneSources
     {
         ArgumentNullException.ThrowIfNull(entity);
 
+        // Map-local source keys are unique only inside their owning import. Runtime additive
+        // maps must never be mistaken for the document's singular authored imported source.
+        if (entity.ContentOwner is not null)
+        {
+            identity = default;
+            return false;
+        }
+
         foreach (var adapter in SourceAdapters)
         {
             if (!adapter.TryGetSourceKey(entity, out var sourceKey))
@@ -142,6 +150,15 @@ internal sealed class ImportedSceneSources
         out IImportedSceneSourceAdapter sourceAdapter,
         out string sourceKey)
     {
+        // Runtime additive maps are never the document's singular imported source. Their
+        // map-local keys must not create or mutate persisted editor overrides.
+        if (entity.ContentOwner is not null)
+        {
+            sourceAdapter = null!;
+            sourceKey = string.Empty;
+            return false;
+        }
+
         foreach (var adapter in SourceAdapters)
         {
             if (!adapter.TryGetSourceKey(entity, out sourceKey))

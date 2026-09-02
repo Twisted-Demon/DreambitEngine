@@ -100,6 +100,39 @@ only that imported hierarchy. `TrackEntity` can attach a runtime-created
 entity to the same lifetime, and `ApplyDrawLayer` copies a Tiled layer's
 resolved Dreambit draw layer to an entity hierarchy.
 
+### Multiple maps through additive Scene content
+
+A Tiled-linked Scene Blueprint can also be loaded additively into an ordinary runtime `Scene`:
+
+```csharp
+var village = Scene.Instance.LoadAdditive("Scenes/Zones/Village.scene");
+var tree = Scene.Instance.LoadAdditive("Scenes/Zones/AncientTree.scene");
+
+TiledMapInstance villageMap = village.TiledMap!;
+TiledMapInstance treeMap = tree.TiledMap!;
+
+Scene.Instance.Unload(village);
+```
+
+Each `SceneContentInstance` owns a fresh `TiledMapInstance`. Generated entities, renderers,
+colliders, runtime tile edits, Automapping output, generated-entity overrides, and runtime layer
+handles remain isolated per instance. Loading the same Scene Blueprint twice creates two independent
+maps; unloading one does not scan or destroy entities owned by the other.
+
+Entities passed to an additive map's `TrackEntity` join the enclosing `SceneContentInstance`
+lifetime. Additive unload invalidates the Tiled instance and its runtime layer handles before
+destroying the complete owned entity set. A failure after import runs the same cleanup transaction,
+so a partially materialized map cannot leak renderers or generated entities.
+
+This additive path does not install a second `TiledMapSceneService` and does not replace a
+`TiledScene.MapInstance`. A legacy primary `TiledScene` map and any number of additive maps can
+coexist in the same Scene. The existing one-primary-map rule still applies to `TiledScene` and
+`LoadIntoSelf` itself.
+
+Additive Tiled entities are runtime-only editor state. Their map-local source keys are excluded from
+document source identity and override recording, so edits to them cannot be saved into the open
+Scene Blueprint.
+
 ### Loading a scene authored from Tiled in Dreambit Editor
 
 A saved editor scene linked to a Tiled map must be loaded into a `TiledScene`
@@ -137,19 +170,19 @@ network.Scenes.RegisterBlueprint<OverworldScene>(
 The network catalog eagerly creates the authored `OverworldScene` while it is still in `Created`;
 the linked map is then imported during Scene initialization before authored network objects bind.
 
-The generic scene type is required. Loading a Tiled-linked scene asset through
-`Scene.SetNextScene("scenes/overworld.scene")`, or into an ordinary `Scene`,
-throws an actionable error before the map is resolved or authored entities are
-materialized. Plain scene blueprints remain loadable into either `Scene` or
-`TiledScene`.
+The generic scene type is required for full Scene creation and `LoadIntoSelf`. Loading a
+Tiled-linked scene asset through `Scene.SetNextScene("scenes/overworld.scene")`, or merging it into
+an ordinary `Scene` with `LoadIntoSelf`, throws an actionable error before the map is resolved or
+authored entities are materialized. `LoadAdditive` is the explicit ordinary-Scene path for an
+independently owned linked map. Plain scene blueprints remain loadable through either path.
 
-Use either a map supplied to `TiledScene(string mapAssetName)` or a map linked
-by the scene blueprint. Combining both sources, loading a second linked Tiled
-scene, or adding the link after the scene starts is rejected. The Tiled-owned
-scene lifetime invalidates `MapInstance` and runtime layer handles when the
-scene is disposed. Dreambit Editor uses an internal Tiled-capable preview host,
-so creation, live reimport, generated-entity overrides, and selection recovery
-continue without requiring game code to run in the editor.
+Use either a primary map supplied to `TiledScene(string mapAssetName)` or a primary map linked by the
+Scene Blueprint. Combining those primary sources, loading a second primary linked map with
+`LoadIntoSelf`, or adding the primary link after the Scene starts is rejected. Independent linked
+maps use `LoadAdditive` instead. The Tiled-owned Scene lifetime invalidates the primary `MapInstance`,
+all additive map instances, and runtime layer handles when the Scene is disposed. Dreambit Editor
+uses an internal Tiled-capable preview host, so creation, live reimport, generated-entity overrides,
+and selection recovery continue without requiring game code to run in the editor.
 
 ## Mutable runtime tile layers
 

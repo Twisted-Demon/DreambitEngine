@@ -72,7 +72,10 @@ internal static class SceneDocumentSerializer
             .SelectMany(root => root.FlattenedHierarchy())
             .ToDictionary(entity => entity.Guid);
         var roots = scene.GetAllEntities()
-            .Where(entity => entity.Parent is null && !entity.IsEditorOnly)
+            .Where(entity =>
+                entity.Parent is null &&
+                !entity.IsEditorOnly &&
+                entity.ContentOwner is null)
             .Select(entity => CaptureEntity(
                 entity,
                 sourceEntities,
@@ -93,6 +96,12 @@ internal static class SceneDocumentSerializer
 
     public static EntityBlueprint CaptureSubtree(Scene scene, SceneBlueprint source, Entity entity)
     {
+        if (Entity.IsNull(entity))
+            throw new InvalidOperationException(
+                "A destroyed Entity cannot be captured into authored Scene source data.");
+        if (entity.ContentOwner is not null)
+            throw new InvalidOperationException(
+                "Runtime additive content cannot be captured into authored Scene source data.");
         scene.FlushStructuralChanges();
         var sourceEntities = source.Entities
             .SelectMany(root => root.FlattenedHierarchy())
@@ -390,7 +399,7 @@ internal static class SceneDocumentSerializer
             Scale = entity.Transform.Scale,
             Components = capturedComponents,
             Children = entity.Children
-                .Where(child => !child.IsEditorOnly)
+                .Where(child => !child.IsEditorOnly && child.ContentOwner is null)
                 .Select(child => CaptureEntity(
                     child,
                     sourceEntities,
@@ -469,9 +478,27 @@ internal static class SceneDocumentSerializer
                 ? new JValue(asset.AssetName ?? string.Empty)
                 : DreambitAssetReferenceToken.Create(asset.AssetId, asset.AssetName);
         if (value is Entity entity)
+        {
+            if (Entity.IsNull(entity))
+                throw new InvalidOperationException(
+                    $"Destroyed Entity '{entity.Name}' cannot be serialized as an authored Scene reference.");
+            if (entity.ContentOwner is not null)
+                throw new InvalidOperationException(
+                    $"Entity '{entity.Name}' belongs to runtime additive content and cannot be " +
+                    "serialized as an authored Scene reference.");
             return new JValue(entity.Id.ToString());
+        }
         if (value is Component component)
-            return new JValue(component.Entity.Id.ToString());
+        {
+            var componentEntity = component.Entity ?? throw new InvalidOperationException(
+                $"Detached component '{component.GetType().FullName}' cannot be serialized as an " +
+                "authored Scene reference.");
+            if (componentEntity.ContentOwner is not null)
+                throw new InvalidOperationException(
+                    $"Component '{component.GetType().FullName}' belongs to runtime additive content " +
+                    "and cannot be serialized as an authored Scene reference.");
+            return new JValue(componentEntity.Id.ToString());
+        }
         if (value is IDictionary dictionary)
         {
             var valueType = declaredType.IsGenericType

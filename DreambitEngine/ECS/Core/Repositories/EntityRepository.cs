@@ -25,6 +25,7 @@ public class EntityRepository
     private readonly Logger<EntityRepository> _logger = new();
     private readonly Scene _scene;
     private readonly Dictionary<Guid, Entity> _toCreateById = new(64);
+    private int _iterationDepth;
 
     public EntityRepository(Scene scene)
     {
@@ -32,6 +33,8 @@ public class EntityRepository
     }
 
     public int Count => _entities.Count + _entitiesToCreate.Count;
+
+    internal bool IsIterating => _iterationDepth > 0;
 
     internal Entity CreateEntity(string name, HashSet<string> tags, bool enabled, Vector3? createAt,
         Vector3? eulerRotation,
@@ -369,33 +372,65 @@ public class EntityRepository
 
     internal void Tick()
     {
-        HandleEntityCreations();
-        UpdateEntities();
-        HandleEntityDeletions();
+        _iterationDepth++;
+        try
+        {
+            HandleEntityCreations();
+            UpdateEntities();
+            HandleEntityDeletions();
+        }
+        finally
+        {
+            _iterationDepth--;
+        }
     }
 
     internal void FlushStructuralChanges()
     {
-        HandleEntityCreations();
-        for (var index = 0; index < _entities.Count; index++)
-            _entities[index].FlushStructuralChanges();
-        HandleEntityDeletions();
+        _iterationDepth++;
+        try
+        {
+            HandleEntityCreations();
+            for (var index = 0; index < _entities.Count; index++)
+                _entities[index].FlushStructuralChanges();
+            HandleEntityDeletions();
+        }
+        finally
+        {
+            _iterationDepth--;
+        }
     }
 
     internal void EditorUpdate()
     {
         FlushStructuralChanges();
-        for (var index = 0; index < _entities.Count; index++)
+        _iterationDepth++;
+        try
         {
-            var entity = _entities[index];
-            if (entity.Enabled)
-                entity.EditorUpdate();
+            for (var index = 0; index < _entities.Count; index++)
+            {
+                var entity = _entities[index];
+                if (entity.Enabled)
+                    entity.EditorUpdate();
+            }
+        }
+        finally
+        {
+            _iterationDepth--;
         }
     }
 
     internal void PhysicsTick()
     {
-        PhysicsUpdateEntities();
+        _iterationDepth++;
+        try
+        {
+            PhysicsUpdateEntities();
+        }
+        finally
+        {
+            _iterationDepth--;
+        }
     }
 
     public Entity GetEntity(Guid id)

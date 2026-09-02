@@ -442,6 +442,28 @@ construct the corresponding Scene.
 
 This makes Scene construction local while keeping Scene **choice and timing** authoritative.
 
+### Additive content and the current network boundary
+
+`Scene.LoadAdditive` is a local runtime ownership feature. It keeps one Dreambit `Scene` and one
+`NetworkWorld`; a `SceneContentInstance.InstanceId` is not a network identity or interest scope.
+
+Non-networked additive content can be loaded and unloaded while a network world exists. Doing so
+does not change the synchronized Scene epoch, authored bindings, dynamic records, structural
+revision, baselines, or snapshots.
+
+Additive content containing a `NetworkObject` is not supported in this release. Dreambit rejects it
+before materialization, including a marker introduced by a component requirement, a dynamic
+attachment, or adoption of an already-networked entity. This explicit failure prevents a newly
+loaded authored object from being silently omitted from a baseline or registered with an ambiguous
+source identity.
+
+Networked additive content requires a later protocol phase. That design must add a network-owned
+replication-scope identity separate from `SceneContentInstance.InstanceId`, authoritative
+load/unload messages, instance-qualified authored bindings, late-join scope state, per-peer scope
+subscriptions, per-peer baselines, and scope-aware structural sequencing. The current global
+`NetworkWorld.Records`, structural revision, and snapshot stream cannot be made correct by filtering
+snapshot records alone.
+
 ## Editor-authored Scene Blueprints
 
 Dreambit's networking model works directly with Scenes constructed in Dreambit.Editor.

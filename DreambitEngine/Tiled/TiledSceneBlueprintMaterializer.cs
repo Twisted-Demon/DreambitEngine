@@ -118,16 +118,62 @@ internal static class TiledSceneBlueprintMaterializer
         }
 
         host.ValidateTiledBlueprint(reference);
-        var map = (options.TiledMapResolver ?? ResolveTiledMap)(reference)
-                  ?? throw new InvalidOperationException(
-                      $"Tiled map asset '{reference.AssetName}' could not be loaded.");
-        var importOptions = (reference.ImportOptions ?? new TiledImportOptions()).Clone();
-        importOptions.Validate();
-        host.ConfigureTiledBlueprint(new TiledSceneLoadConfiguration(
-            map,
-            importOptions,
+        host.ConfigureTiledBlueprint(CreateConfiguration(
             reference,
+            options.TiledMapResolver,
             options.MarkImportedTiledEntitiesEditorOnly));
+    }
+
+    /// <summary>
+    /// Imports a fresh map instance directly into an existing Scene. The generic content owner,
+    /// rather than the singular primary-map Scene service, owns its lifetime.
+    /// </summary>
+    internal static TiledMapInstance MaterializeAdditive(
+        Scene scene,
+        TiledSceneReference reference,
+        SceneContentInstance owner,
+        Func<TiledSceneReference, TmxMap>? mapResolver = null,
+        TiledMapImporter? importer = null)
+    {
+        ArgumentNullException.ThrowIfNull(scene);
+        ArgumentNullException.ThrowIfNull(reference);
+        ArgumentNullException.ThrowIfNull(owner);
+        if (!ReferenceEquals(owner.Scene, scene))
+            throw new ArgumentException(
+                "The additive content owner belongs to another Scene.",
+                nameof(owner));
+
+        var configuration = CreateConfiguration(reference, mapResolver, false);
+        importer ??= new TiledMapImporter();
+        var instance = importer.Import(
+            scene,
+            configuration.Map,
+            configuration.ImportOptions.Clone());
+        try
+        {
+            instance.BindContentOwner(owner);
+            TiledGeneratedEntityOverrides.Apply(
+                instance.OwnedEntities,
+                reference.EntityOverrides ??
+                new Dictionary<string, TiledGeneratedEntityOverride>());
+            return instance;
+        }
+        catch (Exception materializationException)
+        {
+            try
+            {
+                instance.Unload();
+            }
+            catch (Exception cleanupException)
+            {
+                throw new AggregateException(
+                    "Additive Tiled materialization and cleanup both failed.",
+                    materializationException,
+                    cleanupException);
+            }
+
+            throw;
+        }
     }
 
     internal static TiledMapSceneService GetOrCreateLifetimeService(Scene scene)
@@ -138,6 +184,23 @@ internal static class TiledSceneBlueprintMaterializer
         var entity = scene.CreateEntity("__dreambit-tiled-map-lifetime");
         entity.IsEditorOnly = scene.ExecutionMode == SceneExecutionMode.Editor;
         return entity.AttachComponent<TiledMapSceneService>();
+    }
+
+    private static TiledSceneLoadConfiguration CreateConfiguration(
+        TiledSceneReference reference,
+        Func<TiledSceneReference, TmxMap>? mapResolver,
+        bool markGeneratedEntitiesEditorOnly)
+    {
+        var map = (mapResolver ?? ResolveTiledMap)(reference)
+                  ?? throw new InvalidOperationException(
+                      $"Tiled map asset '{reference.AssetName}' could not be loaded.");
+        var importOptions = (reference.ImportOptions ?? new TiledImportOptions()).Clone();
+        importOptions.Validate();
+        return new TiledSceneLoadConfiguration(
+            map,
+            importOptions,
+            reference,
+            markGeneratedEntitiesEditorOnly);
     }
 
     private static TmxMap ResolveTiledMap(TiledSceneReference reference)

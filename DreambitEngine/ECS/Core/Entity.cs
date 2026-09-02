@@ -58,6 +58,12 @@ public class Entity : IDisposable
     public HashSet<string> Tags { get; } = [];
     internal Scene Scene { get; private set; }
 
+    /// <summary>
+    /// Runtime-only additive lifetime owner. Source Blueprints and editor serialization never
+    /// read or write this field.
+    /// </summary>
+    internal SceneContentInstance? ContentOwner { get; set; }
+
     public Entity? Parent
     {
         get => _parent;
@@ -326,6 +332,8 @@ public class Entity : IDisposable
         var component = ComponentRepository.GetComponent<T>();
         if (component != null) return component;
 
+        Scene?.ValidateContentComponentAttachment(this, typeof(T));
+
         component = (T)Activator.CreateInstance<T>().SetUpAndCreateChildren(this);
 
         if (component == null)
@@ -350,6 +358,8 @@ public class Entity : IDisposable
 
         if (type is null || !type.IsSubclassOf(typeof(Component)))
             return null;
+
+        Scene?.ValidateContentComponentAttachment(this, type);
 
         component = (Component)Activator.CreateInstance(type);
         if (component == null) return null;
@@ -411,6 +421,9 @@ public class Entity : IDisposable
                 exception);
             return;
         }
+
+        foreach (var componentType in creationOrder)
+            Scene?.ValidateContentComponentAttachment(this, componentType);
 
         foreach (var componentType in creationOrder)
         {
@@ -746,6 +759,8 @@ public class Entity : IDisposable
         }
         finally
         {
+            var owningScene = Scene;
+
             // Never allow component cleanup failure to leave repository state alive.
             ComponentRepository.ClearLists();
 
@@ -773,6 +788,7 @@ public class Entity : IDisposable
 
             _children.Clear();
 
+            owningScene?.NotifyContentEntityDestroyed(this);
             Scene = null;
         }
     }
