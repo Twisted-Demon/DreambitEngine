@@ -59,6 +59,21 @@ public sealed class NetworkOptions
     /// </summary>
     public int MaxBaselineComponentRecords { get; set; } = 1_000_000;
 
+    /// <summary>Maximum registered replication scopes in one Scene epoch, including Global.</summary>
+    public int MaxReplicationScopes { get; set; } = 1024;
+
+    /// <summary>Maximum additive scope subscriptions tracked for one remote peer.</summary>
+    public int MaxScopeSubscriptionsPerPeer { get; set; } = 256;
+
+    /// <summary>Maximum UTF-8 bytes accepted for a scoped Scene Blueprint fallback name.</summary>
+    public int MaxScopeAssetNameBytes { get; set; } = 1024;
+
+    /// <summary>Maximum authored network entities accepted in one additive scope baseline.</summary>
+    public int MaxScopedAuthoredEntities { get; set; } = 100_000;
+
+    /// <summary>Maximum component-state records accepted in one additive scope baseline.</summary>
+    public int MaxScopeBaselineComponentRecords { get; set; } = 1_000_000;
+
     internal NetworkOptions Snapshot(string? defaultContentFingerprint = null) =>
         new()
         {
@@ -68,7 +83,12 @@ public sealed class NetworkOptions
             MaxQueuedTransportEvents = MaxQueuedTransportEvents,
             ReplicationRate = ReplicationRate,
             MaxNetworkEntities = MaxNetworkEntities,
-            MaxBaselineComponentRecords = MaxBaselineComponentRecords
+            MaxBaselineComponentRecords = MaxBaselineComponentRecords,
+            MaxReplicationScopes = MaxReplicationScopes,
+            MaxScopeSubscriptionsPerPeer = MaxScopeSubscriptionsPerPeer,
+            MaxScopeAssetNameBytes = MaxScopeAssetNameBytes,
+            MaxScopedAuthoredEntities = MaxScopedAuthoredEntities,
+            MaxScopeBaselineComponentRecords = MaxScopeBaselineComponentRecords
         };
 
     internal void Validate()
@@ -89,5 +109,15 @@ public sealed class NetworkOptions
             throw new ArgumentOutOfRangeException(nameof(MaxNetworkEntities));
         if (MaxBaselineComponentRecords is < 1 or > 10_000_000)
             throw new ArgumentOutOfRangeException(nameof(MaxBaselineComponentRecords));
+        if (MaxReplicationScopes is < 1 or > 1_000_000)
+            throw new ArgumentOutOfRangeException(nameof(MaxReplicationScopes));
+        if (MaxScopeSubscriptionsPerPeer is < 1 or > 1_000_000)
+            throw new ArgumentOutOfRangeException(nameof(MaxScopeSubscriptionsPerPeer));
+        if (MaxScopeAssetNameBytes is < 1 or > 65_536)
+            throw new ArgumentOutOfRangeException(nameof(MaxScopeAssetNameBytes));
+        if (MaxScopedAuthoredEntities is < 1 or > 1_000_000)
+            throw new ArgumentOutOfRangeException(nameof(MaxScopedAuthoredEntities));
+        if (MaxScopeBaselineComponentRecords is < 1 or > 10_000_000)
+            throw new ArgumentOutOfRangeException(nameof(MaxScopeBaselineComponentRecords));
     }
 }

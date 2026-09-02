@@ -24,6 +24,7 @@ public sealed class SceneContentInstance
     private readonly ReadOnlyCollection<Entity> _ownedEntitiesView;
     private readonly ReadOnlyCollection<Entity> _rootEntitiesView;
     private SceneContentInstanceState _state = SceneContentInstanceState.Loading;
+    private object? _networkCoordinator;
 
     internal SceneContentInstance(
         Scene scene,
@@ -59,6 +60,12 @@ public sealed class SceneContentInstance
 
     public bool IsLoaded => _state == SceneContentInstanceState.Loaded;
 
+    /// <summary>
+    /// Gets whether this lifetime is controlled by the active networking session. Network-managed
+    /// content must be removed through the replication-scope API so peers cannot diverge.
+    /// </summary>
+    public bool IsNetworkManaged => _networkCoordinator is not null;
+
     public TiledMapInstance? TiledMap { get; private set; }
 
     public bool TryGetEntity(Guid sourceEntityGuid, out Entity? entity)
@@ -93,6 +100,7 @@ public sealed class SceneContentInstance
         Vector3? scale = null)
     {
         EnsureLoaded();
+        EnsureUserMutationAllowed();
         return Scene.CreateContentEntity(
             this,
             name,
@@ -111,6 +119,7 @@ public sealed class SceneContentInstance
         Vector3? scale = null)
     {
         EnsureLoaded();
+        EnsureUserMutationAllowed();
         return Scene.CreateContentEntity(
             this,
             blueprint,
@@ -123,11 +132,23 @@ public sealed class SceneContentInstance
     public void TrackEntity(Entity entity, bool includeDescendants = true)
     {
         EnsureLoaded();
+        EnsureUserMutationAllowed();
         Scene.TrackContentEntity(this, entity, includeDescendants);
     }
 
     internal bool AcceptsOwnership =>
         _state is SceneContentInstanceState.Loading or SceneContentInstanceState.Loaded;
+
+    internal void BindNetworkCoordinator(object coordinator)
+    {
+        ArgumentNullException.ThrowIfNull(coordinator);
+        if (_networkCoordinator is not null && !ReferenceEquals(_networkCoordinator, coordinator))
+            throw new InvalidOperationException("The content instance already has a networking coordinator.");
+        _networkCoordinator = coordinator;
+    }
+
+    internal bool IsNetworkCoordinator(object? coordinator) =>
+        coordinator is not null && ReferenceEquals(_networkCoordinator, coordinator);
 
     internal void TrackCreatedEntity(Entity entity)
     {
@@ -247,6 +268,7 @@ public sealed class SceneContentInstance
         _entitiesBySourceGuid.Clear();
         _sourceGuidByEntity.Clear();
         TiledMap = null;
+        _networkCoordinator = null;
         _state = SceneContentInstanceState.Unloaded;
     }
 
@@ -255,6 +277,13 @@ public sealed class SceneContentInstance
         if (!IsLoaded)
             throw new InvalidOperationException(
                 $"Content instance '{InstanceId}' is not loaded.");
+    }
+
+    private void EnsureUserMutationAllowed()
+    {
+        if (IsNetworkManaged)
+            throw new InvalidOperationException(
+                "Network-managed content can only be mutated through NetworkService scope APIs.");
     }
 
     private static void RemoveByReference(List<Entity> entities, Entity entity)

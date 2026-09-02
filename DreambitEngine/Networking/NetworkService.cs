@@ -120,6 +120,12 @@ public sealed class NetworkService : IDisposable
     /// </summary>
     public event Action<TransportDisconnectReason, string?>? ConnectionFailed;
 
+    /// <summary>Occurs on the server when a peer has committed one subscribed additive scope.</summary>
+    public event Action<NetworkPeerId, NetworkReplicationScopeId>? PeerScopeReady;
+
+    /// <summary>Occurs on the server after a peer confirms that a scope was removed locally.</summary>
+    public event Action<NetworkPeerId, NetworkReplicationScopeId>? PeerScopeUnloaded;
+
     /// <summary>
     /// Registers default dreambit replicated components i.e. NetworkTransform2D
     /// </summary>
@@ -244,6 +250,54 @@ public sealed class NetworkService : IDisposable
         _core.SetNextSceneFromNetworking(scene, this);
     }
 
+    /// <summary>Loads a Scene Blueprint into a new server-authoritative replication scope.</summary>
+    public NetworkReplicationScopeId LoadScope(string sceneAssetName) =>
+        _session?.LoadScope(sceneAssetName) ??
+        throw new InvalidOperationException("A networking session is not active.");
+
+    /// <summary>
+    /// Unloads a server scope. All peers must first complete <see cref="Unsubscribe"/> for it.
+    /// </summary>
+    public void UnloadScope(NetworkReplicationScopeId scope)
+    {
+        if (_session is null)
+            throw new InvalidOperationException("A networking session is not active.");
+        _session.UnloadScope(scope);
+    }
+
+    /// <summary>Starts reliable materialization and baseline synchronization of a scope for a peer.</summary>
+    public void Subscribe(NetworkPeerId peer, NetworkReplicationScopeId scope)
+    {
+        if (_session is null)
+            throw new InvalidOperationException("A networking session is not active.");
+        _session.Subscribe(peer, scope);
+    }
+
+    /// <summary>Stops scoped traffic and reliably removes the scope from a peer.</summary>
+    public void Unsubscribe(NetworkPeerId peer, NetworkReplicationScopeId scope)
+    {
+        if (_session is null)
+            throw new InvalidOperationException("A networking session is not active.");
+        _session.Unsubscribe(peer, scope);
+    }
+
+    /// <summary>Looks up a scope in the current Scene epoch.</summary>
+    public bool TryGetScope(NetworkReplicationScopeId id, out NetworkReplicationScope? scope)
+    {
+        if (_session is not null)
+            return _session.TryGetScope(id, out scope);
+        scope = null;
+        return false;
+    }
+
+    /// <summary>Gets whether the server currently tracks a peer subscription.</summary>
+    public bool IsPeerSubscribed(NetworkPeerId peer, NetworkReplicationScopeId scope) =>
+        _session?.IsPeerSubscribed(peer, scope) == true;
+
+    /// <summary>Gets whether a peer has acknowledged and committed a scope baseline.</summary>
+    public bool IsPeerScopeReady(NetworkPeerId peer, NetworkReplicationScopeId scope) =>
+        _session?.IsPeerScopeReady(peer, scope) == true;
+
     /// <summary>
     /// Materializes a Blueprint as a server-authoritative runtime entity and reliably reproduces it
     /// on synchronized clients with its initial replicated Component state.
@@ -345,6 +399,30 @@ public sealed class NetworkService : IDisposable
         if (_session?.World is { } world)
             return world.TryGetNetworkId(entity, out id);
         id = NetworkEntityId.None;
+        return false;
+    }
+
+    /// <summary>Looks up the replication scope that owns a registered network Entity.</summary>
+    public bool TryGetReplicationScope(Entity entity, out NetworkReplicationScopeId scope)
+    {
+        if (_session?.World is { } world && world.TryGetNetworkId(entity, out var id))
+        {
+            scope = world.GetScope(id);
+            return true;
+        }
+        scope = NetworkReplicationScopeId.None;
+        return false;
+    }
+
+    /// <summary>Resolves an authored source GUID inside one replication scope.</summary>
+    public bool TryGetAuthoredEntity(
+        NetworkReplicationScopeId scope,
+        Guid sourceGuid,
+        out Entity? entity)
+    {
+        if (_session?.World is { } world)
+            return world.TryGetAuthoredEntity(scope, sourceGuid, out entity);
+        entity = null;
         return false;
     }
 
@@ -491,6 +569,8 @@ public sealed class NetworkService : IDisposable
                 PeerDisconnected?.Invoke(peer, reason, diagnostic);
             session.ConnectionFailed += (reason, diagnostic) =>
                 ConnectionFailed?.Invoke(reason, diagnostic);
+            session.PeerScopeReady += (peer, scope) => PeerScopeReady?.Invoke(peer, scope);
+            session.PeerScopeUnloaded += (peer, scope) => PeerScopeUnloaded?.Invoke(peer, scope);
             session.SceneChangeRequested += HandleSceneChangeRequested;
             session.Start();
             _session = session;

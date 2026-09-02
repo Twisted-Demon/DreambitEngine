@@ -55,8 +55,9 @@ public readonly record struct NetworkSceneEpoch(uint Value)
 }
 
 /// <summary>
-/// Identifies the authoritative structural state of the current network world. The revision
-/// advances when entities spawn or despawn and when ownership or player mappings change.
+/// Identifies structural state within one Scene epoch. On the server, the session property tracks
+/// authoritative world changes. In packets and on clients, the value tracks the receiving peer's
+/// projected structural stream so scope-filtered events remain strictly sequential.
 /// </summary>
 /// <param name="Value">The monotonically increasing revision within the scene epoch.</param>
 public readonly record struct NetworkStructuralRevision(ulong Value)
@@ -65,6 +66,30 @@ public readonly record struct NetworkStructuralRevision(ulong Value)
     public static NetworkStructuralRevision None => default;
 
     /// <summary>Returns the numeric structural revision as text.</summary>
+    public override string ToString() => Value.ToString();
+}
+
+/// <summary>
+/// Identifies one independently replicated content lifetime inside a synchronized Scene.
+/// Scope identity is assigned by the server, is never reused within a Scene epoch, and is
+/// deliberately separate from both source asset identity and <see cref="SceneContentInstance.InstanceId"/>.
+/// </summary>
+/// <param name="Value">The epoch-local numeric identity. Zero is invalid and one is global.</param>
+public readonly record struct NetworkReplicationScopeId(uint Value)
+{
+    /// <summary>Gets the invalid value used when no scope is assigned.</summary>
+    public static NetworkReplicationScopeId None => default;
+
+    /// <summary>Gets the always-present replication scope for the base synchronized Scene.</summary>
+    public static NetworkReplicationScopeId Global => new(1);
+
+    /// <summary>Gets whether this value identifies a replication scope.</summary>
+    public bool IsValid => Value != 0;
+
+    /// <summary>Gets whether this value identifies the base synchronized Scene.</summary>
+    public bool IsGlobal => Value == Global.Value;
+
+    /// <summary>Returns the numeric scope identifier as text.</summary>
     public override string ToString() => Value.ToString();
 }
 

@@ -17,6 +17,7 @@ internal sealed class NetworkEntityRecord
     public required Entity Entity { get; init; }
     public required NetworkObject Marker { get; init; }
     public required NetworkSpawnOrigin Origin { get; init; }
+    public required NetworkReplicationScopeId Scope { get; init; }
     public NetworkPeerId Owner { get; set; }
     public Guid SourceGuid { get; init; }
     public AssetId BlueprintAssetId { get; init; }

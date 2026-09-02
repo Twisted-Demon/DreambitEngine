@@ -14,4 +14,25 @@ namespace Dreambit.Networking.World;
 public readonly record struct NetworkAuthoredBinding(
     Guid SourceGuid,
     NetworkEntityId NetworkEntityId,
-    NetworkPeerId Owner);
+    NetworkPeerId Owner)
+{
+    /// <summary>Gets the replication scope containing the authored entity.</summary>
+    public NetworkReplicationScopeId Scope { get; init; } = NetworkReplicationScopeId.Global;
+
+    /// <summary>
+    /// Gets whether the authored entity still exists authoritatively. A false value is a baseline
+    /// tombstone for peers that subscribe after the authored entity was despawned.
+    /// </summary>
+    public bool IsPresent { get; init; } = true;
+
+    /// <summary>Creates an explicitly scoped authored binding.</summary>
+    public NetworkAuthoredBinding(
+        NetworkReplicationScopeId scope,
+        Guid sourceGuid,
+        NetworkEntityId networkEntityId,
+        NetworkPeerId owner)
+        : this(sourceGuid, networkEntityId, owner)
+    {
+        Scope = scope;
+    }
+}

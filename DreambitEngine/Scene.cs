@@ -274,7 +274,7 @@ public class Scene : IDisposable
         var blueprint = Resources.LoadAsset<SceneBlueprint>(sceneAssetName)
                         ?? throw new InvalidOperationException(
                             $"Scene asset '{sceneAssetName}' could not be loaded.");
-        return LoadAdditiveCore(blueprint, options, sceneAssetName);
+        return LoadAdditiveCore(blueprint, options, sceneAssetName, false, null);
     }
 
     /// <summary>
@@ -284,11 +284,40 @@ public class Scene : IDisposable
         SceneBlueprint blueprint,
         SceneContentLoadOptions? options = null)
     {
-        return LoadAdditiveCore(blueprint, options, null);
+        return LoadAdditiveCore(blueprint, options, null, false, null);
     }
 
     /// <summary>Requests independent cleanup of one additive content instance.</summary>
     public bool Unload(SceneContentInstance instance)
+    {
+        return UnloadContentCore(instance, null);
+    }
+
+    /// <summary>
+    /// Trusted networking-only additive materialization. The coordinator token is intentionally
+    /// private to the active session and cannot be enabled through public load options.
+    /// </summary>
+    internal SceneContentInstance LoadNetworkAdditive(
+        SceneBlueprint blueprint,
+        string? requestedAssetName,
+        object coordinator)
+    {
+        ArgumentNullException.ThrowIfNull(coordinator);
+        return LoadAdditiveCore(
+            blueprint,
+            new SceneContentLoadOptions(),
+            requestedAssetName,
+            true,
+            coordinator);
+    }
+
+    internal bool UnloadNetworkContent(SceneContentInstance instance, object coordinator)
+    {
+        ArgumentNullException.ThrowIfNull(coordinator);
+        return UnloadContentCore(instance, coordinator);
+    }
+
+    private bool UnloadContentCore(SceneContentInstance instance, object? networkCoordinator)
     {
         ArgumentNullException.ThrowIfNull(instance);
         if (!ReferenceEquals(instance.Scene, this))
@@ -297,6 +326,9 @@ public class Scene : IDisposable
                 nameof(instance));
         if (!instance.IsLoaded)
             return false;
+        if (instance.IsNetworkManaged && !instance.IsNetworkCoordinator(networkCoordinator))
+            throw new InvalidOperationException(
+                "Network-managed additive content must be unloaded through its replication scope.");
         if (_contentMutationInProgress)
             throw new InvalidOperationException(
                 "Additive content cannot be unloaded during another content mutation.");
@@ -369,7 +401,9 @@ public class Scene : IDisposable
     private SceneContentInstance LoadAdditiveCore(
         SceneBlueprint blueprint,
         SceneContentLoadOptions? options,
-        string? requestedAssetName)
+        string? requestedAssetName,
+        bool allowNetworkObjects,
+        object? networkCoordinator)
     {
         ArgumentNullException.ThrowIfNull(blueprint);
         options ??= new SceneContentLoadOptions();
@@ -379,6 +413,8 @@ public class Scene : IDisposable
             ? requestedAssetName
             : blueprint.AssetName;
         var instance = new SceneContentInstance(this, blueprint.AssetId, sourceAssetName);
+        if (networkCoordinator is not null)
+            instance.BindNetworkCoordinator(networkCoordinator);
         var previousSettings = options.ApplySceneSettings ? Settings.Clone() : null;
         var settingsApplied = false;
 
@@ -397,11 +433,12 @@ public class Scene : IDisposable
                     Children = materializedRoots.ToList()
                 };
                 BlueprintValidator.ValidateOrThrow(validationRoot);
-                ValidateContentBlueprintComponents(materializedRoots);
+                ValidateContentBlueprintComponents(materializedRoots, allowNetworkObjects);
             }
-            ValidateContentTiledOverrides(blueprint.Tiled);
+            ValidateContentTiledOverrides(blueprint.Tiled, allowNetworkObjects);
 
             _activeContentOwner = instance;
+            _activeNetworkContentCoordinator = networkCoordinator;
             try
             {
                 if (options.ApplySceneSettings)
@@ -438,11 +475,12 @@ public class Scene : IDisposable
                     instance.SetAuthoredEntities(materializedRoots, context.SpawnedEntities);
                 }
 
-                ValidateOwnedContentEntities(instance);
+                ValidateOwnedContentEntities(instance, allowNetworkObjects);
             }
             finally
             {
                 _activeContentOwner = null;
+                _activeNetworkContentCoordinator = null;
             }
 
             instance.Commit();
@@ -456,6 +494,7 @@ public class Scene : IDisposable
             // Keep the provisional loading owner active while rollback callbacks run. If user
             // cleanup creates another Entity, it joins this transaction and is drained too.
             _activeContentOwner = instance;
+            _activeNetworkContentCoordinator = networkCoordinator;
             try
             {
                 InvalidateTiledContent(instance, cleanupErrors);
@@ -472,6 +511,7 @@ public class Scene : IDisposable
             finally
             {
                 _activeContentOwner = null;
+                _activeNetworkContentCoordinator = null;
             }
 
             instance.BeginUnload();
@@ -494,6 +534,7 @@ public class Scene : IDisposable
         finally
         {
             _activeContentOwner = null;
+            _activeNetworkContentCoordinator = null;
             _contentMutationInProgress = false;
         }
     }
@@ -528,6 +569,7 @@ public class Scene : IDisposable
     private readonly List<PendingContentUnload> _pendingContentUnloads = [];
     private readonly ReadOnlyCollection<SceneContentInstance> _contentInstancesView;
     private SceneContentInstance? _activeContentOwner;
+    private object? _activeNetworkContentCoordinator;
     private bool _contentMutationInProgress;
     private int _contentCallbackBoundaryDepth;
 
@@ -1191,6 +1233,151 @@ public class Scene : IDisposable
             () => CreateEntity(name, tags, enabled, createAt, eulerRotation, scale));
     }
 
+    internal Entity CreateNetworkContentEntity(
+        SceneContentInstance owner,
+        EntityBlueprint blueprint,
+        object coordinator,
+        bool? enabled = null,
+        Vector3? createAt = null,
+        Vector3? eulerRotation = null,
+        Vector3? scale = null,
+        Action<Entity>? initialize = null)
+    {
+        ArgumentNullException.ThrowIfNull(blueprint);
+        ArgumentNullException.ThrowIfNull(coordinator);
+        ValidateContentOwnerMutation(owner);
+        if (!owner.IsNetworkCoordinator(coordinator))
+            throw new InvalidOperationException(
+                "Only the networking session that owns this content instance may create scoped entities.");
+
+        var materialized = BlueprintInstanceMaterializer.Materialize(
+            [blueprint],
+            ResolveBlueprintInstance);
+        if (materialized.Count != 1)
+            throw new InvalidOperationException("A network Blueprint must materialize exactly one root Entity.");
+        ValidateNetworkBlueprintShape(materialized[0]);
+        ValidateContentBlueprintComponents(materialized, true);
+
+        var existingEntities = new HashSet<Entity>(
+            owner.OwnedEntities,
+            ReferenceEqualityComparer.Instance);
+        var previousCoordinator = _activeNetworkContentCoordinator;
+        _activeNetworkContentCoordinator = coordinator;
+        try
+        {
+            return RunWithContentOwner(
+                owner,
+                () =>
+                {
+                    var root = SpawnBlueprint(
+                        materialized[0],
+                        null,
+                        enabled,
+                        createAt,
+                        eulerRotation,
+                        scale);
+                    initialize?.Invoke(root);
+                    ValidateNetworkContentSpawn(owner, existingEntities, root);
+                    return root;
+                });
+        }
+        catch (Exception materializationException)
+        {
+            var cleanupErrors = new List<Exception>();
+            try
+            {
+                RunWithContentOwner(
+                    owner,
+                    () =>
+                    {
+                        RollbackNetworkContentSpawn(owner, existingEntities, cleanupErrors);
+                        return true;
+                    });
+            }
+            catch (Exception cleanupException)
+            {
+                cleanupErrors.Add(cleanupException);
+            }
+
+            if (cleanupErrors.Count != 0)
+            {
+                cleanupErrors.Insert(0, materializationException);
+                throw new AggregateException(
+                    "Scoped network spawn failed and cleanup also reported errors.",
+                    cleanupErrors);
+            }
+            throw;
+        }
+        finally
+        {
+            _activeNetworkContentCoordinator = previousCoordinator;
+        }
+    }
+
+    private static void ValidateNetworkContentSpawn(
+        SceneContentInstance owner,
+        HashSet<Entity> existingEntities,
+        Entity root)
+    {
+        var hierarchy = new HashSet<Entity>(
+            root.GetChildren(),
+            ReferenceEqualityComparer.Instance)
+        {
+            root
+        };
+        foreach (var entity in owner.OwnedEntities)
+        {
+            if (existingEntities.Contains(entity))
+                continue;
+            if (!hierarchy.Contains(entity))
+                throw new InvalidOperationException(
+                    "A scoped network Blueprint created an Entity outside its root hierarchy. " +
+                    "Runtime scoped network entities must have one exact unloadable hierarchy.");
+            if (!ReferenceEquals(entity, root) && entity.GetComponent<NetworkObject>() is not null)
+                throw new InvalidOperationException(
+                    "A scoped network Blueprint created a nested NetworkObject at runtime. " +
+                    "Spawn each network root independently.");
+        }
+    }
+
+    private void RollbackNetworkContentSpawn(
+        SceneContentInstance owner,
+        HashSet<Entity> existingEntities,
+        List<Exception> cleanupErrors)
+    {
+        HashSet<Entity>? previousRemaining = null;
+        while (true)
+        {
+            var remaining = new HashSet<Entity>(ReferenceEqualityComparer.Instance);
+            foreach (var entity in owner.GetOwnedEntitiesChildFirst())
+                if (!existingEntities.Contains(entity))
+                    remaining.Add(entity);
+            if (remaining.Count == 0)
+                return;
+            if (previousRemaining is not null && previousRemaining.SetEquals(remaining))
+            {
+                cleanupErrors.Add(new InvalidOperationException(
+                    "Scoped network spawn rollback could not release every newly created Entity."));
+                return;
+            }
+            previousRemaining = remaining;
+
+            foreach (var entity in owner.GetOwnedEntitiesChildFirst())
+            {
+                if (existingEntities.Contains(entity))
+                    continue;
+                if (Entity.IsNull(entity))
+                {
+                    owner.OnEntityDestroyed(entity);
+                    continue;
+                }
+                TryContentCleanup(
+                    cleanupErrors,
+                    () => Entities.DestroyEntityImmediately(entity));
+            }
+        }
+    }
+
     internal Entity CreateContentEntity(
         SceneContentInstance owner,
         EntityBlueprint blueprint,
@@ -1249,7 +1436,9 @@ public class Scene : IDisposable
             [componentType],
             entity.HasComponentOfType);
         foreach (var type in creationOrder)
-            ThrowIfForbiddenContentComponent(type);
+            ThrowIfForbiddenContentComponent(
+                type,
+                owner.IsNetworkCoordinator(_activeNetworkContentCoordinator));
     }
 
     internal void NotifyContentEntityDestroyed(Entity entity)
@@ -1502,7 +1691,8 @@ public class Scene : IDisposable
     }
 
     private static void ValidateContentBlueprintComponents(
-        IReadOnlyList<EntityBlueprint> roots)
+        IReadOnlyList<EntityBlueprint> roots,
+        bool allowNetworkObjects = false)
     {
         foreach (var root in roots)
         foreach (var blueprint in root.FlattenedHierarchy())
@@ -1520,23 +1710,27 @@ public class Scene : IDisposable
                 declaredTypes,
                 static _ => false);
             foreach (var componentType in creationOrder)
-                ThrowIfForbiddenContentComponent(componentType);
+                ThrowIfForbiddenContentComponent(componentType, allowNetworkObjects);
         }
     }
 
-    private static void ThrowIfForbiddenContentComponent(Type componentType)
+    private static void ThrowIfForbiddenContentComponent(
+        Type componentType,
+        bool allowNetworkObjects = false)
     {
         if (typeof(SceneServiceComponent).IsAssignableFrom(componentType))
             throw new InvalidOperationException(
                 $"Scene service component '{componentType.FullName}' cannot belong to additive Scene content. " +
                 "Scene services have whole-Scene lifetime.");
-        if (typeof(NetworkObject).IsAssignableFrom(componentType))
+        if (!allowNetworkObjects && typeof(NetworkObject).IsAssignableFrom(componentType))
             throw new InvalidOperationException(
                 $"NetworkObject component '{componentType.FullName}' cannot belong to additive Scene content " +
-                "until scoped authored networking is implemented.");
+                "outside a network-managed replication scope.");
     }
 
-    private static void ValidateContentTiledOverrides(TiledSceneReference? reference)
+    private static void ValidateContentTiledOverrides(
+        TiledSceneReference? reference,
+        bool allowNetworkObjects = false)
     {
         if (reference?.EntityOverrides is null)
             return;
@@ -1552,13 +1746,14 @@ public class Scene : IDisposable
                 [componentType],
                 static _ => false);
             foreach (var requiredType in creationOrder)
-                ThrowIfForbiddenContentComponent(requiredType);
+                ThrowIfForbiddenContentComponent(requiredType, allowNetworkObjects);
         }
     }
 
     private static void ValidateEntityForContentOwnership(
         SceneContentInstance owner,
-        Entity entity)
+        Entity entity,
+        bool allowNetworkObjects = false)
     {
         if (Entity.IsNull(entity))
             throw new InvalidOperationException("A destroyed Entity cannot be adopted by Scene content.");
@@ -1570,13 +1765,15 @@ public class Scene : IDisposable
                 $"Entity '{entity.Name}' already belongs to content instance '{existing.InstanceId}'.");
 
         foreach (var component in entity.GetAllComponents())
-            ThrowIfForbiddenContentComponent(component.GetType());
+            ThrowIfForbiddenContentComponent(component.GetType(), allowNetworkObjects);
     }
 
-    private static void ValidateOwnedContentEntities(SceneContentInstance owner)
+    private static void ValidateOwnedContentEntities(
+        SceneContentInstance owner,
+        bool allowNetworkObjects = false)
     {
         foreach (var entity in owner.OwnedEntities)
-            ValidateEntityForContentOwnership(owner, entity);
+            ValidateEntityForContentOwnership(owner, entity, allowNetworkObjects);
     }
 
     private static void DisableAndSuspendOwnedEntities(SceneContentInstance instance)
@@ -1840,6 +2037,7 @@ public class Scene : IDisposable
         _contentInstancesById.Clear();
         _contentInstances.Clear();
         _activeContentOwner = null;
+        _activeNetworkContentCoordinator = null;
         _contentMutationInProgress = false;
     }
 

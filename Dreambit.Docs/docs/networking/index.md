@@ -12,7 +12,7 @@ Related documentation: [Scenes](../core/scenes.md), [Entity blueprints](../ecs/b
 [Scene/asset loading](../assets/resources.md), and [Entity Blueprint assets](../assets/blueprints.md).
 
 !!! note "Implementation status"
-    This page describes the current public networking APIs and protocol version 3. Direct IP is the
+    This page describes the current public networking APIs and protocol version 4. Direct IP is the
     available transport today; Steam P2P and other transports remain future integrations behind the
     same transport boundary.
 
@@ -66,6 +66,7 @@ Dreambit uses several distinct identifiers because they solve different problems
 | `NetworkPeerId` | Identifies a connected peer/player for the active session. |
 | `NetworkEntityId` | Identifies one replicated Entity across machines. |
 | `NetworkSceneEpoch` | Identifies the synchronized Scene generation in which network entities exist. |
+| `NetworkReplicationScopeId` | Identifies one server-managed additive replication lifetime within the Scene epoch. |
 | `NetworkStructuralRevision` | Orders reliable topology changes such as spawn, despawn, ownership, and player mappings. |
 | `NetworkEntityRef` | Safe cross-machine Entity reference containing both the Scene epoch and network Entity ID. |
 
@@ -442,27 +443,107 @@ construct the corresponding Scene.
 
 This makes Scene construction local while keeping Scene **choice and timing** authoritative.
 
-### Additive content and the current network boundary
+### Additive content and replication scopes
 
-`Scene.LoadAdditive` is a local runtime ownership feature. It keeps one Dreambit `Scene` and one
-`NetworkWorld`; a `SceneContentInstance.InstanceId` is not a network identity or interest scope.
+Dreambit can replicate independently loaded `SceneBlueprint` content without creating another full
+`Scene`. The process still owns one `Scene`, one Entity repository, one render/physics world, one
+service collection, and one `NetworkWorld`.
 
-Non-networked additive content can be loaded and unloaded while a network world exists. Doing so
-does not change the synchronized Scene epoch, authored bindings, dynamic records, structural
-revision, baselines, or snapshots.
+The base synchronized Scene is always represented by `NetworkReplicationScopeId.Global`. Existing
+authored `NetworkObject`s and calls to `NetworkService.Spawn` use Global by default, so games that do
+not use additive scopes keep their previous behavior.
 
-Additive content containing a `NetworkObject` is not supported in this release. Dreambit rejects it
-before materialization, including a marker introduced by a component requirement, a dynamic
-attachment, or adoption of an already-networked entity. This explicit failure prevents a newly
-loaded authored object from being silently omitted from a baseline or registered with an ambiguous
-source identity.
+The server loads a reusable scope and explicitly chooses which peers receive it:
 
-Networked additive content requires a later protocol phase. That design must add a network-owned
-replication-scope identity separate from `SceneContentInstance.InstanceId`, authoritative
-load/unload messages, instance-qualified authored bindings, late-join scope state, per-peer scope
-subscriptions, per-peer baselines, and scope-aware structural sequencing. The current global
-`NetworkWorld.Records`, structural revision, and snapshot stream cannot be made correct by filtering
-snapshot records alone.
+```csharp
+var village = network.LoadScope("Scenes/Village.scene");
+var tree = network.LoadScope("Scenes/AncientTree.scene");
+
+network.Subscribe(peerA, village);
+network.Subscribe(peerB, village);
+```
+
+`Subscribe` runs a reliable protocol transaction:
+
+```text
+ScopeLoad -> ScopeLoaded -> scoped baseline -> ScopeReady
+```
+
+The client materializes the source into a network-managed `SceneContentInstance`, keeps its entities
+suspended while the authored bindings, dynamic spawns, ownership, player mappings, and initial
+component state are applied, and only then acknowledges readiness. Live scoped snapshots are sent
+only to ready subscribers. A peer that subscribes later receives the current scoped baseline,
+including dynamic scoped entities.
+
+Reliable structural changes that occur after baseline capture are ordered behind that baseline and
+reach the client only after its local scope has committed. This closes the acknowledgement window
+without exposing a partially initialized scope. Unreliable snapshots remain disabled until the
+server has received `ScopeReady`.
+
+`TryGetScope` can observe the local materialization while the handshake is in progress;
+`NetworkReplicationScope.IsReady` becomes true only after its initial baseline commits. A peer may
+unsubscribe and later subscribe to the same still-loaded server scope. That creates a fresh local
+`SceneContentInstance` while retaining the existing network scope and Entity identities.
+
+Spawn a dynamic entity into a scope through the normal API:
+
+```csharp
+var npc = network.Spawn(
+    npcBlueprint,
+    new NetworkSpawnOptions { Scope = village });
+```
+
+For a transition, subscribe to the destination first and wait for `PeerScopeReady` before removing
+the old content:
+
+```csharp
+network.Subscribe(peerA, tree);
+
+// In the PeerScopeReady handler, after confirming tree:
+network.Unsubscribe(peerA, village);
+```
+
+`Unsubscribe` immediately stops new scoped traffic for that peer, clears any player mapping that
+would reference an entity becoming invisible, and completes a reliable
+`ScopeUnload -> ScopeUnloaded` transaction. Server scope lifetime is a separate decision:
+
+```csharp
+network.UnloadScope(village);
+```
+
+`UnloadScope` rejects the request while any peer subscription remains. This explicit invariant
+keeps game policy—grace periods, population rules, and zone persistence—outside the engine.
+
+The relevant identities have deliberately different meanings:
+
+| Identity | Meaning |
+| --- | --- |
+| `SceneContentInstance.InstanceId` | Process-local content lifetime; different on server and clients. |
+| `NetworkReplicationScopeId` | Server-assigned, session-visible content identity within one Scene epoch. |
+| `NetworkEntityId` | Runtime network identity for one registered entity. |
+| `NetworkPeerId` | Session identity for one peer. |
+
+Authored additive identity is the pair `(NetworkReplicationScopeId, source entity GUID)`. This lets
+the same Scene Blueprint load more than once without cross-linking or ID collisions. Scope IDs are
+not reused within an epoch; the allocator resets only for a new synchronized Scene epoch.
+
+Every peer has its own projected structural revision. An entity change in Village advances only the
+projected streams of peers that know Village, while a later Global change advances every applicable
+peer's next local revision. Unsubscribed peers therefore never observe revision gaps.
+Scoped baselines also carry the server's current state-sequence watermark, so delayed unreliable
+snapshots from an earlier subscription cannot overwrite the newly committed baseline.
+
+Network-managed content cannot be manually unloaded or mutated through `SceneContentInstance`.
+Use `Subscribe`, `Unsubscribe`, and `UnloadScope` so the protocol and local ownership state remain
+consistent. Ordinary `Scene.LoadAdditive` remains a local-only API and still rejects
+`NetworkObject`; the permission to materialize scoped network objects is private to the active
+network session.
+
+Tiled-linked scoped Scene Blueprints are supported. Each process builds its own `TiledMapInstance`,
+and its generated renderers, colliders, and entities share the enclosing content lifetime. Authored
+Dreambit entities in the Scene Blueprint can be networked normally. Runtime tile edits and Tiled-
+generated entities are local content and are **not** automatically replicated; games must define
+their own tile-change messages or replicated state when they need that behavior.
 
 ## Editor-authored Scene Blueprints
 
@@ -2227,7 +2308,7 @@ Useful next layers include:
 
 - interpolation using buffered snapshots;
 - optional client prediction/reconciliation for responsive movement;
-- relevancy/interest management for large worlds;
+- automatic spatial/distance policies for choosing replication-scope subscriptions;
 - snapshot batching and/or dirty-state/delta optimization when profiling demonstrates the need;
 - additional transports such as Steam P2P;
 - matchmaking/lobbies/session discovery;

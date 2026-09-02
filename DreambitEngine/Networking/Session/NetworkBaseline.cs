@@ -15,6 +15,7 @@ internal enum NetworkBaselineRecordKind : byte
 }
 
 internal readonly record struct NetworkDynamicSpawnRecord(
+    NetworkReplicationScopeId Scope,
     NetworkEntityId EntityId,
     AssetId BlueprintAssetId,
     string? BlueprintAssetName,
@@ -32,9 +33,11 @@ internal readonly record struct NetworkComponentStateRecord(
 
 internal sealed class ClientBaselineState
 {
+    public required NetworkReplicationScopeId Scope { get; init; }
     public required NetworkSceneEpoch SceneEpoch { get; init; }
     public required NetworkStructuralRevision StructuralRevision { get; init; }
     public required ulong ServerTick { get; init; }
+    public required uint StateSequence { get; init; }
     public required int ExpectedAuthored { get; init; }
     public required int ExpectedDynamic { get; init; }
     public required int ExpectedPlayers { get; init; }

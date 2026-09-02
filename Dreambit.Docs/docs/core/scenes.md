@@ -116,9 +116,13 @@ handle, generated map, renderer, collider, or partial entity hierarchy. Unload i
 immediately, suspends its entities, and completes destruction at the current or next safe ECS
 structural boundary. Calling `Unload` again returns `false`.
 
-`SceneServiceComponent` and `NetworkObject` are deliberately forbidden in additive content,
-including required or dynamically attached components. Scene services have whole-Scene lifetime;
-scoped authored networking requires a separate networking protocol that is not implemented yet.
+`SceneServiceComponent` is deliberately forbidden in all additive content because Scene services
+have whole-Scene lifetime. Ordinary, locally managed `Scene.LoadAdditive` calls also reject
+`NetworkObject`, including required or dynamically attached markers. Networked additive content is
+instead loaded through `NetworkService.LoadScope`; that private trusted path creates a
+network-managed `SceneContentInstance` and binds authored objects by `(scope, source GUID)`. Game
+code cannot manually mutate or unload that instance behind the network protocol. See
+[Network replication scopes](../networking/#additive-content-and-replication-scopes).
 
 Additive ownership is runtime-only. It is not serialized into Scene or Entity Blueprints, and
 additive loading is rejected in editor-hosted Scenes so preview/runtime content cannot be baked back

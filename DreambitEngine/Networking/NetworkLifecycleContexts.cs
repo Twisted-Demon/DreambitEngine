@@ -32,7 +32,11 @@ public readonly record struct NetworkSpawnReadyContext(
     NetworkPeerId Owner,
     NetworkRole LocalRole,
     NetworkSceneEpoch SceneEpoch,
-    ulong ServerTick);
+    ulong ServerTick)
+{
+    /// <summary>Gets the replication scope that owns this Entity.</summary>
+    public NetworkReplicationScopeId Scope { get; init; } = NetworkReplicationScopeId.Global;
+}
 
 /// <summary>
 /// Information available after one complete authoritative Component payload is applied locally.
@@ -49,6 +53,9 @@ public readonly record struct NetworkStateAppliedContext(
     NetworkSceneEpoch SceneEpoch,
     ulong ServerTick)
 {
+    /// <summary>Gets the replication scope that owns this Entity.</summary>
+    public NetworkReplicationScopeId Scope { get; init; } = NetworkReplicationScopeId.Global;
+
     /// <summary>
     /// Gets whether this payload is part of the Entity's initial network state rather than a later
     /// snapshot.

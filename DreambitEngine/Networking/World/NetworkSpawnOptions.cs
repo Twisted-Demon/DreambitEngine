@@ -6,6 +6,12 @@ namespace Dreambit.Networking;
 public sealed class NetworkSpawnOptions
 {
     /// <summary>
+    /// Gets or sets the replication scope that owns this spawn. The default is the base Scene's
+    /// <see cref="NetworkReplicationScopeId.Global"/> scope.
+    /// </summary>
+    public NetworkReplicationScopeId Scope { get; set; } = NetworkReplicationScopeId.Global;
+
+    /// <summary>
     /// Gets or sets the peer that owns the spawned entity. Use <see cref="NetworkPeerId.None"/>
     /// for a server-owned entity.
     /// </summary>

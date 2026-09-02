@@ -32,11 +32,18 @@ internal sealed class NetworkSession : IDisposable
     private readonly Dictionary<ReplicationStateKey, uint> _lastStateSequences = [];
     private readonly Dictionary<ClientTransformStateKey, uint> _lastClientTransformSequences = [];
     private readonly Dictionary<NetworkEntityId, PendingLiveSpawn> _pendingLiveSpawns = [];
+    private readonly Dictionary<NetworkReplicationScopeId, NetworkReplicationScope> _scopes = [];
+    private readonly HashSet<NetworkReplicationScopeId> _retiredScopes = [];
+    private readonly Dictionary<NetworkReplicationScopeId, ScopeSourceIdentity> _knownScopeSources = [];
+    private readonly Dictionary<NetworkReplicationScopeId, ClientBaselineState> _clientScopeBaselines = [];
+    private readonly Dictionary<NetworkReplicationScopeId, List<SuspendedEntityState>> _suspendedScopeEntities = [];
+    private readonly object _scopeCoordinator = new();
     private double _snapshotElapsed;
     private uint _stateSequence;
     private ClientBaselineState? _clientBaseline;
     private bool _clientSceneLoadedSent;
     private bool _clientSceneReady;
+    private uint _nextScopeId = 2;
 
     public NetworkSession(
         NetworkRole role,
@@ -68,6 +75,8 @@ internal sealed class NetworkSession : IDisposable
     public event Action<NetworkPeerId, TransportDisconnectReason, string?>? PeerDisconnected;
     public event Action<TransportDisconnectReason, string?>? ConnectionFailed;
     public event Action<string, NetworkSceneEpoch>? SceneChangeRequested;
+    public event Action<NetworkPeerId, NetworkReplicationScopeId>? PeerScopeReady;
+    public event Action<NetworkPeerId, NetworkReplicationScopeId>? PeerScopeUnloaded;
 
     public NetworkRole Role { get; }
     public INetworkTransport Transport { get; }
@@ -83,6 +92,7 @@ internal sealed class NetworkSession : IDisposable
     public ulong ServerTick { get; private set; }
     public string? CurrentSceneKey { get; private set; }
     public NetworkWorld? World { get; private set; }
+    internal IReadOnlyDictionary<NetworkReplicationScopeId, NetworkReplicationScope> Scopes => _scopes;
     internal bool HasPendingSynchronizedScene =>
         _pendingSceneEpoch.IsValid && _pendingSceneKey is not null;
 
@@ -219,6 +229,7 @@ internal sealed class NetworkSession : IDisposable
             World.EntityRemoved -= HandleWorldEntityRemoved;
             World.Dispose(false);
             World = null;
+            ClearScopeState(false);
             _lastStateSequences.Clear();
             _lastClientTransformSequences.Clear();
             _pendingLiveSpawns.Clear();
@@ -242,6 +253,8 @@ internal sealed class NetworkSession : IDisposable
         _pendingSceneEpoch = NetworkSceneEpoch.None;
         _pendingSceneKey = null;
         StructuralRevision = NetworkStructuralRevision.None;
+        _nextScopeId = 2;
+        ClearScopeState(false);
         World = new NetworkWorld(
             scene,
             SceneEpoch,
@@ -249,13 +262,23 @@ internal sealed class NetworkSession : IDisposable
             _replication,
             _options.MaxNetworkEntities);
         World.EntityRemoved += HandleWorldEntityRemoved;
+        var globalScope = new NetworkReplicationScope(
+            NetworkReplicationScopeId.Global,
+            SceneEpoch,
+            AssetId.Empty,
+            CurrentSceneKey,
+            null)
+        {
+            IsReady = IsServer || !synchronizedClientAssignment
+        };
+        _scopes.Add(NetworkReplicationScopeId.Global, globalScope);
         scene.SetStartPreparationGate(
             IsServer || synchronizedClientAssignment
                 ? PrepareSceneStart
                 : null);
         _clientBaseline = null;
         _clientSceneLoadedSent = false;
-        _clientSceneReady = IsServer || !synchronizedClientAssignment;
+        _clientSceneReady = globalScope.IsReady;
         if (IsServer && scene.State == SceneState.Running && !World.AuthoredEntitiesBound)
             BindServerAuthoredEntities();
     }
@@ -292,6 +315,221 @@ internal sealed class NetworkSession : IDisposable
         _acceptTransportEvents = false;
     }
 
+    internal NetworkReplicationScopeId LoadScope(string sceneAssetName)
+    {
+        if (!IsServer || World is null)
+            throw new InvalidOperationException("Only an active server can load replication scopes.");
+        ArgumentException.ThrowIfNullOrWhiteSpace(sceneAssetName);
+        if (Encoding.UTF8.GetByteCount(sceneAssetName) > _options.MaxScopeAssetNameBytes)
+            throw new ArgumentException(
+                $"A scope asset name cannot exceed {_options.MaxScopeAssetNameBytes} UTF-8 bytes.",
+                nameof(sceneAssetName));
+        if (_scopes.Count >= _options.MaxReplicationScopes)
+            throw new InvalidOperationException(
+                $"The configured MaxReplicationScopes limit of {_options.MaxReplicationScopes} was reached.");
+
+        var blueprint = Resources.LoadAsset<SceneBlueprint>(sceneAssetName) ??
+            throw new InvalidOperationException($"Scene asset '{sceneAssetName}' could not be loaded.");
+        if (blueprint.AssetId.IsEmpty)
+            throw new InvalidOperationException(
+                $"Network scope source '{sceneAssetName}' must have a stable AssetId.");
+        var manifestValidation = EncodePacket(
+            NetworkProtocolMessage.ScopeLoad,
+            writer =>
+            {
+                writer.WriteUInt32(2);
+                writer.WriteGuid(blueprint.AssetId.Value);
+                writer.WriteString(sceneAssetName, _options.MaxScopeAssetNameBytes);
+            },
+            SceneEpoch,
+            ServerTick,
+            NetworkStructuralRevision.None);
+        EnsurePacketFitsReliableTransport(manifestValidation, "ScopeLoad manifest");
+        var scopeId = AllocateScopeId();
+        SceneContentInstance? content = null;
+        NetworkReplicationScope? scope = null;
+        try
+        {
+            content = World.Scene.LoadNetworkAdditive(blueprint, sceneAssetName, _scopeCoordinator);
+            scope = new NetworkReplicationScope(
+                scopeId, SceneEpoch, blueprint.AssetId, sceneAssetName, content);
+            _scopes.Add(scopeId, scope);
+            World.BindServerAuthoredScope(scopeId, content, AllocateEntityId);
+            if (World.GetAuthoredBindings(scopeId).Count > _options.MaxScopedAuthoredEntities)
+                throw new InvalidOperationException(
+                    $"Scope {scopeId} exceeds MaxScopedAuthoredEntities {_options.MaxScopedAuthoredEntities}.");
+            foreach (var record in World.GetRecords(scopeId))
+                NotifyNetworkSpawnReady(record, SceneEpoch, ServerTick);
+            StructuralRevision = NextStructuralRevision(StructuralRevision);
+            return scopeId;
+        }
+        catch (Exception exception)
+        {
+            var cleanupErrors = new List<Exception>();
+            if (scope is not null)
+            {
+                scope.IsLoaded = false;
+                scope.IsReady = false;
+            }
+            _scopes.Remove(scopeId);
+            _retiredScopes.Add(scopeId);
+            try
+            {
+                World.UnregisterScope(scopeId, false);
+            }
+            catch (Exception cleanupException)
+            {
+                cleanupErrors.Add(cleanupException);
+            }
+            if (content?.IsLoaded == true)
+                try
+                {
+                    World.Scene.UnloadNetworkContent(content, _scopeCoordinator);
+                }
+                catch (Exception cleanupException)
+                {
+                    cleanupErrors.Add(cleanupException);
+                }
+            if (cleanupErrors.Count == 0)
+                throw;
+            cleanupErrors.Insert(0, exception);
+            throw new AggregateException(
+                $"Replication scope {scopeId} failed to load and rollback also reported errors.",
+                cleanupErrors);
+        }
+    }
+
+    internal void UnloadScope(NetworkReplicationScopeId scopeId)
+    {
+        if (!IsServer || World is null)
+            throw new InvalidOperationException("Only an active server can unload replication scopes.");
+        var scope = GetAdditiveScope(scopeId);
+        foreach (var peer in _peersById.Values)
+            if (peer.ScopeSubscriptions.ContainsKey(scopeId))
+                throw new InvalidOperationException(
+                    $"Scope {scopeId} cannot be unloaded while peer {peer.PeerId} is subscribed.");
+
+        // Retire network visibility before any component/content cleanup callback can re-enter.
+        scope.IsLoaded = false;
+        scope.IsReady = false;
+        _scopes.Remove(scopeId);
+        _retiredScopes.Add(scopeId);
+        StructuralRevision = NextStructuralRevision(StructuralRevision);
+        var cleanupErrors = new List<Exception>();
+        try
+        {
+            World.UnregisterScope(scopeId, false);
+        }
+        catch (Exception exception)
+        {
+            cleanupErrors.Add(exception);
+        }
+        if (scope.Content?.IsLoaded == true)
+            try
+            {
+                World.Scene.UnloadNetworkContent(scope.Content, _scopeCoordinator);
+            }
+            catch (Exception exception)
+            {
+                cleanupErrors.Add(exception);
+            }
+        if (cleanupErrors.Count != 0)
+            throw new AggregateException(
+                $"Replication scope {scopeId} was retired, but one or more local cleanup operations failed.",
+                cleanupErrors);
+    }
+
+    internal void Subscribe(NetworkPeerId peerId, NetworkReplicationScopeId scopeId)
+    {
+        if (!IsServer || World is null)
+            throw new InvalidOperationException("Only an active server can change scope subscriptions.");
+        var scope = GetAdditiveScope(scopeId);
+        var peer = GetPeer(peerId);
+        if (peer.ScopeSubscriptions.ContainsKey(scopeId))
+            return;
+        if (peer.ScopeSubscriptions.Count >= _options.MaxScopeSubscriptionsPerPeer)
+            throw new InvalidOperationException(
+                $"Peer {peerId} reached MaxScopeSubscriptionsPerPeer {_options.MaxScopeSubscriptionsPerPeer}.");
+
+        var subscription = new NetworkScopeSubscription
+        {
+            Scope = scopeId,
+            Phase = peer.IsLocal
+                ? NetworkScopeSubscriptionPhase.Ready
+                : peer.Phase == NetworkConnectionPhase.Ready
+                    ? NetworkScopeSubscriptionPhase.AwaitingLoaded
+                    : NetworkScopeSubscriptionPhase.Pending
+        };
+        peer.ScopeSubscriptions.Add(scopeId, subscription);
+        if (peer.IsLocal)
+        {
+            PeerScopeReady?.Invoke(peerId, scopeId);
+            return;
+        }
+        if (subscription.Phase == NetworkScopeSubscriptionPhase.AwaitingLoaded)
+        {
+            try
+            {
+                SendScopeLoad(peer, scope, subscription);
+            }
+            catch
+            {
+                peer.ScopeSubscriptions.Remove(scopeId);
+                throw;
+            }
+        }
+    }
+
+    internal void Unsubscribe(NetworkPeerId peerId, NetworkReplicationScopeId scopeId)
+    {
+        if (!IsServer || World is null)
+            throw new InvalidOperationException("Only an active server can change scope subscriptions.");
+        if (scopeId.IsGlobal)
+            throw new InvalidOperationException("The Global scope cannot be unsubscribed.");
+        var peer = GetPeer(peerId);
+        if (!peer.ScopeSubscriptions.TryGetValue(scopeId, out var subscription))
+            return;
+        if (peer.IsLocal)
+        {
+            peer.ScopeSubscriptions.Remove(scopeId);
+            RemoveProjectedPlayersInScope(peer, scopeId);
+            PeerScopeUnloaded?.Invoke(peerId, scopeId);
+            return;
+        }
+        if (subscription.Phase == NetworkScopeSubscriptionPhase.Pending)
+        {
+            peer.ScopeSubscriptions.Remove(scopeId);
+            return;
+        }
+        if (subscription.Phase == NetworkScopeSubscriptionPhase.Unloading)
+            return;
+
+        subscription.Phase = NetworkScopeSubscriptionPhase.Unloading;
+        RemoveProjectedPlayersInScope(peer, scopeId);
+        var revision = AdvancePeerRevision(peer);
+        subscription.UnloadRevision = revision;
+        SendPacket(peer.Connection, NetworkProtocolMessage.ScopeUnload,
+            writer => writer.WriteUInt32(scopeId.Value), SceneEpoch, ServerTick, revision);
+    }
+
+    internal bool TryGetScope(NetworkReplicationScopeId scopeId, out NetworkReplicationScope? scope)
+    {
+        if (_scopes.TryGetValue(scopeId, out var found) && found.IsLoaded)
+        { scope = found; return true; }
+        scope = null; return false;
+    }
+
+    internal bool IsPeerSubscribed(NetworkPeerId peerId, NetworkReplicationScopeId scopeId) =>
+        _peersById.TryGetValue(peerId, out var peer) &&
+        (scopeId.IsGlobal || peer.ScopeSubscriptions.ContainsKey(scopeId));
+
+    internal bool IsPeerScopeReady(NetworkPeerId peerId, NetworkReplicationScopeId scopeId) =>
+        _peersById.TryGetValue(peerId, out var peer) &&
+        (scopeId.IsGlobal
+            ? peer.IsLocal || peer.Phase == NetworkConnectionPhase.Ready
+            : peer.ScopeSubscriptions.TryGetValue(scopeId, out var subscription) &&
+              subscription.Phase == NetworkScopeSubscriptionPhase.Ready);
+
     internal Entity Spawn(
         EntityBlueprint blueprint,
         NetworkSpawnOptions? options = null) =>
@@ -317,22 +555,27 @@ internal sealed class NetworkSession : IDisposable
                 "A remotely replicated Blueprint fallback name cannot exceed 1024 UTF-8 bytes.");
 
         options ??= new NetworkSpawnOptions();
+        if (!options.Scope.IsValid)
+            throw new InvalidOperationException("A network spawn requires a valid replication scope.");
+        var targetScope = GetScopeForSpawn(options.Scope);
+        if (options.Owner.IsValid && !CanAssignScopeToPeer(options.Owner, options.Scope))
+            throw new InvalidOperationException(
+                $"Peer {options.Owner} is not ready for replication scope {options.Scope}.");
         Entity? entity = null;
         var networkId = NetworkEntityId.None;
         var registered = false;
-        byte[] spawnPacket;
-        List<byte[]> initialStatePackets;
-        byte[] readyPacket;
-        NetworkStructuralRevision revision;
+        NetworkEntityRecord? record = null;
         try
         {
-            entity = World.Scene.CreateNetworkEntity(
-                blueprint,
-                options.Enabled,
-                options.Position,
-                options.Rotation,
-                options.Scale);
-            initialize(entity);
+            entity = options.Scope.IsGlobal
+                ? World.Scene.CreateNetworkEntity(
+                    blueprint, options.Enabled, options.Position, options.Rotation, options.Scale)
+                : World.Scene.CreateNetworkContentEntity(
+                    targetScope.Content!, blueprint, _scopeCoordinator,
+                    options.Enabled, options.Position, options.Rotation, options.Scale,
+                    initialize);
+            if (options.Scope.IsGlobal)
+                initialize(entity);
             networkId = AllocateEntityId();
             World.RegisterDynamicEntity(
                 entity,
@@ -340,30 +583,37 @@ internal sealed class NetworkSession : IDisposable
                 options.Owner,
                 blueprint.AssetId,
                 blueprint.AssetName,
-                options.DestroyWithOwner);
+                options.DestroyWithOwner,
+                options.Scope);
             registered = true;
 
-            var record = World.Records.First(candidate => candidate.Id == networkId);
-            revision = NextStructuralRevision(StructuralRevision);
-            spawnPacket = EncodePacket(
+            if (!World.TryGetRecord(networkId, out record) || record is null)
+                throw new InvalidOperationException("The registered network spawn could not be indexed.");
+            var validationRevision = NextStructuralRevision(StructuralRevision);
+            var validationPacket = EncodePacket(
                 NetworkProtocolMessage.Spawn,
                 writer => WriteSpawn(writer, entity, networkId, blueprint, options),
                 SceneEpoch,
                 ServerTick,
-                revision);
-            EnsurePacketFitsReliableTransport(spawnPacket, "Spawn");
+                validationRevision);
+            EnsurePacketFitsReliableTransport(validationPacket, "Spawn");
 
-            initialStatePackets = new List<byte[]>(record.ReplicationBindings.Count);
             var sequence = NextStateSequence();
             foreach (var binding in record.ReplicationBindings)
-                initialStatePackets.Add(EncodeStateRecord(networkId, binding, sequence, revision));
-            readyPacket = EncodePacket(
+                EnsurePacketFitsReliableTransport(
+                    EncodeStateRecord(record.Scope, networkId, binding, sequence, validationRevision),
+                    "initial Component state");
+            var validationReady = EncodePacket(
                 NetworkProtocolMessage.SpawnReady,
-                writer => writer.WriteUInt64(networkId.Value),
+                writer =>
+                {
+                    writer.WriteUInt32(record.Scope.Value);
+                    writer.WriteUInt64(networkId.Value);
+                },
                 SceneEpoch,
                 ServerTick,
-                revision);
-            EnsurePacketFitsReliableTransport(readyPacket, "SpawnReady");
+                validationRevision);
+            EnsurePacketFitsReliableTransport(validationReady, "SpawnReady");
             NotifyNetworkSpawnReady(record, SceneEpoch, ServerTick);
         }
         catch (Exception exception)
@@ -397,14 +647,29 @@ internal sealed class NetworkSession : IDisposable
             throw;
         }
 
-        StructuralRevision = revision;
+        StructuralRevision = NextStructuralRevision(StructuralRevision);
         foreach (var peer in _peersById.Values)
         {
-            if (peer.IsLocal || !ReceivesLiveStructure(peer))
+            if (peer.IsLocal || !PeerReceivesStructure(peer, options.Scope))
                 continue;
+            var revision = AdvancePeerRevision(peer);
+            var spawnPacket = EncodePacket(
+                NetworkProtocolMessage.Spawn,
+                writer => WriteSpawn(writer, entity!, networkId, blueprint, options),
+                SceneEpoch, ServerTick, revision);
             Transport.Send(peer.Connection, spawnPacket, NetworkDelivery.ReliableOrdered, 0);
-            foreach (var statePacket in initialStatePackets)
+            var sequence = NextStateSequence();
+            foreach (var binding in record!.ReplicationBindings)
+            {
+                var statePacket = EncodeStateRecord(
+                    record.Scope, networkId, binding, sequence, revision);
                 Transport.Send(peer.Connection, statePacket, NetworkDelivery.ReliableOrdered, 0);
+            }
+            var readyPacket = EncodePacket(NetworkProtocolMessage.SpawnReady, writer =>
+            {
+                writer.WriteUInt32(record.Scope.Value);
+                writer.WriteUInt64(networkId.Value);
+            }, SceneEpoch, ServerTick, revision);
             Transport.Send(peer.Connection, readyPacket, NetworkDelivery.ReliableOrdered, 0);
         }
         return entity;
@@ -428,6 +693,9 @@ internal sealed class NetworkSession : IDisposable
         {
             if (peer.IsLocal || !peer.PeerId.IsValid)
                 continue;
+            peer.ProjectedStructuralRevision = NetworkStructuralRevision.None;
+            peer.ScopeSubscriptions.Clear();
+            peer.ProjectedPlayerEntities.Clear();
             peer.Phase = NetworkConnectionPhase.AwaitingSceneLoad;
             SendPacket(
                 peer.Connection,
@@ -456,16 +724,13 @@ internal sealed class NetworkSession : IDisposable
             throw new InvalidOperationException("Only an active server can assign player entities.");
         if (!World.TryGetNetworkId(entity, out var entityId))
             throw new InvalidOperationException("The player Entity is not registered in the current NetworkWorld.");
+        var scope = World.GetScope(entityId);
+        if (!CanAssignScopeToPeer(peerId, scope))
+            throw new InvalidOperationException(
+                $"Peer {peerId} is not ready for replication scope {scope}.");
         World.SetPlayerEntity(peerId, entityId);
-        var revision = AdvanceStructuralRevision();
-        BroadcastStructural(
-            NetworkProtocolMessage.PlayerEntity,
-            writer =>
-            {
-                writer.WriteUInt32(peerId.Value);
-                writer.WriteUInt64(entityId.Value);
-            },
-            revision);
+        AdvanceStructuralRevision();
+        PublishPlayerMapping(peerId, entityId, scope);
     }
 
     internal void SetOwner(Entity entity, NetworkPeerId owner)
@@ -474,19 +739,16 @@ internal sealed class NetworkSession : IDisposable
             throw new InvalidOperationException("Only an active server can change network ownership.");
         if (!World.TryGetNetworkId(entity, out var entityId))
             throw new InvalidOperationException("The Entity is not registered in the current NetworkWorld.");
+        var scope = World.GetScope(entityId);
+        if (owner.IsValid && !CanAssignScopeToPeer(owner, scope))
+            throw new InvalidOperationException(
+                $"Peer {owner} is not ready for replication scope {scope}.");
         if (owner.IsValid && entity.ContainsSceneServiceInHierarchy())
             throw new InvalidOperationException(
                 "Scene service hosts are scene-owned and cannot be assigned to a network peer.");
         World.SetOwner(entityId, owner);
-        var revision = AdvanceStructuralRevision();
-        BroadcastStructural(
-            NetworkProtocolMessage.Ownership,
-            writer =>
-            {
-                writer.WriteUInt64(entityId.Value);
-                writer.WriteUInt32(owner.Value);
-            },
-            revision);
+        AdvanceStructuralRevision();
+        PublishOwnership(entityId, owner, scope);
     }
 
     internal void SendToServer<T>(
@@ -558,7 +820,7 @@ internal sealed class NetworkSession : IDisposable
             writer => writer.WriteBytes(payload),
             SceneEpoch,
             ServerTick,
-            StructuralRevision,
+            peer.ProjectedStructuralRevision,
             delivery,
             delivery == NetworkDelivery.ReliableOrdered ? (byte)1 : (byte)2);
     }
@@ -571,24 +833,36 @@ internal sealed class NetworkSession : IDisposable
         _disposed = true;
         _acceptTransportEvents = false;
         _transportEvents.Clear();
-        _peersByConnection.Clear();
-        _peersById.Clear();
-        _pendingLiveSpawns.Clear();
-        _lastClientTransformSequences.Clear();
+        var cleanupErrors = new List<Exception>();
         if (World is not null)
         {
             World.Scene.SetStartPreparationGate(null);
             World.EntityRemoved -= HandleWorldEntityRemoved;
         }
-        World?.Dispose(true);
+        TryCleanup(() => ClearScopeState(true));
+        _peersByConnection.Clear();
+        _peersById.Clear();
+        _pendingLiveSpawns.Clear();
+        _lastClientTransformSequences.Clear();
+        TryCleanup(() => World?.Dispose(true));
         World = null;
-        try
+        TryCleanup(Transport.Stop);
+        TryCleanup(Transport.Dispose);
+        if (cleanupErrors.Count != 0)
+            throw new AggregateException(
+                "One or more resources failed while stopping the networking session.",
+                cleanupErrors);
+
+        void TryCleanup(Action cleanup)
         {
-            Transport.Stop();
-        }
-        finally
-        {
-            Transport.Dispose();
+            try
+            {
+                cleanup();
+            }
+            catch (Exception exception)
+            {
+                cleanupErrors.Add(exception);
+            }
         }
     }
 
@@ -678,6 +952,7 @@ internal sealed class NetworkSession : IDisposable
             case NetworkProtocolMessage.SceneLoaded:
                 RequireDelivery(transportEvent, NetworkDelivery.ReliableOrdered, 0);
                 ValidateReadyPacket(peer, packet.Header);
+                if (IsStaleScenePacket(packet.Header)) return;
                 HandleSceneLoaded(peer, packet);
                 break;
             case NetworkProtocolMessage.Baseline:
@@ -690,7 +965,44 @@ internal sealed class NetworkSession : IDisposable
             case NetworkProtocolMessage.Ready:
                 RequireDelivery(transportEvent, NetworkDelivery.ReliableOrdered, 0);
                 ValidateReadyPacket(peer, packet.Header);
+                if (IsStaleScenePacket(packet.Header)) return;
                 HandleReady(peer, packet);
+                break;
+            case NetworkProtocolMessage.ScopeLoad:
+                RequireDelivery(transportEvent, NetworkDelivery.ReliableOrdered, 0);
+                ValidateReadyPacket(peer, packet.Header);
+                if (IsStaleScenePacket(packet.Header)) return;
+                HandleScopeLoad(peer, packet);
+                break;
+            case NetworkProtocolMessage.ScopeLoaded:
+                RequireDelivery(transportEvent, NetworkDelivery.ReliableOrdered, 0);
+                ValidateReadyPacket(peer, packet.Header);
+                if (IsStaleScenePacket(packet.Header)) return;
+                HandleScopeLoaded(peer, packet);
+                break;
+            case NetworkProtocolMessage.ScopeBaseline:
+                RequireDelivery(transportEvent, NetworkDelivery.ReliableOrdered, 0);
+                ValidateReadyPacket(peer, packet.Header);
+                if (IsStaleScenePacket(packet.Header)) return;
+                HandleScopeBaseline(peer, packet);
+                break;
+            case NetworkProtocolMessage.ScopeReady:
+                RequireDelivery(transportEvent, NetworkDelivery.ReliableOrdered, 0);
+                ValidateReadyPacket(peer, packet.Header);
+                if (IsStaleScenePacket(packet.Header)) return;
+                HandleScopeReady(peer, packet);
+                break;
+            case NetworkProtocolMessage.ScopeUnload:
+                RequireDelivery(transportEvent, NetworkDelivery.ReliableOrdered, 0);
+                ValidateReadyPacket(peer, packet.Header);
+                if (IsStaleScenePacket(packet.Header)) return;
+                HandleScopeUnload(peer, packet);
+                break;
+            case NetworkProtocolMessage.ScopeUnloaded:
+                RequireDelivery(transportEvent, NetworkDelivery.ReliableOrdered, 0);
+                ValidateReadyPacket(peer, packet.Header);
+                if (IsStaleScenePacket(packet.Header)) return;
+                HandleScopeUnloaded(peer, packet);
                 break;
             case NetworkProtocolMessage.PlayerEntity:
                 RequireDelivery(transportEvent, NetworkDelivery.ReliableOrdered, 0);
@@ -711,7 +1023,10 @@ internal sealed class NetworkSession : IDisposable
                 RequireGameplayDelivery(transportEvent, inboundToServer: IsServer);
                 if (IsStaleScenePacket(packet.Header))
                     return;
-                ValidateCurrentScenePacket(packet.Header, requireNextRevision: false);
+                if (IsServer)
+                    ValidatePeerKnownProjection(peer, packet.Header);
+                else
+                    ValidateCurrentScenePacket(packet.Header, requireNextRevision: false);
                 DispatchUserMessage(
                     packet.Payload.Span,
                     inboundFromClient: IsServer,
@@ -797,9 +1112,7 @@ internal sealed class NetworkSession : IDisposable
                 writer => writer.WriteString(synchronizationKey, 256),
                 synchronizationEpoch,
                 ServerTick,
-                _pendingSceneEpoch.IsValid
-                    ? NetworkStructuralRevision.None
-                    : StructuralRevision);
+                NetworkStructuralRevision.None);
         }
         PeerConnected?.Invoke(peer.PeerId);
     }
@@ -905,10 +1218,10 @@ internal sealed class NetworkSession : IDisposable
         if (!World.AuthoredEntitiesBound)
             BindServerAuthoredEntities();
 
-        peer.Phase = NetworkConnectionPhase.Synchronizing;
         try
         {
             SendBaseline(peer);
+            peer.Phase = NetworkConnectionPhase.Synchronizing;
         }
         catch (NetworkSynchronizationException exception)
         {
@@ -924,14 +1237,20 @@ internal sealed class NetworkSession : IDisposable
         if (World is null)
             throw new InvalidOperationException("Cannot capture a baseline without a NetworkWorld.");
         World.ReconcileDestroyedEntities();
-        var revision = StructuralRevision;
+        // The baseline establishes this peer's projection, not the server world's revision.
+        var revision = peer.ProjectedStructuralRevision;
         var tick = ServerTick;
-        var authored = World.AuthoredBindings.ToArray();
-        var dynamic = World.Records
+        var stateSequence = _stateSequence;
+        var authored = World.GetAuthoredBindings(NetworkReplicationScopeId.Global).ToArray();
+        var globalRecords = World.GetRecords(NetworkReplicationScopeId.Global);
+        var dynamic = globalRecords
             .Where(record => record.Origin == NetworkSpawnOrigin.DynamicBlueprint)
             .ToArray();
-        var players = World.PlayerEntities.ToArray();
-        var componentCount = World.Records.Sum(record => record.ReplicationBindings.Count);
+        var players = World.PlayerEntities
+            .Where(pair => World.TryGetRecord(pair.Value, out var record) &&
+                           record!.Scope.IsGlobal)
+            .ToArray();
+        var componentCount = globalRecords.Sum(record => record.ReplicationBindings.Count);
         if (authored.Length + dynamic.Length > _options.MaxNetworkEntities ||
             players.Length > _options.MaxNetworkEntities ||
             componentCount > _options.MaxBaselineComponentRecords)
@@ -952,6 +1271,7 @@ internal sealed class NetworkSession : IDisposable
                 writer.WriteInt32(dynamic.Length);
                 writer.WriteInt32(players.Length);
                 writer.WriteInt32(componentCount);
+                writer.WriteUInt32(stateSequence);
             },
             "baseline Begin");
 
@@ -963,6 +1283,7 @@ internal sealed class NetworkSession : IDisposable
                     writer.WriteGuid(binding.SourceGuid);
                     writer.WriteUInt64(binding.NetworkEntityId.Value);
                     writer.WriteUInt32(binding.Owner.Value);
+                    writer.WriteBoolean(binding.IsPresent);
                 },
                 $"authored Entity {binding.NetworkEntityId}");
 
@@ -973,6 +1294,7 @@ internal sealed class NetworkSession : IDisposable
                 $"dynamic Entity {record.Id}");
 
         foreach (var player in players)
+        {
             AddBaselinePacket(
                 NetworkBaselineRecordKind.PlayerEntity,
                 writer =>
@@ -981,8 +1303,9 @@ internal sealed class NetworkSession : IDisposable
                     writer.WriteUInt64(player.Value.Value);
                 },
                 $"player mapping {player.Key}");
+        }
 
-        foreach (var record in World.Records)
+        foreach (var record in globalRecords)
             foreach (var binding in record.ReplicationBindings)
             {
                 var payload = binding.Capture();
@@ -998,6 +1321,8 @@ internal sealed class NetworkSession : IDisposable
             }
 
         AddBaselinePacket(NetworkBaselineRecordKind.End, null, "baseline End");
+        foreach (var player in players)
+            peer.ProjectedPlayerEntities[player.Key] = player.Value;
         foreach (var packet in packets)
             Transport.Send(peer.Connection, packet, NetworkDelivery.ReliableOrdered, 0);
 
@@ -1073,12 +1398,15 @@ internal sealed class NetworkSession : IDisposable
                 ref reader,
                 _options.MaxBaselineComponentRecords,
                 "Component states");
+            var stateSequence = reader.ReadUInt32();
             reader.EnsureComplete();
             _clientBaseline = new ClientBaselineState
             {
+                Scope = NetworkReplicationScopeId.Global,
                 SceneEpoch = packet.Header.SceneEpoch,
                 StructuralRevision = packet.Header.StructuralRevision,
                 ServerTick = packet.Header.ServerTick,
+                StateSequence = stateSequence,
                 ExpectedAuthored = authored,
                 ExpectedDynamic = dynamic,
                 ExpectedPlayers = players,
@@ -1098,13 +1426,19 @@ internal sealed class NetworkSession : IDisposable
             case NetworkBaselineRecordKind.AuthoredEntity:
                 EnsureRecordCapacity(baseline.Authored.Count, baseline.ExpectedAuthored, "authored Entity");
                 baseline.Authored.Add(new NetworkAuthoredBinding(
+                    NetworkReplicationScopeId.Global,
                     reader.ReadGuid(),
                     new NetworkEntityId(reader.ReadUInt64()),
-                    new NetworkPeerId(reader.ReadUInt32())));
+                    new NetworkPeerId(reader.ReadUInt32()))
+                {
+                    IsPresent = reader.ReadBoolean()
+                });
                 break;
             case NetworkBaselineRecordKind.DynamicEntity:
                 EnsureRecordCapacity(baseline.Dynamic.Count, baseline.ExpectedDynamic, "dynamic Entity");
-                baseline.Dynamic.Add(ReadDynamicBaselineRecord(ref reader));
+                baseline.Dynamic.Add(ReadDynamicBaselineRecord(
+                    ref reader,
+                    NetworkReplicationScopeId.Global));
                 break;
             case NetworkBaselineRecordKind.PlayerEntity:
                 EnsureRecordCapacity(baseline.Players.Count, baseline.ExpectedPlayers, "player mapping");
@@ -1144,16 +1478,53 @@ internal sealed class NetworkSession : IDisposable
         ValidateBaselineCount(baseline.Players.Count, baseline.ExpectedPlayers, "player mappings");
         ValidateBaselineCount(baseline.Components.Count, baseline.ExpectedComponents, "Component states");
 
+        var playerIds = new HashSet<NetworkPeerId>();
+        foreach (var player in baseline.Players)
+            if (!playerIds.Add(player.Key))
+                throw new NetworkProtocolException(
+                    $"Scope {baseline.Scope} baseline duplicates player mapping {player.Key}.");
+        var componentKeys = new HashSet<ReplicationStateKey>();
+        foreach (var state in baseline.Components)
+            if (!componentKeys.Add(new ReplicationStateKey(state.EntityId, state.ComponentId)))
+                throw new NetworkProtocolException(
+                    $"Scope {baseline.Scope} baseline duplicates Component {state.ComponentId} " +
+                    $"state for Entity {state.EntityId}.");
+
+        var previousRevision = StructuralRevision;
+        Dictionary<NetworkPeerId, NetworkEntityId?>? previousPlayerMappings = null;
+        if (!baseline.Scope.IsGlobal)
+        {
+            previousPlayerMappings = [];
+            foreach (var player in baseline.Players)
+                previousPlayerMappings.Add(
+                    player.Key,
+                    World.PlayerEntities.TryGetValue(player.Key, out var previous)
+                        ? previous
+                        : null);
+        }
+
         try
         {
-            World.BindClientAuthoredEntities(baseline.Authored);
+            var content = baseline.Scope.IsGlobal
+                ? null
+                : GetClientScope(baseline.Scope).Content;
+            World.BindClientAuthoredScope(baseline.Scope, content, baseline.Authored);
             foreach (var spawn in baseline.Dynamic)
                 MaterializeDynamicSpawn(spawn);
             foreach (var player in baseline.Players)
+            {
+                if (!World.TryGetRecord(player.Value, out var playerRecord) ||
+                    playerRecord is null || playerRecord.Scope != baseline.Scope)
+                    throw new InvalidOperationException(
+                        $"Baseline player {player.Key} references Entity {player.Value} outside " +
+                        $"scope {baseline.Scope}.");
                 World.SetPlayerEntity(player.Key, player.Value);
+            }
             foreach (var state in baseline.Components)
             {
-                if (!World.TryGetReplicationBinding(
+                if (!World.TryGetRecord(state.EntityId, out var stateRecord) ||
+                    stateRecord is null || stateRecord.Scope != baseline.Scope ||
+                    !World.TryGetReplicationBinding(
                         state.EntityId,
                         state.ComponentId,
                         out var binding) || binding is null)
@@ -1165,28 +1536,89 @@ internal sealed class NetworkSession : IDisposable
                     state.ComponentId,
                     NetworkStateApplyKind.InitialBaseline,
                     baseline.SceneEpoch,
-                    baseline.ServerTick));
+                    baseline.ServerTick)
+                {
+                    Scope = baseline.Scope
+                });
+                _lastStateSequences[
+                    new ReplicationStateKey(state.EntityId, state.ComponentId)] = baseline.StateSequence;
+            }
+
+            StructuralRevision = baseline.StructuralRevision;
+            ServerTick = baseline.ServerTick;
+            foreach (var record in World.GetRecords(baseline.Scope).ToArray())
+                NotifyNetworkSpawnReady(record, baseline.SceneEpoch, baseline.ServerTick);
+            if (baseline.Scope.IsGlobal)
+            {
+                if (_scopes.TryGetValue(NetworkReplicationScopeId.Global, out var globalScope))
+                    globalScope.IsReady = true;
+                _clientBaseline = null;
+                _clientSceneReady = true;
+                peer.Phase = NetworkConnectionPhase.Ready;
+                SendPacket(peer.Connection, NetworkProtocolMessage.Ready, null,
+                    SceneEpoch, ServerTick, StructuralRevision);
+            }
+            else
+            {
+                GetClientScope(baseline.Scope).IsReady = true;
+                _clientScopeBaselines.Remove(baseline.Scope);
+                RestoreScopeEntities(baseline.Scope);
+                SendPacket(peer.Connection, NetworkProtocolMessage.ScopeReady,
+                    writer =>
+                    {
+                        writer.WriteUInt32(baseline.Scope.Value);
+                        writer.WriteUInt64(baseline.StructuralRevision.Value);
+                    }, SceneEpoch, ServerTick, baseline.StructuralRevision);
             }
         }
-        catch (Exception exception) when (exception is not NetworkProtocolException)
+        catch (Exception exception)
         {
-            throw new NetworkProtocolException($"Could not apply initial world baseline: {exception.Message}");
-        }
+            if (baseline.Scope.IsGlobal)
+            {
+                if (exception is NetworkProtocolException)
+                    throw;
+                throw new NetworkProtocolException(
+                    $"Could not apply initial world baseline: {exception.Message}", exception);
+            }
 
-        StructuralRevision = baseline.StructuralRevision;
-        ServerTick = baseline.ServerTick;
-        foreach (var record in World.Records.ToArray())
-            NotifyNetworkSpawnReady(record, baseline.SceneEpoch, baseline.ServerTick);
-        _clientBaseline = null;
-        _clientSceneReady = true;
-        peer.Phase = NetworkConnectionPhase.Ready;
-        SendPacket(
-            peer.Connection,
-            NetworkProtocolMessage.Ready,
-            null,
-            SceneEpoch,
-            ServerTick,
-            StructuralRevision);
+            StructuralRevision = previousRevision;
+            Exception failure = exception;
+            var cleanupErrors = new List<Exception>();
+            try
+            {
+                RollbackClientScope(baseline.Scope);
+            }
+            catch (Exception cleanupException)
+            {
+                cleanupErrors.Add(cleanupException);
+            }
+            if (previousPlayerMappings is not null)
+                try
+                {
+                    foreach (var mapping in previousPlayerMappings)
+                    {
+                        if (mapping.Value is { } previous &&
+                            World.TryGetRecord(previous, out _))
+                            World.SetPlayerEntity(mapping.Key, previous);
+                        else
+                            World.RemovePlayerEntity(mapping.Key);
+                    }
+                }
+                catch (Exception cleanupException)
+                {
+                    cleanupErrors.Add(cleanupException);
+                }
+            if (cleanupErrors.Count != 0)
+            {
+                cleanupErrors.Insert(0, exception);
+                failure = new AggregateException(
+                    "Scoped baseline application failed and rollback also reported errors.",
+                    cleanupErrors);
+            }
+            throw new NetworkProtocolException(
+                $"Could not apply baseline for replication scope {baseline.Scope}: {failure.Message}",
+                failure);
+        }
     }
 
     private void MaterializeDynamicSpawn(NetworkDynamicSpawnRecord spawn)
@@ -1203,12 +1635,12 @@ internal sealed class NetworkSession : IDisposable
         var registered = false;
         try
         {
-            entity = World.Scene.CreateNetworkEntity(
-                blueprint,
-                spawn.Enabled,
-                spawn.Position,
-                null,
-                spawn.Scale);
+            entity = spawn.Scope.IsGlobal
+                ? World.Scene.CreateNetworkEntity(
+                    blueprint, spawn.Enabled, spawn.Position, null, spawn.Scale)
+                : World.Scene.CreateNetworkContentEntity(
+                    GetClientScope(spawn.Scope).Content!, blueprint, _scopeCoordinator,
+                    spawn.Enabled, spawn.Position, null, spawn.Scale);
             entity.Transform.Rotation = spawn.Rotation;
             World.RegisterDynamicEntity(
                 entity,
@@ -1216,7 +1648,8 @@ internal sealed class NetworkSession : IDisposable
                 spawn.Owner,
                 spawn.BlueprintAssetId,
                 spawn.BlueprintAssetName,
-                spawn.DestroyWithOwner);
+                spawn.DestroyWithOwner,
+                spawn.Scope);
             registered = true;
         }
         catch (Exception exception)
@@ -1251,7 +1684,9 @@ internal sealed class NetworkSession : IDisposable
         }
     }
 
-    private static NetworkDynamicSpawnRecord ReadDynamicBaselineRecord(ref NetworkReader reader)
+    private static NetworkDynamicSpawnRecord ReadDynamicBaselineRecord(
+        ref NetworkReader reader,
+        NetworkReplicationScopeId scope)
     {
         var entityId = new NetworkEntityId(reader.ReadUInt64());
         var assetId = new AssetId(reader.ReadGuid());
@@ -1267,6 +1702,7 @@ internal sealed class NetworkSession : IDisposable
             reader.ReadSingle());
         var scale = ReadVector3(ref reader);
         return new NetworkDynamicSpawnRecord(
+            scope,
             entityId,
             assetId,
             assetName,
@@ -1288,6 +1724,420 @@ internal sealed class NetworkSession : IDisposable
         var reader = new NetworkReader(packet.Payload.Span);
         reader.EnsureComplete();
         peer.Phase = NetworkConnectionPhase.Ready;
+        foreach (var subscription in peer.ScopeSubscriptions.Values)
+        {
+            if (subscription.Phase != NetworkScopeSubscriptionPhase.Pending)
+                continue;
+            if (!_scopes.TryGetValue(subscription.Scope, out var scope))
+                continue;
+            subscription.Phase = NetworkScopeSubscriptionPhase.AwaitingLoaded;
+            SendScopeLoad(peer, scope, subscription);
+        }
+    }
+
+    private void SendScopeLoad(
+        NetworkPeer peer,
+        NetworkReplicationScope scope,
+        NetworkScopeSubscription subscription)
+    {
+        subscription.ManifestRevision = peer.ProjectedStructuralRevision;
+        SendPacket(peer.Connection, NetworkProtocolMessage.ScopeLoad,
+            writer =>
+            {
+                writer.WriteUInt32(scope.Id.Value);
+                writer.WriteGuid(scope.SourceAssetId.Value);
+                writer.WriteString(scope.SourceAssetName, _options.MaxScopeAssetNameBytes);
+            }, SceneEpoch, ServerTick, peer.ProjectedStructuralRevision);
+    }
+
+    private void HandleScopeLoad(NetworkPeer peer, NetworkPacket packet)
+    {
+        if (IsServer || peer.Phase != NetworkConnectionPhase.Ready || World is null)
+            throw new NetworkProtocolException("Unexpected ScopeLoad message.");
+        ValidateCurrentScenePacket(packet.Header, false);
+        if (packet.Header.StructuralRevision != StructuralRevision)
+            throw new NetworkProtocolException("ScopeLoad was not sent at the current projected revision.");
+
+        var reader = new NetworkReader(packet.Payload.Span);
+        var scopeId = new NetworkReplicationScopeId(reader.ReadUInt32());
+        var assetId = new AssetId(reader.ReadGuid());
+        var assetName = reader.ReadString(_options.MaxScopeAssetNameBytes);
+        reader.EnsureComplete();
+        if (!scopeId.IsValid || scopeId.IsGlobal || assetId.IsEmpty)
+            throw new NetworkProtocolException("ScopeLoad contains an invalid scope or source identity.");
+        if (_scopes.ContainsKey(scopeId))
+            throw new NetworkProtocolException($"Active scope identity {scopeId} was duplicated.");
+        var sourceIdentity = new ScopeSourceIdentity(assetId, assetName);
+        if (_knownScopeSources.TryGetValue(scopeId, out var knownSource) && knownSource != sourceIdentity)
+            throw new NetworkProtocolException(
+                $"Scope identity {scopeId} was reused for a different source in the same Scene epoch.");
+        _knownScopeSources.TryAdd(scopeId, sourceIdentity);
+        _retiredScopes.Remove(scopeId);
+        if (_scopes.Count >= _options.MaxReplicationScopes)
+            throw new NetworkProtocolException("ScopeLoad exceeds the configured scope limit.");
+
+        SceneContentInstance? content = null;
+        try
+        {
+            var blueprint = Resources.LoadDreambitAsset(assetId, assetName, typeof(SceneBlueprint)) as SceneBlueprint
+                ?? throw new InvalidOperationException(
+                    $"Scene Blueprint '{assetName}' ({assetId}) could not be loaded.");
+            content = World.Scene.LoadNetworkAdditive(blueprint, assetName, _scopeCoordinator);
+            var scope = new NetworkReplicationScope(
+                scopeId, SceneEpoch, assetId, assetName, content);
+            scope.IsReady = false;
+            _scopes.Add(scopeId, scope);
+            SuspendScopeEntities(scopeId, content);
+            SendPacket(peer.Connection, NetworkProtocolMessage.ScopeLoaded,
+                writer => writer.WriteUInt32(scopeId.Value),
+                SceneEpoch, ServerTick, StructuralRevision);
+        }
+        catch (Exception exception)
+        {
+            var cleanupErrors = new List<Exception>();
+            if (_scopes.Remove(scopeId, out var failedScope))
+            {
+                failedScope.IsLoaded = false;
+                failedScope.IsReady = false;
+            }
+            _clientScopeBaselines.Remove(scopeId);
+            _suspendedScopeEntities.Remove(scopeId);
+            _retiredScopes.Add(scopeId);
+            try
+            {
+                World.UnregisterScope(scopeId, false);
+            }
+            catch (Exception cleanupException)
+            {
+                cleanupErrors.Add(cleanupException);
+            }
+            if (content?.IsLoaded == true)
+                try
+                {
+                    World.Scene.UnloadNetworkContent(content, _scopeCoordinator);
+                }
+                catch (Exception cleanupException)
+                {
+                    cleanupErrors.Add(cleanupException);
+                }
+            Exception failure = exception;
+            if (cleanupErrors.Count != 0)
+            {
+                cleanupErrors.Insert(0, exception);
+                failure = new AggregateException(
+                    "Client scope materialization failed and rollback also reported errors.",
+                    cleanupErrors);
+            }
+            throw new NetworkProtocolException(
+                $"Could not materialize replication scope {scopeId}: {failure.Message}", failure);
+        }
+    }
+
+    private void HandleScopeLoaded(NetworkPeer peer, NetworkPacket packet)
+    {
+        if (!IsServer || peer.Phase != NetworkConnectionPhase.Ready)
+            throw new NetworkProtocolException("Unexpected ScopeLoaded message.");
+        if (packet.Header.SceneEpoch != SceneEpoch)
+            throw new NetworkProtocolException("ScopeLoaded uses a stale Scene epoch.");
+        var reader = new NetworkReader(packet.Payload.Span);
+        var scopeId = new NetworkReplicationScopeId(reader.ReadUInt32());
+        reader.EnsureComplete();
+        if (!peer.ScopeSubscriptions.TryGetValue(scopeId, out var subscription) ||
+            subscription.Phase is not (NetworkScopeSubscriptionPhase.AwaitingLoaded or
+                NetworkScopeSubscriptionPhase.Unloading))
+            throw new NetworkProtocolException($"Peer {peer.PeerId} acknowledged unexpected scope {scopeId}.");
+        if (packet.Header.StructuralRevision != subscription.ManifestRevision)
+            throw new NetworkProtocolException(
+                $"Peer {peer.PeerId} acknowledged scope {scopeId} at revision " +
+                $"{packet.Header.StructuralRevision}; expected manifest revision " +
+                $"{subscription.ManifestRevision}.");
+        if (subscription.Phase == NetworkScopeSubscriptionPhase.Unloading)
+            return;
+        if (!_scopes.TryGetValue(scopeId, out var scope) || !scope.IsLoaded)
+            throw new NetworkProtocolException($"Peer {peer.PeerId} acknowledged unavailable scope {scopeId}.");
+        try
+        {
+            SendScopeBaseline(peer, scope, subscription);
+        }
+        catch (Exception exception)
+        {
+            var diagnostic = exception is NetworkSynchronizationException
+                ? exception.Message
+                : $"Scope {scopeId} synchronization failed: {exception.Message}";
+            peer.RemoteDiagnostic = diagnostic;
+            peer.Phase = NetworkConnectionPhase.Rejected;
+            try
+            {
+                SendReject(peer.Connection, diagnostic);
+            }
+            finally
+            {
+                Transport.Disconnect(peer.Connection, TransportDisconnectReason.Incompatible);
+            }
+        }
+    }
+
+    private void SendScopeBaseline(
+        NetworkPeer peer,
+        NetworkReplicationScope scope,
+        NetworkScopeSubscription subscription)
+    {
+        if (World is null)
+            throw new InvalidOperationException("Cannot capture a scope baseline without a NetworkWorld.");
+        World.ReconcileDestroyedEntities();
+        var records = World.GetRecords(scope.Id);
+        var authored = World.GetAuthoredBindings(scope.Id);
+        var dynamic = records.Where(record => record.Origin == NetworkSpawnOrigin.DynamicBlueprint).ToArray();
+        var players = World.PlayerEntities
+            .Where(pair => World.TryGetRecord(pair.Value, out var record) && record!.Scope == scope.Id)
+            .ToArray();
+        var componentCount = records.Sum(record => record.ReplicationBindings.Count);
+        var stateSequence = _stateSequence;
+        if (authored.Count > _options.MaxScopedAuthoredEntities ||
+            dynamic.Length > _options.MaxNetworkEntities ||
+            authored.Count > _options.MaxNetworkEntities - dynamic.Length ||
+            players.Length > _options.MaxNetworkEntities ||
+            componentCount > _options.MaxScopeBaselineComponentRecords)
+            throw new NetworkSynchronizationException(
+                $"Scope {scope.Id} exceeds configured synchronization limits.");
+
+        var revision = NextStructuralRevision(peer.ProjectedStructuralRevision);
+        var packets = new List<byte[]>(checked(2 + authored.Count + dynamic.Length + players.Length + componentCount));
+
+        Add(NetworkBaselineRecordKind.Begin, writer =>
+        {
+            writer.WriteInt32(authored.Count);
+            writer.WriteInt32(dynamic.Length);
+            writer.WriteInt32(players.Length);
+            writer.WriteInt32(componentCount);
+            writer.WriteUInt32(stateSequence);
+        });
+        foreach (var binding in authored)
+            Add(NetworkBaselineRecordKind.AuthoredEntity, writer =>
+            {
+                writer.WriteGuid(binding.SourceGuid);
+                writer.WriteUInt64(binding.NetworkEntityId.Value);
+                writer.WriteUInt32(binding.Owner.Value);
+                writer.WriteBoolean(binding.IsPresent);
+            });
+        foreach (var record in dynamic)
+            Add(NetworkBaselineRecordKind.DynamicEntity, writer => WriteDynamicBaselineRecord(writer, record));
+        foreach (var player in players)
+        {
+            Add(NetworkBaselineRecordKind.PlayerEntity, writer =>
+            {
+                writer.WriteUInt32(player.Key.Value);
+                writer.WriteUInt64(player.Value.Value);
+            });
+        }
+        foreach (var record in records)
+            foreach (var binding in record.ReplicationBindings)
+            {
+                var payload = binding.Capture();
+                Add(NetworkBaselineRecordKind.ComponentState, writer =>
+                {
+                    writer.WriteUInt64(record.Id.Value);
+                    writer.WriteUInt16(binding.Descriptor.Id);
+                    writer.WriteLengthPrefixedBytes(payload, binding.Descriptor.MaximumPayload);
+                });
+        }
+        Add(NetworkBaselineRecordKind.End, null);
+
+        // Commit projection state only after the complete baseline has been captured and encoded.
+        // A serializer or payload-limit failure therefore leaves the peer at its previous revision.
+        peer.ProjectedStructuralRevision = revision;
+        subscription.BaselineRevision = revision;
+        subscription.Phase = NetworkScopeSubscriptionPhase.AwaitingReady;
+        foreach (var player in players)
+            peer.ProjectedPlayerEntities[player.Key] = player.Value;
+        foreach (var bytes in packets)
+            Transport.Send(peer.Connection, bytes, NetworkDelivery.ReliableOrdered, 0);
+
+        void Add(NetworkBaselineRecordKind kind, Action<NetworkWriter>? payload)
+        {
+            var bytes = EncodePacket(NetworkProtocolMessage.ScopeBaseline, writer =>
+            {
+                writer.WriteUInt32(scope.Id.Value);
+                writer.WriteByte((byte)kind);
+                payload?.Invoke(writer);
+            }, SceneEpoch, ServerTick, revision);
+            if (bytes.Length > Transport.Capabilities.MaxReliablePayload)
+                throw new NetworkSynchronizationException(
+                    $"Scope {scope.Id} baseline record exceeds the reliable transport payload limit.");
+            packets.Add(bytes);
+        }
+    }
+
+    private void HandleScopeBaseline(NetworkPeer peer, NetworkPacket packet)
+    {
+        if (IsServer || peer.Phase != NetworkConnectionPhase.Ready || World is null)
+            throw new NetworkProtocolException("Unexpected ScopeBaseline message.");
+        ValidateCurrentScenePacket(packet.Header, false);
+        if (packet.Header.StructuralRevision.Value != StructuralRevision.Value + 1)
+            throw new NetworkProtocolException("Scope baseline is not the next projected structural revision.");
+        var reader = new NetworkReader(packet.Payload.Span);
+        var scopeId = new NetworkReplicationScopeId(reader.ReadUInt32());
+        var kindValue = reader.ReadByte();
+        if (!Enum.IsDefined(typeof(NetworkBaselineRecordKind), kindValue))
+            throw new NetworkProtocolException($"Unknown scoped baseline record kind {kindValue}.");
+        if (!_scopes.TryGetValue(scopeId, out var targetScope) ||
+            scopeId.IsGlobal || targetScope.IsReady)
+            throw new NetworkProtocolException($"Scoped baseline references unknown scope {scopeId}.");
+        var kind = (NetworkBaselineRecordKind)kindValue;
+
+        if (kind == NetworkBaselineRecordKind.Begin)
+        {
+            if (_clientScopeBaselines.ContainsKey(scopeId))
+                throw new NetworkProtocolException($"Scope {scopeId} received a second baseline Begin.");
+            var authored = ReadBoundedCount(ref reader, _options.MaxScopedAuthoredEntities, "scoped authored entities");
+            var dynamic = ReadBoundedCount(ref reader, _options.MaxNetworkEntities, "scoped dynamic entities");
+            if (authored > _options.MaxNetworkEntities - dynamic)
+                throw new NetworkProtocolException(
+                    "Scoped baseline entity count exceeds the configured limit.");
+            var players = ReadBoundedCount(ref reader, _options.MaxNetworkEntities, "scoped player mappings");
+            var components = ReadBoundedCount(ref reader, _options.MaxScopeBaselineComponentRecords, "scoped Component states");
+            var stateSequence = reader.ReadUInt32();
+            reader.EnsureComplete();
+            _clientScopeBaselines.Add(scopeId, new ClientBaselineState
+            {
+                Scope = scopeId,
+                SceneEpoch = packet.Header.SceneEpoch,
+                StructuralRevision = packet.Header.StructuralRevision,
+                ServerTick = packet.Header.ServerTick,
+                StateSequence = stateSequence,
+                ExpectedAuthored = authored,
+                ExpectedDynamic = dynamic,
+                ExpectedPlayers = players,
+                ExpectedComponents = components
+            });
+            return;
+        }
+
+        if (!_clientScopeBaselines.TryGetValue(scopeId, out var baseline) ||
+            baseline.StructuralRevision != packet.Header.StructuralRevision)
+            throw new NetworkProtocolException($"Scope {scopeId} baseline record arrived before Begin.");
+        switch (kind)
+        {
+            case NetworkBaselineRecordKind.AuthoredEntity:
+                EnsureRecordCapacity(baseline.Authored.Count, baseline.ExpectedAuthored, "scoped authored Entity");
+                baseline.Authored.Add(new NetworkAuthoredBinding(scopeId, reader.ReadGuid(),
+                    new NetworkEntityId(reader.ReadUInt64()), new NetworkPeerId(reader.ReadUInt32()))
+                {
+                    IsPresent = reader.ReadBoolean()
+                });
+                break;
+            case NetworkBaselineRecordKind.DynamicEntity:
+                EnsureRecordCapacity(baseline.Dynamic.Count, baseline.ExpectedDynamic, "scoped dynamic Entity");
+                baseline.Dynamic.Add(ReadDynamicBaselineRecord(ref reader, scopeId));
+                break;
+            case NetworkBaselineRecordKind.PlayerEntity:
+                EnsureRecordCapacity(baseline.Players.Count, baseline.ExpectedPlayers, "scoped player mapping");
+                baseline.Players.Add(new KeyValuePair<NetworkPeerId, NetworkEntityId>(
+                    new NetworkPeerId(reader.ReadUInt32()), new NetworkEntityId(reader.ReadUInt64())));
+                break;
+            case NetworkBaselineRecordKind.ComponentState:
+                EnsureRecordCapacity(baseline.Components.Count, baseline.ExpectedComponents, "scoped Component state");
+                var entityId = new NetworkEntityId(reader.ReadUInt64());
+                var componentId = reader.ReadUInt16();
+                var descriptor = _replication.GetById(componentId);
+                baseline.Components.Add(new NetworkComponentStateRecord(entityId, componentId,
+                    reader.ReadLengthPrefixedBytes(descriptor.MaximumPayload).ToArray()));
+                break;
+            case NetworkBaselineRecordKind.End:
+                reader.EnsureComplete();
+                ApplyClientBaseline(peer, baseline);
+                return;
+            default:
+                throw new NetworkProtocolException($"Unexpected scoped baseline record kind {kind}.");
+        }
+        reader.EnsureComplete();
+    }
+
+    private void HandleScopeReady(NetworkPeer peer, NetworkPacket packet)
+    {
+        if (!IsServer || peer.Phase != NetworkConnectionPhase.Ready)
+            throw new NetworkProtocolException("Unexpected ScopeReady message.");
+        if (packet.Header.SceneEpoch != SceneEpoch)
+            throw new NetworkProtocolException("ScopeReady uses a stale Scene epoch.");
+        var reader = new NetworkReader(packet.Payload.Span);
+        var scopeId = new NetworkReplicationScopeId(reader.ReadUInt32());
+        var baselineRevision = new NetworkStructuralRevision(reader.ReadUInt64());
+        reader.EnsureComplete();
+        if (!peer.ScopeSubscriptions.TryGetValue(scopeId, out var subscription) ||
+            subscription.Phase is not (NetworkScopeSubscriptionPhase.AwaitingReady or
+                NetworkScopeSubscriptionPhase.Unloading) ||
+            baselineRevision != subscription.BaselineRevision ||
+            packet.Header.StructuralRevision != baselineRevision)
+            throw new NetworkProtocolException($"Peer {peer.PeerId} sent an invalid ScopeReady for {scopeId}.");
+        if (subscription.Phase == NetworkScopeSubscriptionPhase.Unloading)
+            return;
+        subscription.Phase = NetworkScopeSubscriptionPhase.Ready;
+        PeerScopeReady?.Invoke(peer.PeerId, scopeId);
+    }
+
+    private void HandleScopeUnload(NetworkPeer peer, NetworkPacket packet)
+    {
+        if (IsServer || peer.Phase != NetworkConnectionPhase.Ready || World is null)
+            throw new NetworkProtocolException("Unexpected ScopeUnload message.");
+        ValidateCurrentScenePacket(packet.Header, true);
+        var reader = new NetworkReader(packet.Payload.Span);
+        var scopeId = new NetworkReplicationScopeId(reader.ReadUInt32());
+        reader.EnsureComplete();
+        if (!_scopes.TryGetValue(scopeId, out var scope) || scope.IsGlobal)
+            throw new NetworkProtocolException($"ScopeUnload references unknown scope {scopeId}.");
+
+        // Make the scope unavailable before cleanup callbacks can observe or mutate it.
+        scope.IsLoaded = false;
+        scope.IsReady = false;
+        _scopes.Remove(scopeId);
+        _retiredScopes.Add(scopeId);
+        _clientScopeBaselines.Remove(scopeId);
+        _suspendedScopeEntities.Remove(scopeId);
+        StructuralRevision = packet.Header.StructuralRevision;
+        var cleanupErrors = new List<Exception>();
+        try
+        {
+            World.UnregisterScope(scopeId, false);
+        }
+        catch (Exception exception)
+        {
+            cleanupErrors.Add(exception);
+        }
+        if (scope.Content?.IsLoaded == true)
+            try
+            {
+                World.Scene.UnloadNetworkContent(scope.Content, _scopeCoordinator);
+            }
+            catch (Exception exception)
+            {
+                cleanupErrors.Add(exception);
+            }
+        if (cleanupErrors.Count != 0)
+            throw new NetworkProtocolException(
+                $"Could not completely unload replication scope {scopeId}.",
+                new AggregateException(cleanupErrors));
+        SendPacket(peer.Connection, NetworkProtocolMessage.ScopeUnloaded,
+            writer => writer.WriteUInt32(scopeId.Value), SceneEpoch, ServerTick, StructuralRevision);
+    }
+
+    private void HandleScopeUnloaded(NetworkPeer peer, NetworkPacket packet)
+    {
+        if (!IsServer || peer.Phase != NetworkConnectionPhase.Ready)
+            throw new NetworkProtocolException("Unexpected ScopeUnloaded message.");
+        if (packet.Header.SceneEpoch != SceneEpoch)
+            throw new NetworkProtocolException("ScopeUnloaded uses a stale Scene epoch.");
+        var reader = new NetworkReader(packet.Payload.Span);
+        var scopeId = new NetworkReplicationScopeId(reader.ReadUInt32());
+        reader.EnsureComplete();
+        if (!peer.ScopeSubscriptions.TryGetValue(scopeId, out var subscription) ||
+            subscription.Phase != NetworkScopeSubscriptionPhase.Unloading)
+            throw new NetworkProtocolException($"Peer {peer.PeerId} acknowledged unexpected scope unload {scopeId}.");
+        if (packet.Header.StructuralRevision != subscription.UnloadRevision)
+            throw new NetworkProtocolException(
+                $"Peer {peer.PeerId} acknowledged scope unload {scopeId} at revision " +
+                $"{packet.Header.StructuralRevision}; expected {subscription.UnloadRevision}.");
+        peer.ScopeSubscriptions.Remove(scopeId);
+        PeerScopeUnloaded?.Invoke(peer.PeerId, scopeId);
     }
 
     private static int ReadBoundedCount(ref NetworkReader reader, int maximum, string label)
@@ -1361,19 +2211,42 @@ internal sealed class NetworkSession : IDisposable
             _serverConnection = TransportConnectionId.None;
             LocalPeerId = NetworkPeerId.None;
             SessionId = Guid.Empty;
+            List<Exception>? cleanupErrors = null;
             if (World is not null)
             {
                 var disconnectedScene = World.Scene;
                 World.EntityRemoved -= HandleWorldEntityRemoved;
-                World.Dispose(true);
-                disconnectedScene.SetStartPreparationGate(_ => false);
-                World = null;
+                try
+                {
+                    ClearScopeState(true);
+                }
+                catch (Exception exception)
+                {
+                    (cleanupErrors ??= []).Add(exception);
+                }
+                try
+                {
+                    World.Dispose(true);
+                }
+                catch (Exception exception)
+                {
+                    (cleanupErrors ??= []).Add(exception);
+                }
+                finally
+                {
+                    disconnectedScene.SetStartPreparationGate(_ => false);
+                    World = null;
+                }
             }
             _clientBaseline = null;
             _clientSceneReady = false;
             _lastStateSequences.Clear();
             _lastClientTransformSequences.Clear();
             _pendingLiveSpawns.Clear();
+            if (cleanupErrors is not null)
+                throw new AggregateException(
+                    "One or more resources failed while cleaning up a disconnected client world.",
+                    cleanupErrors);
         }
     }
 
@@ -1500,6 +2373,7 @@ internal sealed class NetworkSession : IDisposable
         EntityBlueprint blueprint,
         NetworkSpawnOptions options)
     {
+        writer.WriteUInt32(options.Scope.Value);
         writer.WriteUInt64(id.Value);
         writer.WriteGuid(blueprint.AssetId.Value);
         writer.WriteString(blueprint.AssetName, 1024);
@@ -1525,6 +2399,7 @@ internal sealed class NetworkSession : IDisposable
             throw new NetworkProtocolException("Received a Spawn without an active NetworkWorld.");
 
         var reader = new NetworkReader(packet.Payload.Span);
+        var scopeId = new NetworkReplicationScopeId(reader.ReadUInt32());
         var id = new NetworkEntityId(reader.ReadUInt64());
         var assetId = new AssetId(reader.ReadGuid());
         var fallbackName = reader.ReadString(1024);
@@ -1538,8 +2413,10 @@ internal sealed class NetworkSession : IDisposable
         Vector3? rotation = (flags & 4) != 0 ? ReadVector3(ref reader) : null;
         Vector3? scale = (flags & 8) != 0 ? ReadVector3(ref reader) : null;
         reader.EnsureComplete();
-        if (!id.IsValid || assetId.IsEmpty)
+        if (!scopeId.IsValid || !id.IsValid || assetId.IsEmpty)
             throw new NetworkProtocolException("Spawn contains an empty network or Blueprint identity.");
+        if (!_scopes.TryGetValue(scopeId, out var scope) || !scope.IsLoaded || !scope.IsReady)
+            throw new NetworkProtocolException($"Spawn references unavailable replication scope {scopeId}.");
 
         Entity? entity = null;
         var registered = false;
@@ -1549,12 +2426,12 @@ internal sealed class NetworkSession : IDisposable
                             as EntityBlueprint
                             ?? throw new InvalidOperationException(
                                 $"Blueprint '{fallbackName}' ({assetId}) could not be loaded.");
-            entity = World.Scene.CreateNetworkEntity(
-                blueprint,
-                intendedEnabled,
-                position,
-                rotation,
-                scale);
+            entity = scopeId.IsGlobal
+                ? World.Scene.CreateNetworkEntity(
+                    blueprint, intendedEnabled, position, rotation, scale)
+                : World.Scene.CreateNetworkContentEntity(
+                    scope.Content!, blueprint, _scopeCoordinator,
+                    intendedEnabled, position, rotation, scale);
             SetHierarchyUpdatesSuspended(entity, true);
             World.RegisterDynamicEntity(
                 entity,
@@ -1562,9 +2439,11 @@ internal sealed class NetworkSession : IDisposable
                 owner,
                 assetId,
                 fallbackName,
-                destroyWithOwner);
+                destroyWithOwner,
+                scopeId);
             registered = true;
-            var record = World.Records.First(candidate => candidate.Id == id);
+            if (!World.TryGetRecord(id, out var record) || record is null)
+                throw new InvalidOperationException($"Network Entity {id} was not indexed after spawn.");
             _pendingLiveSpawns.Add(
                 id,
                 new PendingLiveSpawn(
@@ -1619,6 +2498,7 @@ internal sealed class NetworkSession : IDisposable
                 $"SpawnReady revision {packet.Header.StructuralRevision} does not match " +
                 $"the active structural revision {StructuralRevision}.");
         var reader = new NetworkReader(packet.Payload.Span);
+        var scopeId = new NetworkReplicationScopeId(reader.ReadUInt32());
         var id = new NetworkEntityId(reader.ReadUInt64());
         reader.EnsureComplete();
         if (!_pendingLiveSpawns.Remove(id, out var pending))
@@ -1628,9 +2508,10 @@ internal sealed class NetworkSession : IDisposable
                 $"SpawnReady for network Entity {id} arrived before initial state for Component(s) " +
                 $"{string.Join(", ", pending.RemainingComponentIds)}.");
 
-        var record = World?.Records.FirstOrDefault(candidate => candidate.Id == id) ??
-                     throw new NetworkProtocolException(
-                         $"SpawnReady references missing network Entity {id}.");
+        if (World is null || !World.TryGetRecord(id, out var record) || record is null ||
+            record.Scope != scopeId)
+            throw new NetworkProtocolException(
+                $"SpawnReady references missing or incorrectly scoped network Entity {id}.");
         NotifyNetworkSpawnReady(
             record,
             packet.Header.SceneEpoch,
@@ -1645,9 +2526,11 @@ internal sealed class NetworkSession : IDisposable
             throw new NetworkProtocolException("A server cannot receive an authoritative Despawn message.");
         ValidateCurrentScenePacket(packet.Header, requireNextRevision: true);
         var reader = new NetworkReader(packet.Payload.Span);
+        var scopeId = new NetworkReplicationScopeId(reader.ReadUInt32());
         var id = new NetworkEntityId(reader.ReadUInt64());
         reader.EnsureComplete();
-        if (World is null || !World.TryGetEntity(id, out _))
+        if (World is null || !World.TryGetRecord(id, out var record) || record is null ||
+            record.Scope != scopeId)
             throw new NetworkProtocolException(
                 $"Despawn references unknown network Entity {id} in Scene epoch {SceneEpoch}.");
         World.DespawnLocal(id, false);
@@ -1658,15 +2541,23 @@ internal sealed class NetworkSession : IDisposable
     {
         if (World is null)
             throw new InvalidOperationException("There is no active NetworkWorld.");
-        var revision = AdvanceStructuralRevision();
+        if (!World.TryGetRecord(id, out var record) || record is null)
+            throw new InvalidOperationException($"Network Entity {id} is not registered.");
+        AdvanceStructuralRevision();
         foreach (var peer in _peersById.Values)
         {
-            if (peer.IsLocal || !ReceivesLiveStructure(peer))
+            RemoveProjectedEntityMappings(peer, id);
+            if (peer.IsLocal || !PeerReceivesStructure(peer, record.Scope))
                 continue;
+            var revision = AdvancePeerRevision(peer);
             SendPacket(
                 peer.Connection,
                 NetworkProtocolMessage.Despawn,
-                writer => writer.WriteUInt64(id.Value),
+                writer =>
+                {
+                    writer.WriteUInt32(record.Scope.Value);
+                    writer.WriteUInt64(id.Value);
+                },
                 SceneEpoch,
                 ServerTick,
                 revision);
@@ -1676,33 +2567,25 @@ internal sealed class NetworkSession : IDisposable
 
     private void SetOwnerAuthoritative(NetworkEntityId id, NetworkPeerId owner)
     {
-        if (World is null)
+        if (World is null || !World.TryGetRecord(id, out var record) || record is null)
             return;
         World.SetOwner(id, owner);
-        var revision = AdvanceStructuralRevision();
-        BroadcastStructural(
-            NetworkProtocolMessage.Ownership,
-            writer =>
-            {
-                writer.WriteUInt64(id.Value);
-                writer.WriteUInt32(owner.Value);
-            },
-            revision);
+        AdvanceStructuralRevision();
+        PublishOwnership(id, owner, record.Scope);
     }
 
     private void ClearPlayerEntityAuthoritative(NetworkPeerId peerId)
     {
         if (World is null || !World.RemovePlayerEntity(peerId))
             return;
-        var revision = AdvanceStructuralRevision();
-        BroadcastStructural(
-            NetworkProtocolMessage.PlayerEntity,
-            writer =>
-            {
-                writer.WriteUInt32(peerId.Value);
-                writer.WriteUInt64(NetworkEntityId.None.Value);
-            },
-            revision);
+        AdvanceStructuralRevision();
+        foreach (var recipient in _peersById.Values)
+        {
+            if (recipient.IsLocal || !ReceivesLiveStructure(recipient) ||
+                !recipient.ProjectedPlayerEntities.Remove(peerId))
+                continue;
+            SendPlayerMapping(recipient, peerId, NetworkEntityId.None);
+        }
     }
 
     private void HandlePlayerEntity(NetworkPacket packet)
@@ -1711,6 +2594,7 @@ internal sealed class NetworkSession : IDisposable
             throw new NetworkProtocolException("A server cannot receive PlayerEntity assignments.");
         ValidateCurrentScenePacket(packet.Header, requireNextRevision: true);
         var reader = new NetworkReader(packet.Payload.Span);
+        var scopeId = new NetworkReplicationScopeId(reader.ReadUInt32());
         var peerId = new NetworkPeerId(reader.ReadUInt32());
         var entityId = new NetworkEntityId(reader.ReadUInt64());
         reader.EnsureComplete();
@@ -1720,7 +2604,7 @@ internal sealed class NetworkSession : IDisposable
             throw new NetworkProtocolException("PlayerEntity contains peer ID zero.");
         if (entityId.IsValid)
         {
-            if (!World.TryGetEntity(entityId, out _))
+            if (!World.TryGetRecord(entityId, out var record) || record is null || record.Scope != scopeId)
                 throw new NetworkProtocolException(
                     $"PlayerEntity references missing network Entity {entityId}.");
             World.SetPlayerEntity(peerId, entityId);
@@ -1736,51 +2620,103 @@ internal sealed class NetworkSession : IDisposable
             throw new NetworkProtocolException("A server cannot receive ownership assignments.");
         ValidateCurrentScenePacket(packet.Header, requireNextRevision: true);
         var reader = new NetworkReader(packet.Payload.Span);
+        var scopeId = new NetworkReplicationScopeId(reader.ReadUInt32());
         var entityId = new NetworkEntityId(reader.ReadUInt64());
         var owner = new NetworkPeerId(reader.ReadUInt32());
         reader.EnsureComplete();
-        if (World is null || !World.TryGetEntity(entityId, out _))
+        if (World is null || !World.TryGetRecord(entityId, out var record) || record is null ||
+            record.Scope != scopeId)
             throw new NetworkProtocolException(
                 $"Ownership assignment references missing network Entity {entityId}.");
         World.SetOwner(entityId, owner);
         StructuralRevision = packet.Header.StructuralRevision;
     }
 
-    private void BroadcastStructural(
-        NetworkProtocolMessage message,
-        Action<NetworkWriter> payload,
-        NetworkStructuralRevision revision)
+    private void PublishOwnership(
+        NetworkEntityId id,
+        NetworkPeerId owner,
+        NetworkReplicationScopeId scope)
     {
         foreach (var peer in _peersById.Values)
         {
-            if (peer.IsLocal || !ReceivesLiveStructure(peer))
+            if (peer.IsLocal || !PeerReceivesStructure(peer, scope))
                 continue;
+            var revision = AdvancePeerRevision(peer);
             SendPacket(
                 peer.Connection,
-                message,
-                payload,
+                NetworkProtocolMessage.Ownership,
+                writer =>
+                {
+                    writer.WriteUInt32(scope.Value);
+                    writer.WriteUInt64(id.Value);
+                    writer.WriteUInt32(owner.Value);
+                },
                 SceneEpoch,
                 ServerTick,
                 revision);
         }
     }
 
+    private void PublishPlayerMapping(
+        NetworkPeerId player,
+        NetworkEntityId entity,
+        NetworkReplicationScopeId scope)
+    {
+        foreach (var recipient in _peersById.Values)
+        {
+            if (recipient.IsLocal || !ReceivesLiveStructure(recipient))
+                continue;
+            if (PeerReceivesStructure(recipient, scope))
+            {
+                recipient.ProjectedPlayerEntities[player] = entity;
+                SendPlayerMapping(recipient, player, entity);
+            }
+            else if (recipient.ProjectedPlayerEntities.Remove(player))
+            {
+                SendPlayerMapping(recipient, player, NetworkEntityId.None);
+            }
+        }
+    }
+
+    private void SendPlayerMapping(
+        NetworkPeer recipient,
+        NetworkPeerId player,
+        NetworkEntityId entity)
+    {
+        var scope = NetworkReplicationScopeId.Global;
+        if (entity.IsValid && World?.TryGetRecord(entity, out var record) == true && record is not null)
+            scope = record.Scope;
+        var revision = AdvancePeerRevision(recipient);
+        SendPacket(recipient.Connection, NetworkProtocolMessage.PlayerEntity, writer =>
+        {
+            writer.WriteUInt32(scope.Value);
+            writer.WriteUInt32(player.Value);
+            writer.WriteUInt64(entity.Value);
+        }, SceneEpoch, ServerTick, revision);
+    }
+
     private static bool ReceivesLiveStructure(NetworkPeer peer) =>
         peer.Phase is NetworkConnectionPhase.Ready or NetworkConnectionPhase.Synchronizing;
 
-    private void HandleWorldEntityRemoved(NetworkEntityId id)
+    private void HandleWorldEntityRemoved(NetworkEntityRecord record)
     {
         if (!IsServer || _disposed)
             return;
-        var revision = AdvanceStructuralRevision();
+        AdvanceStructuralRevision();
         foreach (var peer in _peersById.Values)
         {
-            if (peer.IsLocal || !ReceivesLiveStructure(peer))
+            RemoveProjectedEntityMappings(peer, record.Id);
+            if (peer.IsLocal || !PeerReceivesStructure(peer, record.Scope))
                 continue;
+            var revision = AdvancePeerRevision(peer);
             SendPacket(
                 peer.Connection,
                 NetworkProtocolMessage.Despawn,
-                writer => writer.WriteUInt64(id.Value),
+                writer =>
+                {
+                    writer.WriteUInt32(record.Scope.Value);
+                    writer.WriteUInt64(record.Id.Value);
+                },
                 SceneEpoch,
                 ServerTick,
                 revision);
@@ -1812,16 +2748,30 @@ internal sealed class NetworkSession : IDisposable
         {
             if (peer.IsLocal || peer.Phase != NetworkConnectionPhase.Ready)
                 continue;
-            foreach (var record in World.Records)
-                foreach (var binding in record.ReplicationBindings)
-                    SendStateRecord(
-                        peer.Connection,
-                        record.Id,
-                        binding,
-                        sequence,
-                        NetworkDelivery.UnreliableSequenced,
-                        2);
+            SendScopeSnapshots(peer, NetworkReplicationScopeId.Global, sequence);
+            foreach (var subscription in peer.ScopeSubscriptions.Values)
+                if (subscription.Phase == NetworkScopeSubscriptionPhase.Ready)
+                    SendScopeSnapshots(peer, subscription.Scope, sequence);
         }
+    }
+
+    private void SendScopeSnapshots(
+        NetworkPeer peer,
+        NetworkReplicationScopeId scope,
+        uint sequence)
+    {
+        if (World is null)
+            return;
+        foreach (var record in World.GetRecords(scope))
+            foreach (var binding in record.ReplicationBindings)
+                SendStateRecord(
+                    peer,
+                    scope,
+                    record.Id,
+                    binding,
+                    sequence,
+                    NetworkDelivery.UnreliableSequenced,
+                    2);
     }
 
     internal void SendClientTransformsNow()
@@ -1836,6 +2786,10 @@ internal sealed class NetworkSession : IDisposable
         foreach (var record in World.Records)
         {
             if (record.Owner != LocalPeerId)
+                continue;
+            if (record.Scope.IsGlobal
+                    ? !_clientSceneReady
+                    : !_scopes.TryGetValue(record.Scope, out var scope) || !scope.IsReady)
                 continue;
 
             var transform = record.Entity.GetComponent<NetworkTransform2D>();
@@ -1855,6 +2809,7 @@ internal sealed class NetworkSession : IDisposable
                 writer =>
                 {
                     writer.WriteUInt32(sequence);
+                    writer.WriteUInt32(record.Scope.Value);
                     writer.WriteUInt64(record.Id.Value);
                     WriteVector2(writer, position);
                     writer.WriteSingle(rotation);
@@ -1869,6 +2824,7 @@ internal sealed class NetworkSession : IDisposable
     }
 
     private byte[] EncodeStateRecord(
+        NetworkReplicationScopeId scope,
         NetworkEntityId entityId,
         NetworkReplicationBinding binding,
         uint sequence,
@@ -1880,6 +2836,7 @@ internal sealed class NetworkSession : IDisposable
             writer =>
             {
                 writer.WriteUInt32(sequence);
+                writer.WriteUInt32(scope.Value);
                 writer.WriteUInt64(entityId.Value);
                 writer.WriteUInt16(binding.Descriptor.Id);
                 writer.WriteLengthPrefixedBytes(
@@ -1896,7 +2853,8 @@ internal sealed class NetworkSession : IDisposable
     }
 
     private void SendStateRecord(
-        TransportConnectionId connection,
+        NetworkPeer peer,
+        NetworkReplicationScopeId scope,
         NetworkEntityId entityId,
         NetworkReplicationBinding binding,
         uint sequence,
@@ -1907,7 +2865,7 @@ internal sealed class NetworkSession : IDisposable
         var maximumPacket = delivery == NetworkDelivery.ReliableOrdered
             ? Transport.Capabilities.MaxReliablePayload
             : Transport.Capabilities.MaxUnreliablePayload;
-        const int recordOverhead = sizeof(uint) + sizeof(ulong) + sizeof(ushort) + sizeof(int);
+        const int recordOverhead = sizeof(uint) + sizeof(uint) + sizeof(ulong) + sizeof(ushort) + sizeof(int);
         if (NetworkProtocol.HeaderLength + recordOverhead + componentPayload.Length > maximumPacket)
             throw new InvalidOperationException(
                 $"Replicated Component {binding.Descriptor.Id} on Entity {entityId} requires " +
@@ -1915,11 +2873,12 @@ internal sealed class NetworkSession : IDisposable
                 $"{maximumPacket}. Use a smaller/custom representation.");
 
         SendPacket(
-            connection,
+            peer.Connection,
             NetworkProtocolMessage.Snapshot,
             writer =>
             {
                 writer.WriteUInt32(sequence);
+                writer.WriteUInt32(scope.Value);
                 writer.WriteUInt64(entityId.Value);
                 writer.WriteUInt16(binding.Descriptor.Id);
                 writer.WriteLengthPrefixedBytes(
@@ -1928,7 +2887,7 @@ internal sealed class NetworkSession : IDisposable
             },
             SceneEpoch,
             ServerTick,
-            StructuralRevision,
+            peer.ProjectedStructuralRevision,
             delivery,
             channel);
     }
@@ -1948,6 +2907,17 @@ internal sealed class NetworkSession : IDisposable
 
         var reader = new NetworkReader(packet.Payload.Span);
         var sequence = reader.ReadUInt32();
+        var scopeId = new NetworkReplicationScopeId(reader.ReadUInt32());
+        if (!scopeId.IsValid)
+            throw new NetworkProtocolException("A Component snapshot contains scope ID zero.");
+        if (!_scopes.TryGetValue(scopeId, out var snapshotScope))
+        {
+            if (_retiredScopes.Contains(scopeId))
+                return;
+            throw new NetworkProtocolException($"Component snapshot references unknown scope {scopeId}.");
+        }
+        if (!snapshotScope.IsReady)
+            return;
         var entityId = new NetworkEntityId(reader.ReadUInt64());
         var componentId = reader.ReadUInt16();
         var descriptor = _replication.GetById(componentId);
@@ -1955,7 +2925,8 @@ internal sealed class NetworkSession : IDisposable
         reader.EnsureComplete();
         if (!entityId.IsValid)
             throw new NetworkProtocolException("A Component snapshot contains network Entity ID zero.");
-        if (!World.TryGetReplicationBinding(entityId, componentId, out var binding) || binding is null)
+        if (!World.TryGetRecord(entityId, out var record) || record is null || record.Scope != scopeId ||
+            !World.TryGetReplicationBinding(entityId, componentId, out var binding) || binding is null)
             throw new NetworkProtocolException(
                 $"Component snapshot references missing Component {componentId} on network Entity {entityId}.");
 
@@ -1974,7 +2945,10 @@ internal sealed class NetworkSession : IDisposable
                 componentId,
                 applyKind,
                 packet.Header.SceneEpoch,
-                packet.Header.ServerTick));
+                packet.Header.ServerTick)
+            {
+                Scope = scopeId
+            });
             _lastStateSequences[key] = sequence;
             if (_pendingLiveSpawns.TryGetValue(entityId, out var pending))
                 pending.RemainingComponentIds.Remove(componentId);
@@ -1994,18 +2968,19 @@ internal sealed class NetworkSession : IDisposable
         if (IsStaleScenePacket(packet.Header))
             return;
         ValidateCurrentScenePacket(packet.Header, requireNextRevision: false);
-        if (packet.Header.StructuralRevision != StructuralRevision || World is null)
+        if (packet.Header.StructuralRevision != peer.ProjectedStructuralRevision || World is null)
             return;
 
         var reader = new NetworkReader(packet.Payload.Span);
         var sequence = reader.ReadUInt32();
+        var scopeId = new NetworkReplicationScopeId(reader.ReadUInt32());
         var entityId = new NetworkEntityId(reader.ReadUInt64());
         var position = ReadVector2(ref reader);
         var rotation = reader.ReadSingle();
         var scale = ReadVector2(ref reader);
         reader.EnsureComplete();
 
-        if (!entityId.IsValid)
+        if (!scopeId.IsValid || !entityId.IsValid)
             throw new NetworkProtocolException(
                 "A client transform update contains network Entity ID zero.");
         if (!IsFinite(position) || !float.IsFinite(rotation) || !IsFinite(scale))
@@ -2014,7 +2989,9 @@ internal sealed class NetworkSession : IDisposable
 
         // Ownership and authority may legitimately change while an unreliable packet is in flight.
         // Drop stale/unauthorized poses instead of disconnecting an otherwise valid peer.
-        if (!World.TryGetEntity(entityId, out var entity) || entity is null ||
+        if (!PeerScopeIsReady(peer, scopeId) ||
+            !World.TryGetRecord(entityId, out var record) || record is null || record.Scope != scopeId ||
+            !World.TryGetEntity(entityId, out var entity) || entity is null ||
             World.GetOwner(entityId) != peer.PeerId)
         {
             return;
@@ -2088,8 +3065,11 @@ internal sealed class NetworkSession : IDisposable
             new NetworkMessageContext(sender, sceneEpoch, serverTick));
     }
 
-    private bool IsStaleScenePacket(NetworkPacketHeader header) =>
-        header.SceneEpoch.IsValid && header.SceneEpoch.Value < SceneEpoch.Value;
+    private bool IsStaleScenePacket(NetworkPacketHeader header)
+    {
+        var expectedEpoch = _pendingSceneEpoch.IsValid ? _pendingSceneEpoch : SceneEpoch;
+        return header.SceneEpoch.IsValid && header.SceneEpoch.Value < expectedEpoch.Value;
+    }
 
     private static void RequireDelivery(
         QueuedTransportEvent transportEvent,
@@ -2206,7 +3186,10 @@ internal sealed class NetworkSession : IDisposable
             record.Owner,
             Role,
             sceneEpoch,
-            serverTick);
+            serverTick)
+        {
+            Scope = record.Scope
+        };
         NotifyNetworkSpawnReadyHierarchy(record.Entity, context);
     }
 
@@ -2244,6 +3227,233 @@ internal sealed class NetworkSession : IDisposable
         return value[..charsUsed];
     }
 
+    private NetworkReplicationScope GetAdditiveScope(NetworkReplicationScopeId scopeId)
+    {
+        if (!scopeId.IsValid || scopeId.IsGlobal ||
+            !_scopes.TryGetValue(scopeId, out var scope) || !scope.IsLoaded)
+            throw new KeyNotFoundException($"Replication scope {scopeId} is not a loaded additive scope.");
+        return scope;
+    }
+
+    private NetworkReplicationScope GetScopeForSpawn(NetworkReplicationScopeId scopeId)
+    {
+        if (!_scopes.TryGetValue(scopeId, out var scope) || !scope.IsLoaded)
+            throw new KeyNotFoundException($"Replication scope {scopeId} is not loaded.");
+        return scope;
+    }
+
+    private NetworkReplicationScope GetClientScope(NetworkReplicationScopeId scopeId)
+    {
+        if (IsServer || scopeId.IsGlobal || !_scopes.TryGetValue(scopeId, out var scope) || !scope.IsLoaded)
+            throw new InvalidOperationException($"Client replication scope {scopeId} is not loaded.");
+        return scope;
+    }
+
+    private NetworkPeer GetPeer(NetworkPeerId peerId)
+    {
+        if (!peerId.IsValid || !_peersById.TryGetValue(peerId, out var peer))
+            throw new KeyNotFoundException($"Network peer {peerId} is not connected.");
+        return peer;
+    }
+
+    private bool CanAssignScopeToPeer(
+        NetworkPeerId peerId,
+        NetworkReplicationScopeId scope) =>
+        scope.IsGlobal
+            ? _peersById.ContainsKey(peerId)
+            : IsPeerScopeReady(peerId, scope);
+
+    private bool PeerReceivesStructure(NetworkPeer peer, NetworkReplicationScopeId scope)
+    {
+        if (!ReceivesLiveStructure(peer))
+            return false;
+        if (scope.IsGlobal)
+            return true;
+        // Once the scoped baseline has been enqueued, reliable ordering guarantees that later
+        // structural packets reach the client only after baseline End made the local scope ready.
+        // Including AwaitingReady closes the mutation window between baseline capture and its ack;
+        // unreliable snapshots still wait for the server-observed Ready phase.
+        return peer.Phase == NetworkConnectionPhase.Ready &&
+               peer.ScopeSubscriptions.TryGetValue(scope, out var subscription) &&
+               subscription.Phase is NetworkScopeSubscriptionPhase.AwaitingReady or
+                   NetworkScopeSubscriptionPhase.Ready;
+    }
+
+    private bool PeerScopeIsReady(NetworkPeer peer, NetworkReplicationScopeId scope) =>
+        scope.IsGlobal
+            ? peer.Phase == NetworkConnectionPhase.Ready
+            : peer.Phase == NetworkConnectionPhase.Ready &&
+              peer.ScopeSubscriptions.TryGetValue(scope, out var subscription) &&
+              subscription.Phase == NetworkScopeSubscriptionPhase.Ready;
+
+    private NetworkStructuralRevision AdvancePeerRevision(NetworkPeer peer)
+    {
+        peer.ProjectedStructuralRevision = NextStructuralRevision(peer.ProjectedStructuralRevision);
+        return peer.ProjectedStructuralRevision;
+    }
+
+    private void ValidatePeerKnownProjection(NetworkPeer peer, NetworkPacketHeader header)
+    {
+        if (header.SceneEpoch != SceneEpoch)
+            throw new NetworkProtocolException(
+                $"Peer {peer.PeerId} used Scene epoch {header.SceneEpoch}; expected {SceneEpoch}.");
+        if (header.StructuralRevision.Value > peer.ProjectedStructuralRevision.Value)
+            throw new NetworkProtocolException(
+                $"Peer {peer.PeerId} claimed future projected revision {header.StructuralRevision}; " +
+                $"server has sent {peer.ProjectedStructuralRevision}.");
+    }
+
+    private void RemoveProjectedPlayersInScope(
+        NetworkPeer peer,
+        NetworkReplicationScopeId scope)
+    {
+        if (World is null)
+            return;
+        List<NetworkPeerId>? removals = null;
+        foreach (var mapping in peer.ProjectedPlayerEntities)
+            if (World.TryGetRecord(mapping.Value, out var record) && record?.Scope == scope)
+                (removals ??= []).Add(mapping.Key);
+        if (removals is null)
+            return;
+        foreach (var player in removals)
+        {
+            peer.ProjectedPlayerEntities.Remove(player);
+            SendPlayerMapping(peer, player, NetworkEntityId.None);
+        }
+    }
+
+    private static void RemoveProjectedEntityMappings(NetworkPeer peer, NetworkEntityId entity)
+    {
+        List<NetworkPeerId>? removals = null;
+        foreach (var mapping in peer.ProjectedPlayerEntities)
+            if (mapping.Value == entity)
+                (removals ??= []).Add(mapping.Key);
+        if (removals is not null)
+            foreach (var player in removals)
+                peer.ProjectedPlayerEntities.Remove(player);
+    }
+
+    private void SuspendScopeEntities(
+        NetworkReplicationScopeId scope,
+        SceneContentInstance content)
+    {
+        var states = new List<SuspendedEntityState>(content.OwnedEntities.Count);
+        foreach (var entity in content.OwnedEntities)
+        {
+            if (Entity.IsDestroyed(entity))
+                continue;
+            states.Add(new SuspendedEntityState(entity, entity.LocallyEnabled, entity.UpdatesSuspended));
+            entity.UpdatesSuspended = true;
+            entity.Enabled = false;
+        }
+        _suspendedScopeEntities.Add(scope, states);
+    }
+
+    private void RestoreScopeEntities(NetworkReplicationScopeId scope)
+    {
+        if (!_suspendedScopeEntities.Remove(scope, out var states))
+            return;
+        foreach (var state in states)
+        {
+            if (Entity.IsDestroyed(state.Entity))
+                continue;
+            state.Entity.Enabled = state.Enabled;
+            state.Entity.UpdatesSuspended = state.UpdatesSuspended;
+        }
+    }
+
+    private void RollbackClientScope(NetworkReplicationScopeId scopeId)
+    {
+        var cleanupErrors = new List<Exception>();
+        _clientScopeBaselines.Remove(scopeId);
+        _suspendedScopeEntities.Remove(scopeId);
+        SceneContentInstance? content = null;
+        if (_scopes.Remove(scopeId, out var removed))
+        {
+            removed.IsLoaded = false;
+            removed.IsReady = false;
+            content = removed.Content;
+        }
+        _retiredScopes.Add(scopeId);
+        if (World is not null)
+        {
+            try
+            {
+                World.UnregisterScope(scopeId, false);
+            }
+            catch (Exception exception)
+            {
+                cleanupErrors.Add(exception);
+            }
+            if (content?.IsLoaded == true)
+                try
+                {
+                    World.Scene.UnloadNetworkContent(content, _scopeCoordinator);
+                }
+                catch (Exception exception)
+                {
+                    cleanupErrors.Add(exception);
+                }
+        }
+        if (cleanupErrors.Count != 0)
+            throw new AggregateException(
+                $"One or more resources failed while rolling back replication scope {scopeId}.",
+                cleanupErrors);
+    }
+
+    private void ClearScopeState(bool unloadContent)
+    {
+        var scopes = _scopes.Values.ToArray();
+        foreach (var scope in scopes)
+        {
+            scope.IsLoaded = false;
+            scope.IsReady = false;
+        }
+
+        // Clear all observable scope/subscription state before invoking component cleanup.
+        _scopes.Clear();
+        _retiredScopes.Clear();
+        _knownScopeSources.Clear();
+        _clientScopeBaselines.Clear();
+        _suspendedScopeEntities.Clear();
+        foreach (var peer in _peersById.Values)
+        {
+            peer.ScopeSubscriptions.Clear();
+            peer.ProjectedPlayerEntities.Clear();
+        }
+
+        if (!unloadContent || World is null)
+            return;
+
+        var cleanupErrors = new List<Exception>();
+        foreach (var scope in scopes)
+        {
+            if (scope.IsGlobal)
+                continue;
+            try
+            {
+                World.UnregisterScope(scope.Id, false);
+            }
+            catch (Exception exception)
+            {
+                cleanupErrors.Add(exception);
+            }
+            if (scope.Content?.IsLoaded == true)
+                try
+                {
+                    World.Scene.UnloadNetworkContent(scope.Content, _scopeCoordinator);
+                }
+                catch (Exception exception)
+                {
+                    cleanupErrors.Add(exception);
+                }
+        }
+        if (cleanupErrors.Count != 0)
+            throw new AggregateException(
+                "One or more replication scopes failed during session cleanup.",
+                cleanupErrors);
+    }
+
     private void RejectProtocolError(TransportConnectionId connection, string diagnostic)
     {
         if (!connection.IsValid)
@@ -2266,6 +3476,13 @@ internal sealed class NetworkSession : IDisposable
         if (_nextPeerId == 0)
             throw new InvalidOperationException("Network peer ID space was exhausted.");
         return new NetworkPeerId(_nextPeerId++);
+    }
+
+    private NetworkReplicationScopeId AllocateScopeId()
+    {
+        if (_nextScopeId is 0 or 1)
+            throw new InvalidOperationException("Network replication scope ID space was exhausted.");
+        return new NetworkReplicationScopeId(_nextScopeId++);
     }
 
     private uint NextStateSequence()
@@ -2323,9 +3540,18 @@ internal sealed class NetworkSession : IDisposable
         NetworkEntityId EntityId,
         ushort ComponentId);
 
+    private readonly record struct ScopeSourceIdentity(
+        AssetId AssetId,
+        string? AssetName);
+
     private readonly record struct ClientTransformStateKey(
         NetworkPeerId PeerId,
         NetworkEntityId EntityId);
+
+    private readonly record struct SuspendedEntityState(
+        Entity Entity,
+        bool Enabled,
+        bool UpdatesSuspended);
 
     private sealed class PendingLiveSpawn
     {
