@@ -95,7 +95,11 @@ internal sealed class NetworkWorld : IDisposable
         {
             var marker = entity.GetComponent<NetworkObject>();
             if (marker is null) continue;
-            if (marker.Presence == NetworkPresence.ClientOnly) { DisableAndDestroy(entity); continue; }
+            if (marker.Presence == NetworkPresence.ClientOnly)
+            {
+                DisableAndDestroyNetworkHierarchy(entity);
+                continue;
+            }
             if (marker.Presence == NetworkPresence.ServerOnly) continue;
             var source = RequireSourceGuid(scope, entity, sources);
             var id = allocate();
@@ -148,7 +152,11 @@ internal sealed class NetworkWorld : IDisposable
         {
             var marker = entity.GetComponent<NetworkObject>();
             if (marker is null) continue;
-            if (marker.Presence == NetworkPresence.ServerOnly) { DisableAndDestroy(entity); continue; }
+            if (marker.Presence == NetworkPresence.ServerOnly)
+            {
+                DisableAndDestroyNetworkHierarchy(entity);
+                continue;
+            }
             if (marker.Presence == NetworkPresence.ClientOnly) continue;
             var source = RequireSourceGuid(scope, entity, sources);
             if (!bySource.TryGetValue(source, out var binding))
@@ -157,7 +165,7 @@ internal sealed class NetworkWorld : IDisposable
             consumed.Add(source);
             if (!binding.IsPresent)
             {
-                DisableAndDestroy(entity);
+                DisableAndDestroyNetworkHierarchy(entity);
                 continue;
             }
             Register(entity, marker, binding.NetworkEntityId, binding.Owner, NetworkSpawnOrigin.AuthoredScene,
@@ -292,7 +300,7 @@ internal sealed class NetworkWorld : IDisposable
     {
         var record = GetRecord(id);
         Unregister(id, notify);
-        DisableAndDestroy(record.Entity);
+        DisableAndDestroyNetworkHierarchy(record.Entity);
     }
     public void ReconcileDestroyedEntities()
     {
@@ -321,7 +329,7 @@ internal sealed class NetworkWorld : IDisposable
         if (!destroyDynamicEntities) return;
         foreach (var record in records)
             if (record.Origin == NetworkSpawnOrigin.DynamicBlueprint && !Entity.IsDestroyed(record.Entity))
-                DisableAndDestroy(record.Entity);
+                DisableAndDestroyNetworkHierarchy(record.Entity);
     }
 
     private void Register(Entity entity, NetworkObject marker, NetworkEntityId id, NetworkPeerId owner,
@@ -449,8 +457,38 @@ internal sealed class NetworkWorld : IDisposable
         return _byNetworkId.TryGetValue(id, out var record) ? record :
             throw new KeyNotFoundException($"Network entity {id} is not registered in epoch {SceneEpoch}.");
     }
-    private static void DisableAndDestroy(Entity entity)
-    { if (!Entity.IsDestroyed(entity)) { entity.Enabled = false; Entity.Destroy(entity); } }
+    /// <summary>
+    /// Destroys one network root and its ordinary hierarchy without crossing into another
+    /// NetworkObject's independent lifetime. Whole-Scene and whole-content teardown deliberately
+    /// do not use this boundary because those operations own every entity in their exact set.
+    /// </summary>
+    private static void DisableAndDestroyNetworkHierarchy(Entity entity)
+    {
+        if (Entity.IsDestroyed(entity))
+            return;
+
+        var nestedNetworkRoots = new List<Entity>();
+        CollectNestedNetworkRoots(entity, nestedNetworkRoots);
+        foreach (var nestedRoot in nestedNetworkRoots)
+            nestedRoot.SetParent(null, true);
+
+        entity.Enabled = false;
+        Entity.Destroy(entity);
+    }
+
+    private static void CollectNestedNetworkRoots(Entity root, List<Entity> result)
+    {
+        foreach (var child in root.Children)
+        {
+            if (child.GetComponent<NetworkObject>() is not null)
+            {
+                result.Add(child);
+                continue;
+            }
+
+            CollectNestedNetworkRoots(child, result);
+        }
+    }
     private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
 
     private readonly record struct AuthoredEntityKey(

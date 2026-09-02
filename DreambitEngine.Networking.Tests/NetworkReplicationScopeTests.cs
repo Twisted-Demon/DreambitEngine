@@ -708,6 +708,91 @@ public sealed class NetworkReplicationScopeTests
         Assert.True(client.World.TryGetEntity(secondGlobalId, out _));
     }
 
+    [Fact]
+    public void ListenHostAndRemotePeersUseScopesWithoutDuplicatingHostContent()
+    {
+        var hub = MultiClientInMemoryTransport.Create(2);
+        using var host = CreateSession(NetworkRole.Host, hub.Server, CreateReplication());
+        using var clientA = CreateSession(NetworkRole.Client, hub.Clients[0], CreateReplication());
+        using var clientB = CreateSession(NetworkRole.Client, hub.Clients[1], CreateReplication());
+        using var hostScene = new ScopeTestScene();
+        using var sceneA = new ScopeTestScene();
+        using var sceneB = new ScopeTestScene();
+        var village = CreateScopeBlueprint("host-village", Guid.NewGuid());
+        var tree = CreateScopeBlueprint("host-tree", Guid.NewGuid());
+        var dynamicBlueprint = CreateDynamicBlueprint();
+        Assert.True(Resources.TryRegisterAsset(village));
+        Assert.True(Resources.TryRegisterAsset(tree));
+        Assert.True(Resources.TryRegisterAsset(dynamicBlueprint));
+
+        host.Start();
+        clientA.Start();
+        clientB.Start();
+        Pump(host, [clientA, clientB], 8);
+        host.AfterSceneAssigned(hostScene);
+        clientA.AfterSceneAssigned(sceneA);
+        clientB.AfterSceneAssigned(sceneB);
+        var villageScope = host.LoadScope(village.AssetName!);
+        var treeScope = host.LoadScope(tree.AssetName!);
+        var hostContentCount = hostScene.ContentInstances.Count;
+
+        host.Subscribe(host.LocalPeerId, villageScope);
+        host.Subscribe(clientA.LocalPeerId, villageScope);
+        host.Subscribe(clientB.LocalPeerId, treeScope);
+        Pump(host, [clientA, clientB], 10);
+
+        Assert.True(host.IsPeerScopeReady(host.LocalPeerId, villageScope));
+        Assert.True(host.IsPeerScopeReady(clientA.LocalPeerId, villageScope));
+        Assert.True(host.IsPeerScopeReady(clientB.LocalPeerId, treeScope));
+        Assert.Equal(2, hostContentCount);
+        Assert.Equal(hostContentCount, hostScene.ContentInstances.Count);
+        Assert.Single(sceneA.ContentInstances);
+        Assert.Single(sceneB.ContentInstances);
+        Assert.True(clientA.TryGetScope(villageScope, out _));
+        Assert.False(clientA.TryGetScope(treeScope, out _));
+        Assert.True(clientB.TryGetScope(treeScope, out _));
+        Assert.False(clientB.TryGetScope(villageScope, out _));
+
+        var villageEntity = host.Spawn(
+            dynamicBlueprint,
+            new NetworkSpawnOptions { Scope = villageScope });
+        var treeEntity = host.Spawn(
+            dynamicBlueprint,
+            new NetworkSpawnOptions { Scope = treeScope });
+        var globalEntity = host.Spawn(dynamicBlueprint);
+        Pump(host, [clientA, clientB], 8);
+        Assert.True(host.World!.TryGetNetworkId(villageEntity, out var villageId));
+        Assert.True(host.World.TryGetNetworkId(treeEntity, out var treeId));
+        Assert.True(host.World.TryGetNetworkId(globalEntity, out var globalId));
+        Assert.True(clientA.World!.TryGetEntity(villageId, out _));
+        Assert.False(clientA.World.TryGetEntity(treeId, out _));
+        Assert.True(clientB.World!.TryGetEntity(treeId, out _));
+        Assert.False(clientB.World.TryGetEntity(villageId, out _));
+        Assert.True(clientA.World.TryGetEntity(globalId, out _));
+        Assert.True(clientB.World.TryGetEntity(globalId, out _));
+
+        host.Subscribe(host.LocalPeerId, treeScope);
+        host.Unsubscribe(host.LocalPeerId, villageScope);
+
+        Assert.False(host.IsPeerSubscribed(host.LocalPeerId, villageScope));
+        Assert.True(host.IsPeerScopeReady(host.LocalPeerId, treeScope));
+        Assert.True(host.IsPeerScopeReady(clientA.LocalPeerId, villageScope));
+        Assert.True(host.IsPeerScopeReady(clientB.LocalPeerId, treeScope));
+        Assert.Equal(hostContentCount, hostScene.ContentInstances.Count);
+        Assert.True(host.World.TryGetEntity(villageId, out _));
+        Assert.True(host.World.TryGetEntity(treeId, out _));
+        Assert.True(host.TryGetScope(villageScope, out _));
+        Assert.True(host.TryGetScope(treeScope, out _));
+
+        var laterGlobal = host.Spawn(dynamicBlueprint);
+        Pump(host, [clientA, clientB], 5);
+        Assert.True(host.World.TryGetNetworkId(laterGlobal, out var laterGlobalId));
+        Assert.True(clientA.World.TryGetEntity(laterGlobalId, out _));
+        Assert.True(clientB.World.TryGetEntity(laterGlobalId, out _));
+        Assert.True(clientA.IsConnected);
+        Assert.True(clientB.IsConnected);
+    }
+
     private static NetworkReplicationRegistry CreateReplication()
     {
         var registry = new NetworkReplicationRegistry();

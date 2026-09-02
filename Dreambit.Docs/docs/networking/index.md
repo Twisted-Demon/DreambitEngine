@@ -514,6 +514,23 @@ network.UnloadScope(village);
 `UnloadScope` rejects the request while any peer subscription remains. This explicit invariant
 keeps game policy—grace periods, population rules, and zone persistence—outside the engine.
 
+On a listen host, the local peer uses the authoritative Scene and its already-loaded server scope
+content. Subscribing the host-local peer updates readiness/interest state; it does not materialize a
+second client-side `SceneContentInstance`. Remote clients still load their own local content through
+the normal scope handshake.
+
+!!! warning "Replication scopes share one simulation space"
+    A replication scope controls network visibility and remote-client additive content lifetime. It
+    is not a separate ECS, physics world, render world, or spatial-query space. Every simultaneously
+    loaded server scope occupies the same authoritative Scene coordinate system; on a listen host,
+    all server-loaded scope content also belongs to the same renderable Scene.
+
+    Independently authored areas at overlapping coordinates can therefore collide, appear in the
+    same server-side queries, or interact through ordinary gameplay systems. Games such as
+    Rootbound should initially place concurrently loaded areas in distinct world-space regions—for
+    example, one near `(0, 0)`, another near `(100000, 0)`, and another near `(200000, 0)`. The exact
+    placement policy belongs to the game.
+
 The relevant identities have deliberately different meanings:
 
 | Identity | Meaning |
