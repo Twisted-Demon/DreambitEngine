@@ -33,6 +33,38 @@ public sealed class SceneAdditiveTiledTests
     }
 
     [Fact]
+    public void DeferredContentUnloadInvalidatesTiledMapBeforeSafelyDisposingItsEntities()
+    {
+        using var scene = new AdditiveTestScene();
+        var content = LoadTiled(
+            scene,
+            CreateTiledSource("deferred"),
+            CreateEmptyMap("maps/deferred"));
+        var map = content.TiledMap!;
+        var ownedEntities = map.OwnedEntities.ToArray();
+        scene.FlushStructuralChanges();
+
+        scene.RunAtContentCallbackBoundary(() =>
+        {
+            Assert.True(scene.Unload(content));
+
+            Assert.False(content.IsLoaded);
+            Assert.True(map.IsUnloaded);
+            Assert.Throws<ObjectDisposedException>(() => map.GetRuntimeTileLayer("Ground"));
+            Assert.All(ownedEntities, entity =>
+            {
+                Assert.False(Entity.IsNull(entity));
+                Assert.False(entity.Enabled);
+                Assert.True(entity.UpdatesSuspended);
+            });
+        });
+
+        Assert.All(ownedEntities, entity => Assert.True(Entity.IsNull(entity)));
+        Assert.Empty(scene.ContentInstances);
+        Assert.DoesNotContain(scene.GetAllEntities(), entity => entity.IsTiledGenerated);
+    }
+
+    [Fact]
     public void AdditiveGeneratedEntitiesCannotRouteIntoDocumentImportedSourceOverrides()
     {
         using var scene = new AdditiveTestScene();

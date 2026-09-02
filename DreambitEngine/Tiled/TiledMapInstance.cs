@@ -188,10 +188,7 @@ public sealed class TiledMapInstance : IDisposable
             }
         }
 
-        IsUnloaded = true;
-        _automapper?.Clear();
-        _pendingCellChanges.Clear();
-        _dirtyRenderChunks.Clear();
+        Invalidate();
         var cleanupErrors = new List<Exception>();
         for (var index = _ownedEntities.Count - 1; index >= 0; index--)
         {
@@ -214,6 +211,22 @@ public sealed class TiledMapInstance : IDisposable
             throw new AggregateException(
                 $"One or more Entities failed while unloading Tiled map '{Identifier}'.",
                 cleanupErrors);
+    }
+
+    /// <summary>
+    /// Makes an additive map unavailable without destroying renderer resources while a Scene
+    /// callback still holds Component references. The outer SceneContentInstance owns and later
+    /// destroys the exact Entity set at the safe callback boundary.
+    /// </summary>
+    internal void InvalidateForDeferredContentUnload()
+    {
+        if (IsUnloaded)
+            return;
+        if (_contentOwner is null)
+            throw new InvalidOperationException(
+                "Only a Tiled map owned by additive Scene content can use deferred invalidation.");
+
+        Invalidate();
     }
 
     public void Dispose()
@@ -330,6 +343,14 @@ public sealed class TiledMapInstance : IDisposable
         foreach (var component in entity.GetAllComponents())
             if (component is DrawableComponent drawable)
                 drawable.DrawLayer = drawLayer;
+    }
+
+    private void Invalidate()
+    {
+        IsUnloaded = true;
+        _automapper?.Clear();
+        _pendingCellChanges.Clear();
+        _dirtyRenderChunks.Clear();
     }
 
     private void TrackSingleEntity(Entity entity)

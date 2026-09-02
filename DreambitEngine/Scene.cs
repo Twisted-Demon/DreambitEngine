@@ -306,8 +306,18 @@ public class Scene : IDisposable
         {
             instance.BeginUnload();
             var cleanupErrors = new List<Exception>();
-            InvalidateTiledContent(instance, cleanupErrors);
+            var deferForContentCallbacks = _contentCallbackBoundaryDepth > 0;
+            if (deferForContentCallbacks)
+                InvalidateTiledContentForDeferredUnload(instance, cleanupErrors);
+            else
+                InvalidateTiledContent(instance, cleanupErrors);
             DisableAndSuspendOwnedEntities(instance);
+
+            if (deferForContentCallbacks)
+            {
+                _pendingContentUnloads.Add(new PendingContentUnload(instance, cleanupErrors));
+                return true;
+            }
 
             if (Entities.IsIterating)
             {
@@ -519,6 +529,7 @@ public class Scene : IDisposable
     private readonly ReadOnlyCollection<SceneContentInstance> _contentInstancesView;
     private SceneContentInstance? _activeContentOwner;
     private bool _contentMutationInProgress;
+    private int _contentCallbackBoundaryDepth;
 
     private sealed record PendingContentUnload(
         SceneContentInstance Instance,
@@ -717,7 +728,10 @@ public class Scene : IDisposable
     {
         ScriptingManager.Update();
         RunAtContentStructuralBoundary(ContentRepositoryWork.Tick);
-        _coroutineScheduler.Update();
+        RunAtContentCallbackBoundary(
+            _coroutineScheduler,
+            static scheduler => scheduler.Update(),
+            "CoroutineScheduler.Update");
     }
 
     /// <summary>
@@ -729,6 +743,14 @@ public class Scene : IDisposable
         if (State != SceneState.Running)
             return;
 
+        RunAtContentCallbackBoundary(
+            this,
+            static scene => scene.RouteUiInputCore(),
+            "UI input routing");
+    }
+
+    private void RouteUiInputCore()
+    {
         var frameEntries = Drawables.GetAllUiFrames()
             .Select((frame, index) => (frame, index))
             .ToList();
@@ -778,7 +800,10 @@ public class Scene : IDisposable
 
     private void EndOfFrame()
     {
-        _coroutineScheduler.EndOfFrame();
+        RunAtContentCallbackBoundary(
+            _coroutineScheduler,
+            static scheduler => scheduler.EndOfFrame(),
+            "CoroutineScheduler.EndOfFrame");
     }
 
     /// <summary>
@@ -1029,7 +1054,10 @@ public class Scene : IDisposable
         {
             OnPhysicsUpdate();
             RunAtContentStructuralBoundary(ContentRepositoryWork.PhysicsTick);
-            _coroutineScheduler.FixedUpdate();
+            RunAtContentCallbackBoundary(
+                _coroutineScheduler,
+                static scheduler => scheduler.FixedUpdate(),
+                "CoroutineScheduler.FixedUpdate");
         }
     }
 
@@ -1041,7 +1069,10 @@ public class Scene : IDisposable
         if (State != SceneState.Running) return;
 
         //Guard.SafeCall(_renderPipeline.OnDraw, "RenderPipeline.OnDraw");
-        _renderPipeline.OnDraw();
+        RunAtContentCallbackBoundary(
+            this,
+            static scene => scene._renderPipeline.OnDraw(),
+            "RenderPipeline.OnDraw");
     }
 
     /// <summary>
@@ -1060,7 +1091,14 @@ public class Scene : IDisposable
 
         var viewportSize = new Point(target.Width, target.Height);
         EnsureRenderPipelineInitialized(viewportSize);
-        _renderPipeline.Render(camera, target, viewportSize, false);
+        RunAtContentCallbackBoundary(
+            (Scene: this, Target: target, Camera: camera, ViewportSize: viewportSize),
+            static request => request.Scene._renderPipeline.Render(
+                request.Camera,
+                request.Target,
+                request.ViewportSize,
+                false),
+            "RenderPipeline.RenderTo");
     }
 
     #endregion
@@ -1593,6 +1631,14 @@ public class Scene : IDisposable
             TryContentCleanup(cleanupErrors, tiledMap.Unload);
     }
 
+    private static void InvalidateTiledContentForDeferredUnload(
+        SceneContentInstance instance,
+        List<Exception> cleanupErrors)
+    {
+        if (instance.TiledMap is { IsUnloaded: false } tiledMap)
+            TryContentCleanup(cleanupErrors, tiledMap.InvalidateForDeferredContentUnload);
+    }
+
     private void FinalizeContentUnload(
         SceneContentInstance instance,
         List<Exception> cleanupErrors)
@@ -1685,9 +1731,68 @@ public class Scene : IDisposable
             ExceptionDispatchInfo.Capture(contentException).Throw();
     }
 
+    /// <summary>
+    /// Runs callbacks that may retain Entity or Component references while user code executes.
+    /// Additive content becomes logically unavailable immediately when unloaded from the callback,
+    /// but exact Entity destruction is delayed until the outermost callback boundary exits.
+    /// </summary>
+    internal void RunAtContentCallbackBoundary(Action callback)
+    {
+        ArgumentNullException.ThrowIfNull(callback);
+        RunAtContentCallbackBoundary(
+            callback,
+            static action => action(),
+            "Scene component callbacks");
+    }
+
+    private void RunAtContentCallbackBoundary<TState>(
+        TState state,
+        Action<TState> callback,
+        string callbackName)
+    {
+        Exception? callbackException = null;
+        Exception? contentException = null;
+        _contentCallbackBoundaryDepth++;
+        try
+        {
+            callback(state);
+        }
+        catch (Exception exception)
+        {
+            callbackException = exception;
+        }
+        finally
+        {
+            _contentCallbackBoundaryDepth--;
+            if (_contentCallbackBoundaryDepth == 0)
+            {
+                try
+                {
+                    ProcessPendingContentUnloads();
+                }
+                catch (Exception exception)
+                {
+                    contentException = exception;
+                }
+            }
+        }
+
+        if (callbackException is not null && contentException is not null)
+            throw new AggregateException(
+                $"{callbackName} and additive content cleanup both failed.",
+                callbackException,
+                contentException);
+        if (callbackException is not null)
+            ExceptionDispatchInfo.Capture(callbackException).Throw();
+        if (contentException is not null)
+            ExceptionDispatchInfo.Capture(contentException).Throw();
+    }
+
     private void ProcessPendingContentUnloads()
     {
-        if (Entities.IsIterating || _pendingContentUnloads.Count == 0)
+        if (Entities.IsIterating ||
+            _contentCallbackBoundaryDepth > 0 ||
+            _pendingContentUnloads.Count == 0)
             return;
 
         var allErrors = new List<Exception>();

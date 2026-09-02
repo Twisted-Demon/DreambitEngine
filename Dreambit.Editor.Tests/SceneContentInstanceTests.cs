@@ -343,6 +343,82 @@ public sealed class SceneContentInstanceTests
     }
 
     [Fact]
+    public void UnloadDuringDrawDefersPhysicalDisposalUntilRenderCallbackBoundaryEnds()
+    {
+        using var scene = new AdditiveTestScene();
+        var instance = scene.LoadAdditive(CreateRenderCallbackSource("draw"));
+        var unloadingDrawable = instance.RootEntities[0]
+            .AttachComponent<UnloadDuringDrawDrawable>();
+        var retainedDrawable = instance.RootEntities[1]
+            .AttachComponent<AdditiveRenderLifetimeProbe>();
+        unloadingDrawable.Target = instance;
+        scene.FlushStructuralChanges();
+
+        scene.RunAtContentCallbackBoundary(() =>
+        {
+            unloadingDrawable.Draw();
+
+            Assert.False(instance.IsLoaded);
+            Assert.False(unloadingDrawable.WasDisposed);
+            Assert.False(unloadingDrawable.WasDisposedWhenUnloadReturned);
+            Assert.False(retainedDrawable.WasDisposed);
+            Assert.NotNull(unloadingDrawable.Entity);
+            Assert.NotNull(retainedDrawable.Entity);
+            Assert.False(unloadingDrawable.Entity.Enabled);
+            Assert.True(unloadingDrawable.Entity.UpdatesSuspended);
+
+            // This models the next entry in AlbedoPass's already-captured render list.
+            retainedDrawable.Draw();
+            Assert.True(retainedDrawable.DrawObservedLiveEntity);
+        });
+
+        Assert.True(unloadingDrawable.WasDisposed);
+        Assert.True(retainedDrawable.WasDisposed);
+        Assert.Null(unloadingDrawable.Entity);
+        Assert.Null(retainedDrawable.Entity);
+        Assert.Empty(scene.ContentInstances);
+        Assert.Null(scene.FindEntity("draw-unloader"));
+        Assert.Null(scene.FindEntity("draw-retained"));
+    }
+
+    [Fact]
+    public void UnloadDuringPreDrawDefersPhysicalDisposalUntilRenderCallbackBoundaryEnds()
+    {
+        using var scene = new AdditiveTestScene();
+        var instance = scene.LoadAdditive(CreateRenderCallbackSource("predraw"));
+        var unloadingDrawable = instance.RootEntities[0]
+            .AttachComponent<UnloadDuringPreDrawDrawable>();
+        var retainedDrawable = instance.RootEntities[1]
+            .AttachComponent<AdditiveRenderLifetimeProbe>();
+        unloadingDrawable.Target = instance;
+        scene.FlushStructuralChanges();
+
+        scene.RunAtContentCallbackBoundary(() =>
+        {
+            unloadingDrawable.PreDraw();
+
+            Assert.False(instance.IsLoaded);
+            Assert.False(unloadingDrawable.WasDisposed);
+            Assert.False(unloadingDrawable.WasDisposedWhenUnloadReturned);
+            Assert.False(retainedDrawable.WasDisposed);
+            Assert.NotNull(unloadingDrawable.Entity);
+            Assert.NotNull(retainedDrawable.Entity);
+
+            // PreDraw also walks the render list captured by SortDrawablesPass.
+            retainedDrawable.PreDraw();
+            Assert.True(retainedDrawable.PreDrawObservedLiveEntity);
+        });
+
+        Assert.True(unloadingDrawable.WasDisposed);
+        Assert.True(retainedDrawable.WasDisposed);
+        Assert.Null(unloadingDrawable.Entity);
+        Assert.Null(retainedDrawable.Entity);
+        Assert.Empty(scene.ContentInstances);
+        Assert.Null(scene.FindEntity("predraw-unloader"));
+        Assert.Null(scene.FindEntity("predraw-retained"));
+    }
+
+    [Fact]
     public void UnloadValidationAndSceneDisposalInvalidateHandles()
     {
         var scene = new AdditiveTestScene();
@@ -502,6 +578,16 @@ public sealed class SceneContentInstanceTests
         Entities = [new EntityBlueprint { Name = rootName }]
     };
 
+    private static SceneBlueprint CreateRenderCallbackSource(string name) => new()
+    {
+        Name = name,
+        Entities =
+        [
+            new EntityBlueprint { Name = $"{name}-unloader" },
+            new EntityBlueprint { Name = $"{name}-retained" }
+        ]
+    };
+
     private static ComponentBlueprint Component<T>(params (string Name, string Value)[] properties)
         where T : Component
     {
@@ -599,6 +685,66 @@ public sealed class UnloadDuringDisposeComponent : Component
     {
         if (Target is { IsLoaded: true } target && Scene.Unload(target))
             UnloadCount++;
+    }
+}
+
+public sealed class UnloadDuringDrawDrawable : DrawableComponent
+{
+    public SceneContentInstance? Target { get; set; }
+    public bool WasDisposed { get; private set; }
+    public bool WasDisposedWhenUnloadReturned { get; private set; }
+
+    protected override void OnDraw()
+    {
+        if (Target is { IsLoaded: true } target)
+            Scene.Unload(target);
+        WasDisposedWhenUnloadReturned = WasDisposed;
+    }
+
+    protected override void OnDisposing()
+    {
+        WasDisposed = true;
+    }
+}
+
+public sealed class UnloadDuringPreDrawDrawable : DrawableComponent
+{
+    public SceneContentInstance? Target { get; set; }
+    public bool WasDisposed { get; private set; }
+    public bool WasDisposedWhenUnloadReturned { get; private set; }
+
+    public override void OnPreDraw()
+    {
+        if (Target is { IsLoaded: true } target)
+            Scene.Unload(target);
+        WasDisposedWhenUnloadReturned = WasDisposed;
+    }
+
+    protected override void OnDisposing()
+    {
+        WasDisposed = true;
+    }
+}
+
+public sealed class AdditiveRenderLifetimeProbe : DrawableComponent
+{
+    public bool WasDisposed { get; private set; }
+    public bool DrawObservedLiveEntity { get; private set; }
+    public bool PreDrawObservedLiveEntity { get; private set; }
+
+    protected override void OnDraw()
+    {
+        DrawObservedLiveEntity = !WasDisposed && Entity is not null;
+    }
+
+    public override void OnPreDraw()
+    {
+        PreDrawObservedLiveEntity = !WasDisposed && Entity is not null;
+    }
+
+    protected override void OnDisposing()
+    {
+        WasDisposed = true;
     }
 }
 
