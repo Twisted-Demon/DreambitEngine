@@ -712,11 +712,10 @@ public class Collider : Component
 
     #region Events / Callbacks
 
-    public Action<Collider> OnCollisionEnter;
+    public event Action<Collider>? OnCollisionEnter;
 
-    public Action<Collider> OnCollisionStay;
-
-    public Action<Collider> OnCollisionExit;
+    public event Action<Collider>? OnCollisionStay;
+    public event Action<Collider>? OnCollisionExit;
 
     #endregion
 
