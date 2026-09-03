@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+// ReSharper disable UnusedAutoPropertyAccessor.Global
 
 namespace Dreambit.ECS;
 
@@ -12,7 +13,7 @@ public class SpriteAnimator : Component
     private readonly Queue<SpriteAnimation> _animationQueue = [];
 
     [FromRequired]
-    private SpriteDrawer _spriteDrawer;
+    private SpriteDrawer? SpriteDrawer { get; set; }
 
     private float _elapsedFrameTime;
     private float _playSpeed = 1f;
@@ -37,7 +38,7 @@ public class SpriteAnimator : Component
         }
     }
 
-    public event Action<SpriteAnimation> AnimationCompleted;
+    public event Action<SpriteAnimation>? AnimationCompleted;
 
     public SpriteAnimation? Animation { get; private set; }
     public SpriteAnimationFrame? CurrentFrame => Animation?[CurrentFrameIndex];
@@ -221,6 +222,12 @@ public class SpriteAnimator : Component
 
     private void AdvanceFrame()
     {
+        if (Animation is null)
+        {
+            Stop();
+            return;
+        }
+        
         if (CurrentFrameIndex + 1 < Animation.FrameCount)
         {
             SetCurrentFrame(CurrentFrameIndex + 1, dispatchEvent: true);
@@ -232,6 +239,12 @@ public class SpriteAnimator : Component
 
     private void CompleteAnimationIteration()
     {
+        if (Animation is null)
+        {
+            Stop();
+            return;
+        }
+        
         var completedAnimation = Animation;
         var playbackVersion = _playbackVersion;
         AnimationCompleted?.Invoke(completedAnimation);
@@ -284,7 +297,13 @@ public class SpriteAnimator : Component
 
     private void SetCurrentFrame(int frameIndex, bool dispatchEvent)
     {
-        ArgumentNullException.ThrowIfNull(Animation);
+        ArgumentNullException.ThrowIfNull(SpriteDrawer);
+
+        if (Animation is null)
+        {
+            Stop();
+            return;
+        }
 
         CurrentFrameIndex = frameIndex;
         _currentFrameEventDispatched = false;
@@ -294,7 +313,7 @@ public class SpriteAnimator : Component
 
         ArgumentNullException.ThrowIfNull(sprite);
 
-        _spriteDrawer.SetSprite(sprite);
+        SpriteDrawer.SetSprite(sprite);
 
         if (dispatchEvent)
             DispatchCurrentFrameEvent();
@@ -309,7 +328,7 @@ public class SpriteAnimator : Component
         if (_eventHandlers.TryGetValue(animationEvent.Name, out var handler))
             handler.Invoke(animationEvent);
     }
-
+    
     private static void ThrowIfInvalid(SpriteAnimation animation)
     {
         var errors = animation.GetValidationErrors();
@@ -325,6 +344,6 @@ public class SpriteAnimator : Component
         Animation = null;
         _animationQueue.Clear();
         _eventHandlers.Clear();
-        _spriteDrawer = null;
+        SpriteDrawer = null;
     }
 }
