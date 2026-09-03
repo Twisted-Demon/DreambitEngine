@@ -65,6 +65,7 @@ public sealed class NetworkLifecycleTests
 
         serverState.Value = 99;
         server.SendSnapshotNow();
+        Assert.Empty(serverState.Applied);
         Pump(server, client);
 
         Assert.Equal(99, clientState.Value);
@@ -74,6 +75,53 @@ public sealed class NetworkLifecycleTests
         Assert.Equal(99, clientState.Applied[1].Value);
         Assert.Equal(1, clientState.ReadyCount);
         Assert.Equal(1, clientProbe.ReadyCount);
+    }
+
+    [Fact]
+    public void ListenHostIsNotifiedWhenItPublishesSnapshotState()
+    {
+        using var transport = new SessionHandshakeTests.StandaloneInMemoryServerTransportForTests();
+        using var host = CreateSession(NetworkRole.Host, transport, CreateReplication());
+        using var scene = new TestScene();
+        var blueprint = CreateDynamicBlueprint();
+        Assert.True(Resources.TryRegisterAsset(blueprint));
+
+        host.Start();
+        host.AfterSceneAssigned(scene);
+
+        var state = host.Spawn(
+                blueprint,
+                entity => entity.GetComponent<LifecycleState>().Value = 42)
+            .GetComponent<LifecycleState>();
+
+        var initial = Assert.Single(state.Applied);
+        Assert.Equal(NetworkStateApplyKind.InitialSpawn, initial.Context.Kind);
+        Assert.Equal(42, initial.Value);
+
+        state.Value = 99;
+        host.SendSnapshotNow();
+
+        var applied = state.Applied[1];
+        Assert.Equal(NetworkStateApplyKind.Snapshot, applied.Context.Kind);
+        Assert.Equal(99, applied.Value);
+    }
+
+    [Fact]
+    public void ListenHostIsNotifiedWhenItsInitialBaselineBecomesAvailable()
+    {
+        using var transport = new SessionHandshakeTests.StandaloneInMemoryServerTransportForTests();
+        using var host = CreateSession(NetworkRole.Host, transport, CreateReplication());
+        var sourceGuid = Guid.NewGuid();
+        using var scene = CreateAuthoredScene(sourceGuid, 73);
+
+        host.Start();
+        host.AfterSceneAssigned(scene);
+        scene.Tick();
+
+        var state = scene.FindEntity(sourceGuid)!.GetComponent<LifecycleState>();
+        var applied = Assert.Single(state.Applied);
+        Assert.Equal(NetworkStateApplyKind.InitialBaseline, applied.Context.Kind);
+        Assert.Equal(73, applied.Value);
     }
 
     [Fact]
@@ -99,6 +147,7 @@ public sealed class NetworkLifecycleTests
         var serverState = serverScene.FindEntity(sourceGuid)!.GetComponent<LifecycleState>();
         Assert.Equal(73, serverState.ValueDuringReady);
         Assert.Equal(1, serverState.ReadyCount);
+        Assert.Empty(serverState.Applied);
 
         client.Start();
         Synchronize(server, client, () => clientScene);

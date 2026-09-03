@@ -224,15 +224,20 @@ public abstract class Component : IDisposable
 
     /// <summary>
     /// Called on a replicated Component after one complete authoritative payload has been applied
-    /// to it on a remote client.
+    /// to it on a remote client, or when the equivalent initial state or snapshot becomes available
+    /// to a listen host.
     /// </summary>
     /// <param name="context">The applied Component identity, synchronization kind, Scene, and tick.</param>
     /// <remarks>
-    /// All <see cref="Networking.Replication.ReplicatedAttribute"/> members on this Component have
-    /// been decoded before the callback runs. During initial synchronization, other replicated
-    /// Components on the Entity may still be pending; use <see cref="OnNetworkSpawnReady"/> for work
-    /// that requires the entire Entity to be initialized. Direct authoritative assignments on a
-    /// server or host do not invoke this callback.
+    /// On a remote client, all <see cref="Networking.Replication.ReplicatedAttribute"/> members on
+    /// this Component have been decoded before the callback runs. During initial synchronization,
+    /// other replicated Components on the Entity may still be pending; use
+    /// <see cref="OnNetworkSpawnReady"/> for work that requires the entire Entity to be initialized.
+    /// A listen host does not decode a loopback payload; instead, it receives the equivalent
+    /// <see cref="NetworkStateApplyKind.InitialSpawn"/>,
+    /// <see cref="NetworkStateApplyKind.InitialBaseline"/>, or
+    /// <see cref="NetworkStateApplyKind.Snapshot"/> callback as state becomes available locally.
+    /// A dedicated server never receives this callback for its authoritative writes.
     /// </remarks>
     public virtual void OnNetworkStateApplied(NetworkStateAppliedContext context)
     {
