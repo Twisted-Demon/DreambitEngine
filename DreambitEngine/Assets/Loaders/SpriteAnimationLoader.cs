@@ -4,16 +4,16 @@ using System.Linq;
 
 namespace Dreambit;
 
-public class SpriteSheetAnimationLoader : AssetLoaderBase
+public class SpriteAnimationLoader : AssetLoaderBase
 {
     public override string Extension { get; } = ".jsonb";
     public override bool AddToDisposableList { get; } = true;
-    public override Type TargetType { get; } = typeof(SpriteSheetAnimation);
+    public override Type TargetType { get; } = typeof(SpriteAnimation);
 
     public override object Load(string assetName, string pakName, bool usePak, string contentDirectory)
     {
         using var stream = GetStream(GetPath(assetName), pakName, usePak, contentDirectory);
-        var animation = JsnbLoader.Deserialize<SpriteSheetAnimation>(stream);
+        var animation = JsnbLoader.Deserialize<SpriteAnimation>(stream);
         animation.AssetName = assetName;
 
         var errors = animation.GetValidationErrors();

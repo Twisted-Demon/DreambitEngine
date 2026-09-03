@@ -12,7 +12,7 @@ internal static class AssetTypeClassifier
     private static readonly (AssetKind Kind, Type AssetType)[] SerializedTypes =
     [
         (AssetKind.SpriteSheet, typeof(SpriteSheet)),
-        (AssetKind.Animation, typeof(SpriteSheetAnimation)),
+        (AssetKind.Animation, typeof(SpriteAnimation)),
         (AssetKind.Blueprint, typeof(EntityBlueprint)),
         (AssetKind.ParticleEffect, typeof(ParticleFxConfig)),
         (AssetKind.SoundCue, typeof(SoundCue)),
@@ -26,7 +26,7 @@ internal static class AssetTypeClassifier
     private static readonly (string Suffix, AssetKind Kind, Type AssetType)[] LegacyJsonTypes =
     [
         (".spritesheet.json", AssetKind.SpriteSheet, typeof(SpriteSheet)),
-        (".animation.json", AssetKind.Animation, typeof(SpriteSheetAnimation)),
+        (".animation.json", AssetKind.Animation, typeof(SpriteAnimation)),
         (".blueprint.json", AssetKind.Blueprint, typeof(EntityBlueprint)),
         (".particlefx.json", AssetKind.ParticleEffect, typeof(ParticleFxConfig)),
         (".soundcue.json", AssetKind.SoundCue, typeof(SoundCue)),

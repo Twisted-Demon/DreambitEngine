@@ -24,6 +24,14 @@ public class Sprite : DreambitAsset
     [JsonProperty("source")] public Rectangle SourceRect { get; init; }
 
     [DreambitSerialize]
+    [JsonProperty("pivot_type")]
+    public PivotType PivotType { get; init; } = PivotType.Center;
+
+    [DreambitSerialize]
+    [JsonProperty("pivot")]
+    public Vector2 Pivot { get; set; }
+
+    [DreambitSerialize]
     [JsonProperty("pixels_per_unit")]
     public float PixelsPerUnit
     {

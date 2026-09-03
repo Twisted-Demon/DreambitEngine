@@ -344,7 +344,7 @@ public sealed class SceneDocumentTests : IDisposable
     }
 
     [Fact]
-    public void SpriteDrawerMembersWithNonPublicSettersRoundTripThroughBlueprints()
+    public void SpriteDrawerDoesNotCaptureSpriteOwnedPivotMembers()
     {
         var root = new EntityBlueprint
         {
@@ -354,12 +354,7 @@ public sealed class SceneDocumentTests : IDisposable
             [
                 new ComponentBlueprint
                 {
-                    Type = nameof(SpriteDrawer),
-                    Properties = new Dictionary<string, JToken>
-                    {
-                        [nameof(SpriteDrawer.Pivot)] = new JArray(24f, 41f),
-                        [nameof(SpriteDrawer.PivotType)] = (int)PivotType.Custom
-                    }
+                    Type = nameof(SpriteDrawer)
                 }
             ]
         };
@@ -370,12 +365,15 @@ public sealed class SceneDocumentTests : IDisposable
 
         var entity = Assert.Single(document.Scene!.GetAllEntities());
         var drawer = Assert.IsType<SpriteDrawer>(entity.GetComponent<SpriteDrawer>());
-        Assert.Equal(new Vector2(24f, 41f), drawer.Pivot);
-        Assert.Equal(PivotType.Custom, drawer.PivotType);
+        drawer.Sprite = new Sprite
+        {
+            Pivot = new Vector2(24f, 41f),
+            PivotType = PivotType.Custom
+        };
 
         var serialized = Assert.Single(document.CaptureSingleRoot().Components).Properties;
-        Assert.Equal(new[] { 24f, 41f }, serialized[nameof(SpriteDrawer.Pivot)]!.Values<float>());
-        Assert.Equal((int)PivotType.Custom, serialized[nameof(SpriteDrawer.PivotType)]!.Value<int>());
+        Assert.DoesNotContain(nameof(Sprite.Pivot), serialized.Keys);
+        Assert.DoesNotContain(nameof(Sprite.PivotType), serialized.Keys);
     }
 
     [Fact]
