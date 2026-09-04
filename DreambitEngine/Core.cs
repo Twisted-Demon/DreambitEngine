@@ -394,7 +394,15 @@ public class Core : Game
         var entityCount =
             CurrentScene?.Entities.Count ?? 0;
 
+        var clientState = string.Empty;
+
+        if (_networking is { IsConnected: true })
+        {
+            clientState = "HOST | ";
+        }
+
         Dreambit.Window.SetTitle(
+            clientState +
             $"{GameName} {framesPerSecond}fps | " +
             $"memory: {memoryMegabytes:F2}MB | " +
             $"entities: {entityCount}");

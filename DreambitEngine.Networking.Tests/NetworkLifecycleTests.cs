@@ -78,36 +78,56 @@ public sealed class NetworkLifecycleTests
     }
 
     [Fact]
-    public void ListenHostIsNotifiedWhenItPublishesSnapshotState()
+    public void ListenHostDoesNotApplyOutboundStateAndEachRemoteClientAppliesItOnce()
     {
-        using var transport = new SessionHandshakeTests.StandaloneInMemoryServerTransportForTests();
-        using var host = CreateSession(NetworkRole.Host, transport, CreateReplication());
-        using var scene = new TestScene();
+        var hub = MultiClientInMemoryTransport.Create(2);
+        using var host = CreateSession(NetworkRole.Host, hub.Server, CreateReplication());
+        using var clientA = CreateSession(NetworkRole.Client, hub.Clients[0], CreateReplication());
+        using var clientB = CreateSession(NetworkRole.Client, hub.Clients[1], CreateReplication());
+        using var hostScene = new TestScene();
+        using var clientSceneA = new TestScene();
+        using var clientSceneB = new TestScene();
         var blueprint = CreateDynamicBlueprint();
         Assert.True(Resources.TryRegisterAsset(blueprint));
 
         host.Start();
-        host.AfterSceneAssigned(scene);
+        clientA.Start();
+        clientB.Start();
+        Pump(host, [clientA, clientB]);
+        host.AfterSceneAssigned(hostScene);
+        clientA.AfterSceneAssigned(clientSceneA);
+        clientB.AfterSceneAssigned(clientSceneB);
 
-        var state = host.Spawn(
-                blueprint,
-                entity => entity.GetComponent<LifecycleState>().Value = 42)
-            .GetComponent<LifecycleState>();
+        var hostEntity = host.Spawn(
+            blueprint,
+            entity => entity.GetComponent<LifecycleState>().Value = 42);
+        var hostState = hostEntity.GetComponent<LifecycleState>();
+        Assert.Empty(hostState.Applied);
 
-        var initial = Assert.Single(state.Applied);
-        Assert.Equal(NetworkStateApplyKind.InitialSpawn, initial.Context.Kind);
-        Assert.Equal(42, initial.Value);
+        Pump(host, [clientA, clientB]);
 
-        state.Value = 99;
+        Assert.True(host.World!.TryGetNetworkId(hostEntity, out var entityId));
+        Assert.True(clientA.World!.TryGetEntity(entityId, out var entityA));
+        Assert.True(clientB.World!.TryGetEntity(entityId, out var entityB));
+        var stateA = entityA!.GetComponent<LifecycleState>();
+        var stateB = entityB!.GetComponent<LifecycleState>();
+
+        Assert.Equal(NetworkStateApplyKind.InitialSpawn, Assert.Single(stateA.Applied).Context.Kind);
+        Assert.Equal(NetworkStateApplyKind.InitialSpawn, Assert.Single(stateB.Applied).Context.Kind);
+
+        hostState.Value = 99;
         host.SendSnapshotNow();
+        Assert.Empty(hostState.Applied);
+        Pump(host, [clientA, clientB]);
 
-        var applied = state.Applied[1];
-        Assert.Equal(NetworkStateApplyKind.Snapshot, applied.Context.Kind);
-        Assert.Equal(99, applied.Value);
+        Assert.Equal(99, stateA.Value);
+        Assert.Equal(99, stateB.Value);
+        Assert.Single(stateA.Applied, applied => applied.Context.Kind == NetworkStateApplyKind.Snapshot);
+        Assert.Single(stateB.Applied, applied => applied.Context.Kind == NetworkStateApplyKind.Snapshot);
     }
 
     [Fact]
-    public void ListenHostIsNotifiedWhenItsInitialBaselineBecomesAvailable()
+    public void ListenHostDoesNotApplyItsAuthoritativeInitialBaseline()
     {
         using var transport = new SessionHandshakeTests.StandaloneInMemoryServerTransportForTests();
         using var host = CreateSession(NetworkRole.Host, transport, CreateReplication());
@@ -119,9 +139,8 @@ public sealed class NetworkLifecycleTests
         scene.Tick();
 
         var state = scene.FindEntity(sourceGuid)!.GetComponent<LifecycleState>();
-        var applied = Assert.Single(state.Applied);
-        Assert.Equal(NetworkStateApplyKind.InitialBaseline, applied.Context.Kind);
-        Assert.Equal(73, applied.Value);
+        Assert.Empty(state.Applied);
+        Assert.Equal(1, state.ReadyCount);
     }
 
     [Fact]
@@ -250,6 +269,22 @@ public sealed class NetworkLifecycleTests
             client.PollTransport();
             server.ApplyInbound();
             client.ApplyInbound();
+        }
+    }
+
+    private static void Pump(
+        NetworkSession server,
+        IReadOnlyList<NetworkSession> clients,
+        int count = 8)
+    {
+        for (var index = 0; index < count; index++)
+        {
+            server.PollTransport();
+            foreach (var client in clients)
+                client.PollTransport();
+            server.ApplyInbound();
+            foreach (var client in clients)
+                client.ApplyInbound();
         }
     }
 

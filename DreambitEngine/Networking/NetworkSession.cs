@@ -463,7 +463,6 @@ internal sealed class NetworkSession : IDisposable
         peer.ScopeSubscriptions.Add(scopeId, subscription);
         if (peer.IsLocal)
         {
-            NotifyHostScopeState(scopeId, NetworkStateApplyKind.InitialBaseline);
             PeerScopeReady?.Invoke(peerId, scopeId);
             return;
         }
@@ -615,7 +614,6 @@ internal sealed class NetworkSession : IDisposable
                 ServerTick,
                 validationRevision);
             EnsurePacketFitsReliableTransport(validationReady, "SpawnReady");
-            NotifyHostInitialSpawnState(record);
             NotifyNetworkSpawnReady(record, SceneEpoch, ServerTick);
         }
         catch (Exception exception)
@@ -2746,7 +2744,6 @@ internal sealed class NetworkSession : IDisposable
         if (World is null)
             return;
         var sequence = NextStateSequence();
-        NotifyHostSnapshotState();
         foreach (var peer in _peersById.Values)
         {
             if (peer.IsLocal || peer.Phase != NetworkConnectionPhase.Ready)
@@ -2756,62 +2753,6 @@ internal sealed class NetworkSession : IDisposable
                 if (subscription.Phase == NetworkScopeSubscriptionPhase.Ready)
                     SendScopeSnapshots(peer, subscription.Scope, sequence);
         }
-    }
-
-    private void NotifyHostSnapshotState()
-    {
-        if (!IsHost || World is null ||
-            !_peersById.TryGetValue(LocalPeerId, out var localPeer))
-        {
-            return;
-        }
-
-        NotifyHostScopeState(
-            NetworkReplicationScopeId.Global,
-            NetworkStateApplyKind.Snapshot);
-        foreach (var subscription in localPeer.ScopeSubscriptions.Values)
-            if (subscription.Phase == NetworkScopeSubscriptionPhase.Ready)
-                NotifyHostScopeState(
-                    subscription.Scope,
-                    NetworkStateApplyKind.Snapshot);
-    }
-
-    private void NotifyHostInitialSpawnState(NetworkEntityRecord record)
-    {
-        if (!IsHost || !_peersById.TryGetValue(LocalPeerId, out var localPeer) ||
-            !PeerReceivesStructure(localPeer, record.Scope))
-        {
-            return;
-        }
-
-        NotifyHostRecordState(record, NetworkStateApplyKind.InitialSpawn);
-    }
-
-    private void NotifyHostScopeState(
-        NetworkReplicationScopeId scope,
-        NetworkStateApplyKind kind)
-    {
-        if (!IsHost || World is null)
-            return;
-
-        foreach (var record in World.GetRecords(scope))
-            NotifyHostRecordState(record, kind);
-    }
-
-    private void NotifyHostRecordState(
-        NetworkEntityRecord record,
-        NetworkStateApplyKind kind)
-    {
-        foreach (var binding in record.ReplicationBindings)
-            binding.Component.NetworkStateApplied(new NetworkStateAppliedContext(
-                record.Id,
-                binding.Descriptor.Id,
-                kind,
-                SceneEpoch,
-                ServerTick)
-            {
-                Scope = record.Scope
-            });
     }
 
     private void SendScopeSnapshots(
@@ -3226,9 +3167,6 @@ internal sealed class NetworkSession : IDisposable
                 "A NetworkWorld is required before binding authored network entities.");
 
         World.BindServerAuthoredEntities(AllocateEntityId);
-        NotifyHostScopeState(
-            NetworkReplicationScopeId.Global,
-            NetworkStateApplyKind.InitialBaseline);
         foreach (var record in World.Records.ToArray())
             if (record.Origin == NetworkSpawnOrigin.AuthoredScene)
                 NotifyNetworkSpawnReady(record, SceneEpoch, ServerTick);
