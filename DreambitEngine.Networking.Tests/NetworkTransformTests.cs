@@ -235,6 +235,8 @@ public sealed class NetworkTransformTests
             client.PollTransport();
             server.ApplyInbound();
             client.ApplyInbound();
+            server.AdvanceClientScopeLoads();
+            client.AdvanceClientScopeLoads();
         }
     }
 

@@ -20,6 +20,7 @@ internal sealed class NetworkWorld : IDisposable
     private readonly Dictionary<NetworkReplicationScopeId, List<NetworkAuthoredBinding>> _bindingsByScope = [];
     private readonly Dictionary<AuthoredEntityKey, NetworkEntityId> _authoredBySource = [];
     private readonly HashSet<NetworkReplicationScopeId> _boundScopes = [];
+    private readonly HashSet<NetworkReplicationScopeId> _pendingScopes = [];
     private readonly NetworkReplicationRegistry _replication;
     private readonly int _maxNetworkEntities;
     private bool _disposed;
@@ -198,7 +199,9 @@ internal sealed class NetworkWorld : IDisposable
     public bool TryGetNetworkId(Entity? entity, out NetworkEntityId id)
     {
         ThrowIfDisposed();
-        if (entity is not null) return _byEntity.TryGetValue(entity, out id);
+        if (entity is not null && _byEntity.TryGetValue(entity, out id) &&
+            _byNetworkId.TryGetValue(id, out var record) && !_pendingScopes.Contains(record.Scope))
+            return true;
         id = NetworkEntityId.None;
         return false;
     }
@@ -207,7 +210,9 @@ internal sealed class NetworkWorld : IDisposable
     public bool TryGetEntity(NetworkEntityId id, out Entity? entity)
     {
         ThrowIfDisposed();
-        if (_byNetworkId.TryGetValue(id, out var record) && !Entity.IsDestroyed(record.Entity))
+        if (_byNetworkId.TryGetValue(id, out var record) &&
+            !_pendingScopes.Contains(record.Scope) &&
+            !Entity.IsDestroyed(record.Entity))
         { entity = record.Entity; return true; }
         entity = null; return false;
     }
@@ -219,6 +224,22 @@ internal sealed class NetworkWorld : IDisposable
     }
     public NetworkPeerId GetOwner(NetworkEntityId id) => GetRecord(id).Owner;
     public NetworkReplicationScopeId GetScope(NetworkEntityId id) => GetRecord(id).Scope;
+    internal bool TryGetScope(Entity? entity, out NetworkReplicationScopeId scope)
+    {
+        ThrowIfDisposed();
+        // Scope ownership is initialization metadata, not publication of a staged entity.
+        // Components already holding their entity need it to resolve scoped content during
+        // baseline callbacks, before public identity/player lookups become available.
+        if (entity is not null && !Entity.IsDestroyed(entity) &&
+            _byEntity.TryGetValue(entity, out var id) &&
+            _byNetworkId.TryGetValue(id, out var record))
+        {
+            scope = record.Scope;
+            return true;
+        }
+        scope = NetworkReplicationScopeId.None;
+        return false;
+    }
     public bool GetDestroyWithOwner(NetworkEntityId id) => GetRecord(id).DestroyWithOwner;
     public void SetOwner(NetworkEntityId id, NetworkPeerId owner)
     {
@@ -265,6 +286,59 @@ internal sealed class NetworkWorld : IDisposable
     }
     public bool RemovePlayerEntity(NetworkPeerId peer) { ThrowIfDisposed(); return _playerEntities.Remove(peer); }
 
+    internal void MarkScopePending(NetworkReplicationScopeId scope)
+    {
+        ThrowIfDisposed();
+        if (!scope.IsValid)
+            throw new ArgumentOutOfRangeException(nameof(scope));
+        _pendingScopes.Add(scope);
+    }
+
+    internal void CommitScope(NetworkReplicationScopeId scope)
+    {
+        ThrowIfDisposed();
+        _pendingScopes.Remove(scope);
+    }
+
+    internal bool IsScopePending(NetworkReplicationScopeId scope) => _pendingScopes.Contains(scope);
+
+    internal void ApplyClientAuthoredEntity(
+        NetworkReplicationScopeId scope,
+        Entity entity,
+        Guid sourceGuid,
+        NetworkAuthoredBinding? binding)
+    {
+        ThrowIfDisposed();
+        var marker = entity.GetComponent<NetworkObject>() ??
+                     throw new InvalidOperationException(
+                         $"Authored Entity '{entity.Name}' no longer contains NetworkObject.");
+        if (marker.Presence == NetworkPresence.ServerOnly)
+        {
+            DisableAndDestroyNetworkHierarchy(entity);
+            return;
+        }
+        if (marker.Presence == NetworkPresence.ClientOnly)
+            return;
+        if (binding is not { } authored)
+            throw new InvalidOperationException(
+                $"Client Entity '{entity.Name}' has no authored network binding in scope {scope}.");
+        if (!authored.IsPresent)
+        {
+            DisableAndDestroyNetworkHierarchy(entity);
+            return;
+        }
+        Register(entity, marker, authored.NetworkEntityId, authored.Owner,
+            NetworkSpawnOrigin.AuthoredScene, scope, sourceGuid, AssetId.Empty, null, true);
+    }
+
+    internal void CommitClientAuthoredScope(
+        NetworkReplicationScopeId scope,
+        IReadOnlyList<NetworkAuthoredBinding> bindings)
+    {
+        ThrowIfDisposed();
+        CommitBindings(scope, new List<NetworkAuthoredBinding>(bindings));
+    }
+
     public bool Unregister(NetworkEntityId id, bool notify = true)
     {
         ThrowIfDisposed();
@@ -294,6 +368,7 @@ internal sealed class NetworkWorld : IDisposable
                 _authoredBySource.Remove(new AuthoredEntityKey(scope, binding.SourceGuid));
             }
         _boundScopes.Remove(scope);
+        _pendingScopes.Remove(scope);
     }
 
     public void DespawnLocal(NetworkEntityId id, bool notify = true)
@@ -325,7 +400,7 @@ internal sealed class NetworkWorld : IDisposable
         foreach (var record in records) record.Marker.UnbindDestroyed();
         _records.Clear(); _byNetworkId.Clear(); _byEntity.Clear(); _playerEntities.Clear();
         _authoredBindings.Clear(); _recordsByScope.Clear(); _bindingsByScope.Clear();
-        _authoredBySource.Clear(); _boundScopes.Clear();
+        _authoredBySource.Clear(); _boundScopes.Clear(); _pendingScopes.Clear();
         if (!destroyDynamicEntities) return;
         foreach (var record in records)
             if (record.Origin == NetworkSpawnOrigin.DynamicBlueprint && !Entity.IsDestroyed(record.Entity))

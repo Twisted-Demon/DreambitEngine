@@ -214,6 +214,8 @@ public sealed class SessionHandshakeTests
             client.PollTransport();
             server.ApplyInbound();
             client.ApplyInbound();
+            server.AdvanceClientScopeLoads();
+            client.AdvanceClientScopeLoads();
         }
     }
 

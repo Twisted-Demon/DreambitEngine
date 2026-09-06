@@ -4,16 +4,25 @@ using Dreambit.Networking;
 using Dreambit.Networking.Messaging;
 using Dreambit.Networking.Protocol;
 using Dreambit.Networking.Replication;
+using Dreambit.Networking.Session;
 using Dreambit.Networking.Transport;
 using Dreambit.Networking.World;
 using Dreambit.Tiled;
 using Microsoft.Xna.Framework;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace DreambitEngine.Networking.Tests;
 
 public sealed class NetworkReplicationScopeTests
 {
+    private readonly ITestOutputHelper _output;
+
+    public NetworkReplicationScopeTests(ITestOutputHelper output)
+    {
+        _output = output;
+    }
+
     [Fact]
     public void ScopedAuthoredIdentityIsScopeAndSourceGuidAndUnbindIsExact()
     {
@@ -59,6 +68,8 @@ public sealed class NetworkReplicationScopeTests
         using var client = CreateSession(NetworkRole.Client, pair.Client, clientReplication);
         using var serverScene = new ScopeTestScene();
         using var clientScene = new ScopeTestScene();
+        string? connectionDiagnostic = null;
+        client.PeerDisconnected += (_, _, diagnostic) => connectionDiagnostic = diagnostic;
         var sourceGuid = Guid.NewGuid();
         var source = CreateScopeBlueprint("single", sourceGuid);
         var dynamicBlueprint = CreateDynamicBlueprint();
@@ -80,7 +91,9 @@ public sealed class NetworkReplicationScopeTests
         server.Subscribe(client.LocalPeerId, scopeId);
         Pump(server, [client], 8);
 
-        Assert.True(server.IsPeerScopeReady(client.LocalPeerId, scopeId));
+        client.TryGetScopeLoadStatus(scopeId, out var loadStatus);
+        Assert.True(server.IsPeerScopeReady(client.LocalPeerId, scopeId),
+            connectionDiagnostic ?? loadStatus.ToString());
         Assert.True(client.TryGetScope(scopeId, out var clientScope));
         Assert.True(clientScope!.IsReady);
         Assert.NotEqual(serverScope.Content.InstanceId, clientScope!.Content!.InstanceId);
@@ -136,7 +149,7 @@ public sealed class NetworkReplicationScopeTests
         server.Subscribe(client.LocalPeerId, scopeId);
         pair.Server.Send(pair.Server.Connection, staleSnapshot,
             NetworkDelivery.UnreliableSequenced, 2);
-        Pump(server, [client], 8);
+        Pump(server, [client], 16);
         Assert.True(server.IsPeerScopeReady(client.LocalPeerId, scopeId));
         Assert.True(client.TryGetScope(scopeId, out var reloadedScope));
         Assert.True(reloadedScope!.IsReady);
@@ -678,7 +691,7 @@ public sealed class NetworkReplicationScopeTests
             entity => entity.GetComponent<ScopedState>().Value = 41,
             new NetworkSpawnOptions { Scope = secondScope });
         Assert.True(server.World.TryGetNetworkId(baselineCatchUp, out var baselineCatchUpId));
-        Pump(server, [client], 8);
+        Pump(server, [client], 32);
 
         Assert.True(client.IsConnected);
         Assert.True(server.IsPeerScopeReady(client.LocalPeerId, firstScope));
@@ -793,19 +806,768 @@ public sealed class NetworkReplicationScopeTests
         Assert.True(clientB.IsConnected);
     }
 
+    [Fact]
+    public void ClientScopeLoadDefersItsFirstFrameAndAdvancesAtMostOneItemPerFrame()
+    {
+        var pair = InMemoryTransport.CreatePair();
+        using var server = CreateSession(NetworkRole.Server, pair.Server, CreateReplication());
+        using var client = CreateSession(
+            NetworkRole.Client,
+            pair.Client,
+            CreateReplication(),
+            maxScopeLoadItemsPerFrame: 1,
+            maxQueuedTransportEvents: 8);
+        using var serverScene = new ScopeTestScene();
+        using var clientScene = new ScopeTestScene();
+        var sourceGuid = Guid.NewGuid();
+        var source = CreateScopeBlueprint("incremental", sourceGuid);
+        var dynamicBlueprint = CreateDynamicBlueprint();
+        dynamicBlueprint.Components.Add(new ComponentBlueprint
+        {
+            Type = typeof(ScopeActivityProbe).AssemblyQualifiedName!
+        });
+        dynamicBlueprint.Components.Add(new ComponentBlueprint
+        {
+            Type = typeof(ScopeDrawableProbe).AssemblyQualifiedName!
+        });
+        Assert.True(Resources.TryRegisterAsset(source));
+        Assert.True(Resources.TryRegisterAsset(dynamicBlueprint));
+
+        server.Start();
+        client.Start();
+        Pump(server, [client], 8);
+        server.AfterSceneAssigned(serverScene);
+        client.AfterSceneAssigned(clientScene);
+        Pump(server, [client], 64);
+
+        var scope = server.LoadScope(source.AssetName!);
+        var dynamicIds = new List<NetworkEntityId>();
+        for (var i = 0; i < 128; i++)
+        {
+            var entity = server.Spawn(
+                dynamicBlueprint,
+                item => item.GetComponent<ScopedState>().Value = i + 1,
+                new NetworkSpawnOptions { Scope = scope });
+            Assert.True(server.World!.TryGetNetworkId(entity, out var id));
+            dynamicIds.Add(id);
+        }
+        Assert.True(server.World!.TryGetEntity(dynamicIds[0], out var playerEntity));
+        server.World.SetPlayerEntity(client.LocalPeerId, dynamicIds[0]);
+
+        var readyEvents = 0;
+        var clientReadyStatusEvents = 0;
+        server.PeerScopeReady += (peer, readyScope) =>
+        {
+            if (peer == client.LocalPeerId && readyScope == scope)
+                readyEvents++;
+        };
+        client.ScopeLoadStatusChanged += status =>
+        {
+            if (status.Scope == scope && status.Phase == NetworkScopeLoadPhase.Ready)
+                clientReadyStatusEvents++;
+        };
+
+        server.Subscribe(client.LocalPeerId, scope);
+        client.PollTransport();
+        client.ApplyInbound();
+
+        Assert.True(client.TryGetScopeLoadStatus(scope, out var initial));
+        Assert.Equal(NetworkScopeLoadPhase.LoadingContent, initial.Phase);
+        Assert.Empty(clientScene.ContentInstances);
+        Assert.False(server.IsPeerScopeReady(client.LocalPeerId, scope));
+        Assert.False(client.World!.TryGetPlayerEntity(client.LocalPeerId, out _));
+
+        var liveEntity = server.Spawn(
+            dynamicBlueprint,
+            item => item.GetComponent<ScopedState>().Value = 99,
+            new NetworkSpawnOptions { Scope = scope });
+        Assert.True(server.World.TryGetNetworkId(liveEntity, out var liveEntityId));
+        client.PollTransport();
+        client.ApplyInbound();
+        Assert.False(client.World!.TryGetEntity(liveEntityId, out _));
+
+        // ScopeLoad was accepted during this logical frame. The first scheduler call must
+        // do no materialization so the loading cover can be drawn first.
+        client.AdvanceClientScopeLoads();
+        Assert.Empty(clientScene.ContentInstances);
+
+        var observedPartialScope = false;
+        for (var frame = 0; frame < 2048 && readyEvents == 0; frame++)
+        {
+            server.PollTransport();
+            server.ApplyInbound();
+            client.PollTransport();
+            client.ApplyInbound();
+            client.AdvanceClientScopeLoads();
+
+            Assert.True(client.TryGetScopeLoadStatus(scope, out var status));
+            Assert.InRange(status.WorkItemsAdvancedLastFrame, 0, 1);
+            if (status.TotalItems is { } total)
+                Assert.InRange(status.CompletedItems, 0, total);
+
+            if (status.Phase is not NetworkScopeLoadPhase.Ready &&
+                client.TryGetScope(scope, out var loadingScope))
+            {
+                observedPartialScope = true;
+                Assert.False(loadingScope!.IsReady);
+                Assert.All(
+                    loadingScope.Content!.OwnedEntities,
+                    entity => Assert.False(entity.Enabled));
+                foreach (var id in dynamicIds)
+                    Assert.False(client.World!.TryGetEntity(id, out _));
+                Assert.False(client.World.TryGetPlayerEntity(client.LocalPeerId, out _));
+                Assert.False(server.IsPeerScopeReady(client.LocalPeerId, scope));
+                Assert.DoesNotContain(
+                    clientScene.Drawables.GetAllEnabledDrawables(),
+                    drawable => drawable is ScopeDrawableProbe);
+
+                clientScene.Tick();
+                clientScene.PhysicsTick();
+                Assert.All(
+                    clientScene.GetAllEntities()
+                        .Select(entity => entity.GetComponent<ScopeActivityProbe>())
+                        .Where(probe => probe is not null),
+                    probe =>
+                    {
+                        Assert.Equal(0, probe!.UpdateCount);
+                        Assert.Equal(0, probe.PhysicsCount);
+                    });
+            }
+        }
+
+        Assert.True(observedPartialScope);
+        Assert.Equal(1, readyEvents);
+        Assert.True(server.IsPeerScopeReady(client.LocalPeerId, scope));
+        Assert.True(client.TryGetScopeLoadStatus(scope, out var completed));
+        Assert.Equal(NetworkScopeLoadPhase.Ready, completed.Phase);
+        Assert.Equal(completed.TotalItems, completed.CompletedItems);
+        _output.WriteLine(
+            "Scope load timing: total={0:F3}ms, max-item={1:F3}ms, loading-content={2:F3}ms, " +
+            "dynamic-materialization={3:F3}ms, max-slice={4:F3}ms, max-apply-inbound={5:F3}ms.",
+            completed.Elapsed.TotalMilliseconds,
+            completed.MaximumWorkItemDuration.TotalMilliseconds,
+            completed.LoadingContentDuration.TotalMilliseconds,
+            completed.DynamicMaterializationDuration.TotalMilliseconds,
+            client.MaximumClientScopeLoadSliceDuration.TotalMilliseconds,
+            client.MaximumApplyInboundMilliseconds);
+        Assert.All(dynamicIds, id => Assert.True(client.World!.TryGetEntity(id, out _)));
+        Assert.True(client.World!.TryGetEntity(liveEntityId, out _));
+        Assert.True(client.World.TryGetPlayerEntity(client.LocalPeerId, out _));
+
+        Pump(server, [client], 8);
+        Assert.Equal(1, readyEvents);
+        Assert.Equal(1, clientReadyStatusEvents);
+    }
+
+    [Fact]
+    public void PendingScopeCallbacksCanResolveScopeMetadataWithoutPublishingEntities()
+    {
+        var pair = InMemoryTransport.CreatePair();
+        using var server = CreateSession(NetworkRole.Server, pair.Server, CreateReplication());
+        using var client = CreateSession(NetworkRole.Client, pair.Client, CreateReplication(),
+            maxScopeLoadItemsPerFrame: 1);
+        using var serverScene = new ScopeTestScene();
+        using var clientScene = new ScopeTestScene();
+        // Exercise the public facade used by game components without opening a graphics device.
+        var core = (Core)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(Core));
+        using var network = new NetworkService(core);
+        typeof(NetworkService).GetField("_session",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .SetValue(network, client);
+        var source = CreateScopeBlueprint("callback-scope-metadata", Guid.NewGuid());
+        var blueprint = CreateDynamicBlueprint();
+        Assert.True(Resources.TryRegisterAsset(source));
+        Assert.True(Resources.TryRegisterAsset(blueprint));
+        server.Start();
+        client.Start();
+        Pump(server, [client], 8);
+        server.AfterSceneAssigned(serverScene);
+        client.AfterSceneAssigned(clientScene);
+        Pump(server, [client], 64);
+        var scope = server.LoadScope(source.AssetName!);
+        server.Spawn(blueprint, options: new NetworkSpawnOptions { Scope = scope });
+
+        var stateCallbacks = 0;
+        var readyCallbacks = 0;
+        Entity? stagedEntity = null;
+        client.ScopeLoadStatusChanged += status =>
+        {
+            if (status.Scope != scope || status.Phase != NetworkScopeLoadPhase.ApplyingComponentStates)
+                return;
+            foreach (var record in client.World!.GetRecords(scope))
+            {
+                var state = record.Entity.GetComponent<ScopedState>()!;
+                state.StateAppliedCallback = () => { AssertScopeMetadata(); stateCallbacks++; };
+                state.SpawnReadyCallback = () => { AssertScopeMetadata(); readyCallbacks++; };
+
+                void AssertScopeMetadata()
+                {
+                    stagedEntity = state.Entity;
+                    Assert.True(network.TryGetReplicationScope(state.Entity, out var actualScope));
+                    Assert.Equal(scope, actualScope);
+                    Assert.True(network.TryGetScope(actualScope, out var contentScope));
+                    Assert.True(contentScope!.IsLoaded);
+                    Assert.NotNull(contentScope.Content);
+                    Assert.False(contentScope.IsReady);
+                    Assert.False(state.Entity.Enabled);
+                    Assert.True(state.Entity.UpdatesSuspended);
+                    Assert.False(network.TryGetNetworkId(state.Entity, out _));
+                    Assert.False(client.World.TryGetEntity(record.Id, out _));
+                }
+            }
+        };
+        server.Subscribe(client.LocalPeerId, scope);
+        Pump(server, [client], 128);
+
+        Assert.True(client.TryGetScopeLoadStatus(scope, out var completed));
+        Assert.True(completed.Phase == NetworkScopeLoadPhase.Ready, completed.Diagnostic);
+        Assert.Equal(2, stateCallbacks); // Authored and dynamic components both initialize while staged.
+        Assert.Equal(2, readyCallbacks);
+        Assert.NotNull(stagedEntity);
+        Assert.True(network.TryGetNetworkId(stagedEntity, out _));
+        Assert.True(network.TryGetReplicationScope(stagedEntity, out var committedScope));
+        Assert.Equal(scope, committedScope);
+        Assert.False(network.TryGetReplicationScope(clientScene.CreateEntity("not-networked"), out _));
+
+        server.Unsubscribe(client.LocalPeerId, scope);
+        Pump(server, [client], 16);
+        Assert.False(network.TryGetReplicationScope(stagedEntity, out _));
+    }
+
+    [Fact]
+    public void ClientComponentStateFailureRollsBackAndNeverAcknowledgesScopeReady()
+    {
+        var pair = InMemoryTransport.CreatePair();
+        using var server = CreateSession(NetworkRole.Server, pair.Server, CreateReplication());
+        using var client = CreateSession(
+            NetworkRole.Client,
+            pair.Client,
+            CreateReplication(),
+            maxScopeLoadItemsPerFrame: 1);
+        using var serverScene = new ScopeTestScene();
+        using var clientScene = new ScopeTestScene();
+        var source = CreateScopeBlueprint("component-state-failure", Guid.NewGuid());
+        var dynamicBlueprint = CreateDynamicBlueprint();
+        dynamicBlueprint.Components.Add(new ComponentBlueprint
+        {
+            Type = typeof(FailingScopedState).AssemblyQualifiedName!
+        });
+        Assert.True(Resources.TryRegisterAsset(source));
+        Assert.True(Resources.TryRegisterAsset(dynamicBlueprint));
+
+        server.Start();
+        client.Start();
+        Pump(server, [client], 8);
+        server.AfterSceneAssigned(serverScene);
+        client.AfterSceneAssigned(clientScene);
+        Pump(server, [client], 64);
+        var scope = server.LoadScope(source.AssetName!);
+        server.Spawn(
+            dynamicBlueprint,
+            entity => entity.GetComponent<FailingScopedState>().Value = 777,
+            new NetworkSpawnOptions { Scope = scope });
+        var failed = false;
+        client.ScopeLoadStatusChanged += status =>
+        {
+            if (status.Scope == scope && status.Phase == NetworkScopeLoadPhase.Failed)
+                failed = true;
+        };
+
+        server.Subscribe(client.LocalPeerId, scope);
+        FailingScopedState.FailOnApply = true;
+        try
+        {
+            Pump(server, [client], 128);
+        }
+        finally
+        {
+            FailingScopedState.FailOnApply = false;
+        }
+
+        Assert.True(failed);
+        Assert.False(server.IsPeerScopeReady(client.LocalPeerId, scope));
+        Assert.Empty(clientScene.ContentInstances);
+        Assert.Empty(clientScene.GetAllEntities());
+    }
+
+    [Theory]
+    [InlineData(MalformedScopeBaselineCase.DuplicateRecord)]
+    [InlineData(MalformedScopeBaselineCase.IncorrectCount)]
+    [InlineData(MalformedScopeBaselineCase.UnknownComponent)]
+    [InlineData(MalformedScopeBaselineCase.InvalidEntityReference)]
+    [InlineData(MalformedScopeBaselineCase.BadScopeIdentity)]
+    [InlineData(MalformedScopeBaselineCase.TrailingPayload)]
+    [InlineData(MalformedScopeBaselineCase.StaleRevision)]
+    public void MalformedIncrementalScopeBaselineRollsBackWithoutScopeReady(
+        MalformedScopeBaselineCase malformedCase)
+    {
+        var pair = InMemoryTransport.CreatePair();
+        using var server = CreateSession(NetworkRole.Server, pair.Server, CreateReplication());
+        using var client = CreateSession(
+            NetworkRole.Client,
+            pair.Client,
+            CreateReplication(),
+            maxScopeLoadItemsPerFrame: 1);
+        using var serverScene = new ScopeTestScene();
+        using var clientScene = new ScopeTestScene();
+        var sourceGuid = Guid.NewGuid();
+        var source = CreateScopeBlueprint($"malformed-{malformedCase}", sourceGuid);
+        Assert.True(Resources.TryRegisterAsset(source));
+
+        server.Start();
+        client.Start();
+        Pump(server, [client], 8);
+        server.AfterSceneAssigned(serverScene);
+        client.AfterSceneAssigned(clientScene);
+        Pump(server, [client], 64);
+        var scope = server.LoadScope(source.AssetName!);
+        var terminal = false;
+        client.ScopeLoadStatusChanged += status =>
+        {
+            if (status.Scope == scope && status.Phase is
+                NetworkScopeLoadPhase.Failed or NetworkScopeLoadPhase.Cancelled)
+                terminal = true;
+        };
+
+        server.Subscribe(client.LocalPeerId, scope);
+        client.PollTransport();
+        client.ApplyInbound();
+        client.AdvanceClientScopeLoads();
+        client.AdvanceClientScopeLoads();
+        Assert.True(client.TryGetScopeLoadStatus(scope, out var waiting));
+        Assert.Equal(NetworkScopeLoadPhase.WaitingForBaseline, waiting.Phase);
+
+        var nextRevision = new NetworkStructuralRevision(client.StructuralRevision.Value + 1);
+        switch (malformedCase)
+        {
+            case MalformedScopeBaselineCase.DuplicateRecord:
+                Send(NetworkBaselineRecordKind.Begin, writer =>
+                {
+                    writer.WriteInt32(2);
+                    writer.WriteInt32(0);
+                    writer.WriteInt32(0);
+                    writer.WriteInt32(0);
+                    writer.WriteUInt32(1);
+                });
+                SendAuthoredRecord();
+                SendAuthoredRecord();
+                Send(NetworkBaselineRecordKind.End);
+                break;
+            case MalformedScopeBaselineCase.IncorrectCount:
+                Send(NetworkBaselineRecordKind.Begin, writer =>
+                {
+                    writer.WriteInt32(1);
+                    writer.WriteInt32(0);
+                    writer.WriteInt32(0);
+                    writer.WriteInt32(0);
+                    writer.WriteUInt32(1);
+                });
+                Send(NetworkBaselineRecordKind.End);
+                break;
+            case MalformedScopeBaselineCase.UnknownComponent:
+                Send(NetworkBaselineRecordKind.Begin, writer =>
+                {
+                    writer.WriteInt32(0);
+                    writer.WriteInt32(0);
+                    writer.WriteInt32(0);
+                    writer.WriteInt32(1);
+                    writer.WriteUInt32(1);
+                });
+                Send(NetworkBaselineRecordKind.ComponentState, writer =>
+                {
+                    writer.WriteUInt64(1);
+                    writer.WriteUInt16(ushort.MaxValue);
+                });
+                break;
+            case MalformedScopeBaselineCase.InvalidEntityReference:
+                Send(NetworkBaselineRecordKind.Begin, writer =>
+                {
+                    writer.WriteInt32(0);
+                    writer.WriteInt32(0);
+                    writer.WriteInt32(1);
+                    writer.WriteInt32(0);
+                    writer.WriteUInt32(1);
+                });
+                Send(NetworkBaselineRecordKind.PlayerEntity, writer =>
+                {
+                    writer.WriteUInt32(client.LocalPeerId.Value);
+                    writer.WriteUInt64(999);
+                });
+                Send(NetworkBaselineRecordKind.End);
+                break;
+            case MalformedScopeBaselineCase.BadScopeIdentity:
+                Send(
+                    NetworkBaselineRecordKind.Begin,
+                    writer =>
+                    {
+                        writer.WriteInt32(0);
+                        writer.WriteInt32(0);
+                        writer.WriteInt32(0);
+                        writer.WriteInt32(0);
+                        writer.WriteUInt32(1);
+                    },
+                    new NetworkReplicationScopeId(scope.Value + 100));
+                break;
+            case MalformedScopeBaselineCase.TrailingPayload:
+                Send(NetworkBaselineRecordKind.Begin, writer =>
+                {
+                    writer.WriteInt32(0);
+                    writer.WriteInt32(0);
+                    writer.WriteInt32(0);
+                    writer.WriteInt32(0);
+                    writer.WriteUInt32(1);
+                    writer.WriteByte(42);
+                });
+                break;
+            case MalformedScopeBaselineCase.StaleRevision:
+                Send(
+                    NetworkBaselineRecordKind.Begin,
+                    writer =>
+                    {
+                        writer.WriteInt32(0);
+                        writer.WriteInt32(0);
+                        writer.WriteInt32(0);
+                        writer.WriteInt32(0);
+                        writer.WriteUInt32(1);
+                    },
+                    revision: client.StructuralRevision);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(malformedCase));
+        }
+
+        client.PollTransport();
+        client.ApplyInbound();
+        for (var frame = 0; frame < 128 && !terminal; frame++)
+            client.AdvanceClientScopeLoads();
+
+        Assert.True(terminal);
+        Assert.False(server.IsPeerScopeReady(client.LocalPeerId, scope));
+        Assert.Empty(clientScene.ContentInstances);
+        Assert.Empty(clientScene.GetAllEntities());
+
+        void SendAuthoredRecord() =>
+            Send(NetworkBaselineRecordKind.AuthoredEntity, writer =>
+            {
+                writer.WriteGuid(sourceGuid);
+                writer.WriteUInt64(500);
+                writer.WriteUInt32(0);
+                writer.WriteBoolean(true);
+            });
+
+        void Send(
+            NetworkBaselineRecordKind kind,
+            Action<NetworkWriter>? payload = null,
+            NetworkReplicationScopeId? targetScope = null,
+            NetworkStructuralRevision? revision = null)
+        {
+            var bytes = NetworkProtocol.Encode(
+                new NetworkPacketHeader(
+                    NetworkProtocolMessage.ScopeBaseline,
+                    client.SessionId,
+                    client.SceneEpoch,
+                    client.ServerTick,
+                    revision ?? nextRevision),
+                writer =>
+                {
+                    writer.WriteUInt32((targetScope ?? scope).Value);
+                    writer.WriteByte((byte)kind);
+                    payload?.Invoke(writer);
+                },
+                NetworkOptions.DefaultMaxProtocolPayload);
+            pair.Server.Send(
+                pair.Server.Connection,
+                bytes,
+                NetworkDelivery.ReliableOrdered,
+                0);
+        }
+    }
+
+    [Fact]
+    public void UnloadingScopeDuringIncrementalBaselineCancelsAndRollsBackPartialContent()
+    {
+        var pair = InMemoryTransport.CreatePair();
+        using var server = CreateSession(NetworkRole.Server, pair.Server, CreateReplication());
+        using var client = CreateSession(
+            NetworkRole.Client,
+            pair.Client,
+            CreateReplication(),
+            maxScopeLoadItemsPerFrame: 1);
+        using var serverScene = new ScopeTestScene();
+        using var clientScene = new ScopeTestScene();
+        string? disconnectDiagnostic = null;
+        string? serverDisconnectDiagnostic = null;
+        string? loadDiagnostic = null;
+        var observedCancelled = false;
+        client.PeerDisconnected += (_, _, diagnostic) =>
+            disconnectDiagnostic = diagnostic;
+        server.PeerDisconnected += (_, _, diagnostic) =>
+            serverDisconnectDiagnostic = diagnostic;
+        client.ScopeLoadStatusChanged += status =>
+        {
+            if (status.Diagnostic is not null)
+                loadDiagnostic = status.Diagnostic;
+            if (status.Phase == NetworkScopeLoadPhase.Cancelled)
+                observedCancelled = true;
+        };
+        var source = CreateScopeBlueprint("cancel-incremental", Guid.NewGuid());
+        var dynamicBlueprint = CreateDynamicBlueprint();
+        Assert.True(Resources.TryRegisterAsset(source));
+        Assert.True(Resources.TryRegisterAsset(dynamicBlueprint));
+
+        server.Start();
+        client.Start();
+        Pump(server, [client], 8);
+        server.AfterSceneAssigned(serverScene);
+        client.AfterSceneAssigned(clientScene);
+        Pump(server, [client], 64);
+        var scope = server.LoadScope(source.AssetName!);
+        for (var i = 0; i < 16; i++)
+            server.Spawn(dynamicBlueprint, new NetworkSpawnOptions { Scope = scope });
+
+        server.Subscribe(client.LocalPeerId, scope);
+        for (var frame = 0; frame < 20; frame++)
+        {
+            server.PollTransport();
+            server.ApplyInbound();
+            client.PollTransport();
+            client.ApplyInbound();
+            client.AdvanceClientScopeLoads();
+        }
+
+        Assert.True(client.TryGetScope(scope, out var partial));
+        Assert.False(partial!.IsReady);
+        Assert.NotEmpty(clientScene.ContentInstances);
+
+        server.Unsubscribe(client.LocalPeerId, scope);
+        Pump(server, [client], 64);
+
+        Assert.True(
+            client.IsConnected,
+            $"client: {disconnectDiagnostic}; server: {serverDisconnectDiagnostic}; " +
+            $"load: {loadDiagnostic}");
+        Assert.False(client.TryGetScope(scope, out _));
+        Assert.Empty(clientScene.ContentInstances);
+        Assert.True(observedCancelled);
+        Assert.False(client.TryGetScopeLoadStatus(scope, out _));
+        Assert.False(server.IsPeerSubscribed(client.LocalPeerId, scope));
+    }
+
+    [Fact]
+    public void ClientMaterializationFailureRollsBackAndNeverAcknowledgesScopeReady()
+    {
+        var pair = InMemoryTransport.CreatePair();
+        using var server = CreateSession(NetworkRole.Server, pair.Server, CreateReplication());
+        using var client = CreateSession(
+            NetworkRole.Client,
+            pair.Client,
+            CreateReplication(),
+            maxScopeLoadItemsPerFrame: 1);
+        using var serverScene = new ScopeTestScene();
+        using var clientScene = new ScopeTestScene();
+        var source = CreateScopeBlueprint("client-failure", Guid.NewGuid());
+        var dynamicBlueprint = CreateDynamicBlueprint();
+        dynamicBlueprint.Components.Add(new ComponentBlueprint
+        {
+            Type = typeof(ScopeFailureComponent).AssemblyQualifiedName!
+        });
+        Assert.True(Resources.TryRegisterAsset(source));
+        Assert.True(Resources.TryRegisterAsset(dynamicBlueprint));
+
+        server.Start();
+        client.Start();
+        Pump(server, [client], 8);
+        server.AfterSceneAssigned(serverScene);
+        client.AfterSceneAssigned(clientScene);
+        Pump(server, [client], 64);
+        var scope = server.LoadScope(source.AssetName!);
+        server.Spawn(dynamicBlueprint, new NetworkSpawnOptions { Scope = scope });
+        var failed = false;
+        client.ScopeLoadStatusChanged += status =>
+        {
+            if (status.Scope == scope && status.Phase == NetworkScopeLoadPhase.Failed)
+                failed = true;
+        };
+
+        server.Subscribe(client.LocalPeerId, scope);
+        ScopeFailureComponent.Fail = true;
+        try
+        {
+            Pump(server, [client], 64);
+        }
+        finally
+        {
+            ScopeFailureComponent.Fail = false;
+        }
+
+        Assert.True(failed);
+        Assert.False(server.IsPeerScopeReady(client.LocalPeerId, scope));
+        Assert.Empty(clientScene.ContentInstances);
+        Assert.Empty(clientScene.GetAllEntities());
+    }
+
+    [Fact]
+    public void DisconnectDuringIncrementalLoadRemovesContentAndPendingWork()
+    {
+        var pair = InMemoryTransport.CreatePair();
+        using var server = CreateSession(NetworkRole.Server, pair.Server, CreateReplication());
+        using var client = CreateSession(
+            NetworkRole.Client,
+            pair.Client,
+            CreateReplication(),
+            maxScopeLoadItemsPerFrame: 1);
+        using var serverScene = new ScopeTestScene();
+        using var clientScene = new ScopeTestScene();
+        var source = CreateScopeBlueprint("disconnect-incremental", Guid.NewGuid());
+        var dynamicBlueprint = CreateDynamicBlueprint();
+        Assert.True(Resources.TryRegisterAsset(source));
+        Assert.True(Resources.TryRegisterAsset(dynamicBlueprint));
+
+        server.Start();
+        client.Start();
+        Pump(server, [client], 8);
+        server.AfterSceneAssigned(serverScene);
+        client.AfterSceneAssigned(clientScene);
+        Pump(server, [client], 64);
+        var scope = server.LoadScope(source.AssetName!);
+        for (var i = 0; i < 16; i++)
+            server.Spawn(dynamicBlueprint, new NetworkSpawnOptions { Scope = scope });
+        server.Subscribe(client.LocalPeerId, scope);
+        Pump(server, [client], 12);
+        Assert.NotEmpty(clientScene.ContentInstances);
+        Assert.True(client.HasPendingScopeLoads);
+
+        pair.Server.Disconnect(pair.Server.Connection, TransportDisconnectReason.LocalShutdown);
+        client.PollTransport();
+        client.ApplyInbound();
+
+        Assert.False(client.IsConnected);
+        Assert.False(client.HasPendingScopeLoads);
+        Assert.Empty(clientScene.ContentInstances);
+        Assert.Empty(clientScene.GetAllEntities());
+    }
+
+    [Fact]
+    public void SceneReplacementCancelsOldGenerationBeforeAssigningNewWorld()
+    {
+        var pair = InMemoryTransport.CreatePair();
+        using var server = CreateSession(NetworkRole.Server, pair.Server, CreateReplication());
+        using var client = CreateSession(
+            NetworkRole.Client,
+            pair.Client,
+            CreateReplication(),
+            maxScopeLoadItemsPerFrame: 1);
+        using var serverScene = new ScopeTestScene();
+        using var oldClientScene = new ScopeTestScene();
+        using var newClientScene = new ScopeTestScene();
+        var source = CreateScopeBlueprint("scene-replacement", Guid.NewGuid());
+        var dynamicBlueprint = CreateDynamicBlueprint();
+        Assert.True(Resources.TryRegisterAsset(source));
+        Assert.True(Resources.TryRegisterAsset(dynamicBlueprint));
+
+        server.Start();
+        client.Start();
+        Pump(server, [client], 8);
+        server.AfterSceneAssigned(serverScene);
+        client.AfterSceneAssigned(oldClientScene);
+        Pump(server, [client], 64);
+        var scope = server.LoadScope(source.AssetName!);
+        for (var i = 0; i < 16; i++)
+            server.Spawn(dynamicBlueprint, new NetworkSpawnOptions { Scope = scope });
+        server.Subscribe(client.LocalPeerId, scope);
+        Pump(server, [client], 12);
+        Assert.NotEmpty(oldClientScene.ContentInstances);
+
+        client.BeforeSceneUnload(oldClientScene);
+        Assert.Empty(oldClientScene.ContentInstances);
+        client.AfterSceneAssigned(newClientScene);
+        for (var i = 0; i < 64; i++)
+            client.AdvanceClientScopeLoads();
+
+        Assert.False(client.HasPendingScopeLoads);
+        Assert.Empty(newClientScene.ContentInstances);
+        Assert.Empty(newClientScene.GetAllEntities());
+        Assert.Same(newClientScene, client.World!.Scene);
+    }
+
+    [Fact]
+    public void SharedOneItemBudgetAdvancesConcurrentScopesWithoutStarvation()
+    {
+        var pair = InMemoryTransport.CreatePair();
+        using var server = CreateSession(NetworkRole.Server, pair.Server, CreateReplication());
+        using var client = CreateSession(
+            NetworkRole.Client,
+            pair.Client,
+            CreateReplication(),
+            maxScopeLoadItemsPerFrame: 1);
+        using var serverScene = new ScopeTestScene();
+        using var clientScene = new ScopeTestScene();
+        var firstSource = CreateScopeBlueprint("fair-a", Guid.NewGuid());
+        var secondSource = CreateScopeBlueprint("fair-b", Guid.NewGuid());
+        var dynamicBlueprint = CreateDynamicBlueprint();
+        Assert.True(Resources.TryRegisterAsset(firstSource));
+        Assert.True(Resources.TryRegisterAsset(secondSource));
+        Assert.True(Resources.TryRegisterAsset(dynamicBlueprint));
+
+        server.Start();
+        client.Start();
+        Pump(server, [client], 8);
+        server.AfterSceneAssigned(serverScene);
+        client.AfterSceneAssigned(clientScene);
+        Pump(server, [client], 64);
+        var first = server.LoadScope(firstSource.AssetName!);
+        var second = server.LoadScope(secondSource.AssetName!);
+        for (var i = 0; i < 8; i++)
+        {
+            server.Spawn(dynamicBlueprint, new NetworkSpawnOptions { Scope = first });
+            server.Spawn(dynamicBlueprint, new NetworkSpawnOptions { Scope = second });
+        }
+        server.Subscribe(client.LocalPeerId, first);
+        server.Subscribe(client.LocalPeerId, second);
+
+        var firstAdvanced = false;
+        var secondAdvanced = false;
+        for (var frame = 0; frame < 1024 &&
+             (!server.IsPeerScopeReady(client.LocalPeerId, first) ||
+              !server.IsPeerScopeReady(client.LocalPeerId, second)); frame++)
+        {
+            Pump(server, [client], 1);
+            firstAdvanced |= client.TryGetScopeLoadStatus(first, out var firstStatus) &&
+                             firstStatus.CompletedItems > 0;
+            secondAdvanced |= client.TryGetScopeLoadStatus(second, out var secondStatus) &&
+                              secondStatus.CompletedItems > 0;
+        }
+
+        Assert.True(firstAdvanced);
+        Assert.True(secondAdvanced);
+        Assert.True(server.IsPeerScopeReady(client.LocalPeerId, first));
+        Assert.True(server.IsPeerScopeReady(client.LocalPeerId, second));
+        Assert.True(client.TryGetScope(first, out var firstScope) && firstScope!.IsReady);
+        Assert.True(client.TryGetScope(second, out var secondScope) && secondScope!.IsReady);
+    }
+
     private static NetworkReplicationRegistry CreateReplication()
     {
         var registry = new NetworkReplicationRegistry();
         registry.Register<ScopedState>();
+        registry.Register<FailingScopedState>();
         return registry;
     }
 
     private static NetworkSession CreateSession(
         NetworkRole role,
         Dreambit.Networking.Transport.INetworkTransport transport,
-        NetworkReplicationRegistry replication) =>
+        NetworkReplicationRegistry replication,
+        int maxScopeLoadItemsPerFrame = 32,
+        int maxQueuedTransportEvents = NetworkOptions.DefaultMaxQueuedEvents) =>
         new(role, transport,
-            new NetworkOptions { GameBuildId = "scope-tests" },
+            new NetworkOptions
+            {
+                GameBuildId = "scope-tests",
+                ClientScopeLoadBudgetMilliseconds = 1000,
+                MaxQueuedTransportEvents = maxQueuedTransportEvents,
+                MaxClientScopeLoadWorkItemsPerFrame = maxScopeLoadItemsPerFrame
+            },
             new NetworkMessageRegistry(), replication);
 
     private static SceneBlueprint CreateScopeBlueprint(string label, Guid sourceGuid) => new()
@@ -871,7 +1633,12 @@ public sealed class NetworkReplicationScopeTests
             foreach (var client in clients) client.PollTransport();
             server.ApplyInbound();
             foreach (var client in clients) client.ApplyInbound();
+            server.AdvanceClientScopeLoads();
+            foreach (var client in clients) client.AdvanceClientScopeLoads();
         }
+        server.PollTransport();
+        server.ApplyInbound();
+        server.AdvanceClientScopeLoads();
     }
 
     private sealed class ScopeTestScene : Scene
@@ -881,10 +1648,30 @@ public sealed class NetworkReplicationScopeTests
         }
     }
 
+    public enum MalformedScopeBaselineCase : byte
+    {
+        DuplicateRecord,
+        IncorrectCount,
+        UnknownComponent,
+        InvalidEntityReference,
+        BadScopeIdentity,
+        TrailingPayload,
+        StaleRevision
+    }
+
     [NetworkReplicated(901)]
     public sealed class ScopedState : Component
     {
         [Replicated(1)] public int Value { get; set; }
+
+        public Action? StateAppliedCallback { get; set; }
+        public Action? SpawnReadyCallback { get; set; }
+
+        public override void OnNetworkStateApplied(NetworkStateAppliedContext context) =>
+            StateAppliedCallback?.Invoke();
+
+        public override void OnNetworkSpawnReady(NetworkSpawnReadyContext context) =>
+            SpawnReadyCallback?.Invoke();
     }
 
     public sealed class ScopeFailureComponent : Component
@@ -895,6 +1682,40 @@ public sealed class NetworkReplicationScopeTests
         {
             if (Fail)
                 throw new InvalidOperationException("Intentional scoped materialization failure.");
+        }
+    }
+
+    public sealed class ScopeActivityProbe : Component
+    {
+        public int UpdateCount { get; private set; }
+        public int PhysicsCount { get; private set; }
+
+        public override void OnUpdate() => UpdateCount++;
+
+        public override void OnPhysicsUpdate() => PhysicsCount++;
+    }
+
+    public sealed class ScopeDrawableProbe : DrawableComponent
+    {
+    }
+
+    [NetworkReplicated(902)]
+    public sealed class FailingScopedState : Component
+    {
+        private int _value;
+
+        public static bool FailOnApply { get; set; }
+
+        [Replicated(1)]
+        public int Value
+        {
+            get => _value;
+            set
+            {
+                if (FailOnApply && value == 777)
+                    throw new InvalidOperationException("Intentional component-state apply failure.");
+                _value = value;
+            }
         }
     }
 

@@ -28,6 +28,7 @@ public sealed class DirectIpTransport : INetworkTransport
     private const byte UdpData = 2;
 
     private readonly ConcurrentQueue<TransportEvent> _events = new();
+    private readonly object _receiveQueueSpace = new();
     private readonly ConcurrentDictionary<TransportConnectionId, DirectConnection> _connections = [];
     private readonly ConcurrentDictionary<Guid, DirectConnection> _connectionsByToken = [];
     private readonly CancellationTokenSource _shutdown = new();
@@ -160,6 +161,7 @@ public sealed class DirectIpTransport : INetworkTransport
                 new byte[AssociationTokenLength],
                 Capabilities.MaxChannels);
             _clientConnection = connection;
+            Interlocked.Exchange(ref _nextConnectionId, 1);
             _connections.AddOrUpdate(connection.Id, connection, (_, _) => connection);
             connection.ReceiveThread = StartThread(
                 () => TcpReceiveLoop(connection),
@@ -189,6 +191,8 @@ public sealed class DirectIpTransport : INetworkTransport
         if (!_events.TryDequeue(out transportEvent))
             return false;
         Interlocked.Decrement(ref _queuedEventCount);
+        lock (_receiveQueueSpace)
+            Monitor.PulseAll(_receiveQueueSpace);
         return true;
     }
 
@@ -200,10 +204,26 @@ public sealed class DirectIpTransport : INetworkTransport
         byte channel)
     {
         ThrowIfDisposed();
-        if (!_connections.TryGetValue(connection, out var directConnection) || directConnection.IsClosed)
-            throw new InvalidOperationException($"Transport connection {connection} is not active.");
         if (channel >= Capabilities.MaxChannels)
             throw new ArgumentOutOfRangeException(nameof(channel));
+        if (!Enum.IsDefined(delivery))
+            throw new ArgumentOutOfRangeException(nameof(delivery));
+        var maximumPayload = delivery == NetworkDelivery.ReliableOrdered
+            ? Capabilities.MaxReliablePayload
+            : Capabilities.MaxUnreliablePayload;
+        if (payload.Length > maximumPayload)
+            throw new ArgumentOutOfRangeException(nameof(payload));
+        if (!_connections.TryGetValue(connection, out var directConnection) || directConnection.IsClosed)
+        {
+            // Receive workers close sockets before the game thread observes Disconnected.
+            // Match socket-send failure semantics: a known closed connection reports through
+            // that queued lifecycle event, not an exception in the game's outbound update.
+            var wasAllocated = connection.IsValid &&
+                connection.Value <= (ulong)Interlocked.Read(ref _nextConnectionId);
+            if (wasAllocated)
+                return;
+            throw new InvalidOperationException($"Transport connection {connection} is not active.");
+        }
 
         switch (delivery)
         {
@@ -275,6 +295,8 @@ public sealed class DirectIpTransport : INetworkTransport
             return;
 
         _shutdown.Cancel();
+        lock (_receiveQueueSpace)
+            Monitor.PulseAll(_receiveQueueSpace);
         StopSockets();
         var clientConnection = _clientConnection;
         var connections = _connections.Values.ToArray();
@@ -435,18 +457,12 @@ public sealed class DirectIpTransport : INetworkTransport
                         $"Reliable frame channel {channel} is outside 0..{Capabilities.MaxChannels - 1}.");
                 if (reliablePayload.Length > Capabilities.MaxReliablePayload)
                     throw new InvalidDataException("Reliable payload exceeds the configured bound.");
-                if (!TryQueueEvent(new TransportEvent(
+                QueueReliableEvent(connection, new TransportEvent(
                     TransportEventKind.Data,
                     connection.Id,
                     reliablePayload.ToArray(),
                     NetworkDelivery.ReliableOrdered,
-                    channel)))
-                    CloseConnection(
-                        connection,
-                        TransportDisconnectReason.TransportError,
-                        "Direct IP receive queue capacity was exceeded.",
-                        true,
-                        true);
+                    channel));
                 break;
             case TcpDisconnect:
                 var reason = payload.Length >= sizeof(ushort)
@@ -631,6 +647,21 @@ public sealed class DirectIpTransport : INetworkTransport
                 continue;
             _events.Enqueue(transportEvent);
             return true;
+        }
+    }
+
+    private void QueueReliableEvent(DirectConnection connection, TransportEvent transportEvent)
+    {
+        // This runs only on the connection's TCP receive worker. Retain at most one
+        // decoded frame while full, then let TCP flow control bound the remaining burst.
+        lock (_receiveQueueSpace)
+        {
+            while (!_shutdown.IsCancellationRequested && !connection.IsClosed)
+            {
+                if (TryQueueEvent(transportEvent))
+                    return;
+                Monitor.Wait(_receiveQueueSpace, 100);
+            }
         }
     }
 

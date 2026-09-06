@@ -74,6 +74,21 @@ public sealed class NetworkOptions
     /// <summary>Maximum component-state records accepted in one additive scope baseline.</summary>
     public int MaxScopeBaselineComponentRecords { get; set; } = 1_000_000;
 
+    /// <summary>Shared main-thread time budget for client scope loading in one frame.</summary>
+    public double ClientScopeLoadBudgetMilliseconds { get; set; } = 3.0;
+
+    /// <summary>Shared hard cap on client scope-load work items advanced in one frame.</summary>
+    public int MaxClientScopeLoadWorkItemsPerFrame { get; set; } = 32;
+
+    /// <summary>Maximum reliable structural packets retained while a baseline is incomplete.</summary>
+    public int MaxDeferredClientStructuralPackets { get; set; } = 4096;
+
+    /// <summary>Maximum encoded bytes retained while a baseline is incomplete.</summary>
+    public int MaxDeferredClientStructuralBytes { get; set; } = 16 * 1024 * 1024;
+
+    /// <summary>Maximum deferred structural packets replayed in one frame.</summary>
+    public int MaxDeferredClientStructuralPacketsPerFrame { get; set; } = 64;
+
     internal NetworkOptions Snapshot(string? defaultContentFingerprint = null) =>
         new()
         {
@@ -88,7 +103,12 @@ public sealed class NetworkOptions
             MaxScopeSubscriptionsPerPeer = MaxScopeSubscriptionsPerPeer,
             MaxScopeAssetNameBytes = MaxScopeAssetNameBytes,
             MaxScopedAuthoredEntities = MaxScopedAuthoredEntities,
-            MaxScopeBaselineComponentRecords = MaxScopeBaselineComponentRecords
+            MaxScopeBaselineComponentRecords = MaxScopeBaselineComponentRecords,
+            ClientScopeLoadBudgetMilliseconds = ClientScopeLoadBudgetMilliseconds,
+            MaxClientScopeLoadWorkItemsPerFrame = MaxClientScopeLoadWorkItemsPerFrame,
+            MaxDeferredClientStructuralPackets = MaxDeferredClientStructuralPackets,
+            MaxDeferredClientStructuralBytes = MaxDeferredClientStructuralBytes,
+            MaxDeferredClientStructuralPacketsPerFrame = MaxDeferredClientStructuralPacketsPerFrame
         };
 
     internal void Validate()
@@ -119,5 +139,17 @@ public sealed class NetworkOptions
             throw new ArgumentOutOfRangeException(nameof(MaxScopedAuthoredEntities));
         if (MaxScopeBaselineComponentRecords is < 1 or > 10_000_000)
             throw new ArgumentOutOfRangeException(nameof(MaxScopeBaselineComponentRecords));
+        if (!double.IsFinite(ClientScopeLoadBudgetMilliseconds) ||
+            ClientScopeLoadBudgetMilliseconds <= 0 ||
+            ClientScopeLoadBudgetMilliseconds > 1000)
+            throw new ArgumentOutOfRangeException(nameof(ClientScopeLoadBudgetMilliseconds));
+        if (MaxClientScopeLoadWorkItemsPerFrame is < 1 or > 1_000_000)
+            throw new ArgumentOutOfRangeException(nameof(MaxClientScopeLoadWorkItemsPerFrame));
+        if (MaxDeferredClientStructuralPackets is < 1 or > 1_000_000)
+            throw new ArgumentOutOfRangeException(nameof(MaxDeferredClientStructuralPackets));
+        if (MaxDeferredClientStructuralBytes is < 1024 or > 256 * 1024 * 1024)
+            throw new ArgumentOutOfRangeException(nameof(MaxDeferredClientStructuralBytes));
+        if (MaxDeferredClientStructuralPacketsPerFrame is < 1 or > 1_000_000)
+            throw new ArgumentOutOfRangeException(nameof(MaxDeferredClientStructuralPacketsPerFrame));
     }
 }

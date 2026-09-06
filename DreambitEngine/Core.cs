@@ -105,6 +105,8 @@ public class Core : Game
             if (NextScene != null)
                 ChangeScenes();
 
+            _networking?.AdvanceClientScopeLoads();
+
             HandlePhysics();
             CurrentScene?.Tick();
             if (CurrentScene is { } scene)

@@ -242,6 +242,8 @@ public sealed class ReplicationTests
             client.PollTransport();
             server.ApplyInbound();
             client.ApplyInbound();
+            server.AdvanceClientScopeLoads();
+            client.AdvanceClientScopeLoads();
         }
     }
 

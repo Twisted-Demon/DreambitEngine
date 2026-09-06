@@ -269,6 +269,8 @@ public sealed class NetworkLifecycleTests
             client.PollTransport();
             server.ApplyInbound();
             client.ApplyInbound();
+            server.AdvanceClientScopeLoads();
+            client.AdvanceClientScopeLoads();
         }
     }
 
@@ -285,6 +287,9 @@ public sealed class NetworkLifecycleTests
             server.ApplyInbound();
             foreach (var client in clients)
                 client.ApplyInbound();
+            server.AdvanceClientScopeLoads();
+            foreach (var client in clients)
+                client.AdvanceClientScopeLoads();
         }
     }
 

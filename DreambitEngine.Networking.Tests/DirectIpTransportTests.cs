@@ -17,6 +17,51 @@ namespace DreambitEngine.Networking.Tests;
 public sealed class DirectIpTransportTests
 {
     [Fact]
+    public void ReliableBurstWaitsForQueueSpaceWithoutDisconnectingOrLosingOrder()
+    {
+        var port = ReservePort();
+        using var server = DirectIpTransport.Listen(port, address: IPAddress.Loopback);
+        using var client = DirectIpTransport.Connect("127.0.0.1", port,
+            new DirectIpOptions { MaxQueuedEvents = 16 });
+        server.StartServer();
+        client.Connect();
+        var (serverConnection, _) = WaitForConnections(server, client);
+
+        for (var i = 0; i < 128; i++)
+            server.Send(serverConnection, BitConverter.GetBytes(i), NetworkDelivery.ReliableOrdered, 0);
+
+        var countField = typeof(DirectIpTransport).GetField("_queuedEventCount",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        Assert.True(SpinWait.SpinUntil(() => (int)countField.GetValue(client)! == 16,
+            TimeSpan.FromSeconds(5)));
+        for (var i = 0; i < 128; i++)
+        {
+            var received = WaitForEvent(client, TransportEventKind.Data);
+            Assert.Equal(i, BitConverter.ToInt32(received.Payload.Span));
+        }
+        Assert.Equal(TransportState.Connected, client.State);
+    }
+
+    [Fact]
+    public void SendsAfterConnectionClosesBeforeDisconnectIsPolledDoNotThrow()
+    {
+        var port = ReservePort();
+        using var server = DirectIpTransport.Listen(port, address: IPAddress.Loopback);
+        using var client = DirectIpTransport.Connect("127.0.0.1", port);
+        server.StartServer();
+        client.Connect();
+        var (_, clientConnection) = WaitForConnections(server, client);
+
+        client.Disconnect(clientConnection);
+        client.Send(clientConnection, [1], NetworkDelivery.UnreliableSequenced, 3);
+        client.Send(clientConnection, [2], NetworkDelivery.ReliableOrdered, 0);
+        Assert.Throws<InvalidOperationException>(() => client.Send(
+            new TransportConnectionId(999), [3], NetworkDelivery.ReliableOrdered, 0));
+        Assert.Equal(TransportDisconnectReason.LocalShutdown,
+            WaitForEvent(client, TransportEventKind.Disconnected).Reason);
+    }
+
+    [Fact]
     public void LocalhostTransportCarriesReliableAndUnreliablePayloads()
     {
         var port = ReservePort();
@@ -259,6 +304,8 @@ public sealed class DirectIpTransportTests
             client.PollTransport();
             server.ApplyInbound();
             client.ApplyInbound();
+            server.AdvanceClientScopeLoads();
+            client.AdvanceClientScopeLoads();
             perIteration?.Invoke();
             if (condition())
                 return;
@@ -274,6 +321,7 @@ public sealed class DirectIpTransportTests
         {
             server.PollTransport();
             server.ApplyInbound();
+            server.AdvanceClientScopeLoads();
             if (condition())
                 return;
             Thread.Sleep(2);

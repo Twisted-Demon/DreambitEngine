@@ -372,6 +372,8 @@ public sealed class NetworkSceneServiceTests
             client.PollTransport();
             server.ApplyInbound();
             client.ApplyInbound();
+            server.AdvanceClientScopeLoads();
+            client.AdvanceClientScopeLoads();
         }
     }
 }

@@ -25,6 +25,12 @@ public sealed class InitialSynchronizationTests
         using var serverScene = CreateScene(sourceGuid, 10);
         string? connectionDiagnostic = null;
         client.ConnectionFailed += (_, diagnostic) => connectionDiagnostic = diagnostic;
+        client.PeerDisconnected += (_, _, diagnostic) => connectionDiagnostic ??= diagnostic;
+        client.ScopeLoadStatusChanged += status =>
+        {
+            if (status.Diagnostic is not null)
+                connectionDiagnostic = status.Diagnostic;
+        };
         var dynamicBlueprint = CreateDynamicBlueprint();
         Assert.True(Resources.TryRegisterAsset(dynamicBlueprint));
 
@@ -71,9 +77,12 @@ public sealed class InitialSynchronizationTests
         Assert.Equal(0, clientScene.BeginCount);
         clientScene.Tick();
 
-        PumpTransport(server, client, 2);
+        PumpTransport(server, client, 3);
+        Assert.Equal(1, server.ReadyPeerCount);
         server.SendSnapshotNow();
-        PumpTransport(server, client, 4);
+        PumpTransport(server, client, 32);
+        clientScene.Tick();
+        clientScene.Tick();
 
         Assert.True(client.IsConnected, connectionDiagnostic);
         Assert.Equal(SceneState.Running, clientScene.State);
@@ -260,7 +269,11 @@ public sealed class InitialSynchronizationTests
         new(
             role,
             transport,
-            new NetworkOptions { GameBuildId = "synchronization-tests" },
+            new NetworkOptions
+            {
+                GameBuildId = "synchronization-tests",
+                ClientScopeLoadBudgetMilliseconds = 1000
+            },
             new NetworkMessageRegistry(),
             replication);
 
@@ -317,6 +330,8 @@ public sealed class InitialSynchronizationTests
             client.PollTransport();
             server.ApplyInbound();
             client.ApplyInbound();
+            server.AdvanceClientScopeLoads();
+            client.AdvanceClientScopeLoads();
         }
     }
 

@@ -598,6 +598,7 @@ public sealed class NetworkingHardeningTests
     {
         session.PollTransport();
         session.ApplyInbound();
+        session.AdvanceClientScopeLoads();
     }
 
     private static void Pump(NetworkSession server, NetworkSession client, int count = 8)

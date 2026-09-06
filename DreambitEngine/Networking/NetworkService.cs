@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Dreambit.ECS;
 using Dreambit.Networking.Direct;
 using Dreambit.Networking.Messaging;
@@ -91,6 +92,36 @@ public sealed class NetworkService : IDisposable
     /// </summary>
     public ulong ServerTick => _session?.ServerTick ?? 0;
 
+    /// <summary>Duration of the most recent inbound packet application pass.</summary>
+    public TimeSpan LastApplyInboundDuration =>
+        TimeSpan.FromMilliseconds(_session?.LastApplyInboundMilliseconds ?? 0);
+
+    /// <summary>Largest inbound packet application pass observed in the active session.</summary>
+    public TimeSpan MaximumApplyInboundDuration =>
+        TimeSpan.FromMilliseconds(_session?.MaximumApplyInboundMilliseconds ?? 0);
+
+    /// <summary>Wall time used by the most recent client scope-loader and replay slice.</summary>
+    public TimeSpan LastClientScopeLoadSliceDuration =>
+        _session?.LastClientScopeLoadSliceDuration ?? TimeSpan.Zero;
+
+    /// <summary>Largest client scope-loader and replay slice observed in the active session.</summary>
+    public TimeSpan MaximumClientScopeLoadSliceDuration =>
+        _session?.MaximumClientScopeLoadSliceDuration ?? TimeSpan.Zero;
+
+    /// <summary>Time spent replaying deferred structural packets in the most recent slice.</summary>
+    public TimeSpan LastDeferredStructuralReplayDuration =>
+        _session?.LastDeferredReplayDuration ?? TimeSpan.Zero;
+
+    /// <summary>Gets whether this client has one or more scope loads that have not reached a terminal state.</summary>
+    public bool HasPendingScopeLoads => _session?.HasPendingScopeLoads == true;
+
+    /// <summary>
+    /// Gets immutable snapshots for client-local scope loads retained by the active session.
+    /// Terminal snapshots remain present until their scope is unloaded or the session is replaced.
+    /// </summary>
+    public IReadOnlyList<NetworkScopeLoadStatus> ScopeLoadStatuses =>
+        _session?.GetScopeLoadStatuses() ?? [];
+
     /// <summary>
     /// Gets the network Entity assigned to the local peer, or <see langword="null"/> until the
     /// server publishes a player mapping in the current network world.
@@ -125,6 +156,23 @@ public sealed class NetworkService : IDisposable
 
     /// <summary>Occurs on the server after a peer confirms that a scope was removed locally.</summary>
     public event Action<NetworkPeerId, NetworkReplicationScopeId>? PeerScopeUnloaded;
+
+    /// <summary>
+    /// Occurs on the game thread when client-local Dreambit scope loading changes phase or reports
+    /// frame-coalesced progress. Ready does not imply game-specific player/camera presentation readiness.
+    /// </summary>
+    public event Action<NetworkScopeLoadStatus>? ScopeLoadStatusChanged;
+
+    /// <summary>Gets the latest client-local loading snapshot retained for a replication scope.</summary>
+    public bool TryGetScopeLoadStatus(
+        NetworkReplicationScopeId scope,
+        out NetworkScopeLoadStatus status)
+    {
+        if (_session is not null)
+            return _session.TryGetScopeLoadStatus(scope, out status);
+        status = default;
+        return false;
+    }
 
     /// <summary>
     /// Registers default dreambit replicated components i.e. NetworkTransform2D
@@ -402,14 +450,15 @@ public sealed class NetworkService : IDisposable
         return false;
     }
 
-    /// <summary>Looks up the replication scope that owns a registered network Entity.</summary>
+    /// <summary>
+    /// Looks up the replication scope that owns an already-held network Entity. Scope metadata
+    /// is available during baseline initialization so callbacks can resolve scoped content.
+    /// Success does not imply that the scope is ready or that the Entity is publicly available.
+    /// </summary>
     public bool TryGetReplicationScope(Entity entity, out NetworkReplicationScopeId scope)
     {
-        if (_session?.World is { } world && world.TryGetNetworkId(entity, out var id))
-        {
-            scope = world.GetScope(id);
-            return true;
-        }
+        if (_session?.World is { } world)
+            return world.TryGetScope(entity, out scope);
         scope = NetworkReplicationScopeId.None;
         return false;
     }
@@ -516,6 +565,7 @@ public sealed class NetworkService : IDisposable
     internal NetworkSession? ActiveSession => _session;
     internal void PollTransport() => _session?.PollTransport();
     internal void ApplyInbound() => _session?.ApplyInbound();
+    internal void AdvanceClientScopeLoads() => _session?.AdvanceClientScopeLoads();
     internal void BeforeFixedStep(Scene scene) => _session?.BeforeFixedStep(scene);
     internal void AfterFixedStep(Scene scene) => _session?.AfterFixedStep(scene);
     internal void AfterSceneTick(Scene scene) => _session?.AfterSceneTick(scene);
@@ -571,6 +621,7 @@ public sealed class NetworkService : IDisposable
                 ConnectionFailed?.Invoke(reason, diagnostic);
             session.PeerScopeReady += (peer, scope) => PeerScopeReady?.Invoke(peer, scope);
             session.PeerScopeUnloaded += (peer, scope) => PeerScopeUnloaded?.Invoke(peer, scope);
+            session.ScopeLoadStatusChanged += PublishScopeLoadStatus;
             session.SceneChangeRequested += HandleSceneChangeRequested;
             session.Start();
             _session = session;
@@ -595,5 +646,21 @@ public sealed class NetworkService : IDisposable
     {
         var scene = Scenes.Create(sceneKey);
         _core.SetNextSceneFromNetworking(scene, this);
+    }
+
+    private void PublishScopeLoadStatus(NetworkScopeLoadStatus status)
+    {
+        var handlers = ScopeLoadStatusChanged;
+        if (handlers is null)
+            return;
+        foreach (Action<NetworkScopeLoadStatus> handler in handlers.GetInvocationList())
+            try
+            {
+                handler(status);
+            }
+            catch (Exception exception)
+            {
+                Core.Logger.Error("Network scope-load status subscriber failed: {0}", exception);
+            }
     }
 }
